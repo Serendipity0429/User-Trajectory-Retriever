@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %} User Info  {% endblock %}
+
+{% block content %}
+    <div class="row text-center">
+        <h3>
+            User Info
+        </h3>
+    </div>
+    <div class="row">
+    <div class="col-xs-offset-3 col-xs-6 user_info">
+        <div class="user_info_row row">
+            <div class="info_label col-xs-offset-0 col-xs-6">
+                Username:
+            </div>
+            <div class="info_value col-xs-offest-6 col-xs-6">
+                {{ cur_user.username }}
+            </div>
+        </div>
+        <div class="user_info_row row">
+            <div class="info_label col-xs-offset-0 col-xs-6">
+                Name:
+            </div>
+            <div class="info_value col-xs-offest-6 col-xs-6">
+                {{ cur_user.name }}
+            </div>
+        </div>
+        <div class="user_info_row row">
+            <div class="info_label col-xs-offset-0 col-xs-6">
+                Gender:
+            </div>
+            <div class="info_value col-xs-offest-6 col-xs-6">
+                {{ cur_user.sex }}
+            </div>
+        </div>
+        <div class="user_info_row row">
+            <div class="info_label col-xs-offset-0 col-xs-6">
+                Age:
+            </div>
+            <div class="info_value col-xs-offest-6 col-xs-6">
+                {{ cur_user.age }}
+            </div>
+        </div>
+        <div class="user_info_row row">
+            <div class="info_label col-xs-offset-0 col-xs-6">
+                Phone Number:
+            </div>
+            <div class="info_value col-xs-offest-6 col-xs-6">
+                {{ cur_user.phone }}
+            </div>
+        </div>
+        <div class="user_info_row row">
+            <div class="info_label col-xs-offset-0 col-xs-6">
+                E-mail Address:
+            </div>
+            <div class="info_value col-xs-offest-6 col-xs-6">
+                {{ cur_user.email }}
+            </div>
+        </div>
+        <div class="user_info_row row">
+            <div class="info_label col-xs-offset-0 col-xs-6">
+                Occupation:
+            </div>
+            <div class="info_value col-xs-offest-6 col-xs-6">
+                {{ cur_user.field }}
+            </div>
+        </div>
+        <div class="user_info_row row">
+            <div class="info_label col-xs-offset-0 col-xs-6">
+                How often do you use search engines:
+            </div>
+            <div class="info_value col-xs-offest-6 col-xs-6">
+                {{ search_frequency }}
+            </div>
+        </div>
+        <div class="user_info_row row">
+            <div class="info_label col-xs-offset-0 col-xs-6">
+                How long have you been using search engiens:
+            </div>
+            <div class="info_value col-xs-offest-6 col-xs-6">
+                {{ search_history }}
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-xs-6">
+                <a href="/user/edit_info/" class="btn btn-block btn-lg btn-primary">Edit Personal Info</a>
+            </div>
+            <div class="col-xs-6">
+                <a href="/user/edit_password/" class="btn btn-block btn-lg btn-primary">Edit Password</a>
+            </div>
+        </div>
+    </div>
+    </div>
+{% endblock %}
+
+

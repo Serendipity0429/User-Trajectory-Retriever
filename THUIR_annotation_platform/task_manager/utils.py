@@ -11,9 +11,18 @@ except ImportError:
     import json
 import time
 
+ip_to_launch = "http://127.0.0.1:8000/"
+
+__DEBUG__ = True
+
 
 def store_data(message):
-    try:
+    # try:
+    if True:
+        if __DEBUG__:
+            # Pretty print the message
+            # print(json.dumps(message, indent=4))
+            print(message["query"])
         page_log = PageLog()
         user = User.objects.get(username=message['username'])
         page_log.user = user
@@ -43,7 +52,7 @@ def store_data(message):
                 preRate = int(message["preRate"])
                 if preRate == 1:
                     if len(Query.objects.filter(user=user, start_timestamp=int(message['start_timestamp']))) != 0:
-                        new_query = Query.objects.filter(user=user, start_timestamp=int(message['start_timestamp']))[0]
+                        new_query = Query.objects.filter(user=user, start_timestamp=int(message['start_timestamp'])).first()
                         new_query.query_string = message['query']
                         new_query.interface = int(message['interface'])
                         new_query.life_start = int(time.time())
@@ -51,7 +60,7 @@ def store_data(message):
                     else:
                         new_query = Query()
                         new_query.user = user
-                        new_query.task_annotation = TaskAnnotation.objects.filter(annotation_status=True)[0]
+                        new_query.task_annotation = TaskAnnotation.objects.filter(annotation_status=True).first()
                         new_query.partition_status = False
                         new_query.annotation_status = False
                         new_query.query_string = message['query']
@@ -62,7 +71,7 @@ def store_data(message):
                 else:
                     new_query = Query()
                     new_query.user = user
-                    new_query.task_annotation = TaskAnnotation.objects.filter(annotation_status=True)[0]
+                    new_query.task_annotation = TaskAnnotation.objects.filter(annotation_status=True).first()
                     new_query.partition_status = False
                     new_query.annotation_status = False
                     new_query.query_string = message['query']
@@ -72,16 +81,17 @@ def store_data(message):
                     new_query.save()
                 page_log.belong_query = new_query
             else:
-                nearest_log = sorted(PageLog.objects.filter(user=user, page_type='SERP', query_string=message['query']), key=lambda item: item.start_timestamp, reverse=True)[0]
+                nearest_log = sorted(PageLog.objects.filter(user=user, page_type='SERP', query_string=message['query']), key=lambda item: item.start_timestamp, reverse=True).first()
                 belong_query = nearest_log.belong_query
                 belong_query.life_start = int(time.time())
                 page_log.belong_query = belong_query
         else:
-            page_log.belong_query = Query.objects.filter(annotation_status=True)[0]
+            page_log.belong_query = Query.objects.filter(annotation_status=True).first()
+        # print(Query.objects.all())
         if not message['url'].startswith(f'{ip_to_launch}'):   # ip_to_launch should be set manually
             page_log.save()
-    except Exception as e:
-        print ('exception', e)
+    # except Exception as e:
+    #     print ('exception', e)
 
 
 def store_page_annotation(message, page_id):
@@ -98,7 +108,7 @@ def store_page_annotation(message, page_id):
         page_log = PageLog.objects.get(id=page_id)
         serp_annotations = SERPAnnotation.objects.filter(serp_log=page_log)
         if serp_annotations:
-            serp_annotation = serp_annotations[0]
+            serp_annotation = serp_annotations.first()
             serp_annotation.usefulness_0 = usefulness_list[0]
             serp_annotation.usefulness_1 = usefulness_list[1]
             serp_annotation.usefulness_2 = usefulness_list[2]
@@ -156,7 +166,7 @@ def unpartition(user, task_ids):
         queries = Query.objects.filter(user=user, partition_status=True, task_annotation=task)
         for query in queries:
             query.partition_status = False
-            query.task_annotation = TaskAnnotation.objects.filter(annotation_status=True)[0]
+            query.task_annotation = TaskAnnotation.objects.filter(annotation_status=True).first()
             query.save()
             query_annotations = QueryAnnotation.objects.filter(belong_query=query)
             for query_annotation in query_annotations:
@@ -171,7 +181,7 @@ def unpartition(user, task_ids):
 def clear_expired_query(user):
     unpartition_queries = Query.objects.filter(user=user, partition_status=False)
     for query in unpartition_queries:
-        if int(time.time()) - query.life_start > 172800:
+        if int(time.time()) - query.life_start > 172800: # 172800 = 2 days
             pagelogs = PageLog.objects.filter(user=user, belong_query=query)
             for pagelog in pagelogs:
                 pagelog.delete()
@@ -202,7 +212,7 @@ def get_items_list(user, queries):
     items_list = []
     for i in range(len(queries)):
         query = queries[i]
-        query__annotation = QueryAnnotation.objects.filter(belong_query=query)[0]
+        query__annotation = QueryAnnotation.objects.filter(belong_query=query).first()
         pages = sorted(PageLog.objects.filter(user=user, belong_query=query, page_type='SERP'), key=lambda item: item.start_timestamp)
         pages_and_status = []
         for page in pages:
@@ -211,7 +221,7 @@ def get_items_list(user, queries):
             else:
                 pages_and_status.append((page, False))
         if i == 0:
-            prequery = Query.objects.filter(life_start=0)[0]
+            prequery = Query.objects.filter(life_start=0).first()
         else:
             prequery = queries[i-1]
         items_list.append((query, prequery, query__annotation, pages_and_status))

@@ -43,7 +43,7 @@ class Query(models.Model):
     task_annotation = models.ForeignKey(
         TaskAnnotation,
         on_delete=models.CASCADE,
-        )
+        null=True,        )
 
     partition_status = models.BooleanField(default=False)
     annotation_status = models.BooleanField(default=False)
@@ -83,6 +83,7 @@ class PageLog(models.Model):
     belong_query = models.ForeignKey(
         Query,
         on_delete=models.CASCADE,
+        null=True,
         )
     page_type = models.CharField(max_length=50)
     page_title = models.CharField(max_length=50)

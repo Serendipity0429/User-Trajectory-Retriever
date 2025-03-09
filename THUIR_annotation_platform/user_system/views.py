@@ -12,12 +12,18 @@ from .utils import *
 
 import datetime
 
+
+__DEBUG__ = True
+
+
 @csrf_exempt
 def check(request):
     if request.method == 'POST':
         username = request.POST.get('username')
         password = request.POST.get('password')
         error_code, user = authenticate(username, password)
+        if __DEBUG__:
+            print('error_code: ', error_code)
         return HttpResponse(error_code)
 
 

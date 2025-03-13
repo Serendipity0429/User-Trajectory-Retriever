@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %} Task Homepage {% endblock %}
+{% block content_title %} Task Homepage {% endblock %}
+{% block content %}
+    <div class="row text-center">
+        <h3>
+            Task Homepage
+        </h3>
+    </div>
+    <div class="row">
+        <div class="col-xs-offset-3 col-xs-6 user_info">
+            <div class="user_info_row row">
+                <div class="info_label col-xs-offset-0 col-xs-12">
+                    Hello, {{ cur_user.username }}, here is your current annotation:
+                </div>
+            </div>
+            <div class="user_info_row row">
+                <div class="info_label col-xs-offset-0 col-xs-6">
+                    Number of annotated tasks:
+                </div>
+                <div class="info_value col-xs-offest-6 col-xs-6">
+                    {{ annotation_num }}
+                </div>
+            </div>
+            <div class="user_info_row row">
+                <div class="info_label col-xs-offset-0 col-xs-6">
+                    Number of unannotated tasks:
+                </div>
+                <div class="info_value col-xs-offest-6 col-xs-6">
+                    {{ unannotation_num }}
+                </div>
+            </div>
+        </div>
+    </div>
+    <br/>
+    <div class="col-xs-offset-3 col-xs-6">
+        <div id="go-annotation-btn" class="col-xs-12 submit-btn btn btn-block btn-lg btn-primary">
+            Click here to annotate tasks
+        </div>
+    </div>
+    <script>
+        $(function() {
+            $('#go-annotation-btn').click(
+                function () {
+                    window.location.href = '/task/annotation';
+                }
+            );
+        });
+    </script>
+
+{% endblock %}

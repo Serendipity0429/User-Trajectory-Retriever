@@ -135,6 +135,70 @@ class SERPAnnotation(models.Model):
     serendipity_0 = models.CharField(max_length=1000)
     serendipity_1 = models.CharField(max_length=1000)
 
+
+# Pre-task annotation
+class PreTaskAnnotation(models.Model):
+    id = models.AutoField(primary_key=True)
+    annotation_status = models.BooleanField(default=False)
+
+    description = models.CharField(max_length=1000)
+    completion_criteria = models.CharField(max_length=1000)
+    target_type = models.CharField(max_length=100)
+    difficulty = models.IntegerField()  # 0->4, easy -> hard
+    effort = models.IntegerField()  # 0->4, low -> high
+
+# Post-task annotation
+class PostTaskAnnotation(models.Model):
+    id = models.AutoField(primary_key=True)
+    annotation_status = models.BooleanField(default=False)
+
+    completion_reason = models.CharField(max_length=1000) # why user chooses to end the task
+    completion_level = models.IntegerField() # 0->4, not completed -> fully completed
+    time_condition = models.IntegerField() # 0->4, urgent -> relaxed
+    specificity = models.IntegerField() # 0->4, broad -> clear
+    trigger = models.IntegerField() # 0->4, interest-driven -> task-driven
+    expertise = models.IntegerField() # 0->4, unfamiliar -> familiar
+
+
+# Task
+class Task(models.Model):
+    id = models.AutoField(primary_key=True)
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        )
+
+    # basic information
+    active = models.BooleanField(default=True) # whether the task is active
+    start_timestamp = models.IntegerField()
+    end_timestamp = models.IntegerField()
+
+    # pre-task annotation
+    pre_annotation = models.ForeignKey(
+        PreTaskAnnotation,
+        related_name='pre_annotation',
+        on_delete=models.CASCADE,
+        null=True,
+        )
+
+    # post-task annotation
+    post_annotation = models.ForeignKey(
+        PostTaskAnnotation,
+        on_delete=models.CASCADE,
+        null=True,
+        )
+
+    need_update_pre_annotation = models.BooleanField() # whether the pre-task annotation needs to be updated
+    updated_pre_annotation = models.ForeignKey(
+        PreTaskAnnotation,
+        related_name='updated_pre_annotation',
+        on_delete=models.CASCADE,
+        null=True,
+        )
+
+
+
+
 # Annotation of certain behaviors
 # e.g. click, hover, scroll, etc.
 class EventAnnotation(models.Model):
@@ -144,14 +208,14 @@ class EventAnnotation(models.Model):
         on_delete=models.CASCADE,
         )
     belong_task = models.ForeignKey(
-        TaskAnnotation,
+        Task,
         on_delete=models.CASCADE,
-        null=True,
         )
 
-    event_type = models.CharField(max_length=50)
-    event_target = models.CharField(max_length=50)
-    event_timestamp = models.IntegerField()
-    event_detail = models.CharField(max_length=1000)  # description of the event
-    is_key_event = models.BooleanField(default=False) # whether this event is a key event
     annotation_status = models.BooleanField(default=False)
+
+    type = models.CharField(max_length=50)
+    target = models.CharField(max_length=50)
+    timestamp = models.IntegerField()
+    detail = models.CharField(max_length=1000)  # description of the event
+    is_key_event = models.BooleanField(default=False) # whether this event is a key event

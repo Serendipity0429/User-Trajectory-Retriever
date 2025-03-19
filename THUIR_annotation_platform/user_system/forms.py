@@ -3,14 +3,14 @@
 
 from django import forms
 
-search_frequency_choices = (
+llm_frequency_choices = (
     ('', u''),
     ('frequently', u'Several times a day'),
     ('usually', u'Once per day'),
     ('sometimes', u'Several times a week'),
     ('rarely', u'Less than once a week'),
 )
-search_history_choices = (
+llm_history_choices = (
     ('', u''),
     ('very long', u'five years or longer'),
     ('long', u'three to five years'),
@@ -134,8 +134,8 @@ class SignupForm(forms.Form):
     )
     search_frequency = forms.ChoiceField(
         required=True,
-        choices=search_frequency_choices,
-        label=u'How often fo you use search engines?',
+        choices=llm_frequency_choices,
+        label=u'How often do you use large language models (LLMs)?',
         widget=forms.Select(
             attrs={
                 'class': 'select2-container form-control select select-primary',
@@ -144,8 +144,8 @@ class SignupForm(forms.Form):
     )
     search_history = forms.ChoiceField(
         required=True,
-        choices=search_history_choices,
-        label=u'How long have you been using search engines?',
+        choices=llm_history_choices,
+        label=u'How long have you been using large language models(LLMs)?',
         widget=forms.Select(
             attrs={
                 'class': 'select2-container form-control select select-primary',
@@ -227,20 +227,20 @@ class EditInfoForm(forms.Form):
             }
         )
     )
-    search_frequency = forms.ChoiceField(
+    llm_frequency = forms.ChoiceField(
         required=True,
-        choices=search_frequency_choices,
-        label=u'How often fo you use search engines?',
+        choices=llm_frequency_choices,
+        label=u'How often do you use large language models (LLMs)?',
         widget=forms.Select(
             attrs={
                 'class': 'select2-container form-control select select-primary',
             }
         )
     )
-    search_history = forms.ChoiceField(
+    llm_history = forms.ChoiceField(
         required=True,
-        choices=search_history_choices,
-        label=u'How long have you been using search engines?',
+        choices=llm_history_choices,
+        label=u'How long have you been using large language models(LLMs)?',
         widget=forms.Select(
             attrs={
                 'class': 'select2-container form-control select select-primary',

@@ -1,6 +1,8 @@
 var mPage = {
     click_results: [],
     click_others: [],
+    event_annotations: [],
+    behaviours: [],
     query: "",
     page_id: 0,
     html: null,
@@ -22,6 +24,10 @@ var mPage = {
         return mPage.title;
     },
 
+    getPageId: function () {
+        return mPage.page_id;
+    },
+
     getInterface: function () {
         return mPage.interface;
     },
@@ -34,15 +40,16 @@ var mPage = {
         return mPage.click_results;
     },
 
-    click: function (link_obj, type, id, click_time, pos_x, pos_y, content) {
+    click: function (href, type, id, click_time, pos_x, pos_y, content, tag) {
         var new_click = {
-            href: $(link_obj).attr("href"),
+            href: href,
             type: type,
             id: id,
             timestamp: click_time,
             pos_x: pos_x,
             pos_y: pos_y,
-            content: content
+            content: content,
+            tag: tag
         };
         mPage.click_results.push(new_click);
     },
@@ -50,13 +57,14 @@ var mPage = {
     getClickedOthers: function () {
         return mPage.click_others;
     },
-    clickother: function (href, pos_x, pos_y, timestamp, content) {
+    clickother: function (href, pos_x, pos_y, timestamp, content, tag) {
         var new_click_record = {
             href: href,
             pos_x: pos_x,
             pos_y: pos_y,
             timestamp: timestamp,
-            content: content
+            content: content,
+            tag: tag
         };
         mPage.click_others.push(new_click_record);
     },

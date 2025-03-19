@@ -80,8 +80,8 @@ def signup(request):
             user.phone = form.cleaned_data['phone']
             user.email = form.cleaned_data['email']
             user.field = form.cleaned_data['field']
-            user.search_frequency = form.cleaned_data['search_frequency']
-            user.search_history = form.cleaned_data['search_history']
+            user.llm_frequency = form.cleaned_data['llm_frequency']
+            user.llm_history = form.cleaned_data['llm_history']
             user.signup_time = datetime.datetime.now()
             user.last_login = datetime.datetime.now()
             user.login_num = 0
@@ -110,29 +110,29 @@ def logout(request):
 @require_login
 def info(user, request):
     # user_group_string = get_user_groups_string(user.user_groups)
-    search_frequency_choices = {
+    llm_frequency_choices = {
         '': u'',
         'frequently': u'每天使用多次',
         'usually': u'平均每天使用一次',
         'sometimes': u'每周偶尔使用两三次',
         'rarely': u'平均每周使用不超过一次'
     }
-    search_history_choices = {
+    llm_history_choices = {
         '': u'',
         'very long': u'5年以上',
         'long': u'3年~5年',
         'short': u'1年~3年',
         'very short': u'1年以内'
     }
-    search_frequency = search_frequency_choices[user.search_frequency]
-    search_history = search_history_choices[user.search_history]
+    llm_frequency = llm_frequency_choices[user.llm_frequency]
+    llm_history = llm_history_choices[user.llm_history]
     return render(
         request,
         'info.html',
         {
             'cur_user': user,
-            'search_frequency': search_frequency,
-            'search_history': search_history
+            'llm_frequency': llm_frequency,
+            'llm_history': llm_history
             # 'user_group_string': user_group_string
         }
         )
@@ -148,8 +148,8 @@ def edit_info(user, request):
             'phone': user.phone,
             'email': user.email,
             'field': user.field,
-            'search_frequency': user.search_frequency,
-            'search_history': user.search_history
+            'llm_frequency': user.llm_frequency,
+            'llm_history': user.llm_history
         })
     error_message = None
 
@@ -162,8 +162,8 @@ def edit_info(user, request):
             user.phone = form.cleaned_data['phone']
             user.email = form.cleaned_data['email']
             user.field = form.cleaned_data['field']
-            user.search_frequency = form.cleaned_data['search_frequency']
-            user.search_history = form.cleaned_data['search_history']
+            user.llm_frequency = form.cleaned_data['llm_frequency']
+            user.llm_history = form.cleaned_data['llm_history']
             user.save()
             return HttpResponseRedirect('/user/info/')
         else:

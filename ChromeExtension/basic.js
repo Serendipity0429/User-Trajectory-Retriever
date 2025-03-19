@@ -184,27 +184,26 @@ var viewState = {
             $(window).bind('mousemove', viewState.mMove);
             $(window).bind('scroll', viewState.mScroll);
             chrome.runtime.sendMessage({file: origin + ".js"}, function (response) {
-                    if (response.scriptFinish == true) {
-                        if (debug) console.log("execute script done");
-                        pageManager.initialize();
-                        mPage.initialize();
-                        mRec.initialize();
-                        viewState.check();
-                    }
+                if (response.scriptFinish == true) {
+                    if (debug) console.log("execute script done");
+                    pageManager.initialize();
+                    mPage.initialize();
+                    mRec.initialize();
+                    viewState.check();
+                }
             });
-        }
-        else {
+        } else {
             if (debug) console.log("extension is working on general page");
             $(window).bind('mousemove', viewState.mMove);
             $(window).bind('scroll', viewState.mScroll);
             chrome.runtime.sendMessage({file: "general.js"}, function (response) {
-                    if (response.scriptFinish == true) {
-                        if (debug) console.log("execute script done");
-                        pageManager.initialize();
-                        mPage.initialize();
-                        mRec.initialize();
-                        viewState.check();
-                    }
+                if (response.scriptFinish == true) {
+                    if (debug) console.log("execute script done");
+                    pageManager.initialize();
+                    mPage.initialize();
+                    mRec.initialize();
+                    viewState.check();
+                }
             });
         }
     },
@@ -254,7 +253,8 @@ var viewState = {
             isfromserp = 1;
         }
 
-        if (origin != "???") {
+        // if (origin != "???") {
+        if (false) { // old version, now we treat all pages as general pages
             msg.type = "SERP";
             msg.origin = origin;
             msg.query = mPage.getQuery();
@@ -269,20 +269,18 @@ var viewState = {
             msg.clicked_others = JSON.stringify(mPage.getClickedOthers());
             if (isfromserp == 0) {
                 msg.interface = 5;
-            }
-            else{
+            } else {
                 msg.interface = mPage.getInterface();
             }
             msg.preAnnotate = mPage.getPreAnnotate();
-        }
-        else {
+        } else {
             msg.type = "general";
             msg.title = mPage.getTitle();
             msg.mouse_moves = JSON.stringify(mRec.getData());
             msg.clicked_results = JSON.stringify(mPage.getClickedResults());
             msg.clicked_others = JSON.stringify(mPage.getClickedOthers());
         }
-        if (msg.url.slice(0, 27) != "http://127.0.0.1:8000"){
+        if (msg.url.substring(0, 22) != "http://127.0.0.1:8000") { // avoid the local server
             chrome.runtime.sendMessage(msg);
         }
         msg.initialize();

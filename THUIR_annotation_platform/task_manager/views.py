@@ -489,14 +489,6 @@ def active_task(user, request):
 
         return HttpResponse(task_id)
 
-    return render(
-        request,
-        'active_task.html',
-        {
-            'cur_user': user,
-        }
-    )
-
 # Initialize the task
 @require_login
 def initialize(user, request):

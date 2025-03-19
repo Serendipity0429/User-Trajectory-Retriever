@@ -52,3 +52,19 @@ section {
 label {
     margin-bottom: 1px;
 }
+
+.btn-primary {
+    background-color: #2e718d;
+}
+
+.btn-primary:hover {
+    background-color: #5b91be;
+}
+
+.btn-primary:active {
+    background-color: #5183ad;
+}
+
+div.question-wrapper > div{
+    padding-left: 20px;
+}

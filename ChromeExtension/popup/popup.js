@@ -5,25 +5,29 @@ var registerUrl = baseUrl + "/user/signup/";
 var feedbackUrl = baseUrl + "/task/home/";
 var downloadLink = "";
 var taskSniff = null;
+var logged_in = false;
 
 function displayActiveTask() {
     var task_id = getActiveTask();
-    if (task_id == -2) {
-        switchTaskButtonStatus('off')
-        $("#bt_start_task").attr("disabled", true);
-        $("#active_task").text("Fail to connect to server.");
-        $("#active_task").css("color", "#e13636");
-    } else if (task_id == -1) {
+    if (task_id == -1) {
         // No active task
         switchTaskButtonStatus('off');
-        $("#active_task").text("No active task.");
-    } else {
+        $("#active_task").text("No active task");
+        $("#active_task").css("color", "#000");
+    } else if (task_id == -2) {
+        switchTaskButtonStatus('off')
+        $("#bt_start_task").attr("disabled", true);
+        $("#active_task").text("Fail to connect to server");
+        $("#active_task").css("color", "#e13636");
+    } else if (task_id != -1) { // There is an active task
         switchTaskButtonStatus('on');
         $("#active_task").text("Active task: " + task_id);
+        $("#active_task").css("color", "#000");
     }
 }
 
 function userTab() {
+
     $("#failMsg1").hide();
     $("#failMsg2").hide();
     $("#failMsg3").hide();
@@ -31,8 +35,8 @@ function userTab() {
     $("#logged").show();
     $("#username_text_logged").text("User " + localStorage['username']);
     $("#bt_end_task").hide();
-    // Routinely check whether there is an active task
     displayActiveTask();
+    // Routinely check whether there is an active task
     taskSniff = setInterval(displayActiveTask, 2000);
 }
 
@@ -47,8 +51,7 @@ function loginTab() {
 function initializeServer() {
     //console.log("initializing...");
     var result = -1;
-    $.ajax
-    ({
+    $.ajax({
         type: "POST",
         url: baseUrl + "/task/initialize/",
         dataType: 'json',
@@ -71,8 +74,7 @@ function verifyUser() {
         var name = localStorage['username'];
         var psw = localStorage['password'];
         //console.log("POSTing...");
-        $.ajax
-        ({
+        $.ajax({
             type: "POST",
             url: checkUrl,
             dataType: 'json',
@@ -102,8 +104,7 @@ function userLogin() {
         var name = localStorage['username'];
         var psw = localStorage['password'];
         //console.log("POSTing...");
-        $.ajax
-        ({
+        $.ajax({
             type: "POST",
             url: loginUrl,
             dataType: 'json',
@@ -116,6 +117,7 @@ function userLogin() {
 
             }
         });
+        chrome.runtime.sendMessage({log_request: 'on'});
     }
 }
 
@@ -155,8 +157,7 @@ function trylogin() {
 }
 
 function feedback() {
-    if (confirm("Tip: If the task process is on-going (the relevant pages are not closed), please close the pages before annotating!\nIf not, ignore this message."))
-        window.open(feedbackUrl);
+    if (confirm("Tip: If the task process is on-going (the relevant pages are not closed), please close the pages before annotating!\nIf not, ignore this message.")) window.open(feedbackUrl);
 }
 
 function download() {
@@ -167,9 +168,9 @@ function logout() {
     clearInterval(taskSniff)
     localStorage['username'] = null;
     localStorage['password'] = null;
-    localStorage['log_status'] = "off";
     chrome.browserAction.setBadgeText({text: ''});
     location.reload();
+    chrome.runtime.sendMessage({log_request: 'off'});
 }
 
 // Get the active task
@@ -250,6 +251,11 @@ function endtask() {
     }
 }
 
+function tooluse() {
+
+}
+
+
 // Switch task button status
 function switchTaskButtonStatus(task_status) {
     if (task_status == 'on') {
@@ -257,13 +263,16 @@ function switchTaskButtonStatus(task_status) {
         $("#bt_end_task").attr("disabled", false);
         $("#bt_end_task").show();
         $("#bt_start_task").hide();
+        $("#bt_tool_use").show()
     } else if (task_status == 'off') {
         $("#bt_start_task").attr("disabled", false);
         $("#bt_end_task").attr("disabled", true);
         $("#bt_end_task").hide();
         $("#bt_start_task").show();
+        $("#bt_tool_use").hide()
     }
 }
+
 
 chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
     if (request == "task_start_fail") {
@@ -290,6 +299,7 @@ if (jQuery) {
     $("#bt6").click(logout);
     $("#bt_start_task").click(starttask);
     $("#bt_end_task").click(endtask);
+    $("#bt_tool_use").click(tooluse);
     if (verifyUser() == 0) {
         userTab();
         chrome.browserAction.setBadgeText({text: 'on'});

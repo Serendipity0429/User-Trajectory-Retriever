@@ -34,83 +34,116 @@
                 {% csrf_token %}
                 <div class="col-xs-12" style="border:1px dashed #000; border-radius:10px">
                     <h4>Task Completion Annotation</h4>
-                    <label for="task_completion_reason" class="col-xs-12 list_row">1. <b>Task Completion
-                        Reason</b>:
-                        Why did you end this task? (If you complete, please describe how the completion criteria were
-                        met. If you give up, please describe why you give up.)</label>
-                    <textarea class="col-xs-12 list_row" name="task_completion_reason" rows="3"
-                              required></textarea>
-                    <label for="completion_status" class="ratio col-xs-12 list_row"><b>2. The completion status of the
-                        task.</b>&ensp;0→4: Not completed → Fully completed</label>
-                    <div class="ratio col-xs-12">
-                        <label><input type="radio" name="completion_status_{{ task.id }}" value="0"/> 0&emsp; </label>
-                        <label><input type="radio" name="completion_status_{{ task.id }}" value="1"/> 1&emsp; </label>
-                        <label><input type="radio" name="completion_status_{{ task.id }}" value="2"/> 2&emsp; </label>
-                        <label><input type="radio" name="completion_status_{{ task.id }}" value="3"/> 3&emsp; </label>
-                        <label><input type="radio" name="completion_status_{{ task.id }}" value="4"/> 4&emsp; </label>
+                    <div class="question-wrapper">
+                        <label for="task_completion_reason" class="col-xs-12 list_row">1. <b>Task Completion
+                            Reason</b>:
+                            Why did you end this task? (If you complete, please describe how the completion criteria
+                            were
+                            met. If you give up, please describe why you give up.)</label>
+                        <div><textarea class="col-xs-12 list_row" name="task_completion_reason" rows="3"
+                                       required></textarea></div>
                     </div>
-                    <script>
-                        $("input:radio[name='completion_status_{{ task.id }}'][value='{{ task.time_condition }}']").attr('checked', 'true');
-                    </script>
-                    <label for="time_condition" class="ratio col-xs-12 list_row"><b>3. You were urgent and needed to
-                        complete the search immediately.</b>&ensp;0→4: Completely disagreed → Completely agreed</label>
-                    <div class="ratio col-xs-12">
-                        <label><input type="radio" name="time_condition_{{ task.id }}" value="0"/> 0&emsp; </label>
-                        <label><input type="radio" name="time_condition_{{ task.id }}" value="1"/> 1&emsp; </label>
-                        <label><input type="radio" name="time_condition_{{ task.id }}" value="2"/> 2&emsp; </label>
-                        <label><input type="radio" name="time_condition_{{ task.id }}" value="3"/> 3&emsp; </label>
-                        <label><input type="radio" name="time_condition_{{ task.id }}" value="4"/> 4&emsp; </label>
+
+                    <div class="question-wrapper">
+                        <label for="completion_level" class="ratio col-xs-12 list_row"><b>2. The completion level of the
+                            task.</b>&ensp;0→4: Not completed → Fully completed</label>
+                        <div class="ratio col-xs-12">
+                            <label><input type="radio" name="completion_level_{{ task.id }}" value="0"/> 0&emsp;
+                            </label>
+                            <label><input type="radio" name="completion_level_{{ task.id }}" value="1"/> 1&emsp;
+                            </label>
+                            <label><input type="radio" name="completion_level_{{ task.id }}" value="2"/> 2&emsp;
+                            </label>
+                            <label><input type="radio" name="completion_level_{{ task.id }}" value="3"/> 3&emsp;
+                            </label>
+                            <label><input type="radio" name="completion_level_{{ task.id }}" value="4"/> 4&emsp;
+                            </label>
+                        </div>
+                        <script>
+                            $("input:radio[name='completion_level_{{ task.id }}'][value='{{ task.time_condition }}']").attr('checked', 'true');
+                        </script>
                     </div>
-                    <script>
-                        $("input:radio[name='time_condition_{{ task.id }}'][value='{{ task.time_condition }}']").attr('checked', 'true');
-                    </script>
-                    <label for="specificity" class="ratio col-xs-12 list_row"><b>4. Search specificity.</b>&ensp;0→4:
-                        Very broad → Very clear</label>
-                    <div class="ratio col-xs-12">
-                        <label><input type="radio" name="specificity_{{ task.id }}" value="0"/> 0&emsp; </label>
-                        <label><input type="radio" name="specificity_{{ task.id }}" value="1"/> 1&emsp; </label>
-                        <label><input type="radio" name="specificity_{{ task.id }}" value="2"/> 2&emsp; </label>
-                        <label><input type="radio" name="specificity_{{ task.id }}" value="3"/> 3&emsp; </label>
-                        <label><input type="radio" name="specificity_{{ task.id }}" value="4"/> 4&emsp; </label>
+
+                    <div class="question-wrapper">
+                        <label for="time_condition" class="ratio col-xs-12 list_row"><b>3. You were urgent and needed to
+                            complete the search immediately.</b>&ensp;0→4: Completely disagreed → Completely
+                            agreed</label>
+                        <div class="ratio col-xs-12">
+                            <label><input type="radio" name="time_condition_{{ task.id }}" value="0"/> 0&emsp; </label>
+                            <label><input type="radio" name="time_condition_{{ task.id }}" value="1"/> 1&emsp; </label>
+                            <label><input type="radio" name="time_condition_{{ task.id }}" value="2"/> 2&emsp; </label>
+                            <label><input type="radio" name="time_condition_{{ task.id }}" value="3"/> 3&emsp; </label>
+                            <label><input type="radio" name="time_condition_{{ task.id }}" value="4"/> 4&emsp; </label>
+                        </div>
+                        <script>
+                            $("input:radio[name='time_condition_{{ task.id }}'][value='{{ task.time_condition }}']").attr('checked', 'true');
+                        </script>
                     </div>
-                    <script>
-                        $("input:radio[name='specificity_{{ task.id }}'][value='{{ task.specificity }}']").attr('checked', 'true');
-                    </script>
-                    <label for="trigger" class="ratio col-xs-12 list_row"><b>5. How was this search task motivated?</b>&ensp;0→4:
-                        Interest-driven → Task-driven</label>
-                    <div class="ratio col-xs-12">
-                        <label><input type="radio" name="trigger_{{ task.id }}" value="0"/> 0&emsp; </label>
-                        <label><input type="radio" name="trigger_{{ task.id }}" value="1"/> 1&emsp; </label>
-                        <label><input type="radio" name="trigger_{{ task.id }}" value="2"/> 2&emsp; </label>
-                        <label><input type="radio" name="trigger_{{ task.id }}" value="3"/> 3&emsp; </label>
-                        <label><input type="radio" name="trigger_{{ task.id }}" value="4"/> 4&emsp; </label>
+
+                    <div class="question-wrapper">
+                        <label for="specificity" class="ratio col-xs-12 list_row"><b>4. Search specificity.</b>&ensp;0→4:
+                            Very broad → Very clear</label>
+                        <div class="ratio col-xs-12">
+                            <label><input type="radio" name="specificity_{{ task.id }}" value="0"/> 0&emsp; </label>
+                            <label><input type="radio" name="specificity_{{ task.id }}" value="1"/> 1&emsp; </label>
+                            <label><input type="radio" name="specificity_{{ task.id }}" value="2"/> 2&emsp; </label>
+                            <label><input type="radio" name="specificity_{{ task.id }}" value="3"/> 3&emsp; </label>
+                            <label><input type="radio" name="specificity_{{ task.id }}" value="4"/> 4&emsp; </label>
+                        </div>
+                        <script>
+                            $("input:radio[name='specificity_{{ task.id }}'][value='{{ task.specificity }}']").attr('checked', 'true');
+                        </script>
                     </div>
-                    <script>
-                        $("input:radio[name='trigger_{{ task.id }}'][value='{{ task.trigger }}']").attr('checked', 'true');
-                    </script>
-                    <label for="expertise" class="ratio col-xs-12 list_row"><b>6. Were you familiar with the search.</b>&ensp;0→4:
-                        Not at all → Very familiar</label>
-                    <div class="ratio col-xs-12">
-                        <label><input type="radio" name="expertise_{{ task.id }}" value="0"/> 0&emsp; </label>
-                        <label><input type="radio" name="expertise_{{ task.id }}" value="1"/> 1&emsp; </label>
-                        <label><input type="radio" name="expertise_{{ task.id }}" value="2"/> 2&emsp; </label>
-                        <label><input type="radio" name="expertise_{{ task.id }}" value="3"/> 3&emsp; </label>
-                        <label><input type="radio" name="expertise_{{ task.id }}" value="4"/> 4&emsp; </label>
+
+                    <div class="question-wrapper">
+                        <label for="trigger" class="ratio col-xs-12 list_row"><b>5. How was this search task
+                            motivated?</b>&ensp;0→4:
+                            Interest-driven → Task-driven</label>
+                        <div class="ratio col-xs-12">
+                            <label><input type="radio" name="trigger_{{ task.id }}" value="0"/> 0&emsp; </label>
+                            <label><input type="radio" name="trigger_{{ task.id }}" value="1"/> 1&emsp; </label>
+                            <label><input type="radio" name="trigger_{{ task.id }}" value="2"/> 2&emsp; </label>
+                            <label><input type="radio" name="trigger_{{ task.id }}" value="3"/> 3&emsp; </label>
+                            <label><input type="radio" name="trigger_{{ task.id }}" value="4"/> 4&emsp; </label>
+                        </div>
+                        <script>
+                            $("input:radio[name='trigger_{{ task.id }}'][value='{{ task.trigger }}']").attr('checked', 'true');
+                        </script>
                     </div>
-                    <script>
-                        $("input:radio[name='expertise_{{ task.id }}'][value='{{ task.expertise }}']").attr('checked', 'true');
-                    </script>
+
+                    <div class="question-wrapper">
+                        <label for="expertise" class="ratio col-xs-12 list_row"><b>6. Were you familiar with the
+                            search.</b>&ensp;0→4:
+                            Not at all → Very familiar</label>
+                        <div class="ratio col-xs-12">
+                            <label><input type="radio" name="expertise_{{ task.id }}" value="0"/> 0&emsp;
+                            </label>
+                            <label><input type="radio" name="expertise_{{ task.id }}" value="1"/> 1&emsp;
+                            </label>
+                            <label><input type="radio" name="expertise_{{ task.id }}" value="2"/> 2&emsp;
+                            </label>
+                            <label><input type="radio" name="expertise_{{ task.id }}" value="3"/> 3&emsp;
+                            </label>
+                            <label><input type="radio" name="expertise_{{ task.id }}" value="4"/> 4&emsp;
+                            </label>
+                        </div>
+                        <script>
+                            $("input:radio[name='expertise_{{ task.id }}'][value='{{ task.expertise }}']").attr('checked', 'true');
+                        </script>
+                    </div>
                 </div>
                 <div class="col-xs-12" style="border:1px dashed #000; border-radius:10px;margin-top:10px">
                     {# Task Reflection Annotation #}
                     <h4>Task Reflection Annotation</h4>
-                    <p> Below is your annotation before the task. Please review it and provide your feedback.</p>
+                    <p> Below is your annotation before the task. Please review it and provide your
+                        feedback.</p>
                     <label for="task_description" class="col-xs-12 list_row">1. <b>Task Description</b>: Please
                         conclude the task you just ended.</label>
                     <div style="padding-left: 20px;">
                         <div class="ratio col-xs-12 list_row"><b>Before Task:</b></div>
                         <div class="ratio col-xs-12 list_row" id="task_description_pre_task"></div>
-                        <label><input type="checkbox" name="update_task_description" id="update_task_description"
+                        <label><input type="checkbox" name="update_task_description"
+                                      id="update_task_description"
                                       value="1"/> Need Update</label><br/>
                         <div id="task_description_post_task" hidden>
                             <textarea class="col-xs-12 list_row" name="task_description" rows="3" required
@@ -134,7 +167,8 @@
                     </div>
 
 
-                    <label for="habit_ratio" class="ratio col-xs-12 list_row">3. <b>Result Type</b>: Which of the
+                    <label for="habit_ratio" class="ratio col-xs-12 list_row">3. <b>Result Type</b>: Which of
+                        the
                         following result types do you expect to achieve by conducting this task? (Multiple
                         options)</label>
                     <div style="padding-left: 20px;">
@@ -144,12 +178,15 @@
                                       value="1"/> Need Update</label><br/>
                         <div id="habit_post_task" hidden>
                             <div class="ratio col-xs-12 list_row post-task">
-                                <label><input type="checkbox" name="habit" value="1"/> 1. Wikipedia type </label>
+                                <label><input type="checkbox" name="habit" value="1"/> 1. Wikipedia type
+                                </label>
                                 <label><input type="checkbox" name="habit" value="2"/> 2. Image type </label>
                                 <label><input type="checkbox" name="habit" value="3"/> 3. Video type </label>
-                                <label><input type="checkbox" name="habit" value="4"/> 4. Experience type </label><br>
+                                <label><input type="checkbox" name="habit" value="4"/> 4. Experience type
+                                </label><br>
                                 <label><input type="checkbox" name="habit" value="5"/> 5. Map type </label>
-                                <label><input type="checkbox" name="habit" value="6"/> 6. Aggregated type </label>
+                                <label><input type="checkbox" name="habit" value="6"/> 6. Aggregated type
+                                </label>
                                 <label><input type="checkbox" name="habit" value="7"/> 7. Card type </label>
                                 <label><input type="checkbox" name="habit" value="0"/> 0. Others </label><br>
                             </div>
@@ -157,7 +194,8 @@
                     </div>
 
 
-                    <label for="difficulty_ratio" class="ratio col-xs-12 list_row">4. <b>Difficulty</b>: How do you
+                    <label for="difficulty_ratio" class="ratio col-xs-12 list_row">4. <b>Difficulty</b>: How do
+                        you
                         evaluate the difficulty of the task now？</label>
                     <div style="padding-left: 20px;">
                         <div class="ratio col-xs-12 list_row"><b>Before Task:</b></div>
@@ -172,12 +210,14 @@
                                 <label><input type="radio" name="difficulty" value="2"/> 2：A little bit
                                     difficult</label><br>
                                 <label><input type="radio" name="difficulty" value="3"/> 3：Difficult</label><br>
-                                <label><input type="radio" name="difficulty" value="4"/> 4：Very difficult</label><br>
+                                <label><input type="radio" name="difficulty" value="4"/> 4：Very
+                                    difficult</label><br>
                             </div>
                         </div>
                     </div>
 
-                    <label for="effort_ratio" class="ratio col-xs-12 list_row">6. <b>Effort</b>: How much time do you
+                    <label for="effort_ratio" class="ratio col-xs-12 list_row">6. <b>Effort</b>: How much time
+                        do you
                         actually spend on this task?</label>
                     <div style="padding-left: 20px;">
                         <div class="ratio col-xs-12 list_row"><b>Before Task:</b></div>
@@ -209,7 +249,8 @@
                         </div>
                     </div>
 
-                    <label for="task_other_reflection" class="col-xs-12 list_row">7. <b>Other Reflections</b>: Please
+                    <label for="task_other_reflection" class="col-xs-12 list_row">7. <b>Other Reflections</b>:
+                        Please
                         provide any other reflections on the task.</label>
                     <textarea class="col-xs-12 list_row" name="task_other_reflection" rows="5" required
                               style="margin-bottom:10px;"></textarea>
@@ -225,6 +266,10 @@
         <script>
         </script>
         <script>
+            function setEffort(){
+		        var effort_val = document.getElementById("effort_value");
+		        effort_val.innerText = document.getElementsByName("effort")[0].value;
+            }
             function validateForm() {
                 var checks = $('input[type="checkbox"]:checked').map(function () {
                     return $(this).val();
@@ -247,7 +292,7 @@
                         var task_comp_update = $("#task_completion_criteria").is(":checked");
 
                         var task_comp_reason = $("[name='task_completion_reason']");
-                        var comp_status = $("[name='completion_status_{{ task.id }}']:checked");
+                        var comp_status = $("[name='completion_level_{{ task.id }}']:checked");
                         var time_condition = $("[name='time_condition_{{ task.id }}']:checked");
                         var specificity = $("[name='specificity_{{ task.id }}']:checked");
                         var trigger = $("[name='trigger_{{ task.id }}']:checked");

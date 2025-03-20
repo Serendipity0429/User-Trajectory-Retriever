@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 __author__ = 'defaultstr'
 
-from .models import *
 from user_system.models import *
+from .models import *
 
 try:
     import simplejson as json
@@ -14,85 +14,6 @@ import time
 ip_to_launch = "http://127.0.0.1:8000/"
 
 __DEBUG__ = True
-
-
-def store_data(message):
-    # try:
-    if True:
-        if __DEBUG__:
-            # Pretty print the message
-            print(json.dumps(message, indent=4))
-            # print(message["query"])
-        page_log = PageLog()
-        user = User.objects.get(username=message['username'])
-        page_log.user = user
-        page_log.page_type = message['type']
-        page_log.page_title = message['title']
-        page_log.origin = message['origin']
-        page_log.url = message['url']
-        page_log.referrer = message['referrer']
-        page_log.serp_link = message['serp_link']
-        page_log.html = message['html']
-        page_log.start_timestamp = int(message['start_timestamp'])
-        page_log.end_timestamp = int(message['end_timestamp'])
-        page_log.dwell_time = int(message['dwell_time'])
-        page_log.page_timestamps = message['page_timestamps']
-        page_log.query_string = message['query']
-        page_log.mouse_moves = message['mouse_moves']
-        page_log.clicked_results = message['clicked_results']
-        page_log.clicked_others = message['clicked_others']  # x, y, time，content, href
-        if message['page_id']:
-            page_id = int(message['page_id'])
-        else:
-            page_id = 1
-        page_log.page_id = page_id
-
-        if message['type'] == 'SERP':
-            if page_id == 1:
-                preRate = int(message["preRate"])
-                if preRate == 1:
-                    if len(Query.objects.filter(user=user, start_timestamp=int(message['start_timestamp']))) != 0:
-                        new_query = Query.objects.filter(user=user, start_timestamp=int(message['start_timestamp'])).first()
-                        new_query.query_string = message['query']
-                        new_query.interface = int(message['interface'])
-                        new_query.life_start = int(time.time())
-                        new_query.save()
-                    else:
-                        new_query = Query()
-                        new_query.user = user
-                        new_query.task_annotation = TaskAnnotation.objects.filter(annotation_status=True).first()
-                        new_query.partition_status = False
-                        new_query.annotation_status = False
-                        new_query.query_string = message['query']
-                        new_query.start_timestamp = int(message['start_timestamp'])
-                        new_query.interface = int(message['interface'])
-                        new_query.life_start = int(time.time())
-                        new_query.save()
-                else:
-                    new_query = Query()
-                    new_query.user = user
-                    new_query.task_annotation = TaskAnnotation.objects.filter(annotation_status=True).first()
-                    new_query.partition_status = False
-                    new_query.annotation_status = False
-                    new_query.query_string = message['query']
-                    new_query.start_timestamp = int(message['start_timestamp'])
-                    new_query.interface = int(message['interface'])
-                    new_query.life_start = int(time.time())
-                    new_query.save()
-                page_log.belong_query = new_query
-            else:
-                nearest_log = sorted(PageLog.objects.filter(user=user, page_type='SERP', query_string=message['query']), key=lambda item: item.start_timestamp, reverse=True).first()
-                belong_query = nearest_log.belong_query
-                belong_query.life_start = int(time.time())
-                page_log.belong_query = belong_query
-        else:
-            page_log.belong_query = Query.objects.filter(annotation_status=True).first()
-        # print(Query.objects.all())
-        if not message['url'].startswith(f'{ip_to_launch}'):   # ip_to_launch should be set manually
-            page_log.save()
-    # except Exception as e:
-    #     print ('exception', e)
-
 
 def store_page_annotation(message, page_id):
     try:
@@ -124,7 +45,7 @@ def store_page_annotation(message, page_id):
             serp_annotation.serendipity_1 = ','.join(serendipity_list)
         serp_annotation.save()
     except Exception as e:
-        print ('exception', e)
+        print('exception', e)
 
 
 def partition(user, query_ids):
@@ -174,14 +95,14 @@ def unpartition(user, task_ids):
             pagelogs = PageLog.objects.filter(user=user, belong_query=query)
             for pagelog in pagelogs:
                 for serp_annotation in SERPAnnotation.objects.filter(serp_log=pagelog):
-                        serp_annotation.delete()
+                    serp_annotation.delete()
         task.delete()
 
 
 def clear_expired_query(user):
     unpartition_queries = Query.objects.filter(user=user, partition_status=False)
     for query in unpartition_queries:
-        if int(time.time()) - query.life_start > 172800: # 172800 = 2 days
+        if int(time.time()) - query.life_start > 172800:  # 172800 = 2 days
             pagelogs = PageLog.objects.filter(user=user, belong_query=query)
             for pagelog in pagelogs:
                 pagelog.delete()
@@ -213,7 +134,8 @@ def get_items_list(user, queries):
     for i in range(len(queries)):
         query = queries[i]
         query__annotation = QueryAnnotation.objects.filter(belong_query=query).first()
-        pages = sorted(PageLog.objects.filter(user=user, belong_query=query, page_type='SERP'), key=lambda item: item.start_timestamp)
+        pages = sorted(PageLog.objects.filter(user=user, belong_query=query, page_type='SERP'),
+                       key=lambda item: item.start_timestamp)
         pages_and_status = []
         for page in pages:
             if SERPAnnotation.objects.filter(serp_log=page):
@@ -223,7 +145,7 @@ def get_items_list(user, queries):
         if i == 0:
             prequery = Query.objects.filter(life_start=0).first()
         else:
-            prequery = queries[i-1]
+            prequery = queries[i - 1]
         items_list.append((query, prequery, query__annotation, pages_and_status))
     return items_list
 
@@ -231,9 +153,35 @@ def get_items_list(user, queries):
 def check_serp_annotations(user, queries):
     flag = True
     for query in queries:
-        pages = sorted(PageLog.objects.filter(user=user, belong_query=query, page_type='SERP'), key=lambda item: item.start_timestamp)
+        pages = sorted(PageLog.objects.filter(user=user, belong_query=query, page_type='SERP'),
+                       key=lambda item: item.start_timestamp)
         for page in pages:
             if not SERPAnnotation.objects.filter(serp_log=page):
                 flag = False
                 break
     return flag
+
+
+# Refined
+def print_debug(*args, **kwargs):
+    if __DEBUG__:
+        print(*args, **kwargs)
+
+def store_data(message):
+    print_debug(json.dumps(message, indent=4))
+    webpage = Webpage()
+    user = User.objects.get(username=message['username'])
+    webpage.user = user
+    webpage.title = message['title']
+    webpage.url = message['url']
+    webpage.referrer = message['referrer']
+    webpage.start_timestamp = message['start_timestamp']
+    webpage.end_timestamp = message['end_timestamp']
+    webpage.dwell_time = message['dwell_time']
+    webpage.mouse_moves = message['mouse_moves']
+    webpage.event_list = message['event_list']
+    task = TaskAnnotation.objects.filter(user=user, active=True).first()
+    webpage.belong_task = task
+    if not message['url'].startswith(f'{ip_to_launch}'):  # ip_to_launch should be set manually
+        webpage.save()
+

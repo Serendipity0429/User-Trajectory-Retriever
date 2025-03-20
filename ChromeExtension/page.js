@@ -1,14 +1,12 @@
 var mPage = {
-    click_results: [],
-    click_others: [],
-    event_annotations: [],
-    behaviours: [],
     query: "",
     page_id: 0,
     html: null,
     title: null,
     interface: 1,
     preAnnotate: -1, // if the user has annotated the preliminaries (e.g. task purpose)
+
+    event_list: [], // a list of events (e.g. mouse clicks, mouse movements, etc.) including annotations
 
 
     getQuery: function () {
@@ -36,38 +34,11 @@ var mPage = {
         return mPage.preAnnotate;
     },
 
-    getClickedResults: function () {
-        return mPage.click_results;
+    getEventList: function () {
+        return mPage.event_list;
     },
 
-    click: function (href, type, id, click_time, pos_x, pos_y, content, tag) {
-        var new_click = {
-            href: href,
-            type: type,
-            id: id,
-            timestamp: click_time,
-            pos_x: pos_x,
-            pos_y: pos_y,
-            content: content,
-            tag: tag
-        };
-        mPage.click_results.push(new_click);
-    },
 
-    getClickedOthers: function () {
-        return mPage.click_others;
-    },
-    clickother: function (href, pos_x, pos_y, timestamp, content, tag) {
-        var new_click_record = {
-            href: href,
-            pos_x: pos_x,
-            pos_y: pos_y,
-            timestamp: timestamp,
-            content: content,
-            tag: tag
-        };
-        mPage.click_others.push(new_click_record);
-    },
     lastUpdate: 0,
 
     update: function () {
@@ -76,10 +47,37 @@ var mPage = {
 
     initialize: function () {
         mPage.preAnnotate = -1;
-        mPage.click_results = [];
-        mPage.click_others = [];
+        mPage.event_list = [];
         if (debug) console.log("mPage initialize");
+    },
+
+
+    // add a new event
+    addEvent(isActive, type, timestamp, screenX, screenY, clientX, clientY, tag, content, related_info, annotation = null) {
+        var new_event = {
+            isActive: isActive,
+            type: type,
+            timestamp: timestamp,
+            screenX: screenX,
+            screenY: screenY,
+            clientX: clientX,
+            clientY: clientY,
+            tag: tag,
+            content: content,
+            related_info: related_info, // e.g. the href of a clicked link
+            annotation: annotation,
+        };
+        mPage.event_list.push(new_event);
+    },
+
+    addActiveEvent(type, timestamp, screenX, screenY, clientX, clientY, tag, content, related_info, annotation = null) {
+        mPage.addEvent(true, type, timestamp, screenX, screenY, clientX, clientY, tag, content, related_info, annotation);
+    },
+
+    addPassiveEvent(type, timestamp, screenX, screenY, clientX, clientY, tag, content, related_info) {
+        mPage.addEvent(false, type, timestamp, screenX, screenY, clientX, clientY, tag, content, related_info);
     }
+
 };
 
 var debug = true;

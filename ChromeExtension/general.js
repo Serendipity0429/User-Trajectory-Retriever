@@ -5,6 +5,7 @@ if (debug) console.log("General Page is Loaded!");
 mPage.initialize = function () {
     mPage.click_results = new Array();
     mPage.click_others = new Array();
+    mPage.event_list = new Array();
     mPage.init_content();
 };
 
@@ -15,8 +16,10 @@ mPage.init_content = function () {
 setTimeout(mPage.init_content, 1500);
 setTimeout(mPage.init_content, 3000);
 
-var last_event_timestamp = -1;
-var min_click_interval = 200;
+var last_active_event_timestamp = -1;
+var last_passive_event_timestamp = -1;
+var min_active_event_interval = 200;
+var min_passive_event_interval = 100;
 
 var freeze_overlay = null;
 
@@ -29,7 +32,7 @@ var is_server_page = window.location.href.substring(0, 21) == baseUrl;
 // TODO: enable drag and drop for the annotation window
 
 // display the annotation window
-function displayAnnotationWindow(event, screen_x, screen_y, client_x, client_y, event_time, event_type, target) {
+function displayAnnotationWindow(event, target, type, event_time, screen_x, screen_y, client_x, client_y, tag, content, related_info) {
     on_annotation = true;
     freezePage();
     const style = document.createElement('style');
@@ -56,6 +59,7 @@ function displayAnnotationWindow(event, screen_x, screen_y, client_x, client_y, 
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             font-size: 16px;
             box-sizing: initial;
+            color: #000;
         }
 
         .annotation-modal .question-container {
@@ -146,7 +150,7 @@ function displayAnnotationWindow(event, screen_x, screen_y, client_x, client_y, 
             <div class="questions-container">
                 <!-- Question 1 - Purpose -->
                 <div class="question-container">
-                    <h2>What is the purpose of this <div class="event-type">${event_type}</div> event?</h2>
+                    <h2>What is the purpose of this <div class="event-type">${type}</div> event?</h2>
                     <textarea id="purpose" placeholder="Describe the event purpose..."></textarea>
                 </div>
             </div>
@@ -205,45 +209,27 @@ function displayAnnotationWindow(event, screen_x, screen_y, client_x, client_y, 
 
 
     //Event handler for submit button
-    var annotationData = {
-        ignored: true,
-        purpose: '',
-        isKeyEvent: false,
-        timestamp: event_time
+    var annotation = {
+        ignored: true, purpose: '', isKeyEvent: false, timestamp: event_time
     };
 
     function endAnnotation() {
-        mPage.event_annotations.push(annotationData);
         // Close the Window
         overlay.remove();
         unfreezePage();
         // Do the default action of target element
         pending_default = true;
         pending_target = target;
-        on_annotation = false;
-        switch(event_type) {
+        switch (type) {
             case 'click':
                 target.click();
                 break;
-            case 'right click':
-                // display the right click menu at the clicked position
-                var e = new MouseEvent('contextmenu', {
-                    bubbles: false,
-                    cancelable: true,
-                    view: window,
-                    screenX: screen_x,
-                    screenY: screen_y,
-                    clientX: client_x,
-                    clientY: client_y
-                });
-                break;
             case 'change':
-                target.change();
                 break;
             default:
                 break;
         }
-
+        on_annotation = false;
     }
 
     // Submit handler
@@ -258,18 +244,19 @@ function displayAnnotationWindow(event, screen_x, screen_y, client_x, client_y, 
         }
 
         // Prepare data object
-        annotationData.ignored = false;
-        annotationData.purpose = purpose;
-        annotationData.isKeyEvent = isKeyEvent;
+        annotation.ignored = false;
+        annotation.purpose = purpose;
+        annotation.isKeyEvent = isKeyEvent;
 
         // Here you would typically send data to server
-        console.log('Annotation Data:', annotationData);
+        console.log('Annotation Data:', annotation);
 
         // Clear form
         $('#purpose').val('');
         $('#key-event').prop('checked', false);
 
         endAnnotation();
+        activeEventEnd(type, event_time, screen_x, screen_y, client_x, client_y, tag, content, related_info, annotation);
     });
 
     // Ignore button handler
@@ -282,6 +269,7 @@ function displayAnnotationWindow(event, screen_x, screen_y, client_x, client_y, 
         console.log('Event ignored');
 
         endAnnotation();
+        activeEventEnd(type, event_time, screen_x, screen_y, client_x, client_y, tag, content, related_info, null); // annotation is null
     });
 }
 
@@ -318,12 +306,24 @@ function unfreezePage() {
     }
 }
 
+// recover the absolute hyperlink given the relative hyperlink
+function recoverAbsoluteLink(relative_link) {
+    if (relative_link == undefined) {
+        return "";
+    }
+    if (relative_link[0] !== "h") {
+        var url = window.location.href;
+        var start_id = url.search('.com');
+        relative_link = url.slice(0, start_id + 4) + relative_link;
+    }
+    return relative_link;
+}
+
 // Active event handler
 function activeEventHandler(event, type) {
-    if (on_annotation) {
-        return;
-    }
-    console.log(type + " event", event);
+    if (on_annotation) return;
+
+    console.log(type + " active event", event);
     if (pending_default && pending_target == event.target) { // if the default action is pending, do nothing
         console.log("pending default");
         pending_default = false;
@@ -332,11 +332,11 @@ function activeEventHandler(event, type) {
         return;
     }
     var event_time = (new Date()).getTime();
-    // filter out the repeated click event
-    if (event_time - last_event_timestamp < min_click_interval) {
+    // filter out the repeated active event
+    if (event_time - last_active_event_timestamp < min_active_event_interval) {
         return;
     } else {
-        last_event_timestamp = event_time;
+        last_active_event_timestamp = event_time;
     }
 
     checkIsTaskActive();
@@ -346,17 +346,7 @@ function activeEventHandler(event, type) {
 
     event.preventDefault();
     event.stopPropagation(); // stop the event from bubbling up
-    var href = $($(this).get(0)).attr("href");
-    if (href == undefined) {
-        href = "";
-    } else {
-        if (href[0] !== "h") {
-            var url = window.location.href;
-            var start_id = url.search('.com');
-            href = url.slice(0, start_id + 4) + href;
-        }
 
-    }
     var e = event || window.event;
     var screen_x = e.screenX;
     var screen_y = e.screenY;
@@ -364,7 +354,6 @@ function activeEventHandler(event, type) {
     var client_y = e.clientY;
     var target = e.currentTarget;
     var tag = e.target.tagName; // tag name
-    tag = tag.toLowerCase();
 
     if (client_x == undefined) {
         // set the position to the center of the webpage
@@ -375,11 +364,9 @@ function activeEventHandler(event, type) {
         client_y = window.innerHeight / 2;
     }
 
-    if(debug)
-    {
-        console.log("client_x: " + client_x + " client_y: " + client_y);
-    }
+    if (debug) console.log("client_x: " + client_x + " client_y: " + client_y);
 
+    var content = "";
     if (tag == "img") {
         content = e.target.src;
     } else if (tag == "input" || tag == "textarea") {
@@ -388,35 +375,126 @@ function activeEventHandler(event, type) {
         content = e.target.innerText;
     }
 
+
+    var href = $($(this).get(0)).attr("href");
+    href = recoverAbsoluteLink(href);
+
+    related_info = {'href': href};
+    // set related_info according to the event type and target
     switch (type) {
         case 'click':
-            mPage.click(href, screen_x, screen_y, event_time, content, tag)
-            break;
-        case 'hover':
-            break;
-        case 'select':
-            break;
-        case 'right click':
-            break;
-        case 'key press':
-            break;
-        case 'change':
+            if (tag == 'input' || tag == 'button') {
+                // get the form element that the button belongs to
+                var form = $(target).closest('form');
+                if (form.length > 0) {
+                    var form_href = form.attr('action');
+                    // parse the form link
+                    form_href = recoverAbsoluteLink(related_info);
+                    related_info = {'href': form_href};
+                }
+            }
             break;
         default:
             break;
     }
 
     // open an annotation window at the clicked position
-    displayAnnotationWindow(event, screen_x, screen_y, client_x, client_y, event_time, type, target);
+    displayAnnotationWindow(event, target, type, event_time, screen_x, screen_y, client_x, client_y, tag, content, related_info);
 }
+
+function activeEventEnd(type, event_time, screen_x, screen_y, client_x, client_y, tag, content, related_info, annotation) {
+    // add the event to the event list
+    mPage.addEvent(true, type, event_time, screen_x, screen_y, client_x, client_y, tag, content, related_info, annotation);
+}
+
 
 function passiveEventHandler(event, type) {
+    if (on_annotation) return;
+    var event_time = (new Date()).getTime();
+    // filter out the repeated or too frequent passive event
+    if (event_time - last_passive_event_timestamp < min_passive_event_interval) {
+        return;
+    } else {
+        last_passive_event_timestamp = event_time;
+    }
+    if (debug) console.log(type + " passive event", event);
+    // checkIsTaskActive();
+    if (!is_task_active && !debug) {
+        return;
+    }
 
+    // event.preventDefault();
+    event.stopPropagation(); // stop the event from bubbling up
+
+    var e = event || window.event;
+    var screen_x = e.screenX;
+    var screen_y = e.screenY;
+    var client_x = e.clientX;
+    var client_y = e.clientY;
+    var target = e.currentTarget;
+    var tag = e.target.tagName; // tag name
+    if (tag == undefined) {
+        tag = e.target.nodeName;
+    }
+    var content = "";
+    if (tag == "IMG") {
+        content = e.target.src;
+    } else if (tag == "INPUT" || tag == "TEXTAREA") {
+        content = e.target.value;
+    } else {
+        content = e.target.innerText;
+    }
+
+    var related_info = {};
+    // set related_info according to the event type and target
+    switch (type) {
+        case 'scroll':
+            related_info = {'scrollX': window.scrollX, 'scrollY': window.scrollY};
+        case 'hover':
+            break;
+        case 'right click':
+            break;
+        case 'key press':
+            related_info = {
+                'ctrlKey': e.ctrlKey, 'shiftKey': e.shiftKey, 'altKey': e.altKey, 'metaKey': e.metaKey, 'key': e.key,
+            }
+            break;
+        case 'copy':
+            var copied_text = window.getSelection().toString();
+            related_info = {'copied_text': copied_text};
+            break;
+        case 'paste':
+            var pasted_text = e.clipboardData.getData('text');
+            related_info = {'pasted_text': pasted_text};
+            break;
+        case 'change':
+            // get the original value of the input element and the new value
+            var new_value = e.target.value;
+            related_info = {'new_value': new_value};
+            break;
+        default:
+            break;
+    }
+
+    // add the event to the event list
+    mPage.addEvent(false, type, event_time, screen_x, screen_y, client_x, client_y, tag, content, related_info);
 }
 
+function clickEvent(event, is_active = true) {
+    if (is_active) {
+        activeEventHandler(event, 'click');
+    } else {
+        passiveEventHandler(event, 'click');
+    }
+    // mPage.update(); // in case the DOM is changed
+}
 
-function clickEvent(event) {
-    activeEventHandler(event, 'click');
+function activeClickEvent(event) {
+    clickEvent(event, true);
+}
+
+function passiveClickEvent(event) {
+    clickEvent(event, false);
 }
 
 function hoverEvent(event) {
@@ -424,7 +502,7 @@ function hoverEvent(event) {
 }
 
 function rightClickEvent(event) {
-    activeEventHandler(event, 'right click');
+    passiveEventHandler(event, 'right click');
 }
 
 function keyPressEvent(event) {
@@ -432,55 +510,114 @@ function keyPressEvent(event) {
 }
 
 function changeEvent(event) {
-    activeEventHandler(event, 'change');
+    passiveEventHandler(event, 'change');
 }
 
 function scrollEvent(event) {
-    console.log("scroll event", event);
-    // mPage.scroll();
+    passiveEventHandler(event, 'scroll');
 }
 
 function copyEvent(event) {
-    console.log("copy event", event);
+    passiveEventHandler(event, 'copy');
+}
 
+function pasteEvent(event) {
+    passiveEventHandler(event, 'paste');
+}
+
+function doubleClickEvent(event) {
+    passiveEventHandler(event, 'double click');
 }
 
 if (current_url.substring(0, 21) == baseUrl) {
     mPage.update = function () {
     };
 } else {
-    // var interactive_element = "a, button, input, textarea, img";
+    // var interactive_element = "div, a, button, input, textarea, select, img";
     var interactive_element = "*";
+    var excluded_element = ".annotation-overlay *, .annotation-overlay, body, html, .freeze-overlay"
     mPage.update = function () {
         is_server_page = window.location.href.substring(0, 21) == baseUrl;
-        $(interactive_element).not(".annotation-overlay, body, html, .freeze-overlay").each(function (id, element) {
-            // click event
-            if ($(element).attr("bindClick") == undefined) {
-                if ($(element).attr("href") != undefined || $(element).attr("type") == "button" || $(element).attr("type") == "submit") {
-                    $(element).attr("bindClick", true);
-                    $(element).on("click", clickEvent);
+        $(interactive_element).not(excluded_element).each(function (id, element) {
+                // click event
+                if ($(element).attr("bindClick") == undefined) {
+                    var tag_name = $(element).prop("tagName");
+                    var type = $(element).attr("type");
+                    if ($(element).attr('href') != undefined || tag_name == 'BUTTON' || type == 'submit' || type == 'button') {
+                        $(element).attr("bindClick", true);
+                        $(element).on("click", activeClickEvent);
+                    }
+                    // else {
+                    //     // judge if it is wrapped by <a> or <button>
+                    //     if (($(element).closest('a').length > 0 && $(element).closest('a').attr('href') != undefined)
+                    //         || $(element).closest('button').length > 0 || $(element).closest('input').length > 0) {
+                    //         return; // it is already binded by the parent element
+                    //     }
+                    //     $(element).on("click", passiveClickEvent);
+                    // }
+                }
+                // double click event
+                // if ($(element).attr("bindDblClick") == undefined) {
+                //     $(element).attr("bindDblClick", true);
+                //     $(element).on("dblclick", doubleClickEvent);
+                // }
+                // hover event
+                if ($(element).attr("bindHover") == undefined) {
+                    $(element).attr("bindHover", true);
+                    $(element).on("mouseover", hoverEvent);
+                }
+                // // right click event
+                // if ($(element).attr("bindRightClick") == undefined) {
+                //     $(element).attr("bindRightClick", true);
+                //     $(element).on("contextmenu", rightClickEvent);
+                // }
+                // change event
+                if ($(element).attr("bindChange") == undefined) {
+                    var tag_name = $(element).prop("tagName");
+                    if (tag_name == 'TEXTAREA' || tag_name == 'INPUT') {
+                        $(element).attr("bindChange", true);
+                        $(element).on("change", changeEvent);
+                    }
                 }
             }
-            // hover event
-            if ($(element).attr("bindHover") == undefined) {
-                $(element).attr("bindHover", true);
-                $(element).on("mouseover", hoverEvent);
-            }
-            // right click event
-            if ($(element).attr("bindRightClick") == undefined) {
-                $(element).attr("bindRightClick", true);
-                $(element).on("contextmenu", rightClickEvent);
-            }
-            // change event
-            if ($(element).attr("bindChange") == undefined) {
-                $(element).attr("bindChange", true);
-                $(element).on("change", changeEvent);
-            }
-        });
-        addEventListener("scroll", scrollEvent);
-        addEventListener("keypress", keyPressEvent);
-        addEventListener("copy", copyEvent);
-    };
+        );
+
+    }
+    ;
+    // window.onbeforeunload = function (event) {
+    //     activeEventHandler(event, 'jump');
+    //     event.preventDefault();
+    //     event.returnValue = 'True?';
+    // }
+    addEventListener("scroll", scrollEvent);
+    addEventListener("keypress", keyPressEvent);
+    addEventListener("copy", copyEvent);
+    addEventListener("paste", pasteEvent);
 }
 
+addEventListener("DOMContentLoaded", function (event) {
+    if (debug) console.log("DOM fully loaded and parsed");
+    mPage.update();
+    const observer = new MutationObserver(function (mutations) {
+        if (debug) console.log("DOM changed: " + mutations);
+        // for (let mutation of mutations) {
+        //     // console.log(mutation)
+        //     // unbind the modified element
+        //     // var element = mutation.target;
+        //     // $(element).off("click", activeClickEvent);
+        //     // $(element).off("mouseover", hoverEvent);
+        //     // $(element).off("change", changeEvent);
+        //     // // set bind<event> to undefined
+        //     // $(element).attr("bindClick", undefined);
+        //     // $(element).attr("bindHover", undefined);
+        //     // $(element).attr("bindChange", undefined);
+        // }
+        mPage.update();
+    });
+    if (debug) console.log(document.body);
+    // observe all <a> elements
+    observer.observe(document.body,{childList: true, subtree: true, attributes: true});
+});
+
 setTimeout(mPage.update, 1500);
+setInterval(checkIsTaskActive, 60000);

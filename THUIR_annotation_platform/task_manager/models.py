@@ -101,8 +101,7 @@ class PageLog(models.Model):
     query_string = models.CharField(max_length=1000)
     page_id = models.IntegerField()
     mouse_moves = models.CharField(max_length=1000000)
-    clicked_results = models.CharField(max_length=1000000)
-    clicked_others = models.CharField(max_length=1000000)
+    event_list = models.CharField(max_length=1000000)
 
 
 class QueryAnnotation(models.Model):  # !!
@@ -196,7 +195,25 @@ class Task(models.Model):
         null=True,
         )
 
-
+# Webpages
+class Webpage(models.Model):
+    id = models.AutoField(primary_key=True)
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+    )
+    belong_task = models.ForeignKey(
+        Task,
+        on_delete=models.CASCADE,
+    )
+    title = models.CharField(max_length=100)
+    url = models.CharField(max_length=1000)
+    referrer = models.CharField(max_length=1000)
+    start_timestamp = models.IntegerField()
+    end_timestamp = models.IntegerField()
+    dwell_time = models.IntegerField()
+    mouse_moves = models.CharField(max_length=1000000)
+    event_list = models.CharField(max_length=1000000)
 
 
 # Annotation of certain behaviors

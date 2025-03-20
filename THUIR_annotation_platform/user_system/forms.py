@@ -132,7 +132,7 @@ class SignupForm(forms.Form):
             }
         )
     )
-    search_frequency = forms.ChoiceField(
+    llm_frequency = forms.ChoiceField(
         required=True,
         choices=llm_frequency_choices,
         label=u'How often do you use large language models (LLMs)?',
@@ -142,13 +142,13 @@ class SignupForm(forms.Form):
             }
         )
     )
-    search_history = forms.ChoiceField(
+    llm_history = forms.ChoiceField(
         required=True,
         choices=llm_history_choices,
         label=u'How long have you been using large language models(LLMs)?',
         widget=forms.Select(
             attrs={
-                'class': 'select2-container form-control select select-primary',
+                'class': 'select2-container form-control select select-primary' ,
             }
         )
     )

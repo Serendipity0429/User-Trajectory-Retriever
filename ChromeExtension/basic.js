@@ -14,9 +14,10 @@ var msg = {
     page_id: 0,
     html: "",
     mouse_moves: "",
-    clicked_results: "",
     interface: 1,
     preAnnotate: -1,
+
+    event_list: "",
 
     initialize: function () {
         msg.send_flag = true;
@@ -33,10 +34,11 @@ var msg = {
         msg.query = "";
         msg.html = "";
         msg.mouse_moves = "";
-        msg.clicked_results = "";
         msg.username = "";
         msg.interface = 1;
         msg.preAnnotate = -1;
+
+        msg.event_list = "";
     }
 };
 
@@ -179,7 +181,7 @@ var viewState = {
             console.log(mPage);
             console.log(mRec);
         }
-        if (origin != "???") {
+        if (origin != "???" && false) {
             if (debug) console.log("extension is working on SERP");
             $(window).bind('mousemove', viewState.mMove);
             $(window).bind('scroll', viewState.mScroll);
@@ -264,9 +266,6 @@ var viewState = {
             msg.title = mPage.getTitle();
             //msg.mouse_moves = pako.deflate(JSON.stringify(mRec.getData()), {to: 'string'});
             msg.mouse_moves = JSON.stringify(mRec.getData());
-            //msg.clicked_results = pako.deflate(JSON.stringify(mPage.getClickedResults()), {to: 'string'});
-            msg.clicked_results = JSON.stringify(mPage.getClickedResults());
-            msg.clicked_others = JSON.stringify(mPage.getClickedOthers());
             if (isfromserp == 0) {
                 msg.interface = 5;
             } else {
@@ -277,8 +276,7 @@ var viewState = {
             msg.type = "general";
             msg.title = mPage.getTitle();
             msg.mouse_moves = JSON.stringify(mRec.getData());
-            msg.clicked_results = JSON.stringify(mPage.getClickedResults());
-            msg.clicked_others = JSON.stringify(mPage.getClickedOthers());
+            msg.event_list = JSON.stringify(mPage.getEventList());
         }
         if (msg.url.substring(0, 22) != "http://127.0.0.1:8000") { // avoid the local server
             chrome.runtime.sendMessage(msg);

@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import time
-
 from django.http import HttpResponse
 from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
@@ -15,26 +13,11 @@ try:
 except ImportError:
     import json
 
-__DEBUG__ = True
-
-
-@csrf_exempt
-def data(request):
-    if __DEBUG__:
-        print("function data")
-    if request.method == 'POST':
-        message = json.loads(request.POST['message'])
-        store_data(message)
-        return HttpResponse('nice')
-    else:
-        return HttpResponse('oh no')
-
 
 @csrf_exempt
 @require_login
 def page_annotation_submit(user, request, page_id):
-    if __DEBUG__:
-        print("function page_annotation_submit")
+    print_debug("function page_annotation_submit")
     if request.method == 'POST':
         message = request.POST['message']
         store_page_annotation(message, page_id)
@@ -45,8 +28,7 @@ def page_annotation_submit(user, request, page_id):
 
 @require_login
 def task_home(user, request):
-    if __DEBUG__:
-        print("function task_home")
+    print_debug("function task_home")
     clear_expired_query(user)
     annotation_num = len(Query.objects.filter(user=user, annotation_status=True))
     partition_num = len(Query.objects.filter(user=user, partition_status=True, annotation_status=False))
@@ -65,8 +47,7 @@ def task_home(user, request):
 
 @require_login
 def task_partition(user, request):
-    if __DEBUG__:
-        print("function task_partition")
+    print_debug("function task_partition")
     if request.method == 'POST':
         action_type = request.POST.get('action_type')
         if action_type == "partition":
@@ -113,8 +94,7 @@ def task_partition(user, request):
 
 @require_login
 def annotation_home(user, request):
-    if __DEBUG__:
-        print("function annotation_home")
+    print_debug("function annotation_home")
     clear_expired_query(user)
     annotated_tasks = TaskAnnotation.objects.filter(user=user, annotation_status=True)
     unannotated_tasks = TaskAnnotation.objects.filter(user=user, annotation_status=False)
@@ -142,8 +122,7 @@ def annotation_home(user, request):
 
 @require_login
 def task_annotation1(user, request, task_id):
-    if __DEBUG__:
-        print("function task_annotation1")
+    print_debug("function task_annotation1")
     if request.method == 'POST':
         time_condition = request.POST.get('time_condition_' + str(task_id))
         position_condition = request.POST.get('position_condition_' + str(task_id))
@@ -164,8 +143,7 @@ def task_annotation1(user, request, task_id):
     if len(task_annotation) == 0:
         return HttpResponseRedirect('/task/home/')
     # task_annotation = task_annotation[0]
-    if __DEBUG__:
-        print("function task_annotation1")
+    print_debug("function task_annotation1")
     task_annotation = task_annotation.first()
     queries = sorted(Query.objects.filter(user=user, partition_status=True, task_annotation=task_annotation),
                      key=lambda item: item.start_timestamp)
@@ -187,22 +165,16 @@ def task_annotation1(user, request, task_id):
 
 @require_login
 def pre_query_annotation(user, request, timestamp):
-    if __DEBUG__:
-        print("function pre_query_annotation")
+    print_debug("function pre_query_annotation")
     if request.method == 'POST':
-        # print(request.POST)
         diversity = request.POST.get('diversity')
         habit = request.POST.get('habit_str')
         redundancy = request.POST.get('redundancy')
         difficulty = request.POST.get('difficulty')
         gain = request.POST.get('gain')
         effort = request.POST.get('effort')
-        # unique_timstamp = request.POST.get('timestamp')
-        # print diversity, habit, redundancy, difficulty, gain, effort
 
         new_query = Query()
-        # new_query.task_annotation = TaskAnnotation.objects.filter(annotation_status=True)[0]
-        # print(TaskAnnotation.objects.filter(annotation_status=True).first())
         new_query.task_annotation = TaskAnnotation.objects.filter(annotation_status=True).first()
         new_query.partition_status = False
         new_query.annotation_status = False
@@ -216,7 +188,6 @@ def pre_query_annotation(user, request, timestamp):
         new_query.effort = effort
         new_query.start_timestamp = timestamp
         new_query.save()
-        # print 'new_query success!'
         return HttpResponse('<html><body><script>window.close()</script></body></html>')
 
     # GET
@@ -231,12 +202,10 @@ def pre_query_annotation(user, request, timestamp):
 
 @require_login
 def query_annotation(user, request, task_id):
-    if __DEBUG__:
-        print("function query_annotation")
+    print_debug("function query_annotation")
     task_annotation = TaskAnnotation.objects.filter(id=task_id, user=user, annotation_status=False)
     if len(task_annotation) == 0:
         return HttpResponseRedirect('/task/home/')
-    # task_annotation = task_annotation[0]
     task_annotation = task_annotation.first()
     queries = sorted(Query.objects.filter(user=user, partition_status=True, task_annotation=task_annotation),
                      key=lambda item: item.start_timestamp)
@@ -251,8 +220,7 @@ def query_annotation(user, request, task_id):
             other_reason = request.POST.get('ending_text_' + str(query.id))
             other_relation = request.POST.get('relation_text_' + str(query.id))
             # query__annotation = QueryAnnotation.objects.filter(belong_query=query)
-            if __DEBUG__:
-                print("function query_annotation")
+            print_debug("function query_annotation")
             query__annotation = QueryAnnotation.objects.filter(belong_query=query).first()
             for dup_query_annotation in QueryAnnotation.objects.filter(belong_query=query)[1:]:
                 dup_query_annotation.delete()
@@ -294,8 +262,7 @@ def query_annotation(user, request, task_id):
 
 @require_login
 def task_annotation2(user, request, task_id):
-    if __DEBUG__:
-        print("function task_annotation2")
+    print_debug("function task_annotation2")
     task_annotation = TaskAnnotation.objects.filter(id=task_id, user=user, annotation_status=False)
     if len(task_annotation) == 0:
         return HttpResponseRedirect('/task/home/')
@@ -339,8 +306,7 @@ def task_annotation2(user, request, task_id):
 
 @require_login
 def show_page(user, request, page_id):
-    if __DEBUG__:
-        print("function show_page")
+    print_debug("function show_page")
     serp = PageLog.objects.filter(id=page_id, user=user)
     if len(serp) == 0:
         return HttpResponseRedirect('/task/home/')
@@ -362,10 +328,10 @@ def page_annotation(user, request, page_id):
     if len(page) == 0:
         return HttpResponseRedirect('/task/home/')
     # page = page[0]
-    if __DEBUG__:
-        print("function page_annotation")
+    print_debug("function page_annotation")
     page = page.first()
-    clicked_results = json.loads(page.clicked_results)
+    # clicked_results = json.loads(page.clicked_results)
+    clicked_results = []
     clicked_ids = []
     for result in clicked_results:
         if result['id'] not in clicked_ids:
@@ -396,8 +362,7 @@ def page_annotation(user, request, page_id):
 
 @csrf_exempt
 def show_me_serp(request, query_id):
-    if __DEBUG__:
-        print("function show_me_serp")
+    print_debug("function show_me_serp")
     query = Query.objects.get(id=query_id)
     serp = PageLog.objects.filter(belong_query=query, page_id='1')
     # serp = serp[0]
@@ -412,13 +377,26 @@ def show_me_serp(request, query_id):
     )
 
 
+# Refined
+
+# Store data
+@csrf_exempt
+def data(request):
+    print_debug("function data")
+    if request.method == 'POST':
+        message = json.loads(request.POST['message'])
+        store_data(message)
+        return HttpResponse('data storage succeeded')
+    else:
+        return HttpResponse('data storage failed')
+
+
 # Pre-Task Annotation Fetcher
 @require_login
 def pre_task_annotation(user, request, task_id):
     if request.method == 'POST':
         # Start a new task
-        if __DEBUG__:
-            print("start_task")
+        print_debug("start_task")
         task = TaskAnnotation.objects.filter(id=task_id, user=user).first()
         if task is None or not task.active:
             task = TaskAnnotation()
@@ -427,7 +405,6 @@ def pre_task_annotation(user, request, task_id):
             task.id = task_id
             task.save()
         return HttpResponse('<html><body><script>window.close()</script></body></html>')
-
 
     return render(
         request,
@@ -444,16 +421,14 @@ def pre_task_annotation(user, request, task_id):
 def post_task_annotation(user, request, task_id):
     if request.method == 'POST':
         # End a task
-        if __DEBUG__:
-            print("start_task")
+        print_debug("end_task")
         task = TaskAnnotation.objects.filter(id=task_id, user=user).first()
         if task is not None and task.active:
             task.active = False
             task.save()
             return HttpResponse('<html><body><script>window.close()</script></body></html>')
         # error
-        if __DEBUG__:
-            print("error in post_task_annotation")
+        print_debug("error in post_task_annotation")
         return HttpResponse('<html><body><script>window.close()</script></body></html>')
 
     return render(
@@ -471,15 +446,13 @@ def post_task_annotation(user, request, task_id):
 def active_task(user, request):
     if request.method == 'POST':
         # Return active tasks
-        if __DEBUG__:
-            print("active_task")
+        print_debug("active_task")
         task = TaskAnnotation.objects.filter(user=user, active=True).first()
         if task is None:
             return HttpResponse(-1)
 
         task_id = task.id
-        print("Current Task ID: ", task_id)
-        print(request.POST)
+        print_debug("Current Task ID: ", task_id)
         # Query Mode
         if 'task_id' in request.POST:
             if request.POST['task_id'] == task_id:
@@ -489,12 +462,12 @@ def active_task(user, request):
 
         return HttpResponse(task_id)
 
+
 # Initialize the task
 @require_login
 def initialize(user, request):
     if request.method == 'POST':
-        if __DEBUG__:
-            print("initialize")
+        print_debug("initialize")
 
         # Delete all active tasks and relevant queries and pages
         tasks = TaskAnnotation.objects.filter(user=user, active=True)

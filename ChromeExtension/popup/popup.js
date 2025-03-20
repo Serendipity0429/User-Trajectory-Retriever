@@ -263,13 +263,13 @@ function switchTaskButtonStatus(task_status) {
         $("#bt_end_task").attr("disabled", false);
         $("#bt_end_task").show();
         $("#bt_start_task").hide();
-        $("#bt_tool_use").show()
+        $("#bt_tool_use").attr("disabled", false);
     } else if (task_status == 'off') {
         $("#bt_start_task").attr("disabled", false);
         $("#bt_end_task").attr("disabled", true);
         $("#bt_end_task").hide();
         $("#bt_start_task").show();
-        $("#bt_tool_use").hide()
+        $("#bt_tool_use").attr("disabled", true);
     }
 }
 

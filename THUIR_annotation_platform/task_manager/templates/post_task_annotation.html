@@ -2,6 +2,10 @@
 {% block title %} Post-Task Annotation {% endblock %}
 {% block content_title %} Post-Task Annotation {% endblock %}
 {% block content %}
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/rrweb-player@latest/dist/style.css"/>
+    <script src="https://cdn.jsdelivr.net/npm/rrweb-player@latest/dist/index.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/rrweb@latest/dist/style.css"/>
+    <script src="/static/js/rrweb.umd.min.cjs"></script>
     <div class="row text-center">
         <h3>
             Please annotate the following questions after task
@@ -12,16 +16,26 @@
             <div class="col-xs-12 list_header">
                 Trajectory of this task
             </div>
-            {% for query, pages in queries_to_pages %}
+            {% for webpage in webpages %}
                 <div class="col-xs-12 list_row">
-                    <label>{{ query.query_string }}</label>
-                    <ul>
-                        {% for page in pages %}
-                            <li>Page {{ page.page_id }}<a href="/task/show_page/{{ page.id }}" target="_blank">(click
-                                here
-                                to view)</a></li>
-                        {% endfor %}
-                    </ul>
+                    <a href="{{ webpage.url }}" target="_blank">{{ webpage.title }}</a>
+                    <!-- create a div to store the rrweb player -->
+                    <div class="rrweb-player-wrapper" id="rrweb-player-{{ webpage.id }}"></div>
+                    <script>
+                        var rrweb_events_{{ webpage.id }} = "{{  webpage.rrweb_events }}";
+                        // convert JSON string to JSON object
+                        rrweb_events_{{ webpage.id }}  = JSON.parse(rrweb_events_{{ webpage.id }} );
+                        // create a rrweb player
+                        const player_{{ webpage.id }} = new rrwebPlayer({
+                            target: document.getElementById(`rrweb-player-{{ webpage.id }}`),
+                            props: {
+                                events: rrweb_events_{{ webpage.id }},
+                                autoPlay: false,
+                                width: '400px',
+                                height: '300px',
+                            },
+                        });
+                    </script>
                 </div>
             {% endfor %}
         </div>
@@ -266,10 +280,11 @@
         <script>
         </script>
         <script>
-            function setEffort(){
-		        var effort_val = document.getElementById("effort_value");
-		        effort_val.innerText = document.getElementsByName("effort")[0].value;
+            function setEffort() {
+                var effort_val = document.getElementById("effort_value");
+                effort_val.innerText = document.getElementsByName("effort")[0].value;
             }
+
             function validateForm() {
                 var checks = $('input[type="checkbox"]:checked').map(function () {
                     return $(this).val();

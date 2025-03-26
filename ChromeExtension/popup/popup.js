@@ -21,7 +21,7 @@ function displayActiveTask() {
         $("#active_task").css("color", "#e13636");
     } else if (task_id != -1) { // There is an active task
         switchTaskButtonStatus('on');
-        $("#active_task").text("Active task: " + task_id);
+        $("#active_task").text("Active task ID: " + task_id);
         $("#active_task").css("color", "#000");
     }
 }

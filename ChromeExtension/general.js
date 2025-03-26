@@ -1,6 +1,7 @@
 var baseUrl = "http://127.0.0.1:8000";
-var taskUrl = baseUrl + "/task/"
-if (debug) console.log("General Page is Loaded!");
+var taskUrl = baseUrl + "/task/";
+var dataUrl = taskUrl + "data/";
+if (debug) console.log("General Page is Loade;d!");
 
 mPage.initialize = function () {
     mPage.click_results = new Array();
@@ -143,7 +144,7 @@ function displayAnnotationWindow(event, target, type, event_time, screen_x, scre
         }
         `;
     style.innerHTML.replaceAll(';', ' !important;'); // override all styles
-    const overlay = $('<div class="annotation-overlay"></div>');
+    const overlay = $('<div class="annotation-overlay rr-ignore"></div>');
     const modal = $(`
     <div class="annotation-wrapper">
         <div class="annotation-modal">
@@ -276,7 +277,7 @@ function displayAnnotationWindow(event, target, type, event_time, screen_x, scre
 // freeze the page until the annotation is done
 function freezePage() {
     freeze_overlay = document.createElement("div");
-    freeze_overlay.className = "freeze-overlay";
+    freeze_overlay.className = "freeze-overlay, rr-ignore";
     freeze_overlay.style.position = "fixed";
     freeze_overlay.style.top = "0";
     freeze_overlay.style.left = "0";
@@ -318,6 +319,10 @@ function recoverAbsoluteLink(relative_link) {
     }
     return relative_link;
 }
+
+/*
+    Event handlers
+ */
 
 // Active event handler
 function activeEventHandler(event, type) {
@@ -404,7 +409,7 @@ function activeEventHandler(event, type) {
 
 function activeEventEnd(type, event_time, screen_x, screen_y, client_x, client_y, tag, content, related_info, annotation) {
     // add the event to the event list
-    mPage.addEvent(true, type, event_time, screen_x, screen_y, client_x, client_y, tag, content, related_info, annotation);
+    mPage.addActiveEvent(type, event_time, screen_x, screen_y, client_x, client_y, tag, content, related_info, annotation);
 }
 
 
@@ -424,7 +429,7 @@ function passiveEventHandler(event, type) {
     }
 
     // event.preventDefault();
-    event.stopPropagation(); // stop the event from bubbling up
+    // event.stopPropagation(); // stop the event from bubbling up
 
     var e = event || window.event;
     var screen_x = e.screenX;
@@ -472,12 +477,18 @@ function passiveEventHandler(event, type) {
             var new_value = e.target.value;
             related_info = {'new_value': new_value};
             break;
+        case 'blur':
+            break;
+        case 'focus':
+            break;
+        case 'drag':
+            break;
         default:
             break;
     }
 
     // add the event to the event list
-    mPage.addEvent(false, type, event_time, screen_x, screen_y, client_x, client_y, tag, content, related_info);
+    mPage.addPassiveEvent(type, event_time, screen_x, screen_y, client_x, client_y, tag, content, related_info);
 }
 
 function clickEvent(event, is_active = true) {
@@ -525,9 +536,25 @@ function pasteEvent(event) {
     passiveEventHandler(event, 'paste');
 }
 
-function doubleClickEvent(event) {
-    passiveEventHandler(event, 'double click');
+function dragEvent(event) {
+    passiveEventHandler(event, 'drag');
 }
+
+function dropEvent(event) {
+    passiveEventHandler(event, 'drop');
+}
+
+function windowBlurEvent(event) {
+    passiveEventHandler(event, 'blur');
+}
+
+function windowFocusEvent(event) {
+    passiveEventHandler(event, 'focus');
+}
+
+/*
+    End of event handlers
+ */
 
 if (current_url.substring(0, 21) == baseUrl) {
     mPage.update = function () {
@@ -546,31 +573,25 @@ if (current_url.substring(0, 21) == baseUrl) {
                     if ($(element).attr('href') != undefined || tag_name == 'BUTTON' || type == 'submit' || type == 'button') {
                         $(element).attr("bindClick", true);
                         $(element).on("click", activeClickEvent);
+                    } else {
+                        // judge if it is wrapped by <a> or <button>
+                        if (($(element).closest('a').length > 0 && $(element).closest('a').attr('href') != undefined)
+                            || $(element).closest('button').length > 0 || $(element).closest('input').length > 0) {
+                            return; // it is already binded by the parent element
+                        }
+                        $(element).on("click", passiveClickEvent);
                     }
-                    // else {
-                    //     // judge if it is wrapped by <a> or <button>
-                    //     if (($(element).closest('a').length > 0 && $(element).closest('a').attr('href') != undefined)
-                    //         || $(element).closest('button').length > 0 || $(element).closest('input').length > 0) {
-                    //         return; // it is already binded by the parent element
-                    //     }
-                    //     $(element).on("click", passiveClickEvent);
-                    // }
                 }
-                // double click event
-                // if ($(element).attr("bindDblClick") == undefined) {
-                //     $(element).attr("bindDblClick", true);
-                //     $(element).on("dblclick", doubleClickEvent);
-                // }
                 // hover event
                 if ($(element).attr("bindHover") == undefined) {
                     $(element).attr("bindHover", true);
                     $(element).on("mouseover", hoverEvent);
                 }
-                // // right click event
-                // if ($(element).attr("bindRightClick") == undefined) {
-                //     $(element).attr("bindRightClick", true);
-                //     $(element).on("contextmenu", rightClickEvent);
-                // }
+                // right click event
+                if ($(element).attr("bindRightClick") == undefined) {
+                    $(element).attr("bindRightClick", true);
+                    $(element).on("contextmenu", rightClickEvent);
+                }
                 // change event
                 if ($(element).attr("bindChange") == undefined) {
                     var tag_name = $(element).prop("tagName");
@@ -584,40 +605,100 @@ if (current_url.substring(0, 21) == baseUrl) {
 
     }
     ;
-    // window.onbeforeunload = function (event) {
-    //     activeEventHandler(event, 'jump');
-    //     event.preventDefault();
-    //     event.returnValue = 'True?';
-    // }
     addEventListener("scroll", scrollEvent);
     addEventListener("keypress", keyPressEvent);
     addEventListener("copy", copyEvent);
     addEventListener("paste", pasteEvent);
+    addEventListener("blur", windowBlurEvent);
+    addEventListener("focus", windowFocusEvent);
+    addEventListener("drag", dragEvent);
+    addEventListener("drop", dropEvent);
 }
 
 addEventListener("DOMContentLoaded", function (event) {
     if (debug) console.log("DOM fully loaded and parsed");
     mPage.update();
     const observer = new MutationObserver(function (mutations) {
-        if (debug) console.log("DOM changed: " + mutations);
-        // for (let mutation of mutations) {
-        //     // console.log(mutation)
-        //     // unbind the modified element
-        //     // var element = mutation.target;
-        //     // $(element).off("click", activeClickEvent);
-        //     // $(element).off("mouseover", hoverEvent);
-        //     // $(element).off("change", changeEvent);
-        //     // // set bind<event> to undefined
-        //     // $(element).attr("bindClick", undefined);
-        //     // $(element).attr("bindHover", undefined);
-        //     // $(element).attr("bindChange", undefined);
-        // }
+        // if (debug) console.log("DOM changed: " + mutations);
         mPage.update();
     });
     if (debug) console.log(document.body);
     // observe all <a> elements
-    observer.observe(document.body,{childList: true, subtree: true, attributes: true});
+    observer.observe(document.body, {childList: true, subtree: true, attributes: true});
 });
 
 setTimeout(mPage.update, 1500);
 setInterval(checkIsTaskActive, 60000);
+
+
+// let events = [];
+
+rrweb.record({
+    emit(event) {
+        // push event into the events array
+        // events.push(event);
+        mPage.addRRWebEvent(event);
+    },
+});
+
+// var replayer = undefined;
+// var replayer_display = document.body;
+// var replayer_center = undefined;
+// var pageWidth = 0;
+// var pageHeight = 0;
+
+// function save() {
+//     chrome.runtime.sendMessage({rrweb: 'on', events: events}, function (response) {
+//         console.log(response);
+//     });
+//     // if (replayer != undefined) {
+//     //     replayer.destroy();
+//     // }
+//     // replayer = new rrweb.Replayer(events);
+//     // replayer.play();
+//     if (replayer != undefined) {
+//         // replayer.destroy();
+//         const playerEl = document.querySelector('.rr-player');
+//         if (playerEl) {
+//             playerEl.parentNode.removeChild(playerEl);
+//         }
+//     } else {
+//         // add an area for the replayer attached to the bottom of the page
+//         replayer_display = document.createElement('div');
+//         replayer_display.style.position = 'relative';
+//         replayer_display.style.boxSizing = 'border-box';
+//         // border
+//         replayer_display.style.border = '1px solid black';
+//         replayer_display.style.backgroundColor = 'white';
+//         // add class name rr-ignore
+//         replayer_display.className = 'rr-ignore';
+//         // set page width and height
+//         pageWidth = window.innerWidth;
+//         pageHeight = window.innerHeight;
+//         replayer_display.style.width = pageWidth + 'px';
+//         replayer_display.style.height = pageHeight + 'px';
+//         // insert the replayer_display to the body
+//         document.body.appendChild(replayer_display);
+//
+//         replayer_center = document.createElement('div');
+//         replayer_center.style.position = 'absolute';
+//         replayer_center.style.top = '50%';
+//         replayer_center.style.left = '50%';
+//         replayer_display.appendChild(replayer_center);
+//     }
+//     replayer = new rrwebPlayer({
+//         target: replayer_center,
+//         data: {
+//             events: events,
+//             autoplay: true,
+//             width: pageWidth / 2,
+//             height: pageHeight / 2,
+//         },
+//     });
+//     $('.rr-player').attr('box-sizing', 'border-box');
+//     events = [];
+//     record();
+// }
+//
+// record();
+// setTimeout(save, 10000); // save events every 10 seconds

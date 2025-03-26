@@ -7,6 +7,7 @@ var mPage = {
     preAnnotate: -1, // if the user has annotated the preliminaries (e.g. task purpose)
 
     event_list: [], // a list of events (e.g. mouse clicks, mouse movements, etc.) including annotations
+    rrweb_events: [], // a list of rrweb events
 
 
     getQuery: function () {
@@ -38,6 +39,10 @@ var mPage = {
         return mPage.event_list;
     },
 
+    getRRWebEvents: function () {
+        return mPage.rrweb_events;
+    },
+
 
     lastUpdate: 0,
 
@@ -48,6 +53,7 @@ var mPage = {
     initialize: function () {
         mPage.preAnnotate = -1;
         mPage.event_list = [];
+        mPage.rrweb_events = [];
         if (debug) console.log("mPage initialize");
     },
 
@@ -76,10 +82,16 @@ var mPage = {
 
     addPassiveEvent(type, timestamp, screenX, screenY, clientX, clientY, tag, content, related_info) {
         mPage.addEvent(false, type, timestamp, screenX, screenY, clientX, clientY, tag, content, related_info);
+    },
+
+    addRRWebEvent(event) {
+        mPage.rrweb_events.push(event);
     }
 
 };
+// var debug = true;
+var debug = false;
 
-var debug = true;
+
 if (debug) console.log("page.js is loaded");
 mPage.initialize();

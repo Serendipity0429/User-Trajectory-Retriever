@@ -1,7 +1,5 @@
-var debug = true;
-var debug1 = false;
-var debug = true;
-//var debug1 = true;
+// var debug = true;
+// var debug1 = false;
 
 var current_url = window.location.href;
 // var current_url = document.location;
@@ -62,10 +60,9 @@ chrome.runtime.sendMessage({log_status: "request"}, function (response) {
         if (debug) console.log("initialize done");
 
         checkIsTaskActive();
-
-        window.addEventListener("DOMSubtreeModified", function (event) {
-            checkIsTaskActive();
-            // alert("Task is active: " + is_task_active);
+        var observer = new MutationObserver(function (mutations) {
+        // window.addEventListener("DOMSubtreeModified", function (event) {
+        //     checkIsTaskActive();
             if (current_url !== window.location.href) {
                 viewState.sendMessage();
                 current_referrer = current_url;
@@ -74,30 +71,11 @@ chrome.runtime.sendMessage({log_status: "request"}, function (response) {
                 viewState.initialize();
                 if (debug) console.log("initialize again");
             } else {
-                // var origin = "???";
                 // var temp = current_url.match(/www\.(baidu)?(sogou)?(so)?\.com\/(s|web)/g);
-                // if (temp != null) {
-                //     switch (temp[0]) {
-                //         case "www.sogou.com/web":
-                //             origin = "sogou";
-                //             break;
-                //
-                //         case "www.baidu.com/s":
-                //             origin = "baidu";
-                //             break;
-                //
-                //         case "www.so.com/s":
-                //             origin = "360";
-                //             break;
-                //
-                //         default:
-                //             break;
-                //     }
-                // }
-                // if (origin != "???") {
                 viewState.update();
-                // }
             }
         });
+        var config = {childList: true, subtree: true, attributes: true};
+        observer.observe(document.body, config);
     }
 });

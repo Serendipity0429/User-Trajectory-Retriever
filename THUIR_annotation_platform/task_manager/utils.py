@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 __author__ = 'defaultstr'
 
-from user_system.models import *
 from .models import *
 
 try:
@@ -14,6 +13,7 @@ import time
 ip_to_launch = "http://127.0.0.1:8000/"
 
 __DEBUG__ = True
+
 
 def store_page_annotation(message, page_id):
     try:
@@ -167,10 +167,24 @@ def print_debug(*args, **kwargs):
     if __DEBUG__:
         print(*args, **kwargs)
 
-def store_data(message):
+
+def print_json_debug(message):
+    truncator = 50
+    # only print the first 50 characters for each key
+    message = {k: v[:truncator] + "..." if hasattr(v, '__getitem__') and len(v) > truncator else v for k, v in
+               message.items()}
     print_debug(json.dumps(message, indent=4))
+
+
+def store_data(message):
+    print_json_debug(message)
     webpage = Webpage()
     user = User.objects.get(username=message['username'])
+    task = Task.objects.filter(user=user, active=True).first()
+    if not task:
+        print_debug("No active task found for user", user.username)
+        return
+    webpage.belong_task = task
     webpage.user = user
     webpage.title = message['title']
     webpage.url = message['url']
@@ -180,8 +194,7 @@ def store_data(message):
     webpage.dwell_time = message['dwell_time']
     webpage.mouse_moves = message['mouse_moves']
     webpage.event_list = message['event_list']
-    task = TaskAnnotation.objects.filter(user=user, active=True).first()
-    webpage.belong_task = task
+    webpage.rrweb_events = message['rrweb_events']
+
     if not message['url'].startswith(f'{ip_to_launch}'):  # ip_to_launch should be set manually
         webpage.save()
-

@@ -34,10 +34,7 @@ function isTaskActive() {
         async: false,
         data: send_data,
         success: function (data, textStatus) {
-            if (data != -1)
-                result = true;
-            else
-                result = false;
+            result = data != -1;
         },
         error: function () {
             result = false;
@@ -85,13 +82,11 @@ chrome.runtime.onMessage.addListener(function (Msg, sender, sendResponse) {
             sendResponse({log_status: true});
         } else chrome.browserAction.setBadgeText({text: ''});
         return;
-    }
-    else if (Msg.link_store == "request") { // store the link
+    } else if (Msg.link_store == "request") { // store the link
         sessionStorage.setItem(Msg.url, Msg.serp_link);
         sendResponse("sessionStorage done");
         return;
-    }
-    else if (Msg.link_store == "request_update") { // store the link
+    } else if (Msg.link_store == "request_update") { // store the link
         var now_time = new Date().getTime();
         var data = {interface: Msg.interface, expiry: now_time + 1800000};
         localStorage.setItem(Msg.url + Msg.query, JSON.stringify(data));
@@ -133,17 +128,16 @@ chrome.runtime.onMessage.addListener(function (Msg, sender, sendResponse) {
         sendInfo(Msg);
     }
 
-    if(Msg.task_active == "request"){
+    if (Msg.task_active == "request") {
         var task_active = isTaskActive();
         sendResponse({task_active: task_active});
         return;
     }
 
-    if(Msg.log_request == 'on'){
+    if (Msg.log_request == 'on') {
         logged_in = true;
         return;
-    }
-    else if(Msg.log_request == 'off'){
+    } else if (Msg.log_request == 'off') {
         logged_in = false;
         return;
     }

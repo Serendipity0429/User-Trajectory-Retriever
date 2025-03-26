@@ -10,8 +10,8 @@ https://docs.djangoproject.com/en/1.6/ref/settings/
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 import os
-BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 
+BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/1.6/howto/deployment/checklist/
@@ -26,7 +26,6 @@ TEMPLATE_DEBUG = True
 
 ALLOWED_HOSTS = ['*']
 
-
 # Application definition
 
 INSTALLED_APPS = (
@@ -36,6 +35,7 @@ INSTALLED_APPS = (
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    # 'corsheaders',
     'user_system',
     'task_manager',
 )
@@ -45,6 +45,7 @@ MIDDLEWARE = [
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     # 'django.middleware.csrf.CsrfViewMiddleware',
+    # 'corsheaders.middleware.CorsMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
@@ -69,7 +70,6 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'annotation_platform.wsgi.application'
-
 
 # Database
 # https://docs.djangoproject.com/en/1.6/ref/settings/#databases
@@ -103,11 +103,42 @@ STATICFILES_DIRS = (
     os.path.join(BASE_DIR, "static"),
 )
 
+DATA_UPLOAD_MAX_MEMORY_SIZE = 5242880
+
 # Email
 
-EMAIL_HOST = 'smtp.163.com'
-EMAIL_HOST_USER = 'thuir_annotation@163.com'
-EMAIL_HOST_PASSWORD = 'rwpqviduevosjyek'
+# EMAIL_HOST = 'smtp.163.com'
+# EMAIL_HOST_USER = 'thuir_annotation@163.com'
+# EMAIL_HOST_PASSWORD = 'rwpqviduevosjyek'
 
-# # CSRF
+# CSRF
+CORS_ORIGIN_ALLOW_ALL = True
+
 # CORS_ORIGIN_ALLOW_ALL = True
+# CORS_ALLOW_CREDENTIALS = True
+# CORS_ORIGIN_WHITELIST = (
+#     ['http://127.0.0.1:*']
+# )
+# CORS_ALLOW_METHODS = (
+#     'DELETE',
+#     'GET',
+#     'OPTIONS',
+#     'PATCH',
+#     'POST',
+#     'PUT',
+#     'VIEW',
+# )
+#
+# CORS_ALLOW_HEADERS = (
+#     'XMLHttpRequest',
+#     'X_FILENAME',
+#     'accept-encoding',
+#     'authorization',
+#     'content-type',
+#     'dnt',
+#     'origin',
+#     'user-agent',
+#     'x-csrftoken',
+#     'x-requested-with',
+#     'Pragma',
+# )

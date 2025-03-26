@@ -170,7 +170,7 @@ class Task(models.Model):
     # basic information
     active = models.BooleanField(default=True) # whether the task is active
     start_timestamp = models.IntegerField()
-    end_timestamp = models.IntegerField()
+    end_timestamp = models.IntegerField(null=True)
 
     # pre-task annotation
     pre_annotation = models.ForeignKey(
@@ -187,7 +187,7 @@ class Task(models.Model):
         null=True,
         )
 
-    need_update_pre_annotation = models.BooleanField() # whether the pre-task annotation needs to be updated
+    need_update_pre_annotation = models.BooleanField(null=True) # whether the pre-task annotation needs to be updated
     updated_pre_annotation = models.ForeignKey(
         PreTaskAnnotation,
         related_name='updated_pre_annotation',
@@ -214,6 +214,7 @@ class Webpage(models.Model):
     dwell_time = models.IntegerField()
     mouse_moves = models.CharField(max_length=1000000)
     event_list = models.CharField(max_length=1000000)
+    rrweb_events = models.CharField(max_length=100000000)
 
 
 # Annotation of certain behaviors
@@ -236,3 +237,4 @@ class EventAnnotation(models.Model):
     timestamp = models.IntegerField()
     detail = models.CharField(max_length=1000)  # description of the event
     is_key_event = models.BooleanField(default=False) # whether this event is a key event
+    remarks = models.CharField(max_length=1000)  # remarks of the event

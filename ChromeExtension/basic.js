@@ -18,6 +18,7 @@ var msg = {
     preAnnotate: -1,
 
     event_list: "",
+    rrweb_events: "",
 
     initialize: function () {
         msg.send_flag = true;
@@ -39,6 +40,7 @@ var msg = {
         msg.preAnnotate = -1;
 
         msg.event_list = "";
+        msg.rrweb_events = "";
     }
 };
 
@@ -139,6 +141,7 @@ var viewState = {
         //viewState.getIn();
     },
     close: function () {
+        alert("close");
         viewState.sendMessage();
     },
     initialize: function () {
@@ -277,6 +280,8 @@ var viewState = {
             msg.title = mPage.getTitle();
             msg.mouse_moves = JSON.stringify(mRec.getData());
             msg.event_list = JSON.stringify(mPage.getEventList());
+            msg.rrweb_events = JSON.stringify(mPage.getRRWebEvents());
+
         }
         if (msg.url.substring(0, 22) != "http://127.0.0.1:8000") { // avoid the local server
             chrome.runtime.sendMessage(msg);

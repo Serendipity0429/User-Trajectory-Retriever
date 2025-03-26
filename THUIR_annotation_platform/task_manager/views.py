@@ -384,26 +384,26 @@ def show_me_serp(request, query_id):
 def data(request):
     print_debug("function data")
     if request.method == 'POST':
+        print_debug(request.POST)
         message = json.loads(request.POST['message'])
         store_data(message)
         return HttpResponse('data storage succeeded')
     else:
+        print_debug(request.method)
         return HttpResponse('data storage failed')
 
 
 # Pre-Task Annotation Fetcher
 @require_login
-def pre_task_annotation(user, request, task_id):
+def pre_task_annotation(user, request, timestamp):
     if request.method == 'POST':
         # Start a new task
         print_debug("start_task")
-        task = TaskAnnotation.objects.filter(id=task_id, user=user).first()
-        if task is None or not task.active:
-            task = TaskAnnotation()
-            task.user = user
-            task.active = True
-            task.id = task_id
-            task.save()
+        task = Task()
+        task.user = user
+        task.active = True
+        task.start_timestamp = timestamp
+        task.save()
         return HttpResponse('<html><body><script>window.close()</script></body></html>')
 
     return render(
@@ -411,7 +411,7 @@ def pre_task_annotation(user, request, task_id):
         'pre_task_annotation.html',
         {
             'cur_user': user,
-            'task_id': task_id,
+            'task_timestamp': timestamp,
         }
     )
 
@@ -422,7 +422,7 @@ def post_task_annotation(user, request, task_id):
     if request.method == 'POST':
         # End a task
         print_debug("end_task")
-        task = TaskAnnotation.objects.filter(id=task_id, user=user).first()
+        task = Task.objects.filter(id=task_id, user=user).first()
         if task is not None and task.active:
             task.active = False
             task.save()
@@ -431,12 +431,23 @@ def post_task_annotation(user, request, task_id):
         print_debug("error in post_task_annotation")
         return HttpResponse('<html><body><script>window.close()</script></body></html>')
 
+    task = Task.objects.filter(id=task_id, user=user).first()
+    if task is None:
+        return HttpResponse(f'No task found with task_id={task_id}')
+
+    # filter relevant webpages
+    webpages = Webpage.objects.filter(belong_task=task)
+    # sort by start_timestamp
+    webpages = sorted(webpages, key=lambda item: item.start_timestamp)
+    # print_debug(webpages[0].event_list)
+
     return render(
         request,
         'post_task_annotation.html',
         {
             'cur_user': user,
-            'task_id': task_id,
+            'task_id': task.id,
+            'webpages': webpages,
         }
     )
 
@@ -447,7 +458,7 @@ def active_task(user, request):
     if request.method == 'POST':
         # Return active tasks
         print_debug("active_task")
-        task = TaskAnnotation.objects.filter(user=user, active=True).first()
+        task = Task.objects.filter(user=user, active=True).first()
         if task is None:
             return HttpResponse(-1)
 
@@ -459,7 +470,6 @@ def active_task(user, request):
                 return HttpResponse(1)
             else:
                 return HttpResponse(-1)
-
         return HttpResponse(task_id)
 
 
@@ -470,14 +480,8 @@ def initialize(user, request):
         print_debug("initialize")
 
         # Delete all active tasks and relevant queries and pages
-        tasks = TaskAnnotation.objects.filter(user=user, active=True)
+        tasks = Task.objects.filter(user=user, active=True)
         for task in tasks:
-            queries = Query.objects.filter(user=user, task_annotation=task)
-            for query in queries:
-                pages = PageLog.objects.filter(user=user, belong_query=query)
-                for page in pages:
-                    page.delete()
-                query.delete()
             task.delete()
 
         # TODO: Let users choose to continue the previous task or start a new task

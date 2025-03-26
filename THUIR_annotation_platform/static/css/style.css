@@ -1,10 +1,4 @@
-section {
-    /*min-height: 1000px;*/
-}
 
-/*.annotation-content {
-    min-width: 960px;
-}*/
 
 .login_error_message {
     border: solid 2px red;
@@ -67,4 +61,10 @@ label {
 
 div.question-wrapper > div{
     padding-left: 20px;
+}
+
+.rrweb-player-wrapper {
+    width: 500px;
+    height: 500px;
+    background: #7f7f88;
 }

@@ -1,5 +1,5 @@
 {
-  "name": "Alpha: User Trajectory Retriever Toolkit",
+  "name": "A-UTRT: User Trajectory Retriever Toolkit",
   "version": "1.0",
   "manifest_version": 2,
   "description": "A simple chrome extension to collect user behaviors of certain tasks",
@@ -37,6 +37,7 @@
       "js": [
         "jquery-3.3.1.min.js",
         "pako_deflate.min.js",
+        "rrweb.umd.min.cjs",
         "mouseMove.js",
         "basic.js",
         "page.js",

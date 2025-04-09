@@ -12,15 +12,15 @@
             <div class="col-xs-12 list_header">
                 Uncompleted Tasks
             </div>
-            {% for task_id, queries in unannotated_tasks_to_queries %}
+            {% for task_id, webpages in unannotated_tasks_to_webpages %}
                 <div class="col-xs-12 list_row">
-                    <a href="/task/task_annotation1/{{ task_id }}" class="col-xs-4 submit-btn btn btn-primary">
-                        Go to Annotate -> Task ID: {{ task_id }}
+                    <a href="/task/task_annotation1/{{ task_id }}" class="col-xs-8 submit-btn btn btn-primary">
+                        Annotate Task ID: {{ task_id }}
                     </a>
                     <ul>
-                    {% for query in queries %}
-                        <li class="col-xs-12">{{ query.query_string }}</li>
-                    {% endfor %}
+                        {% for webpage in webpages %}
+                            <li class="col-xs-12">{{ webpage.title }}</li>
+                        {% endfor %}
                     </ul>
                 </div>
             {% endfor %}
@@ -29,13 +29,13 @@
             <div class="col-xs-12 list_header">
                 Completed Tasks
             </div>
-            {% for task_id, queries in annotated_tasks_to_queries %}
+            {% for task_id, webpages in annotated_tasks_to_webpages %}
                 <div class="col-xs-12 list_row">
-                    Task ID: {{ task_id }}
+                    Task ID: {{ task_id }} 
                     <ul>
-                    {% for query in queries %}
-                        <li class="col-xs-12">{{ query.query_string }}</li>
-                    {% endfor %}
+                        {% for webpage in webpages %}
+                            <li class="col-xs-12"><a href="{{ webpage.url }}">{{ webpage.title }}</a></li>
+                        {% endfor %}
                     </ul>
                 </div>
             {% endfor %}

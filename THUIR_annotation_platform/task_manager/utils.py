@@ -195,6 +195,7 @@ def store_data(message):
     webpage.mouse_moves = message['mouse_moves']
     webpage.event_list = message['event_list']
     webpage.rrweb_events = message['rrweb_events']
+    task.end_timestamp = message['end_timestamp']
 
     if not message['url'].startswith(f'{ip_to_launch}'):  # ip_to_launch should be set manually
         webpage.save()

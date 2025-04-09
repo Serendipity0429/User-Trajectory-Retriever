@@ -1,3 +1,4 @@
+
 {% extends "base.html" %}
 {% block title %} Post-Task Annotation {% endblock %}
 {% block content_title %} Post-Task Annotation {% endblock %}
@@ -12,27 +13,30 @@
         </h3>
     </div>
     <div class="row">
-        <div class="col-xs-offset-1 col-xs-5">
+        <div class="col-xs-offset-1 col-xs-10">
             <div class="col-xs-12 list_header">
-                Trajectory of this task
-            </div>
-            {% for webpage in webpages %}
-                <div class="col-xs-12 list_row">
-                    <a href="{{ webpage.url }}" target="_blank">{{ webpage.title }}</a>
+                    Trajectory of this task
+                </div>
+                {% for webpage in webpages %}
+                <div class="col-xs-12 list_row webpage-wrapper">
+{#                style="padding: 3% 0 3% 0;border-bottom: 1px solid #cccccc;">#}
+                    <p style="font-size: 20px">Webpage {{ forloop.counter }}:&ensp;<a href="{{ webpage.url }}"
+                                                           target="_blank">{{ webpage.title }}</a></p>
                     <!-- create a div to store the rrweb player -->
                     <div class="rrweb-player-wrapper" id="rrweb-player-{{ webpage.id }}"></div>
                     <script>
-                        var rrweb_events_{{ webpage.id }} = "{{  webpage.rrweb_events }}";
-                        // convert JSON string to JSON object
-                        rrweb_events_{{ webpage.id }}  = JSON.parse(rrweb_events_{{ webpage.id }} );
+                        var rrweb_events_{{ webpage.id }} = {{ webpage.rrweb_events | safe }};
                         // create a rrweb player
                         const player_{{ webpage.id }} = new rrwebPlayer({
                             target: document.getElementById(`rrweb-player-{{ webpage.id }}`),
                             props: {
                                 events: rrweb_events_{{ webpage.id }},
                                 autoPlay: false,
-                                width: '400px',
-                                height: '300px',
+                                width: 800,
+                                height: 377,
+                                {#insertStyleRules: [#}
+                                {#    ".replayer-wrapper {top: 0; left: 0;}",#}
+                                {#]#}
                             },
                         });
                     </script>

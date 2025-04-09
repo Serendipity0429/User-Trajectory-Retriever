@@ -16,6 +16,7 @@ function checkIsTaskActive() {
         console.log("Task is active: " + is_task_active);
     })
 }
+
 checkIsTaskActive();
 
 function storage_link() {
@@ -51,24 +52,30 @@ chrome.runtime.sendMessage({log_status: "request"}, function (response) {
     console.log(current_url.substring(0, 22))
     if (current_url.substring(0, 22) == "http://127.0.0.1:8000/") {
         return;
-    }
-    else if (response.log_status == true) {
+    } else if (response.log_status == true) {
         logged_in = true;
         storage_link();
         if (debug) console.log("content.js is loaded");
         viewState.initialize();
+        rrweb.record({
+            emit(event) {
+                mPage.addRRWebEvent(event);
+            },
+        });
         if (debug) console.log("initialize done");
 
         checkIsTaskActive();
         var observer = new MutationObserver(function (mutations) {
-        // window.addEventListener("DOMSubtreeModified", function (event) {
-        //     checkIsTaskActive();
+            // window.addEventListener("DOMSubtreeModified", function (event) {
+            //     checkIsTaskActive();
             if (current_url !== window.location.href) {
                 viewState.sendMessage();
                 current_referrer = current_url;
                 current_url = window.location.href;
                 storage_link();
                 viewState.initialize();
+                mPage.rrweb_events = []; // clear the rrweb events
+                rrweb.record.takeFullSnapshot();
                 if (debug) console.log("initialize again");
             } else {
                 // var temp = current_url.match(/www\.(baidu)?(sogou)?(so)?\.com\/(s|web)/g);

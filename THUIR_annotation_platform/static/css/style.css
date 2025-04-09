@@ -1,5 +1,4 @@
 
-
 .login_error_message {
     border: solid 2px red;
     background: lightpink;
@@ -59,12 +58,17 @@ label {
     background-color: #5183ad;
 }
 
-div.question-wrapper > div{
+div.question-wrapper > div {
     padding-left: 20px;
 }
 
 .rrweb-player-wrapper {
-    width: 500px;
-    height: 500px;
+    width: 800px;
+    height: 450px;
     background: #7f7f88;
+    display: inline-block;
+}
+
+.webpage-wrapper {
+    margin: 20px 0 20px 0;
 }

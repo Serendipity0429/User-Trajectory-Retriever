@@ -49,12 +49,12 @@ function sendInfo(Msg) {
     var verified = verifyUser();
     if (verified != 0) return;
 
-    var key = storgeInfo(Msg);
+    // var key = storgeInfo(Msg);
     $.ajax({
         type: "POST", dataType: "text", //dataType: 'json',
         url: dataUrl, data: {message: Msg}, //contentType: "application/json; charset=utf-8",
         success: function (data) {
-            deleteInfo(key);
+            // deleteInfo(key);
         }, error: function (jqXHR, textStatus, errorThrown) {
         }
     });

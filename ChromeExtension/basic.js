@@ -141,8 +141,8 @@ var viewState = {
         //viewState.getIn();
     },
     close: function () {
-        alert("close");
-        viewState.sendMessage();
+        if (is_task_active)
+            viewState.sendMessage();
     },
     initialize: function () {
         document.addEventListener("visibilitychange", function (event) {
@@ -203,7 +203,7 @@ var viewState = {
             $(window).bind('scroll', viewState.mScroll);
             chrome.runtime.sendMessage({file: "general.js"}, function (response) {
                 if (response.scriptFinish == true) {
-                    if (debug) console.log("execute script done");
+                    console.log("execute script done");
                     pageManager.initialize();
                     mPage.initialize();
                     mRec.initialize();

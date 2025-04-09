@@ -27,25 +27,6 @@ def page_annotation_submit(user, request, page_id):
 
 
 @require_login
-def task_home(user, request):
-    print_debug("function task_home")
-    clear_expired_query(user)
-    annotation_num = len(Query.objects.filter(user=user, annotation_status=True))
-    partition_num = len(Query.objects.filter(user=user, partition_status=True, annotation_status=False))
-    remain_num = len(Query.objects.filter(user=user, partition_status=False))
-    return render(
-        request,
-        'task_home.html',
-        {
-            'cur_user': user,
-            'annotation_num': annotation_num,
-            'partition_num': partition_num,
-            'remain_num': remain_num
-        }
-    )
-
-
-@require_login
 def task_partition(user, request):
     print_debug("function task_partition")
     if request.method == 'POST':
@@ -88,34 +69,6 @@ def task_partition(user, request):
             'cur_user': user,
             'unpartition_queries_to_pages': unpartition_queries_to_pages,
             'partition_tasks_to_queries': unannotated_tasks_to_queries
-        }
-    )
-
-
-@require_login
-def annotation_home(user, request):
-    print_debug("function annotation_home")
-    clear_expired_query(user)
-    annotated_tasks = TaskAnnotation.objects.filter(user=user, annotation_status=True)
-    unannotated_tasks = TaskAnnotation.objects.filter(user=user, annotation_status=False)
-    annotated_tasks_to_queries = []
-    unannotated_tasks_to_queries = []
-    for task in unannotated_tasks:
-        unannotated_tasks_to_queries.append((task.id, sorted(
-            Query.objects.filter(user=user, partition_status=True, task_annotation=task),
-            key=lambda item: item.start_timestamp)))
-    for task in annotated_tasks:
-        annotated_tasks_to_queries.append((task.id, sorted(
-            Query.objects.filter(user=user, partition_status=True, task_annotation=task),
-            key=lambda item: item.start_timestamp)))
-
-    return render(
-        request,
-        'annotation_home.html',
-        {
-            'cur_user': user,
-            'unannotated_tasks_to_queries': unannotated_tasks_to_queries,
-            'annotated_tasks_to_queries': annotated_tasks_to_queries
         }
     )
 
@@ -384,7 +337,6 @@ def show_me_serp(request, query_id):
 def data(request):
     print_debug("function data")
     if request.method == 'POST':
-        print_debug(request.POST)
         message = json.loads(request.POST['message'])
         store_data(message)
         return HttpResponse('data storage succeeded')
@@ -486,3 +438,54 @@ def initialize(user, request):
 
         # TODO: Let users choose to continue the previous task or start a new task
     return HttpResponse(0)
+
+
+@require_login
+def task_home(user, request):
+    print_debug("function task_home")
+    # clear_expired_query(user)
+    completed_num = len(Task.objects.filter(user=user, active=False))
+    pending_num = len(Task.objects.filter(user=user, active=True))
+    return render(
+        request,
+        'task_home.html',
+        {
+            'cur_user': user,
+            'completed_num': completed_num,
+            'pending_num': pending_num,
+        }
+    )
+
+
+@require_login
+def annotation_home(user, request):
+    print_debug("function annotation_home")
+    clear_expired_query(user)
+    annotated_tasks = sorted(Task.objects.filter(user=user, active=False), key=lambda task: -task.id)
+    unannotated_tasks = sorted(Task.objects.filter(user=user, active=True), key=lambda task: -task.id)
+    annotated_tasks_to_webpages = []
+    unannotated_tasks_to_webpages = []
+    for task in unannotated_tasks:
+        # end_timestamp = task.end_timestamp
+        # Convert to human-readable time
+        # end_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(end_timestamp))
+        unannotated_tasks_to_webpages.append((task.id, sorted(
+            Webpage.objects.filter(user=user, belong_task=task), key=lambda item: item.start_timestamp))
+                                             )
+    for task in annotated_tasks:
+        # end_timestamp = task.end_timestamp
+        # Convert to human-readable time
+        # end_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(end_timestamp))
+        annotated_tasks_to_webpages.append((task.id, sorted(
+            Webpage.objects.filter(user=user, belong_task=task), key=lambda item: item.start_timestamp))
+                                           )
+
+    return render(
+        request,
+        'annotation_home.html',
+        {
+            'cur_user': user,
+            'unannotated_tasks_to_webpages': unannotated_tasks_to_webpages,
+            'annotated_tasks_to_webpages': annotated_tasks_to_webpages,
+        }
+    )

@@ -146,7 +146,7 @@ function displayAnnotationWindow(event, target, type, event_time, screen_x, scre
     style.innerHTML.replaceAll(';', ' !important;'); // override all styles
     const overlay = $('<div class="annotation-overlay rr-ignore"></div>');
     const modal = $(`
-    <div class="annotation-wrapper">
+    <div class="annotation-wrapper rr-ignore">
         <div class="annotation-modal">
             <div class="questions-container">
                 <!-- Question 1 - Purpose -->
@@ -277,7 +277,7 @@ function displayAnnotationWindow(event, target, type, event_time, screen_x, scre
 // freeze the page until the annotation is done
 function freezePage() {
     freeze_overlay = document.createElement("div");
-    freeze_overlay.className = "freeze-overlay, rr-ignore";
+    freeze_overlay.className = "freeze-overlay rr-ignore";
     freeze_overlay.style.position = "fixed";
     freeze_overlay.style.top = "0";
     freeze_overlay.style.left = "0";
@@ -570,7 +570,8 @@ if (current_url.substring(0, 21) == baseUrl) {
                 if ($(element).attr("bindClick") == undefined) {
                     var tag_name = $(element).prop("tagName");
                     var type = $(element).attr("type");
-                    if ($(element).attr('href') != undefined || tag_name == 'BUTTON' || type == 'submit' || type == 'button') {
+                    // if ($(element).attr('href') != undefined || tag_name == 'BUTTON' || type == 'submit' || type == 'button') {
+                    if($(element).attr('href') != undefined && tag_name == 'A') {
                         $(element).attr("bindClick", true);
                         $(element).on("click", activeClickEvent);
                     } else {
@@ -632,14 +633,6 @@ setInterval(checkIsTaskActive, 60000);
 
 
 // let events = [];
-
-rrweb.record({
-    emit(event) {
-        // push event into the events array
-        // events.push(event);
-        mPage.addRRWebEvent(event);
-    },
-});
 
 // var replayer = undefined;
 // var replayer_display = document.body;

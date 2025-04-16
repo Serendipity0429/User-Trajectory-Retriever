@@ -556,7 +556,10 @@ function windowFocusEvent(event) {
     End of event handlers
  */
 
-if (current_url.substring(0, 21) == baseUrl) {
+// !important !important
+var PASSIVE_MODE = true; // whether to annotate the events
+
+if (PASSIVE_MODE || current_url.substring(0, 21) == baseUrl) {
     mPage.update = function () {
     };
 } else {
@@ -630,68 +633,3 @@ addEventListener("DOMContentLoaded", function (event) {
 
 setTimeout(mPage.update, 1500);
 setInterval(checkIsTaskActive, 60000);
-
-
-// let events = [];
-
-// var replayer = undefined;
-// var replayer_display = document.body;
-// var replayer_center = undefined;
-// var pageWidth = 0;
-// var pageHeight = 0;
-
-// function save() {
-//     chrome.runtime.sendMessage({rrweb: 'on', events: events}, function (response) {
-//         console.log(response);
-//     });
-//     // if (replayer != undefined) {
-//     //     replayer.destroy();
-//     // }
-//     // replayer = new rrweb.Replayer(events);
-//     // replayer.play();
-//     if (replayer != undefined) {
-//         // replayer.destroy();
-//         const playerEl = document.querySelector('.rr-player');
-//         if (playerEl) {
-//             playerEl.parentNode.removeChild(playerEl);
-//         }
-//     } else {
-//         // add an area for the replayer attached to the bottom of the page
-//         replayer_display = document.createElement('div');
-//         replayer_display.style.position = 'relative';
-//         replayer_display.style.boxSizing = 'border-box';
-//         // border
-//         replayer_display.style.border = '1px solid black';
-//         replayer_display.style.backgroundColor = 'white';
-//         // add class name rr-ignore
-//         replayer_display.className = 'rr-ignore';
-//         // set page width and height
-//         pageWidth = window.innerWidth;
-//         pageHeight = window.innerHeight;
-//         replayer_display.style.width = pageWidth + 'px';
-//         replayer_display.style.height = pageHeight + 'px';
-//         // insert the replayer_display to the body
-//         document.body.appendChild(replayer_display);
-//
-//         replayer_center = document.createElement('div');
-//         replayer_center.style.position = 'absolute';
-//         replayer_center.style.top = '50%';
-//         replayer_center.style.left = '50%';
-//         replayer_display.appendChild(replayer_center);
-//     }
-//     replayer = new rrwebPlayer({
-//         target: replayer_center,
-//         data: {
-//             events: events,
-//             autoplay: true,
-//             width: pageWidth / 2,
-//             height: pageHeight / 2,
-//         },
-//     });
-//     $('.rr-player').attr('box-sizing', 'border-box');
-//     events = [];
-//     record();
-// }
-//
-// record();
-// setTimeout(save, 10000); // save events every 10 seconds

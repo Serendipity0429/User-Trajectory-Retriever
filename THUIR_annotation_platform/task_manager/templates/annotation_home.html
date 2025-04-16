@@ -30,14 +30,26 @@
                 Completed Tasks
             </div>
             {% for task_id, webpages in annotated_tasks_to_webpages %}
-                <div class="col-xs-12 list_row">
-                    Task ID: {{ task_id }} 
-                    <ul>
+                <div class="col-xs-12 list_row task_wrapper">
+                    <h6>Task ID: {{ task_id }}</h6>
+                    <ul class="col-xs-12">
                         {% for webpage in webpages %}
                             <li class="col-xs-12"><a href="{{ webpage.url }}">{{ webpage.title }}</a></li>
                         {% endfor %}
                     </ul>
+                    <div id="see-{{ task_id }}-btn" class="col-xs-12 submit-btn btn btn-block btn-lg btn-primary">
+                        View Trajectories and Annotations
+                    </div>
                 </div>
+                <script>
+                    $(function() {
+                        $('#see-{{ task_id }}-btn').click(
+                            function () {
+                                window.location.href = '/task/show_task_info/{{ task_id }}';
+                            }
+                        );
+                    });
+                </script>
             {% endfor %}
         </div>
     </div>

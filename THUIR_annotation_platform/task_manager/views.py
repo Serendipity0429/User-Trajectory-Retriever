@@ -330,7 +330,10 @@ def show_me_serp(request, query_id):
     )
 
 
-# Refined
+
+# =============================================
+# =         Below is newly added code         =
+# =============================================
 
 # Store data
 @csrf_exempt
@@ -355,8 +358,19 @@ def pre_task_annotation(user, request, timestamp):
         task.user = user
         task.active = True
         task.start_timestamp = timestamp
+
+        pre_annotation = PreTaskAnnotation()
+        pre_annotation.description = request.POST.get('description')
+        pre_annotation.completion_criteria = request.POST.get('completion_criteria')
+        pre_annotation.difficulty = request.POST.get('difficulty')
+        pre_annotation.effort = request.POST.get('effort')
+        pre_annotation.save()
+
+        task.pre_annotation = pre_annotation
         task.save()
         return HttpResponse('<html><body><script>window.close()</script></body></html>')
+
+    # Randomly choose a task from the dataset
 
     return render(
         request,
@@ -377,6 +391,17 @@ def post_task_annotation(user, request, task_id):
         task = Task.objects.filter(id=task_id, user=user).first()
         if task is not None and task.active:
             task.active = False
+
+            post_annotation = PostTaskAnnotation()
+            post_annotation.completion_level = request.POST.get('completion_level')
+            post_annotation.completion_reason = request.POST.get('completion_reason')
+            post_annotation.time_condition = request.POST.get('time_condition')
+            post_annotation.specificity = request.POST.get('specificity')
+            post_annotation.trigger = request.POST.get('trigger')
+            post_annotation.expertise = request.POST.get('expertise')
+
+            task.post_annotation = post_annotation
+
             task.save()
             return HttpResponse('<html><body><script>window.close()</script></body></html>')
         # error
@@ -433,11 +458,13 @@ def initialize(user, request):
 
         # Delete all active tasks and relevant queries and pages
         tasks = Task.objects.filter(user=user, active=True)
-        for task in tasks:
-            task.delete()
+        # for task in tasks:
+        #     task.delete()
 
         # TODO: Let users choose to continue the previous task or start a new task
-    return HttpResponse(0)
+        if tasks.first() is not None:
+            return HttpResponse(tasks.first().id)
+    return HttpResponse(-1)
 
 
 @require_login
@@ -487,5 +514,90 @@ def annotation_home(user, request):
             'cur_user': user,
             'unannotated_tasks_to_webpages': unannotated_tasks_to_webpages,
             'annotated_tasks_to_webpages': annotated_tasks_to_webpages,
+        }
+    )
+
+@require_login
+def show_task_info(user, request, task_id):
+    print_debug("function show_task_info")
+    task = Task.objects.filter(id=task_id, user=user).first()
+    if task is None:
+        return HttpResponse(f'No task found with task_id={task_id}')
+
+    # filter relevant webpages
+    webpages = Webpage.objects.filter(belong_task=task)
+    # sort by start_timestamp
+    webpages = sorted(webpages, key=lambda item: item.start_timestamp)
+
+    return render(
+        request,
+        'show_task_info.html',
+        {
+            'cur_user': user,
+            'task_id': task.id,
+            'webpages': webpages,
+            'task': task,
+        }
+    )
+
+@require_login
+def show_tool_use_page(user, request):
+    print_debug("function show_tool_use_page")
+
+    return render(
+        request,
+        'show_tool_use_page.html',
+        {
+            'cur_user': user,
+        }
+    )
+
+@require_login
+def tool_use(user, request, task_id):
+    if request.method == 'POST':
+        print_debug("tool_use")
+
+        tool = request.POST['tool']
+        task = Task.objects.filter(id=task_id, user=user).first()
+
+        for_url = ""
+
+        if tool == "math":
+            for_url = "https://www.wolframalpha.com/"
+
+        elif tool == "graph":
+            for_url = "https://www.geogebra.org/classic"
+
+        elif tool == "code":
+            for_url = "https://www.jdoodle.com/start-coding"
+
+        return HttpResponseRedirect(for_url)
+
+@require_login
+def cancel_task(user, request):
+    print_debug("function cancel_task")
+    if request.method == 'POST':
+        task = Task.objects.filter(user=user, active=True).first()
+        if task is not None:
+            task.delete()
+            return HttpResponse('Task cancelled successfully')
+        else:
+            return HttpResponse('Task not found')
+    return HttpResponse('Invalid request method')
+
+@require_login
+def submit_answer(user, request, task_id):
+    print_debug("function submit_answer")
+
+    # TODO: load question
+    question = "THUIR"
+
+    return render(
+        request,
+        'submit_answer.html',
+        {
+            'cur_user': user,
+            'task_id': task_id,
+            'question': question,
         }
     )

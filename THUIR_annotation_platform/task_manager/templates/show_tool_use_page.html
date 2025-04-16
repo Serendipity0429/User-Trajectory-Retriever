@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %} Tool Use {% endblock %}
+{% block content_title %} Tool Use {% endblock %}
+{% block content %}
+    <div class="row text-center">
+        <h3>
+            Tool Use
+        </h3>
+    </div>
+    <div class="row">
+        <form method="POST" action="/task/tool_use" id="tool_use_form">
+            {% csrf_token %}
+            <input type="hidden" name="tool" id="tool-hidden">
+            <div class="col-xs-offset-3 col-xs-6">
+                <input type="submit" id="tool-math" class="col-xs-12 submit-btn btn btn-block btn-lg btn-primary"
+                       value="Math" onclick="submitForm('math')">
+            </div>
+            <br/>
+            <div class="col-xs-offset-3 col-xs-6">
+                <input type="submit" id="tool-graph" class="col-xs-12 submit-btn btn btn-block btn-lg btn-primary"
+                       value="Graph" onclick="submitForm('graph')">
+            </div>
+            <br/>
+            <div class="col-xs-offset-3 col-xs-6">
+                <input type="submit" id="tool-code" class="col-xs-12 submit-btn btn btn-block btn-lg btn-primary"
+                       value="Code" onclick="submitForm('code')">
+            </div>
+        </form>
+        <br/>
+        <hr>
+        <div class="col-xs-offset-3 col-xs-6">
+            <div id="cancel-button" class="col-xs-12 submit-btn btn btn-block btn-lg btn-primary cancel-button">
+                Cancel
+            </div>
+        </div>
+    </div>
+    <script>
+        function submitForm(toolValue) {
+            $('#tool-hidden').val(toolValue);
+            $('#tool_use_form').submit();
+        }
+    </script>
+    <script>
+        $(function () {
+            $('#cancel-button').click(
+                function () {
+                    // Close the popup
+                    window.close();
+                }
+            );
+        });
+    </script>
+
+{% endblock %}

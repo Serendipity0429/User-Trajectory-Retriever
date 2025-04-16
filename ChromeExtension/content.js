@@ -2,7 +2,6 @@
 // var debug1 = false;
 
 var current_url = window.location.href;
-// var current_url = document.location;
 var current_referrer = document.referrer;
 var current_serp_link = "";
 var this_interface = 1;
@@ -66,8 +65,6 @@ chrome.runtime.sendMessage({log_status: "request"}, function (response) {
 
         checkIsTaskActive();
         var observer = new MutationObserver(function (mutations) {
-            // window.addEventListener("DOMSubtreeModified", function (event) {
-            //     checkIsTaskActive();
             if (current_url !== window.location.href) {
                 viewState.sendMessage();
                 current_referrer = current_url;
@@ -78,7 +75,6 @@ chrome.runtime.sendMessage({log_status: "request"}, function (response) {
                 rrweb.record.takeFullSnapshot();
                 if (debug) console.log("initialize again");
             } else {
-                // var temp = current_url.match(/www\.(baidu)?(sogou)?(so)?\.com\/(s|web)/g);
                 viewState.update();
             }
         });

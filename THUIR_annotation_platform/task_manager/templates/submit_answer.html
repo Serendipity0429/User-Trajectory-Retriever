@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block title %} Answer Submission {% endblock %}
+{% block content_title %} Answer Submission {% endblock %}
+{% block content %}
+    <div class="row text-center">
+        <h3>
+            Please submit the answer to the questions below
+        </h3>
+    </div>
+    <div class="row">
+        <div class="col-xs-offset-1 col-xs-10">
+            <form class="col-xs-12" id="query-form" action="" method="post" onsubmit="validateForm()"
+                  enctype='multipart/form-data'>
+                {% csrf_token %}
+                <div class="col-xs-12" style="border:1px dashed #000; border-radius:10px">
+                    <div class="question-wrapper">
+                        <div class="col-xs-12 list_row"><b>Question</b>:
+                            <div>{{ question }}</div>
+                        </div>
+                    </div>
+                    <div class="question-wrapper">
+                        <label for="answer" class="col-xs-12 list_row"> <b>Your Answer</b>:</label>
+                        <div><textarea class="col-xs-12 list_row" name="answer" rows="5" required></textarea>
+                        </div>
+                    </div>
+                </div>
+            </form>
+            <div class="col-xs-12">
+                <div id="query-btn" class="col-xs-6 submit-btn btn btn-block btn-lg btn-primary">
+                    Submit Answer
+                </div>
+            </div>
+            <div class="col-xs-12">
+                <div id="query-btn" class="col-xs-6 submit-btn btn btn-block btn-lg btn-primary cancel-button">
+                    Cancel
+                </div>
+            </div>
+        </div>
+        <script>
+        </script>
+        <script>
+            function validateForm() {
+
+            }
+        </script>
+        <script type="application/x-javascript">
+            $(function () {
+                $('#query-btn').click(
+                    function () {
+                        var answer = $("[name='answer']");
+
+                        if (answer.val() === '') {
+                            alert('Please fill answer!');
+                            answer.focus();
+                            return
+                        }
+
+                        if (confirm("Are you sure to submit all annotations?")) {
+                            task_submit = true;
+                            $('#query-form').submit();
+                        }
+
+                    }
+                );
+            });
+        </script>
+    </div>
+
+{% endblock %}

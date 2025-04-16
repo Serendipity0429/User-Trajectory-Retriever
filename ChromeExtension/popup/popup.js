@@ -58,7 +58,10 @@ function initializeServer() {
         async: false,
         data: {username: localStorage['username'], password: localStorage['password']},
         success: function (data, textStatus) {
-            result = 0;
+            if (data != -1) // There is an active task
+            {
+                switchTaskButtonStatus('on');
+            }
         },
         error: function () {
             result = -1;
@@ -242,17 +245,24 @@ function endtask() {
         switchTaskButtonStatus('off');
         return;
     }
-    var isConfirm = confirm("Do you want to end the task?");
+    // var isConfirm = confirm("Do you want to end the task?");
+    var isConfirm = confirm("Do you want to submit the answer?");
     if (isConfirm && task_id != -1) {
-        window.open(baseUrl + '/task/post_task_annotation/' + task_id, 'newwindow', 'height=1000,width=1200,top=0,left=0,toolbar=no,menubar=no,scrollbars=no, resizable=no,location=no, status=no');
+        // window.open(baseUrl + '/task/post_task_annotation/' + task_id, 'newwindow', 'height=1000,width=1200,top=0,left=0,toolbar=no,menubar=no,scrollbars=no, resizable=no,location=no, status=no');
+        window.open(baseUrl + '/task/submit_answer/' + task_id, 'newwindow', 'height=1000,width=1200,top=0,left=0,toolbar=no,menubar=no,scrollbars=no, resizable=no,location=no, status=no');
         switchTaskButtonStatus('off');
     } else {
         switchTaskButtonStatus('on');
     }
 }
 
-function tooluse() {
+function canceltask() {
 
+
+}
+
+function tooluse() {
+    window.open(baseUrl + '/task/show_tool_use_page', 'newwindow', 'height=1000,width=1200,top=0,left=0,toolbar=no,menubar=no,scrollbars=no, resizable=no,location=no, status=no');
 }
 
 
@@ -263,12 +273,14 @@ function switchTaskButtonStatus(task_status) {
         $("#bt_end_task").attr("disabled", false);
         $("#bt_end_task").show();
         $("#bt_start_task").hide();
+        $("#bt_cancel_task").attr("disabled", false);
         $("#bt_tool_use").attr("disabled", false);
     } else if (task_status == 'off') {
         $("#bt_start_task").attr("disabled", false);
         $("#bt_end_task").attr("disabled", true);
         $("#bt_end_task").hide();
         $("#bt_start_task").show();
+        $("#bt_cancel_task").attr("disabled", true);
         $("#bt_tool_use").attr("disabled", true);
     }
 }
@@ -299,6 +311,7 @@ if (jQuery) {
     $("#bt6").click(logout);
     $("#bt_start_task").click(starttask);
     $("#bt_end_task").click(endtask);
+    $("#bt_cancel_task").click(canceltask);
     $("#bt_tool_use").click(tooluse);
     if (verifyUser() == 0) {
         userTab();

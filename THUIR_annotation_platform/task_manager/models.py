@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 from django.db import models
+
 from user_system.models import User
 
 try:
@@ -15,9 +16,9 @@ class TaskAnnotation(models.Model):
     user = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
-        )
+    )
 
-    active = models.BooleanField(default=True) # whether the task is active
+    active = models.BooleanField(default=True)  # whether the task is active
 
     # user intent
     specificity = models.IntegerField(default=-1)  # 0 ==> 4, broad ==> clear
@@ -41,11 +42,11 @@ class Query(models.Model):
     user = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
-        )
+    )
     task_annotation = models.ForeignKey(
         TaskAnnotation,
         on_delete=models.CASCADE,
-        null=True,        )
+        null=True, )
 
     partition_status = models.BooleanField(default=False)
     annotation_status = models.BooleanField(default=False)
@@ -81,12 +82,12 @@ class PageLog(models.Model):
     user = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
-        )
+    )
     belong_query = models.ForeignKey(
         Query,
         on_delete=models.CASCADE,
         null=True,
-        )
+    )
     page_type = models.CharField(max_length=50)
     page_title = models.CharField(max_length=50)
     origin = models.CharField(max_length=50)
@@ -109,7 +110,7 @@ class QueryAnnotation(models.Model):  # !!
     belong_query = models.ForeignKey(
         Query,
         on_delete=models.CASCADE,
-        )
+    )
     # 1--initial, 2--spec, 3--gen, 4--meronym 5--holonym, 6--synonym, 7--parallel moving, 8--intent shift, 0--others
     relation = models.IntegerField()
     # 1--initial query ,2--SERP search snippets, 3--SERP other components,
@@ -126,7 +127,7 @@ class SERPAnnotation(models.Model):
     serp_log = models.ForeignKey(
         PageLog,
         on_delete=models.CASCADE,
-        )
+    )
     usefulness_0 = models.CharField(max_length=1000)
     usefulness_1 = models.CharField(max_length=1000)
     usefulness_2 = models.CharField(max_length=1000)
@@ -142,21 +143,43 @@ class PreTaskAnnotation(models.Model):
 
     description = models.CharField(max_length=1000)
     completion_criteria = models.CharField(max_length=1000)
-    target_type = models.CharField(max_length=100)
     difficulty = models.IntegerField()  # 0->4, easy -> hard
     effort = models.IntegerField()  # 0->4, low -> high
+
+# Reflection annotation
+class ReflectionAnnotation(models.Model):
+    id = models.AutoField(primary_key=True)
+
+    failure_reason = models.CharField(max_length=10000) # reason for failure
+    future_plan = models.CharField(max_length=10000) # future adjustments and plans
 
 # Post-task annotation
 class PostTaskAnnotation(models.Model):
     id = models.AutoField(primary_key=True)
     annotation_status = models.BooleanField(default=False)
 
-    completion_reason = models.CharField(max_length=1000) # why user chooses to end the task
-    completion_level = models.IntegerField() # 0->4, not completed -> fully completed
-    time_condition = models.IntegerField() # 0->4, urgent -> relaxed
-    specificity = models.IntegerField() # 0->4, broad -> clear
-    trigger = models.IntegerField() # 0->4, interest-driven -> task-driven
-    expertise = models.IntegerField() # 0->4, unfamiliar -> familiar
+    time_condition = models.IntegerField()  # 0->4, urgent -> relaxed
+    specificity = models.IntegerField()  # 0->4, broad -> clear
+    expertise = models.IntegerField()  # 0->4, unfamiliar -> familiar
+
+
+# Task Dataset
+class TaskDataset(models.Model):
+    id = models.AutoField(primary_key=True)
+    name = models.CharField(max_length=1000)
+    path = models.CharField(max_length=1000)
+
+
+class TaskDatasetEntry(models.Model):
+    id = models.AutoField(primary_key=True)
+    belong_dataset = models.ForeignKey(
+        TaskDataset,
+        on_delete=models.CASCADE,
+    )
+    question = models.CharField(max_length=10000)
+    answer = models.JSONField()
+
+    num_associated_tasks = models.IntegerField(default=0)  # number of tasks associated with this entry
 
 
 # Task
@@ -165,12 +188,19 @@ class Task(models.Model):
     user = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
-        )
+    )
 
     # basic information
-    active = models.BooleanField(default=True) # whether the task is active
+    active = models.BooleanField(default=True)  # whether the task is active
     start_timestamp = models.IntegerField()
     end_timestamp = models.IntegerField(null=True)
+
+    # task content
+    task_content = models.ForeignKey(
+        TaskDatasetEntry,
+        on_delete=models.CASCADE,
+        null=True,
+    )
 
     # pre-task annotation
     pre_annotation = models.ForeignKey(
@@ -178,24 +208,28 @@ class Task(models.Model):
         related_name='pre_annotation',
         on_delete=models.CASCADE,
         null=True,
-        )
+    )
 
     # post-task annotation
     post_annotation = models.ForeignKey(
         PostTaskAnnotation,
         on_delete=models.CASCADE,
         null=True,
-        )
+    )
 
-    need_update_pre_annotation = models.BooleanField(null=True) # whether the pre-task annotation needs to be updated
-    updated_pre_annotation = models.ForeignKey(
-        PreTaskAnnotation,
-        related_name='updated_pre_annotation',
+
+# Task Submission
+class TaskSubmission(models.Model):
+    id = models.AutoField(primary_key=True)
+    timestamp = models.IntegerField()
+
+    answer = models.CharField(max_length=10000)
+    is_correct = models.BooleanField(default=False)
+
+    belong_task = models.ForeignKey(
+        Task,
         on_delete=models.CASCADE,
-        null=True,
-        )
-
-
+    )
 
 
 # Webpages
@@ -209,6 +243,8 @@ class Webpage(models.Model):
         Task,
         on_delete=models.CASCADE,
     )
+
+
     title = models.CharField(max_length=100)
     url = models.CharField(max_length=1000)
     referrer = models.CharField(max_length=1000)
@@ -227,11 +263,11 @@ class EventAnnotation(models.Model):
     user = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
-        )
+    )
     belong_task = models.ForeignKey(
         Task,
         on_delete=models.CASCADE,
-        )
+    )
 
     annotation_status = models.BooleanField(default=False)
 
@@ -239,5 +275,5 @@ class EventAnnotation(models.Model):
     target = models.CharField(max_length=50)
     timestamp = models.IntegerField()
     detail = models.CharField(max_length=1000)  # description of the event
-    is_key_event = models.BooleanField(default=False) # whether this event is a key event
+    is_key_event = models.BooleanField(default=False)  # whether this event is a key event
     remarks = models.CharField(max_length=1000)  # remarks of the event

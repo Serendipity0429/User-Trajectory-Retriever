@@ -4,3 +4,5 @@ THUIRChromeExtension
 SQLiteSpy_1.9.13
 rrweb
 __pycache__
+dataset
+*.ipynb

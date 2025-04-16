@@ -51,7 +51,7 @@ label {
 }
 
 .btn-primary:hover {
-    background-color: #5b91be;
+    background-color: #448ab4;
 }
 
 .btn-primary:active {
@@ -71,4 +71,31 @@ div.question-wrapper > div {
 
 .webpage-wrapper {
     margin: 20px 0 20px 0;
+}
+
+.task_wrapper {
+    border-radius: 4px;
+    padding: 10px 23px 20px;
+    margin: 5px 0px 5px 0px;
+    border: 1px solid #c2c9c9;
+    transition: all 0.2s ease-in-out;
+}
+
+.task_wrapper:hover {
+    transform: scale(1.01);
+    transition: all 0.2s ease-in-out;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    cursor: pointer;
+}
+
+.cancel-button {
+    background-color: #777e7e !important;
+}
+
+.cancel-button:hover {
+    background-color: #555757 !important;
+}
+
+.cancel-button:active {
+    background-color: #444545 !important;
 }

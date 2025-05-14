@@ -18,12 +18,15 @@ urlpatterns = [
     re_path(r'^show_me_serp/([0-9]+)/$', views.show_me_serp),
 
     re_path(r'^pre_task_annotation/([0-9]+)/$', views.pre_task_annotation), # Preliminary task annotation
+    re_path(r'^reflection_annotation/([0-9]+)/([0-9]+)/$', views.reflection_annotation), # Reflection annotation
     re_path(r'^post_task_annotation/([0-9]+)/$', views.post_task_annotation), # Post task annotation
-    re_path(r'^show_task_info/([0-9]+)/$', views.show_task_info), # Show task information
-    path('show_tool_use_page', views.show_tool_use_page), # Show tool use page
-    re_path(r'^tool_use/([0-9]+)/$', views.tool_use), # Tool use
-    re_path(r'^submit_answer/([0-9]+)/$', views.submit_answer), # Submit answer
-    path('cancel_task/', views.cancel_task), # Cancel task
+    re_path(r'^show_task/([0-9]+)/$', views.show_task), # Show task
+    re_path(r'^view_task_info/([0-9]+)/$', views.view_task_info), # View task info
+    path('show_tool_use_page/', views.show_tool_use_page), # Show tool use page
+    path('tool_use/', views.tool_use), # Tool use
+    re_path(r'^submit_answer/([0-9]+)/([0-9]+)/$', views.submit_answer), # Submit answer
+    re_path(r'^cancel_task/([0-9]+)/$', views.cancel_task), # Cancel task
+    re_path(r'remove_task/([0-9]+)/$', views.remove_task), # Remove task
     path('active_task/', views.active_task),
     path('initialize/', views.initialize),
 ]

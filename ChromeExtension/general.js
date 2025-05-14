@@ -3,20 +3,6 @@ var taskUrl = baseUrl + "/task/";
 var dataUrl = taskUrl + "data/";
 if (debug) console.log("General Page is Loade;d!");
 
-mPage.initialize = function () {
-    mPage.click_results = new Array();
-    mPage.click_others = new Array();
-    mPage.event_list = new Array();
-    mPage.init_content();
-};
-
-mPage.init_content = function () {
-    mPage.title = document.title;
-};
-
-setTimeout(mPage.init_content, 1500);
-setTimeout(mPage.init_content, 3000);
-
 var last_active_event_timestamp = -1;
 var last_passive_event_timestamp = -1;
 var min_active_event_interval = 200;
@@ -31,6 +17,22 @@ var on_annotation = false; // whether the annotation window is on
 var is_server_page = window.location.href.substring(0, 21) == baseUrl;
 
 // TODO: enable drag and drop for the annotation window
+
+// get the element hierarchy in HTML format
+// leave only the tag name, id, and class name
+function getElementHierarchyHTML(element) {
+  let current = element;
+  let html = '';
+
+  while (current) {
+    const tagName = current.tagName.toLowerCase();
+    const id = current.id ? ` id="${current.id}"` : '';
+    const className = current.className ? ` class="${current.className}"` : '';
+    html = `<${tagName}${id}${className}>${html}</${tagName}>`;
+    current = current.parentElement;
+  }
+  return html;
+}
 
 // display the annotation window
 function displayAnnotationWindow(event, target, type, event_time, screen_x, screen_y, client_x, client_y, tag, content, related_info) {
@@ -237,6 +239,7 @@ function displayAnnotationWindow(event, target, type, event_time, screen_x, scre
     $('#submit-btn').click(function () {
         const purpose = $('#purpose').val().trim();
         const isKeyEvent = $('#key-event').is(':checked');
+        let hierarchy = getElementHierarchyHTML(target);
 
         // Basic validation
         if (!purpose) {
@@ -257,7 +260,7 @@ function displayAnnotationWindow(event, target, type, event_time, screen_x, scre
         $('#key-event').prop('checked', false);
 
         endAnnotation();
-        activeEventEnd(type, event_time, screen_x, screen_y, client_x, client_y, tag, content, related_info, annotation);
+        activeEventEnd(type, event_time, screen_x, screen_y, client_x, client_y, tag, content, hierachy, related_info, annotation);
     });
 
     // Ignore button handler
@@ -302,7 +305,6 @@ function unfreezePage() {
         document.documentElement.style.overflow = '';
         document.body.style.overflow = '';
         document.documentElement.style.touchAction = 'auto';
-
         freeze_overlay.remove();
     }
 }
@@ -323,6 +325,9 @@ function recoverAbsoluteLink(relative_link) {
 /*
     Event handlers
  */
+
+// !important !important
+var PASSIVE_MODE = true; // whether to annotate the events
 
 // Active event handler
 function activeEventHandler(event, type) {
@@ -349,16 +354,18 @@ function activeEventHandler(event, type) {
         return;
     }
 
-    event.preventDefault();
-    event.stopPropagation(); // stop the event from bubbling up
+    if (!PASSIVE_MODE) {
+        event.preventDefault();
+        event.stopPropagation(); // stop the event from bubbling up
+    }
 
-    var e = event || window.event;
-    var screen_x = e.screenX;
-    var screen_y = e.screenY;
-    var client_x = e.clientX;
-    var client_y = e.clientY;
-    var target = e.currentTarget;
-    var tag = e.target.tagName; // tag name
+    let e = event || window.event;
+    let screen_x = e.screenX;
+    let screen_y = e.screenY;
+    let client_x = e.clientX;
+    let client_y = e.clientY;
+    let target = e.currentTarget;
+    let tag = e.target.tagName; // tag name
 
     if (client_x == undefined) {
         // set the position to the center of the webpage
@@ -371,7 +378,7 @@ function activeEventHandler(event, type) {
 
     if (debug) console.log("client_x: " + client_x + " client_y: " + client_y);
 
-    var content = "";
+    let content = "";
     if (tag == "img") {
         content = e.target.src;
     } else if (tag == "input" || tag == "textarea") {
@@ -381,7 +388,7 @@ function activeEventHandler(event, type) {
     }
 
 
-    var href = $($(this).get(0)).attr("href");
+    let href = $($(this).get(0)).attr("href");
     href = recoverAbsoluteLink(href);
 
     related_info = {'href': href};
@@ -390,9 +397,9 @@ function activeEventHandler(event, type) {
         case 'click':
             if (tag == 'input' || tag == 'button') {
                 // get the form element that the button belongs to
-                var form = $(target).closest('form');
+                let form = $(target).closest('form');
                 if (form.length > 0) {
-                    var form_href = form.attr('action');
+                    let form_href = form.attr('action');
                     // parse the form link
                     form_href = recoverAbsoluteLink(related_info);
                     related_info = {'href': form_href};
@@ -403,13 +410,18 @@ function activeEventHandler(event, type) {
             break;
     }
 
-    // open an annotation window at the clicked position
-    displayAnnotationWindow(event, target, type, event_time, screen_x, screen_y, client_x, client_y, tag, content, related_info);
+    if (PASSIVE_MODE) {
+        let hierachy = getElementHierarchyHTML(e.target);
+        activeEventEnd(type, event_time, screen_x, screen_y, client_x, client_y, tag, content, hierachy, related_info, '');
+    } else {
+        // open an annotation window at the clicked position
+        displayAnnotationWindow(event, target, type, event_time, screen_x, screen_y, client_x, client_y, tag, content, related_info);
+    }
 }
 
-function activeEventEnd(type, event_time, screen_x, screen_y, client_x, client_y, tag, content, related_info, annotation) {
+function activeEventEnd(type, event_time, screen_x, screen_y, client_x, client_y, tag, content, hierachy, related_info, annotation) {
     // add the event to the event list
-    mPage.addActiveEvent(type, event_time, screen_x, screen_y, client_x, client_y, tag, content, related_info, annotation);
+    mPage.addActiveEvent(type, event_time, screen_x, screen_y, client_x, client_y, tag, content, hierachy, related_info, annotation);
 }
 
 
@@ -487,8 +499,10 @@ function passiveEventHandler(event, type) {
             break;
     }
 
+    let hierachy = getElementHierarchyHTML(e.target);
+
     // add the event to the event list
-    mPage.addPassiveEvent(type, event_time, screen_x, screen_y, client_x, client_y, tag, content, related_info);
+    mPage.addPassiveEvent(type, event_time, screen_x, screen_y, client_x, client_y, tag, content, hierachy, related_info);
 }
 
 function clickEvent(event, is_active = true) {
@@ -497,7 +511,6 @@ function clickEvent(event, is_active = true) {
     } else {
         passiveEventHandler(event, 'click');
     }
-    // mPage.update(); // in case the DOM is changed
 }
 
 function activeClickEvent(event) {
@@ -556,10 +569,23 @@ function windowFocusEvent(event) {
     End of event handlers
  */
 
-// !important !important
-var PASSIVE_MODE = true; // whether to annotate the events
+mPage.init_content = function () {
+    mPage.title = document.title;
+};
 
-if (PASSIVE_MODE || current_url.substring(0, 21) == baseUrl) {
+mPage.initialize = function () {
+    mPage.click_results = new Array();
+    mPage.click_others = new Array();
+    mPage.event_list = new Array();
+    mPage.init_content();
+};
+
+mPage.initialize();
+
+setTimeout(mPage.init_content, 500); // wait for the page to load
+setTimeout(mPage.init_content, 3000); // wait for the page to load
+
+if (current_url.substring(0, 21) == baseUrl) {
     mPage.update = function () {
     };
 } else {
@@ -574,7 +600,7 @@ if (PASSIVE_MODE || current_url.substring(0, 21) == baseUrl) {
                     var tag_name = $(element).prop("tagName");
                     var type = $(element).attr("type");
                     // if ($(element).attr('href') != undefined || tag_name == 'BUTTON' || type == 'submit' || type == 'button') {
-                    if($(element).attr('href') != undefined && tag_name == 'A') {
+                    if ($(element).attr('href') != undefined && tag_name == 'A') {
                         $(element).attr("bindClick", true);
                         $(element).on("click", activeClickEvent);
                     } else {

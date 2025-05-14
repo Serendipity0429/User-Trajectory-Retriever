@@ -1,6 +1,6 @@
 {% extends "base.html" %}
-{% block title %} Post-Task Annotation {% endblock %}
-{% block content_title %} Post-Task Annotation {% endblock %}
+{% block title %} Task Trajectories & Annotations {% endblock %}
+{% block content_title %} Task Trajectories & Annotations {% endblock %}
 {% block content %}
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/rrweb-player@latest/dist/style.css"/>
     <script src="https://cdn.jsdelivr.net/npm/rrweb-player@latest/dist/index.js"></script>
@@ -65,15 +65,10 @@
                         <br/>
                         <div class="static-task-info">{{ question }}</div>
                         <span class="col-xs-12 list_row">
-                            &emsp;<b>Whose answer is:</b>
+                            <b>Whose answer is:</b>
                         </span>
                         <br/>
-                        <div class="static-task-info">
-                            {% for item in answer %}
-                                {{ item }}
-                                {% if not forloop.last %}, {% endif %}
-                            {% endfor %}
-                        </div>
+                        <div class="static-task-info">{{ answer3 }}</div>
                     </div>
 
                     <div class="question-wrapper">

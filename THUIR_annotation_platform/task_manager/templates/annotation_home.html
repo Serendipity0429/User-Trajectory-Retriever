@@ -10,23 +10,6 @@
     <div class="row">
         <div class="col-xs-offset-1 col-xs-5">
             <div class="col-xs-12 list_header">
-                Uncompleted Tasks
-            </div>
-            {% for task_id, webpages in unannotated_tasks_to_webpages %}
-                <div class="col-xs-12 list_row">
-                    <a href="/task/task_annotation1/{{ task_id }}" class="col-xs-8 submit-btn btn btn-primary">
-                        Annotate Task ID: {{ task_id }}
-                    </a>
-                    <ul>
-                        {% for webpage in webpages %}
-                            <li class="col-xs-12">{{ webpage.title }}</li>
-                        {% endfor %}
-                    </ul>
-                </div>
-            {% endfor %}
-        </div>
-        <div class="col-xs-5">
-            <div class="col-xs-12 list_header">
                 Completed Tasks
             </div>
             {% for task_id, webpages in annotated_tasks_to_webpages %}
@@ -40,16 +23,50 @@
                     <div id="see-{{ task_id }}-btn" class="col-xs-12 submit-btn btn btn-block btn-lg btn-primary">
                         View Trajectories and Annotations
                     </div>
+                    <div id="remove-{{ task_id }}-btn" class="col-xs-12 submit-btn btn btn-block btn-lg btn-primary cancel-button">
+                        Remove Task
+                    </div>
                 </div>
                 <script>
-                    $(function() {
+                    $(function () {
                         $('#see-{{ task_id }}-btn').click(
                             function () {
-                                window.location.href = '/task/show_task_info/{{ task_id }}';
+                                window.location.href = '/task/show_task/{{ task_id }}/';
+                            }
+                        );
+                        $('#remove-{{ task_id }}-btn').click(
+                            function () {
+                                if (confirm("Are you sure to remove this task?")) {
+                                    $.ajax({
+                                        type: "POST",
+                                        url: "/task/remove_task/{{ task_id }}/",
+                                        success: function (response) {
+                                            alert(response);
+                                            window.location.reload();
+                                        },
+                                        error: function (xhr, status, error) {
+                                            alert("Error removing task: " + error);
+                                        }
+                                    });
+                                }
                             }
                         );
                     });
                 </script>
+            {% endfor %}
+        </div>
+        <div class="col-xs-5">
+            <div class="col-xs-12 list_header">
+                Ongoing Tasks
+            </div>
+            {% for task_id, webpages in unannotated_tasks_to_webpages %}
+                <div class="col-xs-12 list_row">
+                    <ul>
+                        {% for webpage in webpages %}
+                            <li class="col-xs-12">{{ webpage.title }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
             {% endfor %}
         </div>
     </div>

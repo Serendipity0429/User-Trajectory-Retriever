@@ -136,33 +136,6 @@ class SERPAnnotation(models.Model):
     serendipity_1 = models.CharField(max_length=1000)
 
 
-# Pre-task annotation
-class PreTaskAnnotation(models.Model):
-    id = models.AutoField(primary_key=True)
-    annotation_status = models.BooleanField(default=False)
-
-    description = models.CharField(max_length=1000)
-    completion_criteria = models.CharField(max_length=1000)
-    difficulty = models.IntegerField()  # 0->4, easy -> hard
-    effort = models.IntegerField()  # 0->4, low -> high
-
-# Reflection annotation
-class ReflectionAnnotation(models.Model):
-    id = models.AutoField(primary_key=True)
-
-    failure_reason = models.CharField(max_length=10000) # reason for failure
-    future_plan = models.CharField(max_length=10000) # future adjustments and plans
-
-# Post-task annotation
-class PostTaskAnnotation(models.Model):
-    id = models.AutoField(primary_key=True)
-    annotation_status = models.BooleanField(default=False)
-
-    time_condition = models.IntegerField()  # 0->4, urgent -> relaxed
-    specificity = models.IntegerField()  # 0->4, broad -> clear
-    expertise = models.IntegerField()  # 0->4, unfamiliar -> familiar
-
-
 # Task Dataset
 class TaskDataset(models.Model):
     id = models.AutoField(primary_key=True)
@@ -191,40 +164,73 @@ class Task(models.Model):
     )
 
     # basic information
+    cancelled = models.BooleanField(default=False)  # whether the task is cancelled
     active = models.BooleanField(default=True)  # whether the task is active
     start_timestamp = models.IntegerField()
     end_timestamp = models.IntegerField(null=True)
 
     # task content
-    task_content = models.ForeignKey(
+    content = models.ForeignKey(
         TaskDatasetEntry,
         on_delete=models.CASCADE,
         null=True,
     )
 
-    # pre-task annotation
-    pre_annotation = models.ForeignKey(
-        PreTaskAnnotation,
-        related_name='pre_annotation',
-        on_delete=models.CASCADE,
-        null=True,
-    )
-
-    # post-task annotation
-    post_annotation = models.ForeignKey(
-        PostTaskAnnotation,
-        on_delete=models.CASCADE,
-        null=True,
-    )
+    # trial-and-error
+    num_trial = models.IntegerField(default=0)  # number of trials
 
 
-# Task Submission
-class TaskSubmission(models.Model):
+# Pre-task annotation
+class PreTaskAnnotation(models.Model):
     id = models.AutoField(primary_key=True)
-    timestamp = models.IntegerField()
+    belong_task = models.ForeignKey(
+        Task,
+        on_delete=models.CASCADE,
+    )
+
+    description = models.CharField(max_length=1000, null=True)
+    completion_criteria = models.CharField(max_length=1000, null=True)
+    difficulty = models.IntegerField()  # 0->4, easy -> hard
+    effort = models.IntegerField()  # 0->4, low -> high
+
+# Reflection annotation
+class ReflectionAnnotation(models.Model):
+    id = models.AutoField(primary_key=True)
+
+    failure_reason = models.CharField(max_length=10000) # reason for failure
+    future_plan = models.CharField(max_length=10000) # future adjustments and plans
+
+# Post-task annotation
+class PostTaskAnnotation(models.Model):
+    id = models.AutoField(primary_key=True)
+    belong_task = models.ForeignKey(
+        Task,
+        on_delete=models.CASCADE,
+    )
+
+    expertise = models.IntegerField()  # 0->4, unfamiliar -> familiar
+    reflection = models.CharField(max_length=10000, null=True)  # reflection on the task
+
+    # If task is cancelled
+    cancel_reason = models.CharField(max_length=10000, null=True)  # reason for cancellation
+    cancel_reflection = models.CharField(max_length=10000, null=True)  # reflection on cancellation
+
+
+# Task Trial
+class TaskTrial(models.Model):
+    id = models.AutoField(primary_key=True)
+    start_timestamp = models.IntegerField()
+    end_timestamp = models.IntegerField()
+    num_trial = models.IntegerField()  # number of trials
 
     answer = models.CharField(max_length=10000)
     is_correct = models.BooleanField(default=False)
+
+    reflection_annotation = models.ForeignKey(
+        ReflectionAnnotation,
+        on_delete=models.CASCADE,
+        null=True,
+    )
 
     belong_task = models.ForeignKey(
         Task,

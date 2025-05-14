@@ -1,8 +1,8 @@
 Structure.md
 db.sqlite3
 THUIRChromeExtension
-SQLiteSpy_1.9.13
-rrweb
 __pycache__
 dataset
 *.ipynb
+utils
+tempFiles

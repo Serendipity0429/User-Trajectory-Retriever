@@ -12,61 +12,63 @@
             <form class="col-xs-12" id="query-form" action="" method="post" onsubmit="validateForm()"
                   enctype='multipart/form-data'>
                 {% csrf_token %}
-                <div class="col-xs-12" style="border:1px dashed #000; border-radius:10px">
+                <div class="col-xs-12 sheet">
+                    <input type="hidden" name="entry_id" id="entry-id" value="{{entry_id}}">
                     <div class="question-wrapper">
-                        1. <b>Task Description</b>: You need to answer the following question:
-                        <div class="col-xs-12 list_row">
-                            <div>{{ question }}</div>
-                        </div>
+                        <span class="col-xs-12 list_row">
+                            1. <b>Task Description</b>: You need to answer the following question:
+                            </span>
+                        <br/>
+                        <div class="static-task-info">{{ question }}</div>
+                    </div>
 
-                        <div class="question-wrapper">
-                            2. <b>Task Completion Criteria</b>: The criteria for task completion.</label>
-                            <div class="col-xs-12 list_row">
-                                Exact Match
-                            </div>
-                        </div>
+                    <div class="question-wrapper">
+                        <span class="col-xs-12 list_row">
+                            2. <b>Task Completion Criteria</b>: The criteria for task completion.</span>
+                        <br/>
+                        <div class="static-task-info">exact match</div>
+                    </div>
 
-                        <div class="question-wrapper">
-                            <label for="difficulty_ratio" class="ratio col-xs-12 list_row">3. <b>Difficulty</b>: How do
-                                you
-                                evaluate the difficulty of the task？</label>
-                            <div class="ratio col-xs-12 list_row">
-                                <label><input type="radio" name="difficulty" value="0"/> 0：Very easy</label><br>
-                                <label><input type="radio" name="difficulty" value="1"/> 1：Easy</label><br>
-                                <label><input type="radio" name="difficulty" value="2"/> 2：A little bit
-                                    difficult</label><br>
-                                <label><input type="radio" name="difficulty" value="3"/> 3：Difficult</label><br>
-                                <label><input type="radio" name="difficulty" value="4"/> 4：Very difficult</label><br>
-                            </div>
+                    <div class="question-wrapper">
+                        <label for="difficulty_ratio" class="ratio col-xs-12 list_row">3. <b>Difficulty</b>: How do
+                            you evaluate the difficulty of the task？</label>
+                        <div class="ratio col-xs-12 list_row ">
+                            <label><input type="radio" name="difficulty" value="0"/> 0：Very easy</label><br>
+                            <label><input type="radio" name="difficulty" value="1"/> 1：Easy</label><br>
+                            <label><input type="radio" name="difficulty" value="2"/> 2：A little bit
+                                difficult</label><br>
+                            <label><input type="radio" name="difficulty" value="3"/> 3：Difficult</label><br>
+                            <label><input type="radio" name="difficulty" value="4"/> 4：Very difficult</label><br>
                         </div>
+                    </div>
 
-                        <div class="question-wrapper">
-                            <label for="effort_ratio" class="ratio col-xs-12 list_row">4. <b>Effort</b>: How much time
-                                do
-                                you
-                                expect to spend on this task?</label>
-                            <div class="ratio col-xs-12 list_row">
+                    <div class="question-wrapper">
+                        <label for="effort_ratio" class="ratio col-xs-12 list_row">4. <b>Effort</b>: How much time
+                            do
+                            you
+                            expect to spend on this task?</label>
+                        <div class="ratio col-xs-12 list_row">
                         <span style="display:flex;">One minute&emsp;<input type="range" style="width: 40%" name="effort"
                                                                            min="1" max="10" value="1" step="1"
                                                                            list="effort_marks" oninput="setEffort()"
                                                                            onchange="setEffort()"/>&emsp;Ten minutes or longer (Current choice:&ensp;<b><span
                                 id="effort_value">1</span></b>)</span><br>
-                                <datalist id="effort_marks">
-                                    <option>1</option>
-                                    <option>2</option>
-                                    <option>3</option>
-                                    <option>4</option>
-                                    <option>5</option>
-                                    <option>6</option>
-                                    <option>7</option>
-                                    <option>8</option>
-                                    <option>9</option>
-                                    <option>10</option>
-                                </datalist>
-                            </div>
+                            <datalist id="effort_marks">
+                                <option>1</option>
+                                <option>2</option>
+                                <option>3</option>
+                                <option>4</option>
+                                <option>5</option>
+                                <option>6</option>
+                                <option>7</option>
+                                <option>8</option>
+                                <option>9</option>
+                                <option>10</option>
+                            </datalist>
                         </div>
                     </div>
-                    <div class="col-xs-12"><br/></div>
+                </div>
+                <div class="col-xs-12"><br/></div>
 
             </form>
             <div class="col-xs-12">
@@ -79,12 +81,12 @@
         </script>
         <script>
             function setEffort() {
-                var effort_val = document.getElementById("effort_value");
+                let effort_val = document.getElementById("effort_value");
                 effort_val.innerText = document.getElementsByName("effort")[0].value;
             }
 
             function validateForm() {
-                var checks = $('input[type="checkbox"]:checked').map(function () {
+                let checks = $('input[type="checkbox"]:checked').map(function () {
                     return $(this).val();
                 }).get();
             }
@@ -93,23 +95,16 @@
             $(function () {
                 $('#query-btn').click(
                     function () {
-                        var difficulty = $("[name='difficulty']:checked");
-                        if (target_type.val() == null) {
-                            alert('Please choose a result type!');
-                            $("[name='target_type]").focus();
-                            return
-                        }
+                        let difficulty = $("[name='difficulty']:checked");
                         if (difficulty.val() == null) {
                             alert('Please check a difficulty button!');
                             $("[name='difficulty']").focus();
                             return
                         }
 
-                        if (confirm("Are you sure to submit all annotations?")) {
-                            task_submit = true;
+                        if (confirm("Are you sure to submit all the annotations?")) {
                             $('#query-form').submit();
                         }
-
                     }
                 );
             });

@@ -38,8 +38,7 @@
 
 .post-task {
     border: 1px dotted #2f4154;
-    padding: 2px;
-    padding-left: 10px;
+    padding: 2px 2px 2px 10px;
 }
 
 label {
@@ -48,6 +47,8 @@ label {
 
 .btn-primary {
     background-color: #2e718d;
+    margin-top: 10px;
+    margin-bottom: 10px;
 }
 
 .btn-primary:hover {
@@ -58,8 +59,17 @@ label {
     background-color: #5183ad;
 }
 
+div.question-wrapper {
+    padding-bottom: 20px;
+}
+
 div.question-wrapper > div {
     padding-left: 20px;
+}
+
+div.question-wrapper > div.static-task-info {
+    color: #ef2e3c;
+    font-weight: bold;
 }
 
 .rrweb-player-wrapper {
@@ -98,4 +108,24 @@ div.question-wrapper > div {
 
 .cancel-button:active {
     background-color: #444545 !important;
+}
+
+.tool-block {
+    margin-bottom: 20px;
+}
+
+.sheet {
+    border: 1px dashed #000;
+    border-radius: 0 0 10px 10px;
+    padding: 20px;
+    margin-bottom: 10px;
+}
+
+.question-wrapper textarea {
+    padding: 10px;
+    font-size: large;
+}
+
+details:hover {
+    cursor: pointer;
 }

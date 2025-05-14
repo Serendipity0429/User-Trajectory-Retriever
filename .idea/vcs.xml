@@ -4,6 +4,5 @@
     <mapping directory="" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/dataset/2wikimultihop" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/dataset/natural-questions" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/rrweb" vcs="Git" />
   </component>
 </project>

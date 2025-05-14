@@ -2,6 +2,8 @@
 # -*- coding: utf-8 -*-
 __author__ = 'defaultstr'
 
+from django.http import HttpResponse
+
 from .models import *
 
 try:
@@ -178,12 +180,21 @@ def print_json_debug(message):
 
 def store_data(message):
     print_json_debug(message)
-    webpage = Webpage()
     user = User.objects.get(username=message['username'])
     task = Task.objects.filter(user=user, active=True).first()
     if not task:
         print_debug("No active task found for user", user.username)
         return
+    # Check whether the webpage already exists
+    existing_webpage = Webpage.objects.filter(
+        url=message['url'],
+        belong_task=task,
+        user=user
+    ).first()
+    webpage = Webpage()
+    if existing_webpage: # if the webpage already exists, update it
+        webpage = existing_webpage
+
     webpage.belong_task = task
     webpage.user = user
     webpage.title = message['title']
@@ -199,3 +210,35 @@ def store_data(message):
 
     if not message['url'].startswith(f'{ip_to_launch}'):  # ip_to_launch should be set manually
         webpage.save()
+
+
+# TODO: use LLM to validate the answer
+def check_answer(entry, user_answer):
+    try:
+        entry_answer = json.loads(entry.answer)
+    except json.JSONDecodeError:
+        print("Error decoding JSON:", entry.answer)
+        return False
+
+    if isinstance(entry_answer, list):
+        entry_answer = [str(ans) for ans in entry_answer]
+    if isinstance(entry_answer, str):
+        entry_answer = [entry_answer]
+
+    is_correct = False
+    if user_answer in entry_answer:
+        is_correct = True
+
+    return is_correct
+
+
+def close_window():
+    return HttpResponse('<html><body><script>window.close()</script></body></html>')
+
+def get_active_task_dataset():
+    active_dataset = "nq_hard_questions"
+    try:
+        active_dataset = TaskDataset.objects.filter(active=True).first()
+    except Exception as e:
+        print(f"Error getting active dataset {active_dataset}, error: {e}")
+    return active_dataset

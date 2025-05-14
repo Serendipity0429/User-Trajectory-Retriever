@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from django.http import HttpResponse
 from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
 
@@ -141,7 +140,7 @@ def pre_query_annotation(user, request, timestamp):
         new_query.effort = effort
         new_query.start_timestamp = timestamp
         new_query.save()
-        return HttpResponse('<html><body><script>window.close()</script></body></html>')
+        return close_window()
 
     # GET
     return render(
@@ -330,7 +329,6 @@ def show_me_serp(request, query_id):
     )
 
 
-
 # =============================================
 # =         Below is newly added code         =
 # =============================================
@@ -358,19 +356,35 @@ def pre_task_annotation(user, request, timestamp):
         task.user = user
         task.active = True
         task.start_timestamp = timestamp
+        entry_id = int(request.POST.get('entry_id'))
+        entry = TaskDatasetEntry.objects.filter(id=entry_id).first()
+        if entry is None:
+            return HttpResponse('No entry found with entry_id={}'.format(entry_id))
+        task.content = entry
+        task.save()
 
         pre_annotation = PreTaskAnnotation()
+        pre_annotation.belong_task = task
         pre_annotation.description = request.POST.get('description')
         pre_annotation.completion_criteria = request.POST.get('completion_criteria')
         pre_annotation.difficulty = request.POST.get('difficulty')
         pre_annotation.effort = request.POST.get('effort')
         pre_annotation.save()
 
-        task.pre_annotation = pre_annotation
-        task.save()
-        return HttpResponse('<html><body><script>window.close()</script></body></html>')
+        return close_window()
 
     # Randomly choose a task from the dataset
+    dataset = get_active_task_dataset()
+    if dataset is None:
+        return HttpResponse('No dataset found')
+    entries = TaskDatasetEntry.objects.filter(belong_dataset=dataset)
+    if not entries.exists():
+        return HttpResponse('No entries found in the dataset')
+    # sort by the number of associated tasks
+    entries = sorted(entries, key=lambda item: item.num_associated_tasks)
+    print_debug(f"[Question] {entries[0].question}")
+    print_debug(f"[Answer] {entries[0].answer}")
+    question = entries[0].question
 
     return render(
         request,
@@ -378,6 +392,8 @@ def pre_task_annotation(user, request, timestamp):
         {
             'cur_user': user,
             'task_timestamp': timestamp,
+            'question': question,
+            'entry_id': entries[0].id,
         }
     )
 
@@ -393,20 +409,16 @@ def post_task_annotation(user, request, task_id):
             task.active = False
 
             post_annotation = PostTaskAnnotation()
-            post_annotation.completion_level = request.POST.get('completion_level')
-            post_annotation.completion_reason = request.POST.get('completion_reason')
-            post_annotation.time_condition = request.POST.get('time_condition')
-            post_annotation.specificity = request.POST.get('specificity')
-            post_annotation.trigger = request.POST.get('trigger')
             post_annotation.expertise = request.POST.get('expertise')
-
-            task.post_annotation = post_annotation
+            post_annotation.reflection = request.POST.get('reflection')
+            post_annotation.belong_task = task
+            post_annotation.save()
 
             task.save()
-            return HttpResponse('<html><body><script>window.close()</script></body></html>')
+            return close_window()
         # error
         print_debug("error in post_task_annotation")
-        return HttpResponse('<html><body><script>window.close()</script></body></html>')
+        return close_window()
 
     task = Task.objects.filter(id=task_id, user=user).first()
     if task is None:
@@ -418,6 +430,10 @@ def post_task_annotation(user, request, task_id):
     webpages = sorted(webpages, key=lambda item: item.start_timestamp)
     # print_debug(webpages[0].event_list)
 
+    question = task.content.question
+    answer = json.loads(task.content.answer)
+    print(answer)
+
     return render(
         request,
         'post_task_annotation.html',
@@ -425,6 +441,8 @@ def post_task_annotation(user, request, task_id):
             'cur_user': user,
             'task_id': task.id,
             'webpages': webpages,
+            'question': question,
+            'answer': answer,
         }
     )
 
@@ -432,22 +450,21 @@ def post_task_annotation(user, request, task_id):
 # Return active tasks
 @require_login
 def active_task(user, request):
-    if request.method == 'POST':
-        # Return active tasks
-        print_debug("active_task")
-        task = Task.objects.filter(user=user, active=True).first()
-        if task is None:
-            return HttpResponse(-1)
+    # Return active tasks
+    print_debug("active_task")
+    task = Task.objects.filter(user=user, active=True).first()
+    if task is None:
+        return HttpResponse(-1)
 
-        task_id = task.id
-        print_debug("Current Task ID: ", task_id)
-        # Query Mode
-        if 'task_id' in request.POST:
-            if request.POST['task_id'] == task_id:
-                return HttpResponse(1)
-            else:
-                return HttpResponse(-1)
-        return HttpResponse(task_id)
+    task_id = task.id
+    print_debug("Current Task ID: ", task_id)
+    # Query Mode
+    if 'task_id' in request.POST:
+        if request.POST['task_id'] == task_id:
+            return HttpResponse(1)
+        else:
+            return HttpResponse(-1)
+    return HttpResponse(task_id)
 
 
 # Initialize the task
@@ -517,9 +534,10 @@ def annotation_home(user, request):
         }
     )
 
+
 @require_login
-def show_task_info(user, request, task_id):
-    print_debug("function show_task_info")
+def show_task(user, request, task_id):
+    print_debug("function show_task")
     task = Task.objects.filter(id=task_id, user=user).first()
     if task is None:
         return HttpResponse(f'No task found with task_id={task_id}')
@@ -531,7 +549,7 @@ def show_task_info(user, request, task_id):
 
     return render(
         request,
-        'show_task_info.html',
+        'show_task.html',
         {
             'cur_user': user,
             'task_id': task.id,
@@ -539,6 +557,7 @@ def show_task_info(user, request, task_id):
             'task': task,
         }
     )
+
 
 @require_login
 def show_tool_use_page(user, request):
@@ -552,13 +571,13 @@ def show_tool_use_page(user, request):
         }
     )
 
+
 @require_login
-def tool_use(user, request, task_id):
+def tool_use(user, request):
     if request.method == 'POST':
         print_debug("tool_use")
 
         tool = request.POST['tool']
-        task = Task.objects.filter(id=task_id, user=user).first()
 
         for_url = ""
 
@@ -571,26 +590,115 @@ def tool_use(user, request, task_id):
         elif tool == "code":
             for_url = "https://www.jdoodle.com/start-coding"
 
-        return HttpResponseRedirect(for_url)
+        return HttpResponse(f'<html><head><meta http-equiv="refresh" content="0;url={for_url}"></head><body></body></html>')
+
 
 @require_login
-def cancel_task(user, request):
+def cancel_task(user, request, task_id):
     print_debug("function cancel_task")
+    task = Task.objects.filter(id=task_id, user=user).first()
+    if task is None:
+        return HttpResponse(f'No task found with task_id={task_id}')
+
     if request.method == 'POST':
-        task = Task.objects.filter(user=user, active=True).first()
-        if task is not None:
-            task.delete()
-            return HttpResponse('Task cancelled successfully')
-        else:
-            return HttpResponse('Task not found')
-    return HttpResponse('Invalid request method')
+        task.cancelled = True
+        task.active = False
+        task.save()
+        return close_window()
+
+    entry = task.content
+    question = entry.question
+
+    return render(
+        request,
+        'cancel_task.html',
+        {
+            'cur_user': user,
+            'task_id': task_id,
+            'question': question,
+        }
+    )
+
+
 
 @require_login
-def submit_answer(user, request, task_id):
+def reflection_annotation(user, request, task_id, end_timestamp):
+    print_debug("function reflection_annotation")
+    task = Task.objects.filter(id=task_id, user=user).first()
+    if task is None:
+        return HttpResponse(f'No task found with task_id={task_id}')
+    entry = task.content
+    question = entry.question
+    task_trial = TaskTrial.objects.filter(belong_task=task, end_timestamp=end_timestamp).first()
+    if task_trial is None:
+        return HttpResponse(f'No trial found with task_id={task_id} and end_timestamp={end_timestamp}')
+
+    if request.method == 'POST':
+        ref_annotation = ReflectionAnnotation()
+        ref_annotation.failure_reason = request.POST.get('failure_reason')
+        ref_annotation.future_plan = request.POST.get('future_plan')
+        ref_annotation.save()
+        task_trial.reflection_annotation = ref_annotation
+        task_trial.save()
+
+        return close_window()
+
+    # Filter the webpage whose timestamp is within the range of start_timestamp and timestamp
+    webpages = Webpage.objects.filter(belong_task=task, start_timestamp__gte=task_trial.start_timestamp,
+                                      start_timestamp__lt=end_timestamp)
+    # Sort by start_timestamp
+    webpages = sorted(webpages, key=lambda item: item.start_timestamp)
+
+    return render(
+        request,
+        'reflection_annotation.html',
+        {
+            'cur_user': user,
+            'task_id': task_id,
+            'question': question,
+            'webpages': webpages,
+        }
+    )
+
+
+@require_login
+def submit_answer(user, request, task_id, timestamp):
     print_debug("function submit_answer")
 
-    # TODO: load question
-    question = "THUIR"
+    task = Task.objects.filter(id=task_id, user=user).first()
+    if task is None:
+        return HttpResponse(f'No task found with task_id={task_id}')
+    question = task.content.question
+    start_timestamp = task.start_timestamp
+    if task.num_trial > 1:
+        last_task_trial = TaskTrial.objects.filter(belong_task=task, num_trial=task.num_trial - 1).first()
+        assert last_task_trial is not None  # Ensure that the last task trial exists, which should always be the case
+        start_timestamp.start_timestamp = last_task_trial.end_timestamp
+
+    if request.method == 'POST':
+        answer = request.POST.get('answer')
+        redirect_url = f'/task/post_task_annotation/{task_id}'
+        task_trial = TaskTrial()
+        task_trial.belong_task = task
+        task_trial.num_trial = task.num_trial + 1
+        task_trial.answer = answer
+        task_trial.start_timestamp = start_timestamp
+        task_trial.end_timestamp = timestamp
+
+        if check_answer(task.content, answer):
+            task_trial.is_correct = True
+        else:
+            task_trial.is_correct = False
+            redirect_url = f'/task/reflection_annotation/{task_id}/{timestamp}'
+
+        task_trial.save()
+        return HttpResponseRedirect(redirect_url)
+
+    # Filter the webpage whose timestamp is within the range of start_timestamp and timestamp
+    webpages = Webpage.objects.filter(belong_task=task, start_timestamp__gte=start_timestamp,
+                                      start_timestamp__lt=timestamp)
+    # Sort by start_timestamp
+    webpages = sorted(webpages, key=lambda item: item.start_timestamp)
 
     return render(
         request,
@@ -599,5 +707,35 @@ def submit_answer(user, request, task_id):
             'cur_user': user,
             'task_id': task_id,
             'question': question,
+            'webpages': webpages,
         }
     )
+
+
+@require_login
+def view_task_info(user, request, task_id):
+    print_debug("function view_task_info")
+    task = Task.objects.filter(id=task_id, user=user, active=True).first()
+    if task is None:
+        return HttpResponse(f'No task found with task_id={task_id}')
+
+    question = task.content.question
+
+    return render(
+        request,
+        'view_task_info.html',
+        {
+            'cur_user': user,
+            'task_id': task.id,
+            'question': question,
+        }
+    )
+
+@require_login
+def remove_task(user, request, task_id):
+    print_debug("function remove_task")
+    task = Task.objects.filter(id=task_id, user=user).first()
+    if task is None:
+        return HttpResponse(f'No task found with task_id={task_id}')
+    task.delete()
+    return HttpResponse('Task removed successfully')

@@ -6,9 +6,10 @@ var feedbackUrl = baseUrl + "/task/home/";
 var downloadLink = "";
 var taskSniff = null;
 var logged_in = false;
+var task_id = -1;
 
 function displayActiveTask() {
-    var task_id = getActiveTask();
+    task_id = getActiveTask();
     if (task_id == -1) {
         // No active task
         switchTaskButtonStatus('off');
@@ -207,7 +208,7 @@ function starttask() {
     // Disable the start task button
     $("#bt_start_task").attr("disabled", true);
     chrome.runtime.sendMessage({start_task: true});
-    var task_id = getActiveTask();
+    task_id = getActiveTask();
     if (task_id == -2) {
         alert("The server is not available. Please try again later.");
         switchTaskButtonStatus('off');
@@ -220,9 +221,8 @@ function starttask() {
     }
     var isConfirm = confirm("Do you want to start a task?");
     if (isConfirm) {
-        task_id = (new Date()).getTime();
-        window.open(baseUrl + '/task/pre_task_annotation/' + task_id, 'newwindow', 'height=1000,width=1200,top=0,left=0,toolbar=no,menubar=no,scrollbars=no, resizable=no,location=no, status=no');
-        switchTaskButtonStatus('on');
+        timestamp = (new Date()).getTime();
+        window.open(baseUrl + '/task/pre_task_annotation/' + timestamp, 'newwindow', 'height=1000,width=1200,top=0,left=0,toolbar=no,menubar=no,scrollbars=no, resizable=no,location=no, status=no');
     } else {
         switchTaskButtonStatus('off');
     }
@@ -231,10 +231,18 @@ function starttask() {
 // End a task
 function endtask() {
     // Ask back-end to end a task
+
+    // Send message to content.js to send webpage data back to server\
+    chrome.tabs.query({active: true, currentWindow: true}, function (tabs) {
+        chrome.tabs.sendMessage(tabs[0].id, {type: "msg_from_popup", update_webpage_info: true}, function (response) {
+            if (debug) console.log(response);
+        });
+    });
+
     // Disable the end task button
     $("#bt_end_task").attr("disabled", true);
     chrome.runtime.sendMessage({end_task: true});
-    var task_id = getActiveTask();
+    task_id = getActiveTask();
     if (task_id == -2) {
         alert("The server is not available. Please try again later.");
         switchTaskButtonStatus('on');
@@ -248,17 +256,32 @@ function endtask() {
     // var isConfirm = confirm("Do you want to end the task?");
     var isConfirm = confirm("Do you want to submit the answer?");
     if (isConfirm && task_id != -1) {
-        // window.open(baseUrl + '/task/post_task_annotation/' + task_id, 'newwindow', 'height=1000,width=1200,top=0,left=0,toolbar=no,menubar=no,scrollbars=no, resizable=no,location=no, status=no');
-        window.open(baseUrl + '/task/submit_answer/' + task_id, 'newwindow', 'height=1000,width=1200,top=0,left=0,toolbar=no,menubar=no,scrollbars=no, resizable=no,location=no, status=no');
-        switchTaskButtonStatus('off');
+        let timestamp = (new Date()).getTime();
+        window.open(baseUrl + '/task/submit_answer/' + task_id + '/' + timestamp, 'newwindow', 'height=1000,width=1200,top=0,left=0,toolbar=no,menubar=no,scrollbars=no, resizable=no,location=no, status=no');
+        if (getActiveTask() < 0)
+            switchTaskButtonStatus('off');
     } else {
         switchTaskButtonStatus('on');
     }
 }
 
+
+
 function canceltask() {
+    task_id = getActiveTask();
+    let isConfirm = confirm("Do you want to cancel the task?");
+    if (isConfirm && task_id != -1) {
+        // Ask back-end to cancel a task
+        window.open(baseUrl + '/task/cancel_task/' + task_id, 'newwindow', 'height=1000,width=1200,top=0,left=0,toolbar=no,menubar=no,scrollbars=no, resizable=no,location=no, status=no');
+    }
+}
 
-
+function viewtask() {
+    task_id = getActiveTask();
+    if (task_id != -1) {
+         let url = baseUrl + '/task/view_task_info/' + task_id + '/?username=' + localStorage['username'] + '&password=' + localStorage['password'];
+        window.open(url, 'newwindow', 'height=600,width=800,top=0,left=0,toolbar=no,menubar=no,scrollbars=no, resizable=no,location=no, status=no');
+    }
 }
 
 function tooluse() {
@@ -274,6 +297,7 @@ function switchTaskButtonStatus(task_status) {
         $("#bt_end_task").show();
         $("#bt_start_task").hide();
         $("#bt_cancel_task").attr("disabled", false);
+        $("#bt_view_task_info").attr("disabled", false);
         $("#bt_tool_use").attr("disabled", false);
     } else if (task_status == 'off') {
         $("#bt_start_task").attr("disabled", false);
@@ -281,6 +305,7 @@ function switchTaskButtonStatus(task_status) {
         $("#bt_end_task").hide();
         $("#bt_start_task").show();
         $("#bt_cancel_task").attr("disabled", true);
+        $("#bt_view_task_info").attr("disabled", true);
         $("#bt_tool_use").attr("disabled", true);
     }
 }
@@ -312,6 +337,7 @@ if (jQuery) {
     $("#bt_start_task").click(starttask);
     $("#bt_end_task").click(endtask);
     $("#bt_cancel_task").click(canceltask);
+    $("#bt_view_task_info").click(viewtask);
     $("#bt_tool_use").click(tooluse);
     if (verifyUser() == 0) {
         userTab();

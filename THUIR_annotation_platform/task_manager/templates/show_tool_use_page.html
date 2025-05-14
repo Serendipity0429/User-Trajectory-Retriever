@@ -8,20 +8,20 @@
         </h3>
     </div>
     <div class="row">
-        <form method="POST" action="/task/tool_use" id="tool_use_form">
+        <form method="POST" action="/task/tool_use/" id="tool_use_form">
             {% csrf_token %}
             <input type="hidden" name="tool" id="tool-hidden">
-            <div class="col-xs-offset-3 col-xs-6">
+            <div class="col-xs-offset-3 col-xs-6 tool-block">
                 <input type="submit" id="tool-math" class="col-xs-12 submit-btn btn btn-block btn-lg btn-primary"
                        value="Math" onclick="submitForm('math')">
             </div>
             <br/>
-            <div class="col-xs-offset-3 col-xs-6">
+            <div class="col-xs-offset-3 col-xs-6 tool-block">
                 <input type="submit" id="tool-graph" class="col-xs-12 submit-btn btn btn-block btn-lg btn-primary"
                        value="Graph" onclick="submitForm('graph')">
             </div>
             <br/>
-            <div class="col-xs-offset-3 col-xs-6">
+            <div class="col-xs-offset-3 col-xs-6 tool-block">
                 <input type="submit" id="tool-code" class="col-xs-12 submit-btn btn btn-block btn-lg btn-primary"
                        value="Code" onclick="submitForm('code')">
             </div>

@@ -59,8 +59,8 @@ var mPage = {
 
 
     // add a new event
-    addEvent(isActive, type, timestamp, screenX, screenY, clientX, clientY, tag, content, related_info, annotation = null) {
-        var new_event = {
+    addEvent(isActive, type, timestamp, screenX, screenY, clientX, clientY, tag, content, hierachy, related_info, annotation = null) {
+        let new_event = {
             isActive: isActive,
             type: type,
             timestamp: timestamp,
@@ -70,18 +70,19 @@ var mPage = {
             clientY: clientY,
             tag: tag,
             content: content,
+            hierachy: hierachy,
             related_info: related_info, // e.g. the href of a clicked link
             annotation: annotation,
         };
         mPage.event_list.push(new_event);
     },
 
-    addActiveEvent(type, timestamp, screenX, screenY, clientX, clientY, tag, content, related_info, annotation = null) {
-        mPage.addEvent(true, type, timestamp, screenX, screenY, clientX, clientY, tag, content, related_info, annotation);
+    addActiveEvent(type, timestamp, screenX, screenY, clientX, clientY, tag, content, hierachy, related_info, annotation = null) {
+        mPage.addEvent(true, type, timestamp, screenX, screenY, clientX, clientY, tag, content, hierachy, related_info, annotation);
     },
 
-    addPassiveEvent(type, timestamp, screenX, screenY, clientX, clientY, tag, content, related_info) {
-        mPage.addEvent(false, type, timestamp, screenX, screenY, clientX, clientY, tag, content, related_info);
+    addPassiveEvent(type, timestamp, screenX, screenY, clientX, clientY, tag, content, hierachy, related_info) {
+        mPage.addEvent(false, type, timestamp, screenX, screenY, clientX, clientY, tag, content, hierachy, related_info);
     },
 
     addRRWebEvent(event) {
@@ -91,7 +92,4 @@ var mPage = {
 };
 // var debug = true;
 var debug = false;
-
-
 if (debug) console.log("page.js is loaded");
-mPage.initialize();

@@ -43,7 +43,7 @@ python manage.py runserver 0.0.0.0:8000
 ## Some things you should notice
 * The baseURL in the extension should be the same with the base URL of the annotation platform.
 ```javascript
-var baseUrl = "http://127.0.0.1:8000";
+let baseUrl = "http://127.0.0.1:8000";
 ```  
 * You should ensure that the chrome extention is on before the search, or nothing will be recorded.  
 
@@ -66,6 +66,10 @@ var baseUrl = "http://127.0.0.1:8000";
 <p align="center">
   <img src="https://github.com/xuanyuan14/Web-Search-Field-Study-Toolkit/blob/master/images/setting.png">
 </p>
+
+## TODOs
+* [ ] move the timestamp to the backend
+* [ ] migrate the chrome manifest v2 to v3
 
 ## Citation
 

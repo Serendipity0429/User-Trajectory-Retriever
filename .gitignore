@@ -2,7 +2,6 @@ Structure.md
 db.sqlite3
 THUIRChromeExtension
 __pycache__
-dataset
 *.ipynb
 utils
 tempFiles

@@ -232,13 +232,6 @@ function starttask() {
 function endtask() {
     // Ask back-end to end a task
 
-    // Send message to content.js to send webpage data back to server\
-    chrome.tabs.query({active: true, currentWindow: true}, function (tabs) {
-        chrome.tabs.sendMessage(tabs[0].id, {type: "msg_from_popup", update_webpage_info: true}, function (response) {
-            if (debug) console.log(response);
-        });
-    });
-
     // Disable the end task button
     $("#bt_end_task").attr("disabled", true);
     chrome.runtime.sendMessage({end_task: true});
@@ -256,6 +249,14 @@ function endtask() {
     // var isConfirm = confirm("Do you want to end the task?");
     var isConfirm = confirm("Do you want to submit the answer?");
     if (isConfirm && task_id != -1) {
+        // TODO: Ask webpages to send data back to server
+        // Send message to content.js to send webpage data back to server\
+        chrome.tabs.query({active: true, currentWindow: true}, function (tabs) {
+            chrome.tabs.sendMessage(tabs[0].id, {type: "msg_from_popup", update_webpage_info: true}, function (response) {
+                if (debug) console.log(response);
+            });
+        });
+
         let timestamp = (new Date()).getTime();
         window.open(baseUrl + '/task/submit_answer/' + task_id + '/' + timestamp, 'newwindow', 'height=1000,width=1200,top=0,left=0,toolbar=no,menubar=no,scrollbars=no, resizable=no,location=no, status=no');
         if (getActiveTask() < 0)

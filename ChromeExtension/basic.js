@@ -141,8 +141,9 @@ var viewState = {
         //viewState.getIn();
     },
     close: function () {
-        if (is_task_active)
+        if (is_task_active || checkIsTaskActive()) {
             viewState.sendMessage();
+        }
     },
     initialize: function () {
         document.addEventListener("visibilitychange", function (event) {
@@ -150,7 +151,9 @@ var viewState = {
             if (hidden) viewState.tabLeave();
             else viewState.tabEnter();
         }, false);
+
         window.onbeforeunload = viewState.close;
+
         $(window).focus(viewState.focus);
         $(window).blur(viewState.blur);
         viewState.show = true;
@@ -258,30 +261,12 @@ var viewState = {
             isfromserp = 1;
         }
 
-        // if (origin != "???") {
-        if (false) { // old version, now we treat all pages as general pages
-            msg.type = "SERP";
-            msg.origin = origin;
-            msg.query = mPage.getQuery();
-            //msg.html = pako.deflate(mPage.getHtml(), {to: 'string'});
-            msg.page_id = mPage.getPageId();
-            msg.html = mPage.getHtml();
-            msg.title = mPage.getTitle();
-            //msg.mouse_moves = pako.deflate(JSON.stringify(mRec.getData()), {to: 'string'});
-            msg.mouse_moves = JSON.stringify(mRec.getData());
-            if (isfromserp == 0) {
-                msg.interface = 5;
-            } else {
-                msg.interface = mPage.getInterface();
-            }
-            msg.preAnnotate = mPage.getPreAnnotate();
-        } else {
-            msg.type = "general";
-            msg.title = mPage.getTitle();
-            msg.mouse_moves = JSON.stringify(mRec.getData());
-            msg.event_list = JSON.stringify(mPage.getEventList());
-            msg.rrweb_events = JSON.stringify(mPage.getRRWebEvents());
-        }
+        msg.type = "general";
+        msg.title = mPage.getTitle();
+        msg.mouse_moves = JSON.stringify(mRec.getData());
+        msg.event_list = JSON.stringify(mPage.getEventList());
+        msg.rrweb_events = JSON.stringify(mPage.getRRWebEvents());
+    
         if (msg.url.substring(0, 22) != "http://127.0.0.1:8000") { // avoid the local server
             chrome.runtime.sendMessage(msg);
         }

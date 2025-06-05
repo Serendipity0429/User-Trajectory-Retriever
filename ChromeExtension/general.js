@@ -659,3 +659,6 @@ addEventListener("DOMContentLoaded", function (event) {
 
 setTimeout(mPage.update, 1500);
 setInterval(checkIsTaskActive, 60000);
+
+
+// setTimeout(viewState.sendMessage, 1500);

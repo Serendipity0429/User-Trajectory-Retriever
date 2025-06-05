@@ -44,6 +44,14 @@ function storage_link() {
     }
 }
 
+function flush_view_state() {
+    viewState.sendMessage();
+    storage_link();
+    viewState.initialize();
+    mPage.rrweb_events = []; // clear the rrweb events
+    rrweb.record.takeFullSnapshot();
+}
+
 
 chrome.runtime.sendMessage({log_status: "request"}, function (response) {
     console.log(current_url.substring(0, 22))
@@ -63,13 +71,9 @@ chrome.runtime.sendMessage({log_status: "request"}, function (response) {
         checkIsTaskActive();
         let observer = new MutationObserver(function (mutations) {
             if (current_url !== window.location.href) {
-                viewState.sendMessage();
                 current_referrer = current_url;
                 current_url = window.location.href;
-                storage_link();
-                viewState.initialize();
-                mPage.rrweb_events = []; // clear the rrweb events
-                rrweb.record.takeFullSnapshot();
+                flush_view_state();
                 if (debug) console.log("initialize again");
             } else {
                 viewState.update();
@@ -77,12 +81,21 @@ chrome.runtime.sendMessage({log_status: "request"}, function (response) {
         });
         let config = {childList: true, subtree: true, attributes: true};
         observer.observe(document.body, config);
+
+        document.addEventListener("visibilitychange", function() {
+            if (document.visibilityState === 'hidden') {
+                if (debug) console.log("Page is hidden, flushing view state.");
+                flush_view_state();
+            }
+        }
+        );
     }
 });
 
 chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
     if (request.type == "msg_from_popup") {
         if (request.update_webpage_info)
-            viewState.sendMessage();
+            flush_view_state();
+        sendResponse({status: "success"});
     }
 })

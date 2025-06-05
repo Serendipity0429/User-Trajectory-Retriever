@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %} View Task Information {% endblock %}
+{% block content_title %} View Task Information {% endblock %}
+{% block content %}
+    <div class="row text-center">
+        <h3>
+            Task Information
+        </h3>
+    </div>
+    <div class="row">
+        <div class="col-xs-offset-1 col-xs-10">
+            {% csrf_token %}
+            <div class="col-xs-12" style="border:1px dashed #000; border-radius:10px">
+                <div class="question-wrapper">
+                        <span class="col-xs-12 list_row">
+                            1. <b>Task Description</b>: You need to answer the following question:
+                            </span>
+                    <br/>
+                    <div class="static-task-info">{{ question }}</div>
+                </div>
+
+                <div class="question-wrapper">
+                        <span class="col-xs-12 list_row">
+                            2. <b>Task Completion Criteria</b>: The criteria for task completion.</span>
+                    <br/>
+                    <div class="static-task-info">exact match</div>
+                </div>
+
+            </div>
+            <div class="col-xs-12">
+                <div id="confirm-btn" class="col-xs-6 submit-btn btn btn-block btn-lg btn-primary">
+                    Confirm
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+        $(function () {
+            $('#confirm-btn').click(
+                function () {
+                    // Close the popup
+                    window.close();
+                }
+            );
+        });
+    </script>
+
+{% endblock %}

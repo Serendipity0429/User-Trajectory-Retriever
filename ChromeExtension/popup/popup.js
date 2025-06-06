@@ -1,3 +1,4 @@
+var debug = false;
 var baseUrl = "http://127.0.0.1:8000";
 var checkUrl = baseUrl + "/user/check/";
 var loginUrl = baseUrl + "/user/login/";
@@ -255,13 +256,12 @@ function endtask() {
         chrome.tabs.query({active: true, currentWindow: true}, function (tabs) {
             chrome.tabs.sendMessage(tabs[0].id, {type: "msg_from_popup", update_webpage_info: true}, function (response) {
                 if (debug) console.log(response);
+                let timestamp = (new Date()).getTime();
+                window.open(baseUrl + '/task/submit_answer/' + task_id + '/' + timestamp, 'newwindow', 'height=1000,width=1200,top=0,left=0,toolbar=no,menubar=no,scrollbars=no, resizable=no,location=no, status=no');
+                if (getActiveTask() < 0)
+                    switchTaskButtonStatus('off');
             });
         });
-
-        let timestamp = (new Date()).getTime();
-        window.open(baseUrl + '/task/submit_answer/' + task_id + '/' + timestamp, 'newwindow', 'height=1000,width=1200,top=0,left=0,toolbar=no,menubar=no,scrollbars=no, resizable=no,location=no, status=no');
-        if (getActiveTask() < 0)
-            switchTaskButtonStatus('off');
     } else {
         switchTaskButtonStatus('on');
     }

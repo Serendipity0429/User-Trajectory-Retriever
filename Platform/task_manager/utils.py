@@ -32,7 +32,7 @@ def print_json_debug(message):
 
 
 def store_data(message):
-    is_storing_data = True
+    # is_storing_data = True
     print_json_debug(message)
     if message['url'].startswith(f'{ip_to_launch}'):  # ip_to_launch should be set manually
         print_debug("Skipping storing data for local URL:", message['url'])
@@ -68,7 +68,7 @@ def store_data(message):
     task.end_timestamp = message['end_timestamp']
     
     webpage.save()
-    is_storing_data = False
+    # is_storing_data = False
 
 def check_is_storing_data():
     global is_storing_data

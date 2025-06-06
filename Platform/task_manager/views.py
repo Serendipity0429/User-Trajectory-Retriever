@@ -354,7 +354,7 @@ def submit_answer(user, request, task_id, timestamp):
     print_debug("function submit_answer")
     
     # Wait until the storage is ready
-    wait_until_storing_data_done()
+    # wait_until_storing_data_done()
 
     task = Task.objects.filter(id=task_id, user=user).first()
     if task is None:

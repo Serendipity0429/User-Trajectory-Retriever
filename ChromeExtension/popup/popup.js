@@ -38,7 +38,7 @@ function userTab() {
     $("#bt_end_task").hide();
     displayActiveTask();
     // Routinely check whether there is an active task
-    taskSniff = setInterval(displayActiveTask, 2000);
+    taskSniff = setInterval(displayActiveTask, 3000);
 }
 
 function loginTab() {
@@ -194,6 +194,7 @@ function getActiveTask(task_id = null) {
         data: send_data,
         success: function (data, textStatus) {
             result = data;
+            chrome.runtime.sendMessage({ task_active: "request" });
         },
         error: function () {
             result = -2;
@@ -273,7 +274,8 @@ function canceltask() {
     let isConfirm = confirm("Do you want to cancel the task?");
     if (isConfirm && task_id != -1) {
         // Ask back-end to cancel a task
-        window.open(baseUrl + '/task/cancel_task/' + task_id, 'newwindow', 'height=1000,width=1200,top=0,left=0,toolbar=no,menubar=no,scrollbars=no, resizable=no,location=no, status=no');
+        let timestamp = (new Date()).getTime();
+        window.open(baseUrl + '/task/cancel_task/' + task_id + '/' + timestamp, 'newwindow', 'height=1000,width=1200,top=0,left=0,toolbar=no,menubar=no,scrollbars=no, resizable=no,location=no, status=no');
     }
 }
 

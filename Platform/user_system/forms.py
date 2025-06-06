@@ -88,7 +88,7 @@ class SignupForm(forms.Form):
         widget=forms.TextInput(
             attrs={
                 'class': 'form-control login-field',
-                'placeholder': u'gender',
+                'placeholder': u'Gender',
             }
         )
     )

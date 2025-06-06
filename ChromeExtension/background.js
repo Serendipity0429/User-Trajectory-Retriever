@@ -8,7 +8,7 @@ var logged_in = false;
 
 var lastReminder = 0;
 
-let current_task = -1;
+var current_task = -1;
 
 function storgeInfo(Msg) {
     var key = (new Date()).getTime();
@@ -31,7 +31,7 @@ function closeAllIrrelevantTabs() {      // 获取所有标签页
     });
 }
 
-function isTaskActive() {
+function checkTaskActive() {
     if (localStorage['username'] == undefined || localStorage['password'] == undefined || !logged_in) {
         return false;
     }
@@ -46,14 +46,15 @@ function isTaskActive() {
         async: false,
         data: send_data,
         success: function (data, textStatus) {
-            result = data != -1;
             if (current_task != data) {
                 closeAllIrrelevantTabs();
             }
             current_task = data;
+            result = data;
         },
         error: function () {
-            result = false;
+            result = -1;
+            current_task = -1;
         }
     });
     return result;
@@ -98,20 +99,11 @@ chrome.runtime.onMessage.addListener(function (Msg, sender, sendResponse) {
             sendResponse({ log_status: true });
         } else chrome.browserAction.setBadgeText({ text: '' });
         return;
-    } else if (Msg.link_store == "request") { // store the link
-        sessionStorage.setItem(Msg.url, Msg.serp_link);
-        sendResponse("sessionStorage done");
-        return;
     } else if (Msg.link_store == "request_update") { // store the link
         var now_time = new Date().getTime();
         var data = { interface: Msg.interface, expiry: now_time + 1800000 };
         localStorage.setItem(Msg.url + Msg.query, JSON.stringify(data));
         sendResponse("localStorage done");
-        return;
-    }
-    if (Msg.ref_request != undefined) { // get the link
-        var serp_link = sessionStorage.getItem(Msg.ref_request);
-        if (serp_link != undefined) sendResponse(serp_link); else sendResponse("");
         return;
     }
     if (Msg.interface_request != undefined) { // get the interface
@@ -145,8 +137,9 @@ chrome.runtime.onMessage.addListener(function (Msg, sender, sendResponse) {
     }
 
     if (Msg.task_active == "request") {
-        let task_active = isTaskActive();
-        sendResponse({ task_active: task_active });
+        let task_id = checkTaskActive();
+        let task_active = task_id != -1;
+        sendResponse({ task_active: task_active, task_id: task_id });
         return;
     }
 

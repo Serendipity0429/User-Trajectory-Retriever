@@ -1,6 +1,5 @@
 var mPage = {
     query: "",
-    page_id: 0,
     html: null,
     title: null,
     interface: 1,
@@ -21,10 +20,6 @@ var mPage = {
 
     getTitle: function () {
         return mPage.title;
-    },
-
-    getPageId: function () {
-        return mPage.page_id;
     },
 
     getInterface: function () {

@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+{% block title %} Reflection Annotation {% endblock %}
+{% block content_title %} Reflection Annotation {% endblock %}
+{% block content %}
+    <div class="row text-center">
+        <h3>
+            Your answer is <span style="color:red">WRONG!</span>
+        </h3>
+        <h3>
+            Please provide your feedback & reflection on this trial.
+        </h3>
+    </div>
+    <div class="row">
+        <div class="col-xs-offset-1 col-xs-10">
+            <details>
+                <summary class="col-xs-12 list_header">
+                    Trajectories of this trial
+                </summary>
+                <div class="col-xs-offset-1 col-xs-10" id="trajectories">
+                    {% for webpage in webpages %}
+                        <div class="col-xs-12 list_row webpage-wrapper">
+                            {#                style="padding: 3% 0 3% 0;border-bottom: 1px solid #cccccc;">#}
+                            <p style="font-size: 20px">Webpage {{ forloop.counter }}:&ensp;<a href="{{ webpage.url }}"
+                                                                                              target="_blank">{{ webpage.title }}</a>
+                            </p>
+                            <!-- create a div to store the rrweb player -->
+                            <div class="rrweb-player-wrapper" id="rrweb-player-{{ webpage.id }}"></div>
+                            <script>
+                                var rrweb_events_{{ webpage.id }} = {{ webpage.rrweb_events | safe }};
+                                // create a rrweb player
+                                const player_{{ webpage.id }} = new rrwebPlayer({
+                                    target: document.getElementById(`rrweb-player-{{ webpage.id }}`),
+                                    props: {
+                                        events: rrweb_events_{{ webpage.id }},
+                                        autoPlay: false,
+                                        width: 800,
+                                        height: 377,
+                                    },
+                                });
+                            </script>
+                        </div>
+                    {% endfor %}
+                </div>
+            </details>
+            <div class="col-xs-12 list_header">
+                Feedback & Reflection
+            </div>
+            <form id="query-form" action="" method="post" onsubmit="validateForm()"
+                  enctype='multipart/form-data'>
+                {% csrf_token %}
+                <div class="col-xs-12 sheet">
+                    <div class="question-wrapper">
+                        <span class="col-xs-12 list_row">
+                            1. <b>Task Description</b>: You need to answer the following question:
+                            </span>
+                        <br/>
+                        <div class="static-task-info">{{ question }}</div>
+                    </div>
+
+                    <div class="question-wrapper">
+                        <span class="col-xs-12 list_row">
+                            2. <b>Task Completion Criteria</b>: The criteria for task completion.</span>
+                        <br/>
+                        <div class="static-task-info">exact match</div>
+                    </div>
+
+                    <div class="question-wrapper">
+                        <label class="col-xs-12 list_row">
+                        3. <b>Primary Reason for Failure</b>: What do you think that might be the main reason your answer was wrong?
+                        </label>
+                        <div class="ratio col-xs-12 list_row">
+                            <label><input type="radio" name="failure_category" value="bad_query" required/> My search query was ineffective or misleading.</label><br>
+                            <label><input type="radio" name="failure_category" value="misinterpreted_info"/> I found the right page, but misinterpreted the information.</label><br>
+                            <label><input type="radio" name="failure_category" value="info_not_found"/> I could not find the necessary information on the websites I visited.</label><br>
+                            <label><input type="radio" name="failure_category" value="logic_error"/> I made a logical or calculation error based on the information I found.</label><br>
+                            <label><input type="radio" name="failure_category" value="ambiguous_info"/> The information I found was ambiguous, contradictory, or outdated.</label><br>
+                            <label><input type="radio" name="failure_category" value="other"/> Other (please specify below).</label><br>
+                        </div>
+                    </div>
+
+                    <div class="question-wrapper">
+                        <label for="failure_reason" class="col-xs-12 list_row">
+                            4. <b>Failure Analysis</b>: Please elaborate on what do you think might have gone wrong. (e.g., "I trusted an outdated blog post," "I misread the column header in the table.")
+                        </label>
+                        <div><textarea class="col-xs-12 list_row" id="failure_reason" name="failure_reason" rows="3" required></textarea></div>
+                    </div>
+                
+
+                    <div class="question-wrapper">
+                        <label class="col-xs-12 list_row">
+                            5. <b>Corrective Plan</b>: What will you do differently in your next attempt? (Check all that apply)
+                        </label>
+                        <div class="ratio col-xs-12 list_row">
+                            <label><input type="checkbox" name="future_plan_actions" value="refine_query"/> Use different or more specific search keywords.</label><br>
+                            <label><input type="checkbox" name="future_plan_actions" value="broaden_query"/> Use more general search keywords.</label><br>
+                            <label><input type="checkbox" name="future_plan_actions" value="find_new_source_type"/> Look for a different type of source (e.g., official report, news, academic paper).</label><br>
+                            <label><input type="checkbox" name="future_plan_actions" value="re-evaluate_info"/> Re-examine the information I've already found more carefully.</label><br>
+                            <label><input type="checkbox" name="future_plan_actions" value="check_recency"/> Specifically look for more recent information.</label><br>
+                            <label><input type="checkbox" name="future_plan_actions" value="validate_source"/> Try to find the same information on a second, independent source to validate it.</label><br>
+                            <label>
+                                <input type="checkbox" name="future_plan_actions" value="other"/> Other (please specify):
+                                <input type="text" name="future_plan_other" style="width: 70%;" />
+                            </label><br>
+                        </div>
+                    </div>
+                </div>
+            </form>
+            <div class="col-xs-12">
+                <div id="query-btn" class="col-xs-6 submit-btn btn btn-block btn-lg btn-primary">
+                    Submit
+                </div>
+            </div>
+            <div class="col-xs-12">
+                <div id="cancel-btn" class="col-xs-6 submit-btn btn btn-block btn-lg btn-primary cancel-button">
+                    Cancel
+                </div>
+            </div>
+        </div>
+        <script>
+        </script>
+        <script>
+            function validateForm() {
+                let checks = $('input[type="checkbox"]:checked').map(function () {
+                    return $(this).val();
+                }).get();
+            }
+        </script>
+        <script type="application/x-javascript">
+            $(function () {
+                $('#query-btn').click(
+                    function () {
+                        var failure_reason = $("[name='failure_reason']");
+                        var future_plan_actions = $("[name='future_plan_actions']:checked");
+                        var failure_category = $("[name='failure_category']:checked");
+                        if (failure_reason.val() === '') {
+                            alert('Please fill in the failure analysis!');
+                            failure_reason.focus();
+                            return
+                        }
+                        if (future_plan_actions.length === 0) {
+                            alert('Please select at least one corrective action for future attempts!');
+                            $("[name='future_plan_actions']").focus();
+                            return
+                        }
+                        // If select "Other" in failure_category, check if the input is filled
+                        else
+                        {
+                            if (failure_category.val() === 'other') {
+                            var future_plan_other = $("[name='future_plan_other']");
+                            if (future_plan_other.val() === '') {
+                                alert('Please specify the corrective action for future attempts!');
+                                future_plan_other.focus();
+                                return
+                            }
+                        }else
+                        {
+                            var future_plan_other = $("[name='future_plan_other']");
+                            future_plan_other.val('');
+                        }
+                    }
+                        if (failure_category.val() == null) {
+                            alert('Please select a primary reason for failure!');
+                            $("[name='failure_category']").focus();
+                            return
+                        }
+
+                        if (confirm("Are you sure to submit your reflections?")) {
+                            $('#query-form').submit();
+                        }
+
+                    }
+                );
+            });
+        </script>
+    </div>
+
+{% endblock %}

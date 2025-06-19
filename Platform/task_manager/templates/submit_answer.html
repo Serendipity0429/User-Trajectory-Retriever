@@ -1,0 +1,244 @@
+{% extends "base.html" %}
+{% block title %} Answer Submission {% endblock %}
+{% block content_title %} Answer Submission {% endblock %}
+{% block content %}
+    <div class="row text-center">
+        <h3>
+            Please submit the answer to the questions below
+        </h3>
+    </div>
+    <div class="row">
+        <div class="col-xs-offset-1 col-xs-10">
+            <details>
+                <summary class="col-xs-12 list_header">
+                    Trajectories of this task
+                </summary>
+                <div class="col-xs-offset-1 col-xs-10" id="trajectories">
+                    {% for webpage in webpages %}
+                        <div class="col-xs-12 list_row webpage-wrapper">
+                            {#                style="padding: 3% 0 3% 0;border-bottom: 1px solid #cccccc;">#}
+                            <p style="font-size: 20px">Webpage {{ forloop.counter }}:&ensp;<a href="{{ webpage.url }}"
+                                                                                              target="_blank">{{ webpage.title }}</a>
+                            </p>
+                            <!-- create a div to store the rrweb player -->
+                            <div class="rrweb-player-wrapper" id="rrweb-player-{{ webpage.id }}"></div>
+                            <script>
+                                var rrweb_events_{{ webpage.id }} = {{ webpage.rrweb_events | safe }};
+                                // create a rrweb player
+                                const player_{{ webpage.id }} = new rrwebPlayer({
+                                    target: document.getElementById(`rrweb-player-{{ webpage.id }}`),
+                                    props: {
+                                        events: rrweb_events_{{ webpage.id }},
+                                        autoPlay: false,
+                                        width: 800,
+                                        height: 377,
+                                    },
+                                });
+                            </script>
+                        </div>
+                    {% endfor %}
+                </div>
+            </details>
+        </div>
+        <div class="col-xs-offset-1 col-xs-10">
+            <div class="col-xs-12 list_header">
+                Your answer
+            </div>
+            <form class="col-xs-12" id="query-form" action="" method="post" onsubmit="validateForm()"
+                  enctype='multipart/form-data'>
+                {% csrf_token %}
+                <div class="col-xs-12 sheet">
+                    <div class="question-wrapper">
+                        <span class="col-xs-12 list_row"><b>Question</b>:</span>
+                        <div class="static-task-info">{{ question }}</div>
+                    </div>
+                    <div class="question-wrapper">
+                        <label for="answer" class="col-xs-12 list_row"> <b>Your Answer</b>:</label>
+                        <i class="col-xs-12 list_row"> &emsp;(Notice: You don't need to reformulate the question into a complete sentence, just provide the answer directly.)</i>
+                        <div><textarea class="col-xs-12 list_row" id="answer" name="answer" rows="5" required></textarea>
+                        </div>
+                    </div>
+                
+
+                <div class="question-wrapper">
+                    <label class="col-xs-12 list_row">
+                        <b>2. Confidence</b>: How confident are you in this answer?
+                    </label>
+                    <div class="ratio col-xs-12 list_row ">
+                        <label><input type="radio" name="confidence" value="1" required/> 1: Just a guess</label><br>
+                        <label><input type="radio" name="confidence" value="2"/> 2: Not very confident</label><br>
+                        <label><input type="radio" name="confidence" value="3"/> 3: Fairly confident</label><br>
+                        <label><input type="radio" name="confidence" value="4"/> 4: Very confident</label><br>
+                        <label><input type="radio" name="confidence" value="5"/> 5: Certain</label><br>
+                    </div>
+                </div>
+
+                <div class="question-wrapper">
+                    <label class="col-xs-12 list_row">
+                        <b>3. Justification</b>: Please provide the primary source URL and source text that you used to answer the question.
+                    </label>
+
+                    <div id="source-container">
+                        <div class="source-entry" data-index="0">
+                            <div class="question-wrapper">
+                                <label for="source_url_0" class="col-xs-12 list_row">Source URL:</label>
+                                <input type="url" class="col-xs-12 list_row source-url" id="source_url_0" name="source_url_0" required>
+                            </div>
+
+                            <div class="question-wrapper">
+                                <label for="source_text_0" class="col-xs-12 list_row">Source Text:</label>
+                                <textarea class="col-xs-12 list_row source-text" id="source_text_0" name="source_text_0" rows="3" required></textarea>
+                            </div>
+
+                            <div class="question-wrapper">
+                                <button type="button" class="btn btn-danger remove-source" style="display: none;">Remove Source</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="question-wrapper">
+                        <button type="button" id="add-source" class="btn btn-success">Add Another Source</button>
+                    </div>
+                </div>
+            </form>
+
+                <script>
+                    $(document).ready(function() {
+                        let sourceIndex = 1;
+
+                        $('#add-source').click(function() {
+                            const newSource = `
+                                <div class="source-entry" data-index="${sourceIndex}">
+                                    <div class="question-wrapper">
+                                        <label for="source_url_${sourceIndex}" class="col-xs-12 list_row">Source URL:</label>
+                                        <input type="url" class="col-xs-12 list_row source-url" id="source_url_${sourceIndex}" name="source_url_${sourceIndex}" required>
+                                    </div>
+
+                                    <div class="question-wrapper">
+                                        <label for="source_text_${sourceIndex}" class="col-xs-12 list_row">Source Text:</label>
+                                        <textarea class="col-xs-12 list_row source-text" id="source_text_${sourceIndex}" name="source_text_${sourceIndex}" rows="3" required></textarea>
+                                    </div>
+
+                                    <div class="question-wrapper">
+                                        <button type="button" class="btn btn-danger remove-source">Remove Source</button>
+                                    </div>
+                                </div>
+                            `;
+                            $('#source-container').append(newSource);
+                            sourceIndex++;
+                            updateRemoveButtons();
+                        });
+
+                        $(document).on('click', '.remove-source', function() {
+                            $(this).closest('.source-entry').remove();
+                            updateRemoveButtons();
+                        });
+
+                        function updateRemoveButtons() {
+                            const sourceEntries = $('.source-entry');
+                            if (sourceEntries.length > 1) {
+                                $('.remove-source').show();
+                            } else {
+                                $('.remove-source').hide();
+                            }
+                        }
+                    });
+                </script>
+
+                <div class="question-wrapper">
+                    <label class="col-xs-12 list_row">
+                        <b>4. Reasoning Method</b>: How did you derive the answer from the source?
+                    </label>
+                    <div class="ratio col-xs-12 list_row">
+                        <label><input type="radio" name="reasoning_method" value="direct_fact" required/> The answer was a direct fact or number stated clearly on the page.</label><br>
+                        <label><input type="radio" name="reasoning_method" value="synthesis_single_page"/> I had to combine multiple pieces of information from the same page.</label><br>
+                        <label><input type="radio" name="reasoning_method" value="synthesis_multi_page"/> I had to combine information from different webpages.</label><br>
+                        <label><input type="radio" name="reasoning_method" value="calculation"/> I had to perform a calculation based on data I found.</label><br>
+                        <label><input type="radio" name="reasoning_method" value="inference"/> I had to make an inference or deduction that was not explicitly stated.</label><br>
+                        <label>
+                            <input type="radio" name="reasoning_method" value="other"/> Other (please specify):
+                            <input type="text" name="reasoning_method_other" style="width: 70%;" />
+                        </label><br>
+                    </div>
+                </div>
+
+                <div class="question-wrapper">
+                    <label class="col-xs-12 list_row">
+                        <b>5. Additional Explanation</b>: If you have any additional explanation or context for your answer, please provide it here.
+                    </label>
+
+                    <div class="question-wrapper">
+                        <textarea class="col-xs-12 list_row" id="additional_explanation" name="additional_explanation" rows="3"></textarea>
+                </div>
+            
+            </form>
+            <div class="col-xs-12">
+                <div id="query-btn" class="col-xs-6 submit-btn btn btn-block btn-lg btn-primary">
+                    Submit Answer
+                </div>
+            </div>
+            <div class="col-xs-12">
+                <div id="cancel-btn" class="col-xs-6 submit-btn btn btn-block btn-lg btn-primary cancel-button">
+                    Cancel
+                </div>
+            </div>
+        </div>
+        <script>
+            function validateForm() {
+
+            }
+        </script>
+        <script type="application/x-javascript">
+            $(function () {
+                $('#query-btn').click(
+                    function () {
+                        let answer = $("[name='answer']");
+                        let confidence = $("[name='confidence']:checked");
+                        let source_url = $("[name='source_url_0']");
+                        let source_text = $("[name='source_text_0']");
+                        let reasoning_method = $("[name='reasoning_method']:checked");
+
+                        if (answer.val() === '') {
+                            alert('Please fill in the answer!');
+                            answer.focus();
+                            return
+                        }
+                        if (confidence.val() === undefined) {
+                            alert('Please select your confidence level!');
+                            confidence.focus();
+                            return
+                        }
+                        if (source_url.val() === '') {
+                            alert('Please fill in the source URL!');
+                            source_url.focus();
+                            return
+                        }
+                        if (source_text.val() === '') {
+                            alert('Please fill in the source text!');
+                            source_text.focus();
+                            return
+                        }
+                        if (reasoning_method.val() === undefined) {
+                            alert('Please select your reasoning method!');
+                            reasoning_method.focus();
+                            return
+                        }
+
+                        if (confirm("Are you sure to submit all annotations?")) {
+                            $('#query-form').submit();
+                        }
+
+                    }
+                );
+                $('#cancel-btn').click(
+                    function () {
+                        if (confirm("Are you sure to abort the task submission?")) {
+                            window.close();
+                        }
+                    }
+                );
+            });
+        </script>
+    </div>
+
+{% endblock %}

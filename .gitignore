@@ -5,3 +5,7 @@ __pycache__
 *.ipynb
 utils
 tempFiles
+.idea
+node_modules
+000*
+migrations/*_*.py

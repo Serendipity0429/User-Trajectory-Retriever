@@ -9,9 +9,7 @@ var msg = {
     origin: "",
     url: "",
     referrer: "",
-    serp_link: "",
     query: "",
-    page_id: 0,
     html: "",
     mouse_moves: "",
     interface: 1,
@@ -29,16 +27,13 @@ var msg = {
         msg.type = "";
         msg.origin = "";
         msg.url = "";
-        msg.referrer = "";
-        msg.serp_link = "";
-        msg.page_id = 0;
+        msg.referrer = ""
         msg.query = "";
         msg.html = "";
         msg.mouse_moves = "";
         msg.username = "";
         msg.interface = 1;
         msg.preAnnotate = -1;
-
         msg.event_list = "";
         msg.rrweb_events = "";
     }
@@ -82,6 +77,7 @@ var viewState = {
     show: true,
     lastOp: 0,
     timeLimit: 100000,
+    sent_current_state: false, // If true, the current state has been sent to the server
     check: function () {
         if (debug) console.log("check state");
         if ((new Date()).getTime() - viewState.lastOp >= viewState.timeLimit && viewState.show == true)
@@ -138,45 +134,33 @@ var viewState = {
     update: function () {
         //if (debug) console.log("update");
         mPage.update();
+        viewState.sent_current_state = false;
         //viewState.getIn();
     },
     close: function () {
-        if (is_task_active)
+        if (is_task_active || checkIsTaskActive()) {
             viewState.sendMessage();
+        }
     },
     initialize: function () {
+        viewState.sent_current_state = false;
+
         document.addEventListener("visibilitychange", function (event) {
             var hidden = event.target.webkitHidden;
             if (hidden) viewState.tabLeave();
             else viewState.tabEnter();
         }, false);
-        window.onbeforeunload = viewState.close;
+
+        // window.onbeforeunload = viewState.close;
+        // NOTICE: the visibilitychange event is also triggered when the page is closed, so we don't need to use onbeforeunload
+
         $(window).focus(viewState.focus);
         $(window).blur(viewState.blur);
         viewState.show = true;
         viewState.lastOp = (new Date()).getTime();
 
-        var origin = "???";
-        var current_url = window.location.href;
-        var temp = current_url.match(/www\.(baidu)?(sogou)?(so)?\.com\/(s|web)/g);
-        if (temp != null) { //SERP页面
-            switch (temp[0]) {
-                case "www.sogou.com/web":
-                    origin = "sogou";
-                    break;
+        let current_url = window.location.href;
 
-                case "www.baidu.com/s":
-                    origin = "baidu";
-                    break;
-
-                case "www.so.com/s":
-                    origin = "360";
-                    break;
-
-                default:
-                    break;
-            }
-        }
         if (debug) {
             console.log("origin=" + origin);
             console.log(viewState);
@@ -184,107 +168,48 @@ var viewState = {
             console.log(mPage);
             console.log(mRec);
         }
-        if (origin != "???" && false) {
-            if (debug) console.log("extension is working on SERP");
-            $(window).bind('mousemove', viewState.mMove);
-            $(window).bind('scroll', viewState.mScroll);
-            chrome.runtime.sendMessage({file: origin + ".js"}, function (response) {
-                if (response.scriptFinish == true) {
-                    if (debug) console.log("execute script done");
-                    pageManager.initialize();
-                    mPage.initialize();
-                    mRec.initialize();
-                    viewState.check();
-                }
-            });
-        } else {
-            if (debug) console.log("extension is working on general page");
-            $(window).bind('mousemove', viewState.mMove);
-            $(window).bind('scroll', viewState.mScroll);
-            chrome.runtime.sendMessage({file: "general.js"}, function (response) {
-                if (response.scriptFinish == true) {
-                    console.log("execute script done");
-                    pageManager.initialize();
-                    mPage.initialize();
-                    mRec.initialize();
-                    viewState.check();
-                }
-            });
-        }
+
+        if (debug) console.log("extension is working on general page");
+        $(window).bind('mousemove', viewState.mMove);
+        $(window).bind('scroll', viewState.mScroll);
+        chrome.runtime.sendMessage({ file: "general.js" }, function (response) {
+            if (response.scriptFinish == true) {
+                console.log("execute script done");
+                pageManager.initialize();
+                mPage.initialize();
+                mRec.initialize();
+                viewState.check();
+            }
+        });
     },
     sendMessage: function () {
         if (debug) console.log("send message");
+        if (viewState.sent_current_state == true) {
+            return;
+        }
+        if (msg.url.substring(0, 22) == baseUrl) { // avoid the local server
+            return;
+        }
         pageManager.getOut();
         mRec.end();
-        var origin = "???";
+
         var current_url = window.location.href;
-        var temp = current_url.match(/www\.(baidu)?(sogou)?(so)?\.com\/(s|web)/g);
-        if (temp != null) {
-            switch (temp[0]) {
-                case "www.sogou.com/web":
-                    origin = "sogou";
-                    break;
-                case "www.baidu.com/s":
-                    origin = "baidu";
-                    break;
-                case "www.so.com/s":
-                    origin = "360";
-                    break;
 
-                default:
-                    break;
-            }
-        }
-
+        msg.type = "general";
+        
         msg.start_timestamp = pageManager.start_timestamp;
         msg.end_timestamp = pageManager.end_timestamp;
         msg.dwell_time = pageManager.dwell_time;
         msg.page_timestamps = JSON.stringify(pageManager.page_timestamps);
         msg.url = current_url;
-        msg.referrer = current_referrer;
-        msg.serp_link = current_serp_link;
+        msg.referrer = current_referrer
+        msg.title = mPage.getTitle();
+        msg.mouse_moves = JSON.stringify(mRec.getData());
+        msg.event_list = JSON.stringify(mPage.getEventList());
+        msg.rrweb_events = JSON.stringify(mPage.getRRWebEvents());
 
-        var temp1 = msg.referrer.match(/www\.(baidu)?(sogou)?(so)?\.com\/(s|web)/g);
-        var tmp1 = 0, tmp2 = 0, isfromserp = 0;
-        if (temp1 != null) {
-            if ((temp1[0] == "www.sogou.com/web") || (temp1[0] == "www.baidu.com/s") || (temp1[0] == "www.so.com/s")) {
-                tmp1 = 1;
-            }
-        }
-        if ((msg.referrer == 'https://www.baidu.com/') || (msg.referrer == 'https://www.sogou.com/') || (msg.referrer == 'https://www.so.com/')) {
-            tmp2 = 1;
-        }
-        if (tmp1 == 1 || tmp2 == 1) {
-            isfromserp = 1;
-        }
-
-        // if (origin != "???") {
-        if (false) { // old version, now we treat all pages as general pages
-            msg.type = "SERP";
-            msg.origin = origin;
-            msg.query = mPage.getQuery();
-            //msg.html = pako.deflate(mPage.getHtml(), {to: 'string'});
-            msg.page_id = mPage.getPageId();
-            msg.html = mPage.getHtml();
-            msg.title = mPage.getTitle();
-            //msg.mouse_moves = pako.deflate(JSON.stringify(mRec.getData()), {to: 'string'});
-            msg.mouse_moves = JSON.stringify(mRec.getData());
-            if (isfromserp == 0) {
-                msg.interface = 5;
-            } else {
-                msg.interface = mPage.getInterface();
-            }
-            msg.preAnnotate = mPage.getPreAnnotate();
-        } else {
-            msg.type = "general";
-            msg.title = mPage.getTitle();
-            msg.mouse_moves = JSON.stringify(mRec.getData());
-            msg.event_list = JSON.stringify(mPage.getEventList());
-            msg.rrweb_events = JSON.stringify(mPage.getRRWebEvents());
-        }
-        if (msg.url.substring(0, 22) != "http://127.0.0.1:8000") { // avoid the local server
-            chrome.runtime.sendMessage(msg);
-        }
+        chrome.runtime.sendMessage(msg);
+        viewState.sent_current_state = true;
         msg.initialize();
     }
 };

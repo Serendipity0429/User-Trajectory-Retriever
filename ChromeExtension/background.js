@@ -8,6 +8,7 @@ var logged_in = false;
 
 var lastReminder = 0;
 
+var current_task = -1;
 
 function storgeInfo(Msg) {
     var key = (new Date()).getTime();
@@ -19,13 +20,24 @@ function deleteInfo(key) {
     localStorage.removeItem(key);
 }
 
-function isTaskActive() {
+function closeAllIrrelevantTabs() {      // 获取所有标签页
+    chrome.tabs.query({}, (tabs) => {
+        // 关闭所有标签页
+        const tabIds = tabs.filter(tab => !tab.url.startsWith(baseUrl)).map(tab => tab.id);
+        chrome.tabs.create({ url: "https://bing.com" });
+        chrome.tabs.remove(tabIds, () => {
+
+        });
+    });
+}
+
+function checkTaskActive() {
     if (localStorage['username'] == undefined || localStorage['password'] == undefined || !logged_in) {
         return false;
     }
     var username = localStorage['username'];
     var password = localStorage['password'];
-    var send_data = {username: username, password: password};
+    var send_data = { username: username, password: password };
     var result = false;
     $.ajax({
         type: "POST",
@@ -34,10 +46,15 @@ function isTaskActive() {
         async: false,
         data: send_data,
         success: function (data, textStatus) {
-            result = data != -1;
+            if (current_task != data) {
+                closeAllIrrelevantTabs();
+            }
+            current_task = data;
+            result = data;
         },
         error: function () {
-            result = false;
+            result = -1;
+            current_task = -1;
         }
     });
     return result;
@@ -52,7 +69,7 @@ function sendInfo(Msg) {
     // var key = storgeInfo(Msg);
     $.ajax({
         type: "POST", dataType: "text", //dataType: 'json',
-        url: dataUrl, data: {message: Msg}, //contentType: "application/json; charset=utf-8",
+        url: dataUrl, data: { message: Msg }, //contentType: "application/json; charset=utf-8",
         success: function (data) {
             // deleteInfo(key);
         }, error: function (jqXHR, textStatus, errorThrown) {
@@ -77,25 +94,16 @@ chrome.runtime.onMessage.addListener(function (Msg, sender, sendResponse) {
     if (Msg.log_status == "request") { // check if the user is logged in
         var verified = verifyUser();
         if (verified == 0) {
-            chrome.browserAction.setBadgeText({text: 'on'});
-            chrome.browserAction.setBadgeBackgroundColor({color: [202, 181, 225, 255]});
-            sendResponse({log_status: true});
-        } else chrome.browserAction.setBadgeText({text: ''});
-        return;
-    } else if (Msg.link_store == "request") { // store the link
-        sessionStorage.setItem(Msg.url, Msg.serp_link);
-        sendResponse("sessionStorage done");
+            chrome.browserAction.setBadgeText({ text: 'on' });
+            chrome.browserAction.setBadgeBackgroundColor({ color: [202, 181, 225, 255] });
+            sendResponse({ log_status: true });
+        } else chrome.browserAction.setBadgeText({ text: '' });
         return;
     } else if (Msg.link_store == "request_update") { // store the link
         var now_time = new Date().getTime();
-        var data = {interface: Msg.interface, expiry: now_time + 1800000};
+        var data = { interface: Msg.interface, expiry: now_time + 1800000 };
         localStorage.setItem(Msg.url + Msg.query, JSON.stringify(data));
         sendResponse("localStorage done");
-        return;
-    }
-    if (Msg.ref_request != undefined) { // get the link
-        var serp_link = sessionStorage.getItem(Msg.ref_request);
-        if (serp_link != undefined) sendResponse(serp_link); else sendResponse("");
         return;
     }
     if (Msg.interface_request != undefined) { // get the interface
@@ -119,7 +127,7 @@ chrome.runtime.onMessage.addListener(function (Msg, sender, sendResponse) {
     }
     if (Msg.file != undefined) { // store the file
         chrome.tabs.executeScript(sender.tab.id, Msg);
-        sendResponse({scriptFinish: true});
+        sendResponse({ scriptFinish: true });
         return;
     }
     if (Msg.send_flag == true) { // send the data
@@ -129,8 +137,9 @@ chrome.runtime.onMessage.addListener(function (Msg, sender, sendResponse) {
     }
 
     if (Msg.task_active == "request") {
-        var task_active = isTaskActive();
-        sendResponse({task_active: task_active});
+        let task_id = checkTaskActive();
+        let task_active = task_id != -1;
+        sendResponse({ task_active: task_active, task_id: task_id });
         return;
     }
 
@@ -157,7 +166,7 @@ function verifyUser() {
             url: checkUrl,
             dataType: 'json',
             async: false,
-            data: {username: name, password: psw},
+            data: { username: name, password: psw },
             success: function (data, textStatus) {
                 if (data == 0) {
                     result = 0;

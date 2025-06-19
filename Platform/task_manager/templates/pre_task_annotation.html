@@ -26,33 +26,41 @@
                         <span class="col-xs-12 list_row">
                             2. <b>Task Completion Criteria</b>: The criteria for task completion.</span>
                         <br/>
-                        <div class="static-task-info">exact match</div>
+                        <div class="static-task-info">Exact Match (EM)</div>
+                        <p> Notice: You don't need to reformulate the question into a complete sentence, just provide the answer directly.</p>
                     </div>
 
                     <div class="question-wrapper">
-                        <label for="difficulty_ratio" class="ratio col-xs-12 list_row">3. <b>Difficulty</b>: How do
+                        <label for="familiarity_ratio" class="ratio col-xs-12 list_row">3. <b>Domain Familiarity</b>: How familiar are you with the topic of this question?</label>
+                        <div class="ratio col-xs-12 list_row ">
+                            <label><input type="radio" name="familiarity" value="0"/> 0：Not familiar at all</label><br>
+                            <label><input type="radio" name="familiarity" value="1"/> 1：Slightly familiar</label><br>
+                            <label><input type="radio" name="familiarity" value="2"/> 2：Moderately familiar</label><br>
+                            <label><input type="radio" name="familiarity" value="3"/> 3：Familiar</label><br>
+                            <label><input type="radio" name="familiarity" value="4"/> 4：Very familiar</label><br>
+                        </div>
+                    </div>
+
+                    <div class="question-wrapper">
+                        <label for="difficulty_ratio" class="ratio col-xs-12 list_row">4. <b>Difficulty</b>: How do
                             you evaluate the difficulty of the task？</label>
                         <div class="ratio col-xs-12 list_row ">
                             <label><input type="radio" name="difficulty" value="0"/> 0：Very easy</label><br>
                             <label><input type="radio" name="difficulty" value="1"/> 1：Easy</label><br>
-                            <label><input type="radio" name="difficulty" value="2"/> 2：A little bit
-                                difficult</label><br>
+                            <label><input type="radio" name="difficulty" value="2"/> 2：Moderately difficult</label><br>
                             <label><input type="radio" name="difficulty" value="3"/> 3：Difficult</label><br>
                             <label><input type="radio" name="difficulty" value="4"/> 4：Very difficult</label><br>
                         </div>
                     </div>
 
                     <div class="question-wrapper">
-                        <label for="effort_ratio" class="ratio col-xs-12 list_row">4. <b>Effort</b>: How much time
-                            do
-                            you
-                            expect to spend on this task?</label>
+                        <label for="effort_ratio" class="ratio col-xs-12 list_row">5. <b>Effort</b>: How much time do you expect to spend on this task?</label>
                         <div class="ratio col-xs-12 list_row">
-                        <span style="display:flex;">One minute&emsp;<input type="range" style="width: 40%" name="effort"
-                                                                           min="1" max="10" value="1" step="1"
+                        <span style="display:flex;">One minute or slower&emsp;<input type="range" style="width: 40%" name="effort"
+                                                                           min="1" max="30" value="10" step="1"
                                                                            list="effort_marks" oninput="setEffort()"
-                                                                           onchange="setEffort()"/>&emsp;Ten minutes or longer (Current choice:&ensp;<b><span
-                                id="effort_value">1</span></b>)</span><br>
+                                                                           onchange="setEffort()"/>&emsp; Thirty minutes or longer (Current choice:&ensp;<b><span
+                                id="effort_value">10</span></b>)</span><br>
                             <datalist id="effort_marks">
                                 <option>1</option>
                                 <option>2</option>
@@ -64,9 +72,39 @@
                                 <option>8</option>
                                 <option>9</option>
                                 <option>10</option>
+                                <option>11</option>
+                                <option>12</option>
+                                <option>13</option>
+                                <option>14</option>
+                                <option>15</option>
+                                <option>16</option>
+                                <option>17</option>
+                                <option>18</option>
+                                <option>19</option>
+                                <option>20</option>
+                                <option>21</option>
+                                <option>22</option>
+                                <option>23</option>
+                                <option>24</option>
+                                <option>25</option>
+                                <option>26</option>
+                                <option>27</option>
+                                <option>28</option>
+                                <option>29</option>
+                                <option>30</option>
                             </datalist>
                         </div>
                     </div>
+
+                    <div class="question-wrapper">
+                        <label for="initial_strategy" class="col-xs-12 list_row">
+                            6. <b>Initial Strategy</b>: Briefly describe your initial plan. What search queries or keywords do you think you will start with? (You can separate multiple queries with semi-colons, e.g., "query1; query2; query3".)
+                        </label>
+                        <div>
+                            <textarea class="col-xs-12 list_row" id="initial_strategy" name="initial_strategy" rows="3" required></textarea>
+                        </div>
+                    </div>
+
                 </div>
                 <div class="col-xs-12"><br/></div>
 
@@ -99,6 +137,18 @@
                         if (difficulty.val() == null) {
                             alert('Please check a difficulty button!');
                             $("[name='difficulty']").focus();
+                            return
+                        }
+                        let familiarity = $("[name='familiarity']:checked");
+                        if (familiarity.val() == null) {
+                            alert('Please check a familiarity button!');
+                            $("[name='familiarity']").focus();
+                            return
+                        }
+                        let initial_strategy = $('#initial_strategy').val();
+                        if (initial_strategy.trim() === '') {
+                            alert('Please fill in the initial strategy!');
+                            $('#initial_strategy').focus();
                             return
                         }
 

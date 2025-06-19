@@ -84,23 +84,24 @@ def wait_until_storing_data_done():
 
 def check_answer(entry, user_answer):
     try:
-        entry_answer = json.loads(entry.answer)
+        entry_answers = json.loads(entry.answer)
     except json.JSONDecodeError:
         print("Error decoding JSON:", entry.answer)
         return False
     
     print_debug("Question:", entry.question)
     print_debug("User Answer:", user_answer)
-    print_debug("Correct Answer:", entry_answer)
+    print_debug("Correct Answer:", entry_answers)
 
     if isinstance(entry_answer, list):
-        entry_answer = [str(ans) for ans in entry_answer]
+        entry_answers = [str(ans) for ans in entry_answers]
     if isinstance(entry_answer, str):
-        entry_answer = [entry_answer]
+        entry_answers = [entry_answers]
 
-    is_correct = False
-    if user_answer in entry_answer:
-        is_correct = True
+    user_answers = [ans.strip().lower() for ans in user_answer.split(';')]
+    entry_answers = [ans.strip().lower() for ans in entry_answers]
+
+    is_correct = all(any(user_ans == entry_ans for entry_ans in entry_answers) for user_ans in user_answers)
 
     return is_correct
 

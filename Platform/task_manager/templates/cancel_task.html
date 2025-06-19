@@ -41,22 +41,45 @@
                             {% endfor %}
                         </div>
                     </div>
+                    
+                    <div class="question-wrapper">
+                        <label class="col-xs-12 list_row">
+                            4. <b>Primary Reason for Cancellation</b>:
+                        </label>
+                        <div class="ratio col-xs-12 list_row">
+                            <label><input type="radio" name="cancel_category" value="info_unavailable" required/> I believe the information is not publicly available online.</label><br>
+                            <label><input type="radio" name="cancel_category" value="too_difficult"/> The task is too complex or difficult for me to solve.</label><br>
+                            <label><input type="radio" name="cancel_category" value="no_idea"/> I am completely stuck and have no idea how to proceed.</label><br>
+                            <label><input type="radio" name="cancel_category" value="too_long"/> The task is taking too much time to complete.</label><br>
+                            <label><input type="radio" name="cancel_category" value="technical_issue"/> I encountered a technical barrier (e.g., paywall, login, broken site).</label><br>
+                            <label><input type="radio" name="cancel_category" value="other"/> Other (please specify below).</label><br>
+                        </div>
+                    </div>
 
                     <div class="question-wrapper">
-                        <label for="cancel_reason" class="col-xs-12 list_row"> 4. <b>Reasons for Cancellation</b>:
-                            Why do you want to cancel this task?</label>
+                        <label for="cancel_reason" class="col-xs-12 list_row">
+                            5. <b>Cancellation Details</b>: Please describe the final roadblock you hit. What was the last thing you tried?
+                        </label>
                         <div><textarea class="col-xs-12 list_row" id="cancel_reason" name="cancel_reason" rows="3" required></textarea>
                         </div>
                     </div>
 
                     <div class="question-wrapper">
-                        <label for="cancel_reflection" class="col-xs-12 list_row"> 5. <b>Reflection on Cancellation</b>: What improvements or precautions do you suggest to complete this task
-                            successfully?</label>
-                        <div><textarea class="col-xs-12 list_row" id="future_plan" name="cancel_reflection" rows="3"
-                                       required></textarea>
+                        <label class="col-xs-12 list_row">
+                            6. <b>Missing Resources</b>: What do you believe was needed to make this task solvable? (Check all that apply)
+                        </label>
+                        <div class="ratio col-xs-12 list_row">
+                            <label><input type="checkbox" name="cancel_missing_resources" value="expert_knowledge"/> Deep, specialized domain knowledge.</label><br>
+                            <label><input type="checkbox" name="cancel_missing_resources" value="paid_access"/> Access to a paid subscription, database, or service.</label><br>
+                            <label><input type="checkbox" name="cancel_missing_resources" value="better_tools"/> A more powerful or specialized search tool.</label><br>
+                            <label><input type="checkbox" name="cancel_missing_resources" value="different_question"/> The question itself was too ambiguous or unanswerable.</label><br>
+                            <label><input type="checkbox" name="cancel_missing_resources" value="info_not_online"/> The information is unlikely to exist publicly online.</label><br>
+                            <label>
+                                <input type="checkbox" name="cancel_missing_resources" value="other"/> Other (please specify):
+                                <input type="text" name="cancel_missing_resources_other" style="width: 70%;" />
+                            </label><br>
                         </div>
                     </div>
-                </div>
             </form>
             <div class="col-xs-12">
                 <div id="query-btn" class="col-xs-6 submit-btn btn btn-block btn-lg btn-primary">
@@ -78,17 +101,38 @@
                 $('#query-btn').click(
                     function () {
                         let cancel_reason = $("[name='cancel_reason']");
-                        var cancel_reflection = $("[name='cancel_reflection']");
+                        let cancel_category = $("[name='cancel_category']:checked");
+                        let cancel_missing_resources = $("[name='cancel_missing_resources']:checked");
+                        
                         if (cancel_reason.val() === '') {
                             alert('Please fill in the reason for cancellation!');
                             cancel_reason.focus();
                             return
                         }
-                        if (cancel_reflection.val() === '') {
-                            alert('Please fill in the reflection on cancellation!');
-                            cancel_reflection.focus();
+                        if (cancel_category.length === 0) {
+                            alert('Please select a primary reason for cancellation!');
                             return
                         }
+                        if (cancel_missing_resources.length === 0) {
+                            alert('Please select at least one missing resource!');
+                            return
+                        } else {
+                            // If "Other" is checked, ensure the text field is filled
+                            if (cancel_missing_resources.filter(function () {
+                                return $(this).val() === 'other';
+                            }).length > 0) {
+                                let otherText = $("[name='cancel_missing_resources_other']");
+                                if (otherText.val() === '') {
+                                    alert('Please specify the other missing resource!');
+                                    otherText.focus();
+                                    return
+                                }
+                            } else {
+                                // If "Other" is not checked, clear the text field
+                                $("[name='cancel_missing_resources_other']").val('');
+                            }
+                        }
+
                         if (confirm("Are you sure to cancel the ongoing task?")) {
                             $('#query-form').submit();
                         }

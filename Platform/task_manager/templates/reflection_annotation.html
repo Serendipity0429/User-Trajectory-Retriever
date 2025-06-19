@@ -65,18 +65,42 @@
                     </div>
 
                     <div class="question-wrapper">
-                        <label for="failure_reason" class="col-xs-12 list_row"> 3. <b>Failure Reflection</b>: What
-                            do you think may be the reason for the failure of this trial?</label>
-                        <div><textarea class="col-xs-12 list_row" id="failure_reason" name="failure_reason" rows="3" required></textarea>
+                        <label class="col-xs-12 list_row">
+                        3. <b>Primary Reason for Failure</b>: What do you think that might be the main reason your answer was wrong?
+                        </label>
+                        <div class="ratio col-xs-12 list_row">
+                            <label><input type="radio" name="failure_category" value="bad_query" required/> My search query was ineffective or misleading.</label><br>
+                            <label><input type="radio" name="failure_category" value="misinterpreted_info"/> I found the right page, but misinterpreted the information.</label><br>
+                            <label><input type="radio" name="failure_category" value="info_not_found"/> I could not find the necessary information on the websites I visited.</label><br>
+                            <label><input type="radio" name="failure_category" value="logic_error"/> I made a logical or calculation error based on the information I found.</label><br>
+                            <label><input type="radio" name="failure_category" value="ambiguous_info"/> The information I found was ambiguous, contradictory, or outdated.</label><br>
+                            <label><input type="radio" name="failure_category" value="other"/> Other (please specify below).</label><br>
                         </div>
                     </div>
 
                     <div class="question-wrapper">
-                        <label for="future_plan" class="col-xs-12 list_row"> 4. <b>Future Plan</b>: What adjustments do
-                            you plan to make in the next trial? What
-                            do you plan to do next?</label>
-                        <div><textarea class="col-xs-12 list_row" id="future_plan" name="future_plan" rows="3"
-                                       required></textarea>
+                        <label for="failure_reason" class="col-xs-12 list_row">
+                            4. <b>Failure Analysis</b>: Please elaborate on what do you think might have gone wrong. (e.g., "I trusted an outdated blog post," "I misread the column header in the table.")
+                        </label>
+                        <div><textarea class="col-xs-12 list_row" id="failure_reason" name="failure_reason" rows="3" required></textarea></div>
+                    </div>
+                
+
+                    <div class="question-wrapper">
+                        <label class="col-xs-12 list_row">
+                            5. <b>Corrective Plan</b>: What will you do differently in your next attempt? (Check all that apply)
+                        </label>
+                        <div class="ratio col-xs-12 list_row">
+                            <label><input type="checkbox" name="future_plan_actions" value="refine_query"/> Use different or more specific search keywords.</label><br>
+                            <label><input type="checkbox" name="future_plan_actions" value="broaden_query"/> Use more general search keywords.</label><br>
+                            <label><input type="checkbox" name="future_plan_actions" value="find_new_source_type"/> Look for a different type of source (e.g., official report, news, academic paper).</label><br>
+                            <label><input type="checkbox" name="future_plan_actions" value="re-evaluate_info"/> Re-examine the information I've already found more carefully.</label><br>
+                            <label><input type="checkbox" name="future_plan_actions" value="check_recency"/> Specifically look for more recent information.</label><br>
+                            <label><input type="checkbox" name="future_plan_actions" value="validate_source"/> Try to find the same information on a second, independent source to validate it.</label><br>
+                            <label>
+                                <input type="checkbox" name="future_plan_actions" value="other"/> Other (please specify):
+                                <input type="text" name="future_plan_other" style="width: 70%;" />
+                            </label><br>
                         </div>
                     </div>
                 </div>
@@ -105,16 +129,38 @@
             $(function () {
                 $('#query-btn').click(
                     function () {
-                        var failure_reflection = $("[name='failure_reflection']");
-                        var future_plan = $("[name='future_plan']");
-                        if (failure_reflection.val() === '') {
-                            alert('Please fill in the failure reflection!');
-                            failure_reflection.focus();
+                        var failure_reason = $("[name='failure_reason']");
+                        var future_plan_actions = $("[name='future_plan_actions']:checked");
+                        var failure_category = $("[name='failure_category']:checked");
+                        if (failure_reason.val() === '') {
+                            alert('Please fill in the failure analysis!');
+                            failure_reason.focus();
                             return
                         }
-                        if (future_plan.val() === '') {
-                            alert('Please fill in the future plan!');
-                            future_plan.focus();
+                        if (future_plan_actions.length === 0) {
+                            alert('Please select at least one corrective action for future attempts!');
+                            $("[name='future_plan_actions']").focus();
+                            return
+                        }
+                        // If select "Other" in failure_category, check if the input is filled
+                        else
+                        {
+                            if (failure_category.val() === 'other') {
+                            var future_plan_other = $("[name='future_plan_other']");
+                            if (future_plan_other.val() === '') {
+                                alert('Please specify the corrective action for future attempts!');
+                                future_plan_other.focus();
+                                return
+                            }
+                        }else
+                        {
+                            var future_plan_other = $("[name='future_plan_other']");
+                            future_plan_other.val('');
+                        }
+                    }
+                        if (failure_category.val() == null) {
+                            alert('Please select a primary reason for failure!');
+                            $("[name='failure_category']").focus();
                             return
                         }
 

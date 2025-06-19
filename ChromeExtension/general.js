@@ -21,17 +21,17 @@ var is_server_page = window.location.href.substring(0, 21) == baseUrl;
 // get the element hierarchy in HTML format
 // leave only the tag name, id, and class name
 function getElementHierarchyHTML(element) {
-  let current = element;
-  let html = '';
+    let current = element;
+    let html = '';
 
-  while (current) {
-    const tagName = current.tagName.toLowerCase();
-    const id = current.id ? ` id="${current.id}"` : '';
-    const className = current.className ? ` class="${current.className}"` : '';
-    html = `<${tagName}${id}${className}>${html}</${tagName}>`;
-    current = current.parentElement;
-  }
-  return html;
+    while (current) {
+        const tagName = current.tagName.toLowerCase();
+        const id = current.id ? ` id="${current.id}"` : '';
+        const className = current.className ? ` class="${current.className}"` : '';
+        html = `<${tagName}${id}${className}>${html}</${tagName}>`;
+        current = current.parentElement;
+    }
+    return html;
 }
 
 // display the annotation window
@@ -391,7 +391,7 @@ function activeEventHandler(event, type) {
     let href = $($(this).get(0)).attr("href");
     href = recoverAbsoluteLink(href);
 
-    related_info = {'href': href};
+    related_info = { 'href': href };
     // set related_info according to the event type and target
     switch (type) {
         case 'click':
@@ -402,7 +402,7 @@ function activeEventHandler(event, type) {
                     let form_href = form.attr('action');
                     // parse the form link
                     form_href = recoverAbsoluteLink(related_info);
-                    related_info = {'href': form_href};
+                    related_info = { 'href': form_href };
                 }
             }
             break;
@@ -466,7 +466,7 @@ function passiveEventHandler(event, type) {
     // set related_info according to the event type and target
     switch (type) {
         case 'scroll':
-            related_info = {'scrollX': window.scrollX, 'scrollY': window.scrollY};
+            related_info = { 'scrollX': window.scrollX, 'scrollY': window.scrollY };
         case 'hover':
             break;
         case 'right click':
@@ -478,16 +478,16 @@ function passiveEventHandler(event, type) {
             break;
         case 'copy':
             var copied_text = window.getSelection().toString();
-            related_info = {'copied_text': copied_text};
+            related_info = { 'copied_text': copied_text };
             break;
         case 'paste':
             var pasted_text = e.clipboardData.getData('text');
-            related_info = {'pasted_text': pasted_text};
+            related_info = { 'pasted_text': pasted_text };
             break;
         case 'change':
             // get the original value of the input element and the new value
             var new_value = e.target.value;
-            related_info = {'new_value': new_value};
+            related_info = { 'new_value': new_value };
             break;
         case 'blur':
             break;
@@ -585,16 +585,18 @@ mPage.initialize();
 setTimeout(mPage.init_content, 500); // wait for the page to load
 setTimeout(mPage.init_content, 3000); // wait for the page to load
 
-if (current_url.substring(0, 21) == baseUrl) {
-    mPage.update = function () {
-    };
-} else {
-    // var interactive_element = "div, a, button, input, textarea, select, img";
-    var interactive_element = "*";
-    var excluded_element = ".annotation-overlay *, .annotation-overlay, body, html, .freeze-overlay"
-    mPage.update = function () {
-        is_server_page = window.location.href.substring(0, 21) == baseUrl;
-        $(interactive_element).not(excluded_element).each(function (id, element) {
+
+chrome.runtime.sendMessage({ log_status: "request" }, function (response) {
+    if (current_url.substring(0, 21) == baseUrl) {
+        mPage.update = function () {
+        };
+    } else {
+        // var interactive_element = "div, a, button, input, textarea, select, img";
+        var interactive_element = "*";
+        var excluded_element = ".annotation-overlay *, .annotation-overlay, body, html, .freeze-overlay"
+        mPage.update = function () {
+            is_server_page = window.location.href.substring(0, 21) == baseUrl;
+            $(interactive_element).not(excluded_element).each(function (id, element) {
                 // click event
                 if ($(element).attr("bindClick") == undefined) {
                     var tag_name = $(element).prop("tagName");
@@ -631,34 +633,34 @@ if (current_url.substring(0, 21) == baseUrl) {
                     }
                 }
             }
-        );
+            );
 
+        }
+            ;
+        addEventListener("scroll", scrollEvent);
+        addEventListener("keypress", keyPressEvent);
+        addEventListener("copy", copyEvent);
+        addEventListener("paste", pasteEvent);
+        addEventListener("blur", windowBlurEvent);
+        addEventListener("focus", windowFocusEvent);
+        addEventListener("drag", dragEvent);
+        addEventListener("drop", dropEvent);
     }
-    ;
-    addEventListener("scroll", scrollEvent);
-    addEventListener("keypress", keyPressEvent);
-    addEventListener("copy", copyEvent);
-    addEventListener("paste", pasteEvent);
-    addEventListener("blur", windowBlurEvent);
-    addEventListener("focus", windowFocusEvent);
-    addEventListener("drag", dragEvent);
-    addEventListener("drop", dropEvent);
-}
 
-addEventListener("DOMContentLoaded", function (event) {
-    if (debug) console.log("DOM fully loaded and parsed");
-    mPage.update();
-    const observer = new MutationObserver(function (mutations) {
-        // if (debug) console.log("DOM changed: " + mutations);
+    addEventListener("DOMContentLoaded", function (event) {
+        if (debug) console.log("DOM fully loaded and parsed");
         mPage.update();
+        const observer = new MutationObserver(function (mutations) {
+            // if (debug) console.log("DOM changed: " + mutations);
+            mPage.update();
+        });
+        if (debug) console.log(document.body);
+        // observe all <a> elements
+        observer.observe(document.body, { childList: true, subtree: true, attributes: true });
     });
-    if (debug) console.log(document.body);
-    // observe all <a> elements
-    observer.observe(document.body, {childList: true, subtree: true, attributes: true});
+
+    setTimeout(mPage.update, 1500);
+    setInterval(checkIsTaskActive, 60000);
 });
-
-setTimeout(mPage.update, 1500);
-setInterval(checkIsTaskActive, 60000);
-
 
 // setTimeout(viewState.sendMessage, 1500);

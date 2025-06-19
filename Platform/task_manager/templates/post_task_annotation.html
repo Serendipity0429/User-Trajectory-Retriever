@@ -76,36 +76,77 @@
                         <span class="col-xs-12 list_row">
                             2. <b>Task Completion Criteria</b>: The criteria for task completion.</span>
                         <br/>
-                        <div class="static-task-info">exact match</div>
+                        <div class="static-task-info">Exact Match (EM)</div>
                     </div>
 
                     <div class="question-wrapper">
-                        <label for="expertise" class="ratio col-xs-12 list_row"><b>3. Were you familiar with the
-                            search.</b>&ensp;0→4:
-                            Not at all → Very familiar</label>
+                        <label class="ratio col-xs-12 list_row">
+                            <b>3. Overall Difficulty</b>: How would you rate the actual difficulty of the search process you completed?
+                        </label>
                         <div class="ratio col-xs-12 user_fill">
-                            <label><input type="radio" name="expertise" value="0"/> 0&emsp;
-                            </label>
-                            <label><input type="radio" name="expertise" value="1"/> 1&emsp;
-                            </label>
-                            <label><input type="radio" name="expertise" value="2"/> 2&emsp;
-                            </label>
-                            <label><input type="radio" name="expertise" value="3"/> 3&emsp;
-                            </label>
-                            <label><input type="radio" name="expertise" value="4"/> 4&emsp;
-                            </label>
+                            <label><input type="radio" name="difficulty_actual" value="0" required/> 0: Very easy</label><br>
+                            <label><input type="radio" name="difficulty_actual" value="1"/> 1: Easy</label><br>
+                            <label><input type="radio" name="difficulty_actual" value="2"/> 2: Moderately difficult</label><br>
+                            <label><input type="radio" name="difficulty_actual" value="3"/> 3: Difficult</label><br>
+                            <label><input type="radio" name="difficulty_actual" value="4"/> 4: Very difficult</label><br>
                         </div>
-                        <script>
-                            $("input:radio[name='expertise'][value='{{ task.expertise }}']").attr('checked', 'true');
-                        </script>
                     </div>
 
                     <div class="question-wrapper">
-                        <label for="reflection" class="col-xs-12 list_row">4. <b>Reflections</b>:
-                            Please provide any other reflections on the task.</label>
-                        <textarea class="col-xs-12 list_row" id="reflection" name="reflection" rows="3" required
-                                  style="margin-bottom:10px;"></textarea>
+                        <label class="col-xs-12 list_row">
+                            <b>4. The "Aha!" Moment</b>: What type of information was most critical to solving this task?
+                        </label>
+                        <div class="ratio col-xs-12 list_row">
+                            <label><input type="radio" name="aha_moment_type" value="data_table" required/> A data table or chart with the exact answer.</label><br>
+                            <label><input type="radio" name="aha_moment_type" value="direct_statement"/> A direct statement in a paragraph.</label><br>
+                            <label><input type="radio" name="aha_moment_type" value="official_document"/> Finding an official document or report (e.g., PDF, government site).</label><br>
+                            <label><input type="radio" name="aha_moment_type" value="key_definition"/> Understanding a key definition or concept.</label><br>
+                            <label><input type="radio" name="aha_moment_type" value="synthesis"/> Connecting two pieces of information that finally made sense together.</label><br>
+                            <label>
+                                <input type="radio" name="aha_moment_type" value="other"/> Other (please specify):
+                                <input type="text" name="aha_moment_other" style="width: 70%;" />
+                            </label><br>
+                        </div>
+                        <label for="aha_moment_source" class="col-xs-12 list_row" style="margin-top: 5px;">
+                            Optional: Paste the source URL or search query for this "Aha!" moment.
+                        </label>
+                        <input type="text" class="col-xs-12 list_row" id="aha_moment_source" name="aha_moment_source">
                     </div>
+
+
+                    <div class="question-wrapper">
+                        <label class="col-xs-12 list_row">
+                            <b>5. Unhelpful Paths</b>: Which of these roadblocks did you encounter? (Check all that apply)
+                        </label>
+                        <div class="ratio col-xs-12 list_row">
+                            <label><input type="checkbox" name="unhelpful_paths" value="irrelevant_results"/> Search results were mostly irrelevant.</label><br>
+                            <label><input type="checkbox" name="unhelpful_paths" value="outdated_info"/> Found sites with outdated information.</label><br>
+                            <label><input type="checkbox" name="unhelpful_paths" value="low_quality"/> Visited low-quality, spam, or untrustworthy sites.</label><br>
+                            <label><input type="checkbox" name="unhelpful_paths" value="paywall"/> Hit a paywall or login requirement.</label><br>
+                            <label><input type="checkbox" name="unhelpful_paths" value="contradictory_info"/> Found contradictory information on different sites.</label><br>
+                            <label><input type="checkbox" name="unhelpful_paths" value="no_major_roadblocks"/> I did not encounter any major roadblocks.</label><br>
+                        </div>
+                    </div>
+
+                    <div class="question-wrapper">
+                        <label class="col-xs-12 list_row">
+                            <b>6. Strategic Shift</b>: How did your successful strategy evolve from your initial plan?
+                        </label>
+                        <div class="ratio col-xs-12 list_row">
+                            <label><input type="radio" name="strategy_shift" value="no_change" required/> It didn't change much; my first approach worked.</label><br>
+                            <label><input type="radio" name="strategy_shift" value="narrowed_search"/> I had to significantly narrow my search to be more specific.</label><br>
+                            <label><input type="radio" name="strategy_shift" value="broadened_search"/> I had to broaden my search to find related concepts first.</label><br>
+                            <label><input type="radio" name="strategy_shift" value="changed_source_type"/> I realized I was looking at the wrong type of sources and switched.</label><br>
+                            <label><input type="radio" name="strategy_shift" value="re-evaluated_assumption"/> I realized my initial assumption was wrong and changed my approach.</label><br>
+                        </div>
+                    </div>
+
+                    <div class="question-wrapper">
+                        <label for="additional_reflection" class="col-xs-12 list_row">
+                            <b>7. (Optional) Additional Reflection</b>: Do you have any additional thoughts or reflections on this task?
+                        <textarea class="col-xs-12 list_row" id="reflection" name="additional_reflection" rows="3" required></textarea>
+                    </div>
+
                 </div>
             </form>
             <div class="col-xs-12">
@@ -128,12 +169,45 @@
             $(function () {
                 $('#query-btn').click(
                     function () {
-                        let expertise = $("[name='expertise']:checked");
+                        let difficulty_actual = $('input[name="difficulty_actual"]:checked');
+                        let aha_moment_type = $('input[name="aha_moment_type"]:checked');
+                        let aha_moment_other = $('input[name="aha_moment_other"]');
+                        let strategy_shift = $('input[name="strategy_shift"]:checked');
+                        let roadblocks = $('input[name="unhelpful_paths"]:checked');
+                        
+                        if(difficulty_actual.val() == null)
+                        {
+                            alert('Please select the actual difficulty of the task!');
+                            $('input[name="difficulty_actual"]').focus();
+                            return;
+                        }
 
-                        if (expertise.val() == null) {
-                            alert('Please choose a expertise level!');
-                            $('input[name="expertise"]').focus();
-                            return
+                        if(aha_moment_type.val() == null)
+                        {
+                            alert('Please select the type of "Aha!" moment!');
+                            $('input[name="aha_moment_type"]').focus();
+                            return;
+                        } else {
+                            if (aha_moment_type.val() === 'other') {
+                                if (aha_moment_other.val() === '') {
+                                    alert('Please specify the type of "Aha!" moment!');
+                                    aha_moment_other.focus();
+                                    return;
+                                }
+                            } else {
+                                aha_moment_other.val('');
+                            }
+                        }
+                        if(strategy_shift.val() == null)
+                        {
+                            alert('Please select the strategic shift! (You can select "No change" if applicable.)');
+                            $('input[name="strategy_shift"]').focus();
+                            return;
+                        }
+                        if (roadblocks.length === 0) {
+                            alert('Please select at least one roadblock you encountered! (You can select "No major roadblocks" if applicable.)');
+                            $('input[name="roadblocks"]').focus();
+                            return;
                         }
 
                         if (confirm("Are you sure to submit all the annotations?")) {

@@ -65,15 +65,20 @@ class PreTaskAnnotation(models.Model):
 
     description = models.CharField(max_length=1000, null=True)
     completion_criteria = models.CharField(max_length=1000, null=True)
-    difficulty = models.IntegerField()  # 0->4, easy -> hard
-    effort = models.IntegerField()  # 0->4, low -> high
+    familiarity = models.IntegerField(null=True)  # 0->4, unfamiliar -> familiar
+    difficulty = models.IntegerField(null=True)  # 0->4, easy -> hard
+    effort = models.IntegerField(null=True)  # 0->4, low -> 
+    
+    initial_strategy = models.CharField(max_length=10000, null=True)  # initial strategy for the task
 
 # Reflection annotation
 class ReflectionAnnotation(models.Model):
     id = models.AutoField(primary_key=True)
 
     failure_reason = models.CharField(max_length=10000) # reason for failure
-    future_plan = models.CharField(max_length=10000) # future adjustments and plans
+    failure_category = models.CharField(max_length=100)  # category of failure, e.g. "lack of resources", "lack of knowledge", etc.
+    future_plan_actions = models.CharField(max_length=100)  # actions to take in the future
+    future_plan_other = models.CharField(max_length=1000)  # text for future plan
 
 # Post-task annotation
 class PostTaskAnnotation(models.Model):
@@ -83,12 +88,24 @@ class PostTaskAnnotation(models.Model):
         on_delete=models.CASCADE,
     )
 
-    expertise = models.IntegerField()  # 0->4, unfamiliar -> familiar
-    reflection = models.CharField(max_length=10000, null=True)  # reflection on the task
+    difficulty_actual = models.IntegerField(null=True)  # 0->4, easy -> hard
+    
+    aha_moment_type = models.CharField(max_length=100, null=True)  # type of aha moment, e.g. "insight", "realization", etc.
+    aha_moment_other = models.CharField(max_length=10000, null=True)  # other type of aha moment
+    aha_moment_source = models.CharField(max_length=10000, null=True)  # source of the aha moment
+
+    unhelpful_paths = models.JSONField(null=True)  # paths that were not helpful, e.g. ["path1", "path2"]
+
+    strategy_shift = models.CharField(max_length=100, null=True)  # strategy shift during the task
+        
+    additional_reflection = models.CharField(max_length=10000, null=True)  # reflection on the task
 
     # If task is cancelled
+    cancel_category = models.IntegerField(null=True)  # refer to post_task_annotation.html
     cancel_reason = models.CharField(max_length=10000, null=True)  # reason for cancellation
     cancel_reflection = models.CharField(max_length=10000, null=True)  # reflection on cancellation
+    cancel_missing_resources = models.CharField(max_length=10000, null=True)  # missing resources that led to cancellation
+    cancel_missing_resources_other = models.CharField(max_length=10000, null=True)  # other missing resources
 
 
 # Task Trial
@@ -100,6 +117,12 @@ class TaskTrial(models.Model):
 
     answer = models.CharField(max_length=10000)
     is_correct = models.BooleanField(default=False)
+    
+    confidence = models.IntegerField()  # confidence level, 0->4, low -> high
+    source_url_and_text = models.JSONField()
+    reasoning_method = models.CharField(max_length=100)  # reasoning method used, e.g. "deductive", "inductive", etc.
+    
+    additional_explanation = models.CharField(max_length=10000, null=True)  # explanation of the answer
 
     reflection_annotation = models.ForeignKey(
         ReflectionAnnotation,

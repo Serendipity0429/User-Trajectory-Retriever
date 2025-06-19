@@ -51,8 +51,10 @@ def pre_task_annotation(user, request, timestamp):
         pre_annotation.belong_task = task
         pre_annotation.description = request.POST.get('description')
         pre_annotation.completion_criteria = request.POST.get('completion_criteria')
+        pre_annotation.familiarity = request.POST.get('familiarity')
         pre_annotation.difficulty = request.POST.get('difficulty')
         pre_annotation.effort = request.POST.get('effort')
+        pre_annotation.initial_strategy = request.POST.get('initial_strategy')
         pre_annotation.save()
 
         return close_window()
@@ -93,8 +95,12 @@ def post_task_annotation(user, request, task_id):
             task.active = False
 
             post_annotation = PostTaskAnnotation()
-            post_annotation.expertise = request.POST.get('expertise')
-            post_annotation.reflection = request.POST.get('reflection')
+            post_annotation.difficulty_actual = request.POST.get('difficulty_actual')
+            post_annotation.aha_moment_type = request.POST.get('aha_moment_type')
+            post_annotation.aha_moment_other = request.POST.get('aha_moment_other')
+            post_annotation.aha_moment_source = request.POST.get('aha_moment_source')
+            post_annotation.unhelpful_paths = request.POST.get('unhelpful_paths')
+            post_annotation.additional_reflection = request.POST.get('additional_reflection')
             post_annotation.belong_task = task
             post_annotation.save()
 
@@ -285,9 +291,13 @@ def cancel_task(user, request, task_id, end_timestamp):
         return HttpResponse(f'No task found with task_id={task_id}')
     
     if request.method == 'POST':
+        task.cancelled = True
+        task.cancel_category = request.POST.get('cancel_category')
+        task.cancel_reason = request.POST.get('cancel_reason')
+        task.cancel_missing_resources = request.POST.get('cancel_missing_resources')
+        task.cancel_missing_resources_other = request.POST.get('cancel_missing_resources_other')
         return close_window()
     
-    task.cancelled = True
     task.active = False
     task.end_timestamp = end_timestamp
     task.save()
@@ -323,8 +333,10 @@ def reflection_annotation(user, request, task_id, end_timestamp):
 
     if request.method == 'POST':
         ref_annotation = ReflectionAnnotation()
+        ref_annotation.failure_category = request.POST.get('failure_category')
         ref_annotation.failure_reason = request.POST.get('failure_reason')
-        ref_annotation.future_plan = request.POST.get('future_plan')
+        ref_annotation.future_plan_actions = request.POST.get('future_plan_actions')
+        ref_annotation.future_plan_other  = request.POST.get('future_plan_other')
         ref_annotation.save()
         task_trial.reflection_annotation = ref_annotation
         task_trial.save()
@@ -368,6 +380,11 @@ def submit_answer(user, request, task_id, timestamp):
 
     if request.method == 'POST':
         answer = request.POST.get('answer')
+        additional_explanation = request.POST.get('additional_explanation')
+        confidence = request.POST.get('confidence')
+        reasoning_method = request.POST.get('reasoning_method')
+        
+        
         redirect_url = f'/task/post_task_annotation/{task_id}'
         task_trial = TaskTrial()
         task_trial.belong_task = task
@@ -376,6 +393,23 @@ def submit_answer(user, request, task_id, timestamp):
         task_trial.answer = answer
         task_trial.start_timestamp = start_timestamp
         task_trial.end_timestamp = timestamp
+        task_trial.additional_explanation = additional_explanation
+        task_trial.confidence = confidence
+        task_trial.reasoning_method = reasoning_method
+        
+        # Deal with source_url_and_text
+        source_id = 0
+        source_url_and_text = {}
+        while f'source_url_{source_id}' in request.POST:
+            source_url = request.POST[f'source_url_{source_id}']
+            source_text = request.POST[f'source_text_{source_id}']
+            if source_url and source_text:
+                if source_url not in source_url_and_text:
+                    source_url_and_text[source_url] = []
+                source_url_and_text[source_url].append(source_text)
+            source_id += 1
+        source_url_and_text = json.dumps(source_url_and_text)
+        task_trial.source_url_and_text = source_url_and_text
         
         if check_answer(task.content, answer):
             task_trial.is_correct = True

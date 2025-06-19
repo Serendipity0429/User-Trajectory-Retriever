@@ -31,8 +31,9 @@ function flush_view_state() {
 
 chrome.runtime.sendMessage({ log_status: "request" }, function (response) {
     console.log(current_url.substring(0, 22))
+    checkIsTaskActive();
     if (current_url.substring(0, 22) != "http://127.0.0.1:8000/"
-        && response.log_status == true) {
+        && response.log_status == true && is_task_active) {
         logged_in = true;
         storage_link();
         if (debug) console.log("content.js is loaded");
@@ -45,7 +46,6 @@ chrome.runtime.sendMessage({ log_status: "request" }, function (response) {
         });
         if (debug) console.log("initialize done");
 
-        checkIsTaskActive();
         let observer = new MutationObserver(function (mutations) {
             if (current_url !== window.location.href) {
                 current_referrer = current_url;

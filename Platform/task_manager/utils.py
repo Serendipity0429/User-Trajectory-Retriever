@@ -93,9 +93,9 @@ def check_answer(entry, user_answer):
     print_debug("User Answer:", user_answer)
     print_debug("Correct Answer:", entry_answers)
 
-    if isinstance(entry_answer, list):
+    if isinstance(entry_answers, list):
         entry_answers = [str(ans) for ans in entry_answers]
-    if isinstance(entry_answer, str):
+    if isinstance(entry_answers, str):
         entry_answers = [entry_answers]
 
     user_answers = [ans.strip().lower() for ans in user_answer.split(';')]

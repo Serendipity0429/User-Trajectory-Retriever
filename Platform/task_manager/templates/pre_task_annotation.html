@@ -15,7 +15,7 @@
                 <div class="col-xs-12 sheet">
                     <input type="hidden" name="entry_id" id="entry-id" value="{{entry_id}}">
                     <div class="question-wrapper">
-                        <span class="col-xs-12 list_row">
+                        <span class="col-xs-12 list_row question">
                             1. <b>Task Description</b>: You need to answer the following question:
                             </span>
                         <br/>
@@ -23,7 +23,7 @@
                     </div>
 
                     <div class="question-wrapper">
-                        <span class="col-xs-12 list_row">
+                        <span class="col-xs-12 list_row question">
                             2. <b>Task Completion Criteria</b>: The criteria for task completion.</span>
                         <br/>
                         <div class="static-task-info">Exact Match (EM)</div>
@@ -31,7 +31,7 @@
                     </div>
 
                     <div class="question-wrapper">
-                        <label for="familiarity_ratio" class="ratio col-xs-12 list_row">3. <b>Domain Familiarity</b>: How familiar are you with the topic of this question?</label>
+                        <label for="familiarity_ratio" class="ratio col-xs-12 list_row question">3. <b>Domain Familiarity</b>: How familiar are you with the topic of this question?</label>
                         <div class="ratio col-xs-12 list_row ">
                             <label><input type="radio" name="familiarity" value="0"/> 0：Not familiar at all</label><br>
                             <label><input type="radio" name="familiarity" value="1"/> 1：Slightly familiar</label><br>
@@ -42,7 +42,7 @@
                     </div>
 
                     <div class="question-wrapper">
-                        <label for="difficulty_ratio" class="ratio col-xs-12 list_row">4. <b>Difficulty</b>: How do
+                        <label for="difficulty_ratio" class="ratio col-xs-12 list_row question">4. <b>Difficulty</b>: How do
                             you evaluate the difficulty of the task？</label>
                         <div class="ratio col-xs-12 list_row ">
                             <label><input type="radio" name="difficulty" value="0"/> 0：Very easy</label><br>
@@ -54,16 +54,14 @@
                     </div>
 
                     <div class="question-wrapper">
-                        <label for="effort_ratio" class="ratio col-xs-12 list_row">5. <b>Effort</b>: How much time do you expect to spend on this task?</label>
+                        <label for="effort_ratio" class="ratio col-xs-12 list_row question">5. <b>Effort</b>: How much time do you expect to spend on this task?</label>
                         <div class="ratio col-xs-12 list_row">
-                        <span style="display:flex;">One minute or slower&emsp;<input type="range" style="width: 40%" name="effort"
-                                                                           min="1" max="30" value="10" step="1"
+                        <span style="display:flex;">three minutes or slower&emsp;<input type="range" style="width: 40%" name="effort"
+                                                                           min="3" max="30" value="10" step="1"
                                                                            list="effort_marks" oninput="setEffort()"
                                                                            onchange="setEffort()"/>&emsp; Thirty minutes or longer (Current choice:&ensp;<b><span
                                 id="effort_value">10</span></b>)</span><br>
                             <datalist id="effort_marks">
-                                <option>1</option>
-                                <option>2</option>
                                 <option>3</option>
                                 <option>4</option>
                                 <option>5</option>
@@ -97,8 +95,8 @@
                     </div>
 
                     <div class="question-wrapper">
-                        <label for="initial_strategy" class="col-xs-12 list_row">
-                            6. <b>Initial Strategy</b>: Briefly describe your initial plan. What search queries or keywords do you think you will start with? (You can separate multiple queries with semi-colons, e.g., "query1; query2; query3".)
+                        <label for="initial_strategy" class="col-xs-12 list_row question">
+                            6. <b>Initial Strategy</b>: Briefly describe your initial plan. What search queries or keywords will you start with? (You can separate multiple queries with semi-colons, e.g., "query1; query2; query3".)
                         </label>
                         <div>
                             <textarea class="col-xs-12 list_row" id="initial_strategy" name="initial_strategy" rows="3" required></textarea>

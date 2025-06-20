@@ -19,8 +19,10 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/rrweb-player@latest/dist/style.css"/>
     <script src="https://cdn.jsdelivr.net/npm/rrweb-player@latest/dist/index.js"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/rrweb@latest/dist/style.css"/>
-    <script src="/static/js/rrweb.umd.min.cjs"></script>
-    <script src="/static/js/rrweb-player.js"></script>
+    {% comment %} <script src="/static/js/rrweb.umd.min.cjs"></script> {% endcomment %}
+    <script src="https://cdn.jsdelivr.net/npm/rrweb@latest/dist/rrweb.umd.min.cjs"></script>
+    {% comment %} <script src="/static/js/rrweb-player.js"></script> {% endcomment %}
+    <script src="https://cdn.jsdelivr.net/npm/rrweb-player@latest/dist/index.umd.cjs"></script>
     <style>
     {% block css %}
     {% endblock %}

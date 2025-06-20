@@ -24,7 +24,6 @@
                             <div class="rrweb-player-wrapper" id="rrweb-player-{{ webpage.id }}"></div>
                             <script>
                                 var rrweb_events_{{ webpage.id }} = {{ webpage.rrweb_events | safe }};
-                                // create a rrweb player
                                 const player_{{ webpage.id }} = new rrwebPlayer({
                                     target: document.getElementById(`rrweb-player-{{ webpage.id }}`),
                                     props: {
@@ -49,11 +48,11 @@
                 {% csrf_token %}
                 <div class="col-xs-12 sheet">
                     <div class="question-wrapper">
-                        <span class="col-xs-12 list_row"><b>Question</b>:</span>
+                        <span class="col-xs-12 list_row question"><b>Question</b>:</span>
                         <div class="static-task-info">{{ question }}</div>
                     </div>
                     <div class="question-wrapper">
-                        <label for="answer" class="col-xs-12 list_row"> <b>Your Answer</b>:</label>
+                        <label for="answer" class="col-xs-12 list_row question"> <b>Your Answer</b>:</label>
                         <i class="col-xs-12 list_row"> &emsp;(Notice: You don't need to reformulate the question into a complete sentence, just provide the answer directly.)</i>
                         <div><textarea class="col-xs-12 list_row" id="answer" name="answer" rows="5" required></textarea>
                         </div>
@@ -61,7 +60,7 @@
                 
 
                 <div class="question-wrapper">
-                    <label class="col-xs-12 list_row">
+                    <label class="col-xs-12 list_row question">
                         <b>2. Confidence</b>: How confident are you in this answer?
                     </label>
                     <div class="ratio col-xs-12 list_row ">
@@ -74,7 +73,7 @@
                 </div>
 
                 <div class="question-wrapper">
-                    <label class="col-xs-12 list_row">
+                    <label class="col-xs-12 list_row question">
                         <b>3. Justification</b>: Please provide the primary source URL and source text that you used to answer the question.
                     </label>
 
@@ -146,7 +145,7 @@
                 </script>
 
                 <div class="question-wrapper">
-                    <label class="col-xs-12 list_row">
+                    <label class="col-xs-12 list_row question">
                         <b>4. Reasoning Method</b>: How did you derive the answer from the source?
                     </label>
                     <div class="ratio col-xs-12 list_row">
@@ -163,7 +162,7 @@
                 </div>
 
                 <div class="question-wrapper">
-                    <label class="col-xs-12 list_row">
+                    <label class="col-xs-12 list_row question">
                         <b>5. Additional Explanation</b>: If you have any additional explanation or context for your answer, please provide it here.
                     </label>
 

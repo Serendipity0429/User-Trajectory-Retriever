@@ -50,7 +50,7 @@
                 {% csrf_token %}
                 <div class="col-xs-12 sheet">
                     <div class="question-wrapper">
-                        <span class="col-xs-12 list_row">
+                        <span class="col-xs-12 list_row question">
                             1. <b>Task Description</b>: You need to answer the following question:
                             </span>
                         <br/>
@@ -58,14 +58,14 @@
                     </div>
 
                     <div class="question-wrapper">
-                        <span class="col-xs-12 list_row">
+                        <span class="col-xs-12 list_row question">
                             2. <b>Task Completion Criteria</b>: The criteria for task completion.</span>
                         <br/>
                         <div class="static-task-info">exact match</div>
                     </div>
 
                     <div class="question-wrapper">
-                        <label class="col-xs-12 list_row">
+                        <label class="col-xs-12 list_row question">
                         3. <b>Primary Reason for Failure</b>: What do you think that might be the main reason your answer was wrong?
                         </label>
                         <div class="ratio col-xs-12 list_row">
@@ -79,7 +79,7 @@
                     </div>
 
                     <div class="question-wrapper">
-                        <label for="failure_reason" class="col-xs-12 list_row">
+                        <label for="failure_reason" class="col-xs-12 list_row question">
                             4. <b>Failure Analysis</b>: Please elaborate on what do you think might have gone wrong. (e.g., "I trusted an outdated blog post," "I misread the column header in the table.")
                         </label>
                         <div><textarea class="col-xs-12 list_row" id="failure_reason" name="failure_reason" rows="3" required></textarea></div>
@@ -87,7 +87,7 @@
                 
 
                     <div class="question-wrapper">
-                        <label class="col-xs-12 list_row">
+                        <label class="col-xs-12 list_row question">
                             5. <b>Corrective Plan</b>: What will you do differently in your next attempt? (Check all that apply)
                         </label>
                         <div class="ratio col-xs-12 list_row">

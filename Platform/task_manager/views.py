@@ -122,7 +122,7 @@ def post_task_annotation(user, request, task_id):
 
     question = task.content.question
     answer = json.loads(task.content.answer)
-    print(answer)
+    print_debug(answer)
 
     return render(
         request,

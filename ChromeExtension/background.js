@@ -87,6 +87,18 @@ function flush() {
     }
 }
 
+// Helper to convert Uint8Array to Base64 string
+// Pako.deflate returns a Uint8Array, which needs to be Base64 encoded for sending via AJAX/chrome.runtime.sendMessage
+function uint8ArrayToBase64(bytes) {
+    var binary = '';
+    var len = bytes.byteLength;
+    for (var i = 0; i < len; i++) {
+        binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary);
+}
+
+
 flush();
 
 chrome.runtime.onMessage.addListener(function (Msg, sender, sendResponse) {
@@ -132,8 +144,10 @@ chrome.runtime.onMessage.addListener(function (Msg, sender, sendResponse) {
     }
     if (Msg.send_flag == true) { // send the data
         Msg.username = localStorage['username'];
-        Msg = JSON.stringify(Msg);
-        sendInfo(Msg);
+        let msgJsonString = JSON.stringify(Msg);
+        let compressedData = pako.deflate(msgJsonString, { to: 'string' });
+        let compressedBase64 = uint8ArrayToBase64(compressedData);
+        sendInfo(compressedBase64);
     }
 
     if (Msg.task_active == "request") {

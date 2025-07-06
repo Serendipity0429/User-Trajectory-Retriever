@@ -25,7 +25,7 @@
   "background": {
     "scripts": [
       "jquery-3.3.1.min.js",
-      "pako_deflate.min.js",
+      "pako.min.js",
       "background.js"
     ]
   },
@@ -36,7 +36,7 @@
       ],
       "js": [
         "jquery-3.3.1.min.js",
-        "pako_deflate.min.js",
+        "pako.min.js",
         "rrweb.min.js",
         "rrweb-player.js",
         "mouseMove.js",

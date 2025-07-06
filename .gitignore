@@ -8,4 +8,4 @@ tempFiles
 .idea
 node_modules
 000*
-migrations/*_*.py
+migrations/0*.py

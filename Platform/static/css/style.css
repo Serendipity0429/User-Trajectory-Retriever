@@ -1,5 +1,5 @@
 
-.login_error_message {
+.login-error-message {
     border: solid 2px red;
     background: lightpink;
     border-radius: 4px;
@@ -9,18 +9,18 @@
     font-size: smaller;
 }
 
-.user_info {
+.user-info {
     background: #edeff1;
     border-radius: 4px;
     padding: 24px 23px 20px;
 }
 
-.list_header {
+.list-header {
     background: #edeff1;
     border-bottom: 2px solid #2f4154;
 }
 
-.list_row {
+.list-row {
     font-size: smaller;
     padding: 1px;
 }
@@ -29,7 +29,7 @@
     background: #edeff1;
 }
 
-.control_panel {
+.control-panel {
     background: #edeff1;
     border-top: 2px solid #2f4154;
     border-radius: 0 0 4px 4px;
@@ -60,14 +60,23 @@ label {
 }
 
 div.question-wrapper {
-    padding-bottom: 20px;
+    margin-bottom: 10px;
 }
 
-div.question-wrapper > div {
+div.question-wrapper .question-text {
+    font-size: large;
+}
+
+div.question-wrapper .notice {
+    font-style: italic;
+}
+
+div.question-wrapper > :not(.question-text) {
     padding-left: 20px;
 }
 
-div.question-wrapper > div.static-task-info {
+
+div.question-wrapper .static-task-info {
     color: #ef2e3c;
     font-weight: bold;
 }
@@ -111,7 +120,7 @@ div.question-wrapper > div.static-task-info {
 }
 
 .tool-block {
-    margin-bottom: 20px;
+    margin-bottom: 10px;
 }
 
 .sheet {
@@ -124,6 +133,8 @@ div.question-wrapper > div.static-task-info {
 .question-wrapper textarea {
     padding: 10px;
     font-size: large;
+    max-width: 100%;
+    min-width: 100%;
 }
 
 details:hover {

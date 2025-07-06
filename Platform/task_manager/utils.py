@@ -11,6 +11,8 @@ try:
 except ImportError:
     import json
 import time
+import base64
+import zlib
 
 ip_to_launch = "http://127.0.0.1:8000/"
 
@@ -30,9 +32,18 @@ def print_json_debug(message):
                message.items()}
     print_debug(json.dumps(message, indent=4))
 
+def decompress_json_data(compressed_data):
+    compressed_bytes = base64.b64decode(compressed_data)
+    decompressed_bytes = zlib.decompress(compressed_bytes).decode('utf-8')
+    decompressed_json = json.loads(decompressed_bytes)
+    return decompressed_json
 
 def store_data(message):
     # is_storing_data = True
+    
+    # decompress the message if it is compressed
+    message = decompress_json_data(message)
+    
     print_json_debug(message)
     if message['url'].startswith(f'{ip_to_launch}'):  # ip_to_launch should be set manually
         print_debug("Skipping storing data for local URL:", message['url'])

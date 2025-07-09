@@ -7,5 +7,5 @@ utils
 tempFiles
 .idea
 node_modules
-000*
+00*
 migrations/0*.py

@@ -67,7 +67,7 @@ class PreTaskAnnotation(models.Model):
     completion_criteria = models.CharField(max_length=1000, null=True)
     familiarity = models.IntegerField(null=True)  # 0->4, unfamiliar -> familiar
     difficulty = models.IntegerField(null=True)  # 0->4, easy -> hard
-    effort = models.IntegerField(null=True)  # 0->4, low -> 
+    effort = models.IntegerField(null=True)  # time effort to complete the task, 3 to 60
     
     initial_strategy = models.CharField(max_length=10000, null=True)  # initial strategy for the task
 
@@ -79,6 +79,9 @@ class ReflectionAnnotation(models.Model):
     failure_category = models.CharField(max_length=100)  # category of failure, e.g. "lack of resources", "lack of knowledge", etc.
     future_plan_actions = models.CharField(max_length=100)  # actions to take in the future
     future_plan_other = models.CharField(max_length=1000)  # text for future plan
+    remaining_effort = models.IntegerField()  # remaining effort to complete the task, 3 to 60
+
+    additional_reflection = models.CharField(max_length=10000, null=True)  # additional reflection on the task
 
 # Post-task annotation
 class PostTaskAnnotation(models.Model):
@@ -95,17 +98,20 @@ class PostTaskAnnotation(models.Model):
     aha_moment_source = models.CharField(max_length=10000, null=True)  # source of the aha moment
 
     unhelpful_paths = models.JSONField(null=True)  # paths that were not helpful, e.g. ["path1", "path2"]
+    unhelpful_paths_other = models.CharField(max_length=10000, null=True)  # other unhelpful paths
 
     strategy_shift = models.CharField(max_length=100, null=True)  # strategy shift during the task
+    strategy_shift_other = models.CharField(max_length=10000, null=True)  # other strategy shift
         
     additional_reflection = models.CharField(max_length=10000, null=True)  # reflection on the task
 
     # If task is cancelled
-    cancel_category = models.IntegerField(null=True)  # refer to post_task_annotation.html
+    cancel_category = models.CharField(max_length=100, null=True)  # refer to post_task_annotation.html
     cancel_reason = models.CharField(max_length=10000, null=True)  # reason for cancellation
     cancel_reflection = models.CharField(max_length=10000, null=True)  # reflection on cancellation
     cancel_missing_resources = models.CharField(max_length=10000, null=True)  # missing resources that led to cancellation
     cancel_missing_resources_other = models.CharField(max_length=10000, null=True)  # other missing resources
+    cancel_additional_reflection = models.CharField(max_length=10000, null=True)  # additional reflection on cancellation
 
 
 # Task Trial
@@ -146,6 +152,11 @@ class Webpage(models.Model):
     belong_task = models.ForeignKey(
         Task,
         on_delete=models.CASCADE,
+    )
+    belong_task_trial = models.ForeignKey(
+        TaskTrial,
+        on_delete=models.CASCADE,
+        null=True,
     )
 
 

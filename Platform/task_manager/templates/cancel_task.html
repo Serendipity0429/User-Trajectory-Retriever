@@ -3,9 +3,12 @@
 {% block content_title %} Cancel Task {% endblock %}
 {% block content %}
     <div class="row text-center">
-        <h3>
-            Please provide reason why you want to cancel this task.
-        </h3>
+        <h2>
+            Ongoing Task Cancelled 
+        </h2>
+        <h4>
+            Please provide reasons why you want to cancel this task
+        </h4>
     </div>
     <div class="row">
         <div class="col-xs-offset-1 col-xs-10">
@@ -15,38 +18,42 @@
             <form id="query-form" action="" method="post" enctype='multipart/form-data'>
                 {% csrf_token %}
                 <div class="col-xs-12 sheet">
-                    <div class="question-wrapper">
-                        <span class="col-xs-12 list_row">
-                            1. <b>Task Description</b>: You need to answer the following question:
+                    <div class="question-wrapper col-xs-12">
+                        <span class="col-xs-12 list-row question-text">
+                            <b>1. Task Description</b>: You need to answer the following question:
                             </span>
                         <br/>
                         <div class="static-task-info">{{ question }}</div>
                     </div>
 
-                    <div class="question-wrapper">
-                        <span class="col-xs-12 list_row">
-                            2. <b>Task Completion Criteria</b>: The criteria for task completion.</span>
+                    <div class="question-wrapper col-xs-12">
+                        <span class="col-xs-12 list-row question-text">
+                            <b>2. Task Completion Criteria</b>: The criteria for task completion.</span>
                         <br/>
-                        <div class="static-task-info">exact match</div>
+                        <div class="static-task-info">Exact Match (EM)</div>
                     </div>
 
-                    <div class="question-wrapper">
-                        <span class="col-xs-12 list_row">
-                            3. <b>Task Solution</b>: The authentic solution for this task. (Multiple answers are separated by semicolons)</span>
+                    <div class="question-wrapper col-xs-12">
+                        <span class="col-xs-12 list-row question-text">
+                            <b>3. Task Solution</b>: The authentic answers for this task.</span>
                         <br/>
-                        <div class="static-task-info">
-                            {% for item in answer %}
-                                {{ item }}
-                                {% if not forloop.last %}; {% endif %}
-                            {% endfor %}
+                        <!-- Modified section for expandable/collapsible answers -->
+                        <div class="static-task-info" style="font-size: 16px;">
+                            <ul id="answer-list" style="padding-left: 20px; margin-top: 5px; list-style-position: inside; column-count: 1; -webkit-column-count: 1; -moz-column-count: 1; margin-bottom: 5px;">
+                                {% for item in answer %}
+                                    <li>{{ item }}</li>
+                                {% endfor %}
+                            </ul>
+                            <a href="#" id="show-all-answers" style="display: none; margin-top: 10px; cursor: pointer;">Click here to see all possible correct answers</a>
+                            <a href="#" id="show-fewer-answers" style="display: none; margin-top: 10px; cursor: pointer;">Show fewer answers</a>
                         </div>
                     </div>
                     
-                    <div class="question-wrapper">
-                        <label class="col-xs-12 list_row">
-                            4. <b>Primary Reason for Cancellation</b>:
+                    <div class="question-wrapper col-xs-12">
+                        <label class="col-xs-12 list-row question-text">
+                            <b>4. Primary Reason for Cancellation</b>: Please select the primary reason you are cancelling this task.
                         </label>
-                        <div class="ratio col-xs-12 list_row">
+                        <div class="ratio col-xs-12 list-row">
                             <label><input type="radio" name="cancel_category" value="info_unavailable" required/> I believe the information is not publicly available online.</label><br>
                             <label><input type="radio" name="cancel_category" value="too_difficult"/> The task is too complex or difficult for me to solve.</label><br>
                             <label><input type="radio" name="cancel_category" value="no_idea"/> I am completely stuck and have no idea how to proceed.</label><br>
@@ -56,53 +63,210 @@
                         </div>
                     </div>
 
-                    <div class="question-wrapper">
-                        <label for="cancel_reason" class="col-xs-12 list_row">
-                            5. <b>Cancellation Details</b>: Please describe the final roadblock you hit. What was the last thing you tried?
+                    <div class="question-wrapper col-xs-12">
+                        <label for="cancel_reason" class="col-xs-12 list-row question-text">
+                            <b>5. Detailed Explanation</b>: Please explain what specific obstacle prevented you from completing the task. What was your final attempt before deciding to cancel?
                         </label>
-                        <div><textarea class="col-xs-12 list_row" id="cancel_reason" name="cancel_reason" rows="3" required></textarea>
+                        <div><textarea class="col-xs-12 list-row" id="cancel_reason" name="cancel_reason" rows="3" required></textarea>
                         </div>
                     </div>
 
-                    <div class="question-wrapper">
-                        <label class="col-xs-12 list_row">
-                            6. <b>Missing Resources</b>: What do you believe was needed to make this task solvable? (Check all that apply)
+                    <div class="question-wrapper col-xs-12">
+                        <label class="col-xs-12 list-row question-text">
+                            <b>6. Missing Resources</b>: What do you believe was needed to make this task solvable? (Check all that apply and drag to reorder by priority)
                         </label>
-                        <div class="ratio col-xs-12 list_row">
-                            <label><input type="checkbox" name="cancel_missing_resources" value="expert_knowledge"/> Deep, specialized domain knowledge.</label><br>
-                            <label><input type="checkbox" name="cancel_missing_resources" value="paid_access"/> Access to a paid subscription, database, or service.</label><br>
-                            <label><input type="checkbox" name="cancel_missing_resources" value="better_tools"/> A more powerful or specialized search tool.</label><br>
-                            <label><input type="checkbox" name="cancel_missing_resources" value="different_question"/> The question itself was too ambiguous or unanswerable.</label><br>
-                            <label><input type="checkbox" name="cancel_missing_resources" value="info_not_online"/> The information is unlikely to exist publicly online.</label><br>
-                            <label>
-                                <input type="checkbox" name="cancel_missing_resources" value="other"/> Other (please specify):
-                                <input type="text" name="cancel_missing_resources_other" style="width: 70%;" />
-                            </label><br>
+                        <div id="missing-resources-list" class="sortable-list col-xs-12 list-row">
+                            <div class="drag-option" data-value="expert_knowledge">
+                                <input type="checkbox" name="cancel_missing_resources" value="expert_knowledge"/>
+                                <span class="drag-handle">≡</span>
+                                <label>Deep, specialized domain knowledge.</label>
+                            </div>
+                            <div class="drag-option" data-value="paid_access">
+                                <input type="checkbox" name="cancel_missing_resources" value="paid_access"/>
+                                <span class="drag-handle">≡</span>
+                                <label>Access to a paid subscription, database, or service.</label>
+                            </div>
+                            <div class="drag-option" data-value="better_tools">
+                                <input type="checkbox" name="cancel_missing_resources" value="better_tools"/>
+                                <span class="drag-handle">≡</span>
+                                <label>A more powerful or specialized search tool.</label>
+                            </div>
+                            <div class="drag-option" data-value="different_question">
+                                <input type="checkbox" name="cancel_missing_resources" value="different_question"/>
+                                <span class="drag-handle">≡</span>
+                                <label>The question itself was too ambiguous or unanswerable.</label>
+                            </div>
+                            <div class="drag-option" data-value="info_not_online">
+                                <input type="checkbox" name="cancel_missing_resources" value="info_not_online"/>
+                                <span class="drag-handle">≡</span>
+                                <label>The information is unlikely to exist publicly online.</label>
+                            </div>
+                            <div class="drag-option" data-value="time_limit">
+                                <input type="checkbox" name="cancel_missing_resources" value="time_limit"/>
+                                <span class="drag-handle">≡</span>
+                                <label>More time to research and explore.</label>
+                            </div>
+                            <div class="drag-option" data-value="team_help">
+                                <input type="checkbox" name="cancel_missing_resources" value="team_help"/>
+                                <span class="drag-handle">≡</span>
+                                <label>Help from a team or community.</label>
+                            </div>
+                             <div class="drag-option" data-value="guidance">
+                                <input type="checkbox" name="cancel_missing_resources" value="guidance"/>
+                                <span class="drag-handle">≡</span>
+                                <label>Guidance or mentorship from an expert.</label>
+                            </div>
+                            <div class="drag-option" data-value="better_question">
+                                <input type="checkbox" name="cancel_missing_resources" value="better_question"/>
+                                <span class="drag-handle">≡</span>
+                                <label>A better-formulated question or clearer instructions.</label>
+                            </div>
+                            <div class="drag-option" data-value="other">
+                                <input type="checkbox" name="cancel_missing_resources" value="other"/>
+                                <span class="drag-handle">≡</span>
+                                <label>Other (please specify):</label>
+                                <input type="text" name="cancel_missing_resources_other" style="width: 70%; white-space: no-wrap; margin-left: 5px;" disabled/>
+                            </div>
                         </div>
+                        <input type="hidden" name="cancel_missing_resources_list" id="cancel_missing_resources_list" />
                     </div>
+                    <div class="question-wrapper col-xs-12">
+                        <label for="cancel_additional_reflection" class="col-xs-12 list-row question-text">
+                            <b>7. (Optional) Additional Reflection</b>: Do you have any additional thoughts or reflections on this task?
+                        <textarea class="col-xs-12 list-row" id="reflection" name="cancel_additional_reflection" rows="3" required></textarea>
+                    </div>
+                </div>
             </form>
             <div class="col-xs-12">
                 <div id="query-btn" class="col-xs-6 submit-btn btn btn-block btn-lg btn-primary">
                     Submit
                 </div>
             </div>
-            {% comment %} <div class="col-xs-12">
-                <div id="cancel-btn" class="col-xs-6 submit-btn btn btn-block btn-lg btn-primary cancel-button">
-                    Cancel
-                </div>
-            </div> {% endcomment %}
         </div>
         <script type="application/x-javascript">
-            // Submit the form when the window is closed
-            window.onbeforeunload = function () {
-                $('#query-form').submit();
-            };
             $(function () {
+                // --- Updated logic for expanding and collapsing the answer list ---
+                var answerList = $('#answer-list');
+                var listItems = answerList.find('li');
+                var showAllButton = $('#show-all-answers');
+                var showFewerButton = $('#show-fewer-answers');
+                var initialItemCount = 2; // Show 2 items initially
+
+                // Check if there are more answers than the initial count
+                if (listItems.length > initialItemCount) {
+                    // Hide items after the initial count
+                    listItems.slice(initialItemCount).hide();
+                    // Show the "show all" button
+                    showAllButton.show();
+                }
+
+                // Add click event to the "show all" button
+                showAllButton.on('click', function(e) {
+                    e.preventDefault(); // Prevent default link behavior
+                    // Show all hidden list items
+                    answerList.find('li:hidden').show();
+                    // Hide this button and show the "show fewer" button
+                    $(this).hide();
+                    showFewerButton.show();
+                    // Set to two columns when all are shown
+                    answerList.css({
+                        'column-count': 2,
+                        '-webkit-column-count': 2,
+                        '-moz-column-count': 2
+                    });
+                });
+
+                // Add click event to the "show fewer" button
+                showFewerButton.on('click', function(e) {
+                    e.preventDefault(); // Prevent default link behavior
+                    // Hide items after the initial count
+                    listItems.slice(initialItemCount).hide();
+                    // Hide this button and show the "show all" button
+                    $(this).hide();
+                    showAllButton.show();
+                    // Restore to single column when fewer are shown
+                    answerList.css({
+                        'column-count': 1,
+                        '-webkit-column-count': 1,
+                        '-moz-column-count': 1
+                    });
+                });
+                // --- END UPDATED SCRIPT ---
+
+
+                // Initialize jQuery UI Sortable on the list
+                $("#missing-resources-list").sortable({
+                    cursor: "grabbing",
+                    opacity: 0.8,
+                    placeholder: "sortable-placeholder",
+                    tolerance: "pointer",
+                    items: ".drag-option.selected", // Only selected items are sortable
+                    helper: "clone",
+                    cursorAt: { left: 5 },
+                    start: function(event, ui) {
+                        ui.placeholder.height(ui.item.height());
+                    },
+                    update: function(event, ui) {
+                        // Update the hidden input and priority numbers after sorting
+                        updateMissingResourcesOrder();
+                        updateMissingResourcesPriorityNumbers();
+                    }
+                });
+
+                // Handle checkbox changes to toggle selection and reorder
+                $('input[name="cancel_missing_resources"]').change(function() {
+                    var option = $(this).closest('.drag-option');
+                    var otherTextInput = $('[name="cancel_missing_resources_other"]');
+
+                    if ($(this).is(':checked')) {
+                        option.addClass('selected');
+                        if ($(this).val() === 'other') {
+                            otherTextInput.prop('disabled', false);
+                        }
+                    } else {
+                        option.removeClass('selected');
+                        $(this).attr('data-priority', '');
+                         if ($(this).val() === 'other') {
+                            otherTextInput.prop('disabled', true).val('');
+                        }
+                    }
+                    
+                    // Move selected items to the top of the list
+                    var container = $('#missing-resources-list');
+                    container.prepend(container.children('.drag-option.selected'));
+                    container.sortable('refresh'); // Refresh sortable instance
+
+                    // Update order and priority numbers
+                    updateMissingResourcesOrder();
+                    updateMissingResourcesPriorityNumbers();
+                });
+
+                // Function to update the hidden input with the sorted order of selected items
+                function updateMissingResourcesOrder() {
+                    var order = [];
+                    $('#missing-resources-list .drag-option.selected').each(function() {
+                        order.push($(this).data('value'));
+                    });
+                    $('#cancel_missing_resources_list').val(JSON.stringify(order));
+                }
+
+                // Function to update the visual priority numbers on the checkboxes
+                function updateMissingResourcesPriorityNumbers() {
+                    $('#missing-resources-list .drag-option.selected').each(function(index) {
+                        $(this).find('input[type="checkbox"]').attr('data-priority', index + 1);
+                    });
+                     $('#missing-resources-list .drag-option:not(.selected)').each(function(index) {
+                        $(this).find('input[type="checkbox"]').removeAttr('data-priority');
+                    });
+                }
+
+
+                // Handle form submission
                 $('#query-btn').click(
                     function () {
                         let cancel_reason = $("[name='cancel_reason']");
                         let cancel_category = $("[name='cancel_category']:checked");
-                        let cancel_missing_resources = $("[name='cancel_missing_resources']:checked");
+                        let selectedResources = $("#missing-resources-list .drag-option.selected");
                         
                         if (cancel_reason.val() === '') {
                             alert('Please fill in the reason for cancellation!');
@@ -113,34 +277,27 @@
                             alert('Please select a primary reason for cancellation!');
                             return
                         }
-                        if (cancel_missing_resources.length === 0) {
+                        if (selectedResources.length === 0) {
                             alert('Please select at least one missing resource!');
-                            return
-                        } else {
-                            // If "Other" is checked, ensure the text field is filled
-                            if (cancel_missing_resources.filter(function () {
-                                return $(this).val() === 'other';
-                            }).length > 0) {
-                                let otherText = $("[name='cancel_missing_resources_other']");
-                                if (otherText.val() === '') {
-                                    alert('Please specify the other missing resource!');
-                                    otherText.focus();
-                                    return
-                                }
-                            } else {
-                                // If "Other" is not checked, clear the text field
-                                $("[name='cancel_missing_resources_other']").val('');
+                            return;
+                        }
+                        
+                        // If "Other" is checked, ensure the text field is filled
+                        let otherCheckbox = selectedResources.find('input[value="other"]');
+                        if (otherCheckbox.length > 0) {
+                            let otherText = $("[name='cancel_missing_resources_other']");
+                            if (otherText.val().trim() === '') {
+                                alert('Please specify the other missing resource!');
+                                otherText.focus();
+                                return;
                             }
                         }
 
                         if (confirm("Are you sure to cancel the ongoing task?")) {
+                            // Before submitting, ensure the hidden field is up-to-date
+                            updateMissingResourcesOrder();
                             $('#query-form').submit();
                         }
-                    }
-                );
-                $('#cancel-btn').click(
-                    function () {
-                        window.close();
                     }
                 );
             });

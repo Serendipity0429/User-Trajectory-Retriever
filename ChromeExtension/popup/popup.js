@@ -283,12 +283,12 @@ function viewtask() {
     task_id = getActiveTask();
     if (task_id != -1) {
          let url = baseUrl + '/task/view_task_info/' + task_id + '/?username=' + localStorage['username'] + '&password=' + localStorage['password'];
-        window.open(url, 'newwindow', 'height=600,width=800,top=0,left=0,toolbar=no,menubar=no,scrollbars=no, resizable=no,location=no, status=no');
+        window.open(url, 'newwindow', 'height=600,width=930,top=0,left=0,toolbar=no,menubar=no,scrollbars=no, resizable=no,location=no, status=no');
     }
 }
 
 function tooluse() {
-    window.open(baseUrl + '/task/show_tool_use_page', 'newwindow', 'height=1000,width=1200,top=0,left=0,toolbar=no,menubar=no,scrollbars=no, resizable=no,location=no, status=no');
+    window.open(baseUrl + '/task/show_tool_use_page', 'newwindow', 'height=520,width=620,top=0,left=0,toolbar=no,menubar=no,scrollbars=no, resizable=no,location=no, status=no');
 }
 
 

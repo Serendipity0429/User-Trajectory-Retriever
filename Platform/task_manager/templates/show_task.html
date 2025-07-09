@@ -1,42 +1,71 @@
 {% extends "base.html" %}
-{% block title %} Task Trajectories & Annotations {% endblock %}
-{% block content_title %} Task Trajectories & Annotations {% endblock %}
+{% block title %}Task Process Details{% endblock %}
+{% block content_title %}Task Process Details{% endblock %}
+
 {% block content %}
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/rrweb-player@latest/dist/style.css"/>
-    <script src="https://cdn.jsdelivr.net/npm/rrweb-player@latest/dist/index.js"></script>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/rrweb@latest/dist/style.css"/>
-    <script src="/static/js/rrweb.umd.min.cjs"></script>
-    <div class="row text-center">
-        <h2>
-            Your answer is
-            <span style="color:limegreen">RIGHT!</span>
-        </h2>
-        <h3>
-            Please annotate the following questions
-        </h3>
-    </div>
-    <div class="row">
-        <div class="col-xs-offset-1 col-xs-10">
-            <details>
-                <summary class="col-xs-12 list-header">
-                    Trajectories of this task
-                </summary>
-                <div class="col-xs-offset-1 col-xs-10" id="trajectories">
-                    {% for webpage in webpages %}
-                        <div class="col-xs-12 list_row webpage-wrapper">
-                            {#                style="padding: 3% 0 3% 0;border-bottom: 1px solid #cccccc;">#}
-                            <p style="font-size: 20px">Webpage {{ forloop.counter }}:&ensp;<a href="{{ webpage.url }}"
-                                                                                              target="_blank">{{ webpage.title }}</a>
-                            </p>
-                            <!-- create a div to store the rrweb player -->
-                            <div class="rrweb-player-wrapper" id="rrweb-player-{{ webpage.id }}"></div>
+<div class="row">
+    <div class="col-xs-offset-1 col-xs-10 task-process-container">
+        <!-- General Task Information -->
+        <div class="sheet" style="margin-bottom: 20px; border: 1px solid #c2c9c9;">
+            <div class="question-wrapper col-xs-12">
+                <div class="question-text">Task Question</div>
+                <div class="static-task-info">{{ task_question }}</div>
+            </div>
+            <div class="question-wrapper col-xs-12">
+                <div class="question-text">Task Completion Criteria</div>
+                <div class="static-task-info" style="font-size: medium; color: #333;">Exact Match (EM)</div>
+            </div>
+        </div>
+
+        <!-- Pre-Task Annotation -->
+        {% if pre_task_annotation %}
+        <details open>
+            <summary>Pre-Task Annotation</summary>
+            <div class="annotation-body">
+                <div class="annotation-block">
+                    <div class="question-text">Domain Familiarity</div>
+                    <div class="annotation-value">{{ pre_task_annotation.familiarity }}</div>
+                </div>
+                <div class="annotation-block">
+                    <div class="question-text">Predicted Difficulty</div>
+                    <div class="annotation-value">{{ pre_task_annotation.difficulty }}</div>
+                </div>
+                <div class="annotation-block">
+                    <div class="question-text">Predicted Effort (minutes)</div>
+                    <div class="annotation-value">{{ pre_task_annotation.effort }}</div>
+                </div>
+                <div class="annotation-block">
+                    <div class="question-text">Initial Strategy</div>
+                    <div class="annotation-value">{{ pre_task_annotation.initial_strategy }}</div>
+                </div>
+            </div>
+        </details>
+        {% endif %}
+
+        <!-- Trials Loop -->
+        {% for trial in trials %}
+        <details>
+            <summary>
+                Trial {{ trial.num_trial }} -
+                {% if trial.is_correct %}
+                    <span class="status-right">Correct</span>
+                {% else %}
+                    <span class="status-wrong">Incorrect</span>
+                {% endif %}
+            </summary>
+            <div class="annotation-body">
+                <!-- Session Replay for this Trial -->
+                <div class="annotation-block">
+                     <div class="question-text" style="font-size: 1.4em; color: #337ab7;">Session Replay</div>
+                     {% for webpage in trial.webpages %}
+                        <div class="webpage-wrapper">
+                            <p style="font-size: 18px">Webpage {{ forloop.counter }}: <a href="{{ webpage.url }}" target="_blank">{{ webpage.title }}</a></p>
+                            <div class="rrweb-player-wrapper" id="rrweb-player-trial{{trial.num_trial}}-{{ webpage.id }}"></div>
                             <script>
-                                var rrweb_events_{{ webpage.id }} = {{ webpage.rrweb_events | safe }};
-                                // create a rrweb player
-                                const player_{{ webpage.id }} = new rrwebPlayer({
-                                    target: document.getElementById(`rrweb-player-{{ webpage.id }}`),
+                                new rrwebPlayer({
+                                    target: document.getElementById('rrweb-player-trial{{trial.num_trial}}-{{ webpage.id }}'),
                                     props: {
-                                        events: rrweb_events_{{ webpage.id }},
+                                        events: {{ webpage.rrweb_events|safe }},
                                         autoPlay: false,
                                         width: 800,
                                         height: 377,
@@ -44,104 +73,153 @@
                                 });
                             </script>
                         </div>
-                    {% endfor %}
+                     {% empty %}
+                        <p>No recorded webpages for this trial.</p>
+                     {% endfor %}
                 </div>
-            </details>
-        </div>
-        <div class="col-xs-offset-1 col-xs-10">
-            <div class="col-xs-12 list-header">
-                Please review the search process and select the appropriate options.
+
+                <!-- Submitted Answer -->
+                <div class="annotation-block">
+                    <div class="question-text" style="font-size: 1.4em; color: #337ab7;">Submitted Answer</div>
+                    <div class="question-text">Answer:</div>
+                    <div class="annotation-value">{{ trial.submitted_answer.answer }}</div>
+                    
+                    <div class="question-text" style="margin-top:15px;">Confidence:</div>
+                    <div class="annotation-value">{{ trial.submitted_answer.confidence }}</div>
+
+                    <div class="question-text" style="margin-top:15px;">Justification:</div>
+                    <div class="annotation-value">
+                        <ul>
+                        {% for source in trial.submitted_answer.sources %}
+                            <li>
+                                <strong>URL:</strong> <a href="{{ source.url }}" target="_blank">{{ source.url }}</a><br>
+                                <strong>Text:</strong> {{ source.text }}
+                            </li>
+                        {% endfor %}
+                        </ul>
+                    </div>
+                    
+                    <div class="question-text" style="margin-top:15px;">Reasoning Method:</div>
+                    <div class="annotation-value">{{ trial.submitted_answer.reasoning_method }}</div>
+                    
+                    {% if trial.submitted_answer.additional_explanation %}
+                    <div class="question-text" style="margin-top:15px;">Additional Explanation:</div>
+                    <div class="annotation-value">{{ trial.submitted_answer.additional_explanation }}</div>
+                    {% endif %}
+                </div>
+
+                <!-- Reflection Annotation (if wrong) -->
+                {% if not trial.is_correct and trial.reflection_annotation %}
+                <div class="annotation-block">
+                    <div class="question-text" style="font-size: 1.4em; color: #337ab7;">Reflection (Incorrect Answer)</div>
+                    <div class="question-text">Primary Reasons for Failure:</div>
+                    <div class="annotation-value">
+                        <ul>
+                        {% for reason in trial.reflection_annotation.failure_reasons %}
+                            <li>{{ reason }}</li>
+                        {% endfor %}
+                        </ul>
+                    </div>
+
+                    <div class="question-text" style="margin-top:15px;">Failure Analysis:</div>
+                    <div class="annotation-value">{{ trial.reflection_annotation.failure_analysis }}</div>
+
+                    <div class="question-text" style="margin-top:15px;">Corrective Plan:</div>
+                    <div class="annotation-value">
+                         <ul>
+                        {% for plan in trial.reflection_annotation.corrective_plan %}
+                            <li>{{ plan }}</li>
+                        {% endfor %}
+                        </ul>
+                    </div>
+
+                    <div class="question-text" style="margin-top:15px;">Expected Remaining Effort (minutes):</div>
+                    <div class="annotation-value">{{ trial.reflection_annotation.remaining_effort }}</div>
+                    
+                    {% if trial.reflection_annotation.additional_reflection %}
+                    <div class="question-text" style="margin-top:15px;">Additional Reflection:</div>
+                    <div class="annotation-value">{{ trial.reflection_annotation.additional_reflection }}</div>
+                    {% endif %}
+                </div>
+                {% endif %}
             </div>
-            <form id="query-form" action="" method="post" onsubmit="validateForm()"
-                  enctype='multipart/form-data'>
-                {% csrf_token %}
-                <div class="col-xs-12 sheet">
-                    <h4>Task Completion Annotation</h4>
+        </details>
+        {% endfor %}
 
-                    <div class="question-wrapper">
-                        <span class="col-xs-12 list_row">
-                            1. <b>Task Description</b>: You need to answer the following question:
-                            </span>
-                        <br/>
-                        <div class="static-task-info">{{ question }}</div>
-                        <span class="col-xs-12 list_row">
-                            <b>Whose answer is:</b>
-                        </span>
-                        <br/>
-                        <div class="static-task-info">{{ answer3 }}</div>
-                    </div>
-
-                    <div class="question-wrapper">
-                        <span class="col-xs-12 list_row">
-                            2. <b>Task Completion Criteria</b>: The criteria for task completion.</span>
-                        <br/>
-                        <div class="static-task-info">exact match</div>
-                    </div>
-
-                    <div class="question-wrapper">
-                        <label for="expertise" class="ratio col-xs-12 list_row"><b>3. Were you familiar with the
-                            search.</b>&ensp;0→4:
-                            Not at all → Very familiar</label>
-                        <div class="ratio col-xs-12 user_fill">
-                            <label><input type="radio" name="expertise" value="0"/> 0&emsp;
-                            </label>
-                            <label><input type="radio" name="expertise" value="1"/> 1&emsp;
-                            </label>
-                            <label><input type="radio" name="expertise" value="2"/> 2&emsp;
-                            </label>
-                            <label><input type="radio" name="expertise" value="3"/> 3&emsp;
-                            </label>
-                            <label><input type="radio" name="expertise" value="4"/> 4&emsp;
-                            </label>
-                        </div>
-                        <script>
-                            $("input:radio[name='expertise'][value='{{ task.expertise }}']").attr('checked', 'true');
-                        </script>
-                    </div>
-
-                    <div class="question-wrapper">
-                        <label for="reflection" class="col-xs-12 list_row">4. <b>Reflections</b>:
-                            Please provide any other reflections on the task.</label>
-                        <textarea class="col-xs-12 list_row" id="reflection" name="reflection" rows="3" required
-                                  style="margin-bottom:10px;"></textarea>
+        <!-- Post-Task Annotation (if task was successfully completed) -->
+        {% if post_task_annotation %}
+        <details open>
+            <summary>Final Annotation (Successful Completion)</summary>
+            <div class="annotation-body">
+                <div class="annotation-block">
+                    <div class="question-text">Overall Difficulty</div>
+                    <div class="annotation-value">{{ post_task_annotation.difficulty_actual }}</div>
+                </div>
+                <div class="annotation-block">
+                    <div class="question-text">"Aha!" Moment</div>
+                    <div class="annotation-value">{{ post_task_annotation.aha_moment_type }}</div>
+                     {% if post_task_annotation.aha_moment_source %}
+                    <div class="question-text" style="margin-top:15px;">"Aha!" Moment Source:</div>
+                    <div class="annotation-value">{{ post_task_annotation.aha_moment_source }}</div>
+                    {% endif %}
+                </div>
+                <div class="annotation-block">
+                    <div class="question-text">Unhelpful Paths Encountered</div>
+                    <div class="annotation-value">
+                        <ul>
+                        {% for path in post_task_annotation.unhelpful_paths %}
+                            <li>{{ path }}</li>
+                        {% endfor %}
+                        </ul>
                     </div>
                 </div>
-            </form>
-            <div class="col-xs-12">
-                <div id="query-btn" class="col-xs-6 submit-btn btn btn-block btn-lg btn-primary"
-                     style="margin-top:10px;">
-                    Submit
+                <div class="annotation-block">
+                    <div class="question-text">Strategic Shift</div>
+                    <div class="annotation-value">{{ post_task_annotation.strategy_shift }}</div>
                 </div>
+                 {% if post_task_annotation.additional_reflection %}
+                <div class="annotation-block">
+                    <div class="question-text">Additional Reflection</div>
+                    <div class="annotation-value">{{ post_task_annotation.additional_reflection }}</div>
+                </div>
+                {% endif %}
             </div>
-        </div>
-        <script>
-        </script>
-        <script>
-            function validateForm() {
-                let checks = $('input[type="checkbox"]:checked').map(function () {
-                    return $(this).val();
-                }).get();
-            }
-        </script>
-        <script type="application/x-javascript">
-            $(function () {
-                $('#query-btn').click(
-                    function () {
-                        let expertise = $("[name='expertise']:checked");
+        </details>
+        {% endif %}
 
-                        if (expertise.val() == null) {
-                            alert('Please choose a expertise level!');
-                            $('input[name="expertise"]').focus();
-                            return
-                        }
+        <!-- Cancel Annotation (if task was cancelled) -->
+        {% if cancel_annotation %}
+        <details open>
+            <summary>Task Status: <span class="status-cancelled">Cancelled</span></summary>
+            <div class="annotation-body">
+                <div class="annotation-block">
+                    <div class="question-text">Primary Reason for Cancellation</div>
+                    <div class="annotation-value">{{ cancel_annotation.cancel_category }}</div>
+                </div>
+                <div class="annotation-block">
+                    <div class="question-text">Detailed Explanation</div>
+                    <div class="annotation-value">{{ cancel_annotation.cancel_reason }}</div>
+                </div>
+                <div class="annotation-block">
+                    <div class="question-text">Missing Resources</div>
+                    <div class="annotation-value">
+                        <ul>
+                        {% for resource in cancel_annotation.missing_resources %}
+                            <li>{{ resource }}</li>
+                        {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+                {% if cancel_annotation.additional_reflection %}
+                <div class="annotation-block">
+                    <div class="question-text">Additional Reflection</div>
+                    <div class="annotation-value">{{ cancel_annotation.additional_reflection }}</div>
+                </div>
+                {% endif %}
+            </div>
+        </details>
+        {% endif %}
 
-                        if (confirm("Are you sure to submit all the annotations?")) {
-                            $('#query-form').submit();
-                        }
-                    }
-                );
-            });
-        </script>
     </div>
-
+</div>
 {% endblock %}

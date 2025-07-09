@@ -20,7 +20,9 @@ except ImportError:
 def data(request):
     print_debug("function data")
     if request.method == 'POST':
-        message = json.loads(request.POST['message'])
+        message = request.POST['message']
+        # decompress the message if it is compressed
+        message = decompress_json_data(message)
         store_data(message)
         return HttpResponse('data storage succeeded')
     else:
@@ -227,26 +229,126 @@ def annotation_home(user, request):
 
 @require_login
 def show_task(user, request, task_id):
-    print_debug("function show_task")
+    """
+    获取与特定任务相关的所有数据，并在详细视图中呈现。
+    此函数收集任务前问卷、所有尝试及其各自的网页、
+    提交的答案、反思以及任务后或取消问卷。
+    """
+    print_debug(f"function show_task for task_id: {task_id}")
     task = Task.objects.filter(id=task_id, user=user).first()
     if task is None:
         return HttpResponse(f'No task found with task_id={task_id}')
 
-    # filter relevant webpages
-    webpages = Webpage.objects.filter(belong_task=task)
-    # sort by start_timestamp
-    webpages = sorted(webpages, key=lambda item: item.start_timestamp)
+    # 1. 获取常规任务信息
+    task_question = task.content.question
 
-    return render(
-        request,
-        'show_task.html',
-        {
-            'cur_user': user,
-            'task_id': task.id,
-            'webpages': webpages,
-            'task': task,
+    # 2. 获取任务前问卷
+    pre_task_annotation = PreTaskAnnotation.objects.filter(belong_task=task).first()
+
+    # 3. 获取所有尝试及相关数据
+    task_trials = TaskTrial.objects.filter(belong_task=task).order_by('num_trial')
+    trials_context = []
+    for trial in task_trials:
+        # 获取此特定尝试的所有网页
+        trial_webpages = Webpage.objects.filter(belong_task_trial=trial).order_by('start_timestamp')
+
+        # 格式化提交的答案来源
+        submitted_sources = []
+        try:
+            # 该字段存储一个JSON字符串，格式如：{"url1": ["text1", "text2"], "url2": ["text3"]}
+            sources_dict = json.loads(trial.source_url_and_text)
+            for url, texts in sources_dict.items():
+                for text in texts:
+                    submitted_sources.append({'url': url, 'text': text})
+        except (json.JSONDecodeError, TypeError):
+            # 处理数据不是有效JSON或不存在的情况
+            submitted_sources = []
+            
+        submitted_answer_context = {
+            'answer': trial.answer,
+            'confidence': trial.confidence,
+            'sources': submitted_sources,
+            'reasoning_method': trial.reasoning_method,
+            'additional_explanation': trial.additional_explanation,
         }
-    )
+
+        # 如果尝试不正确，则格式化反思问卷
+        reflection_context = None
+        if not trial.is_correct and trial.reflection_annotation:
+            reflection = trial.reflection_annotation
+            try:
+                failure_reasons = json.loads(reflection.failure_category) if reflection.failure_category else []
+            except (json.JSONDecodeError, TypeError):
+                failure_reasons = []
+            
+            try:
+                corrective_plan = json.loads(reflection.future_plan_actions) if reflection.future_plan_actions else []
+            except (json.JSONDecodeError, TypeError):
+                corrective_plan = []
+
+            reflection_context = {
+                'failure_reasons': failure_reasons,
+                'failure_analysis': reflection.failure_reason,
+                'corrective_plan': corrective_plan,
+                'remaining_effort': reflection.remaining_effort,
+                'additional_reflection': reflection.additional_reflection,
+            }
+
+        trials_context.append({
+            'num_trial': trial.num_trial,
+            'is_correct': trial.is_correct,
+            'webpages': trial_webpages,
+            'submitted_answer': submitted_answer_context,
+            'reflection_annotation': reflection_context,
+        })
+
+    # 4. 获取任务后或取消问卷
+    final_annotation = PostTaskAnnotation.objects.filter(belong_task=task).first()
+    post_task_annotation_context = None
+    cancel_annotation_context = None
+
+    if final_annotation:
+        if task.cancelled:
+            # 这是取消问卷
+            try:
+                missing_resources = json.loads(final_annotation.cancel_missing_resources) if final_annotation.cancel_missing_resources else []
+            except (json.JSONDecodeError, TypeError):
+                missing_resources = []
+
+            cancel_annotation_context = {
+                'cancel_category': final_annotation.cancel_category,
+                'cancel_reason': final_annotation.cancel_reason,
+                'missing_resources': missing_resources,
+                'additional_reflection': final_annotation.cancel_additional_reflection,
+            }
+        else:
+            # 这是成功完成的问卷
+            try:
+                unhelpful_paths = json.loads(final_annotation.unhelpful_paths) if final_annotation.unhelpful_paths else []
+            except (json.JSONDecodeError, TypeError):
+                unhelpful_paths = []
+
+            post_task_annotation_context = {
+                'difficulty_actual': final_annotation.difficulty_actual,
+                'aha_moment_type': final_annotation.aha_moment_type,
+                'aha_moment_source': final_annotation.aha_moment_source,
+                'unhelpful_paths': unhelpful_paths,
+                'strategy_shift': final_annotation.strategy_shift,
+                'additional_reflection': final_annotation.additional_reflection,
+            }
+
+    # 5. 组装最终上下文并渲染模板
+    context = {
+        'cur_user': user,
+        'task_id': task.id,
+        'task_question': task_question,
+        'pre_task_annotation': pre_task_annotation,
+        'trials': trials_context,
+        'post_task_annotation': post_task_annotation_context,
+        'cancel_annotation': cancel_annotation_context,
+        'task': task, # 如果需要，传递整个任务对象
+    }
+    return render(request, 'show_task.html', context)
 
 
 @require_login
@@ -292,10 +394,14 @@ def cancel_task(user, request, task_id, end_timestamp):
     
     if request.method == 'POST':
         task.cancelled = True
-        task.cancel_category = request.POST.get('cancel_category')
-        task.cancel_reason = request.POST.get('cancel_reason')
-        task.cancel_missing_resources = request.POST.get('cancel_missing_resources')
-        task.cancel_missing_resources_other = request.POST.get('cancel_missing_resources_other')
+        cancel_annotation = PostTaskAnnotation()
+        cancel_annotation.belong_task = task
+        cancel_annotation.cancel_category = request.POST.get('cancel_category')
+        cancel_annotation.cancel_reason = request.POST.get('cancel_reason')
+        cancel_annotation.cancel_missing_resources = request.POST.get('cancel_missing_resources')
+        cancel_annotation.cancel_missing_resources_other = request.POST.get('cancel_missing_resources_other')
+        cancel_annotation.cancel_additional_reflection = request.POST.get('cancel_additional_reflection')
+        cancel_annotation.save()
         return close_window()
     
     task.active = False
@@ -333,10 +439,11 @@ def reflection_annotation(user, request, task_id, end_timestamp):
 
     if request.method == 'POST':
         ref_annotation = ReflectionAnnotation()
-        ref_annotation.failure_category = request.POST.get('failure_category')
+        ref_annotation.failure_category = request.POST.get('failure_category_list')
         ref_annotation.failure_reason = request.POST.get('failure_reason')
-        ref_annotation.future_plan_actions = request.POST.get('future_plan_actions')
+        ref_annotation.future_plan_actions = request.POST.get('future_plan_actions_list')
         ref_annotation.future_plan_other  = request.POST.get('future_plan_other')
+        ref_annotation.remaining_effort = request.POST.get('remaining_effort')
         ref_annotation.save()
         task_trial.reflection_annotation = ref_annotation
         task_trial.save()
@@ -373,10 +480,17 @@ def submit_answer(user, request, task_id, timestamp):
         return HttpResponse(f'No task found with task_id={task_id}')
     question = task.content.question
     start_timestamp = task.start_timestamp
-    if task.num_trial > 1:
-        last_task_trial = TaskTrial.objects.filter(belong_task=task, num_trial=task.num_trial - 1).first()
+    num_trial = task.num_trial
+    if num_trial > 1:
+        last_task_trial = TaskTrial.objects.filter(belong_task=task, num_trial=num_trial - 1).first()
         assert last_task_trial is not None  # Ensure that the last task trial exists, which should always be the case
-        start_timestamp.start_timestamp = last_task_trial.end_timestamp
+        start_timestamp = last_task_trial.end_timestamp
+        
+    # Filter the webpage whose timestamp is within the range of start_timestamp and timestamp
+    webpages = Webpage.objects.filter(belong_task=task, start_timestamp__gte=start_timestamp,
+                                      start_timestamp__lt=timestamp)
+    # Sort by start_timestamp
+    webpages = sorted(webpages, key=lambda item: item.start_timestamp)
 
     if request.method == 'POST':
         answer = request.POST.get('answer')
@@ -384,11 +498,9 @@ def submit_answer(user, request, task_id, timestamp):
         confidence = request.POST.get('confidence')
         reasoning_method = request.POST.get('reasoning_method')
         
-        
-        redirect_url = f'/task/post_task_annotation/{task_id}'
         task_trial = TaskTrial()
         task_trial.belong_task = task
-        task_trial.num_trial = task.num_trial + 1
+        task_trial.num_trial = num_trial + 1
         task.num_trial += 1
         task_trial.answer = answer
         task_trial.start_timestamp = start_timestamp
@@ -411,6 +523,7 @@ def submit_answer(user, request, task_id, timestamp):
         source_url_and_text = json.dumps(source_url_and_text)
         task_trial.source_url_and_text = source_url_and_text
         
+        redirect_url = f'/task/post_task_annotation/{task_id}'
         if check_answer(task.content, answer):
             task_trial.is_correct = True
             task.end_timestamp = timestamp
@@ -420,13 +533,12 @@ def submit_answer(user, request, task_id, timestamp):
 
         task_trial.save()
         task.save()
+        
+        for webpage in webpages:
+            webpage.belong_task_trial = task_trial
+            webpage.save()
+        
         return HttpResponseRedirect(redirect_url)
-
-    # Filter the webpage whose timestamp is within the range of start_timestamp and timestamp
-    webpages = Webpage.objects.filter(belong_task=task, start_timestamp__gte=start_timestamp,
-                                      start_timestamp__lt=timestamp)
-    # Sort by start_timestamp
-    webpages = sorted(webpages, key=lambda item: item.start_timestamp)
 
     return render(
         request,
@@ -436,6 +548,7 @@ def submit_answer(user, request, task_id, timestamp):
             'task_id': task_id,
             'question': question,
             'webpages': webpages,
+            'num_trial': num_trial + 1,
         }
     )
 

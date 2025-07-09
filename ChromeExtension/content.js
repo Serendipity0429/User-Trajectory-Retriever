@@ -4,6 +4,7 @@
 var current_url = window.location.href;
 var current_referrer = document.referrer;
 var is_task_active = false;
+var is_in_background = false; // This variable is not used in the current code, but can be used for future enhancements
 
 // check whether there is an active task
 function checkIsTaskActive() {
@@ -20,9 +21,11 @@ function storage_link() {
     // Leave it here for compatibility
 }
 
-function flush_view_state() {
-    viewState.sendMessage();
-    storage_link();
+function flush_view_state(send_message = true) {
+    if (send_message) {
+        viewState.sendMessage();
+        storage_link();
+    }
     viewState.initialize();
     mPage.rrweb_events = []; // clear the rrweb events
     rrweb.record.takeFullSnapshot();
@@ -62,10 +65,16 @@ chrome.runtime.sendMessage({ log_status: "request" }, function (response) {
         document.addEventListener("visibilitychange", function () {
             if (document.visibilityState === 'hidden') {
                 if (debug) console.log("Page is hidden, flushing view state.");
-                flush_view_state();
+                is_in_background = true;
+                flush_view_state(true);
+            } else if (document.visibilityState === 'visible') {
+                if (is_in_background) {
+                    if (debug) console.log("Page is visible after being hidden, updating view state.");
+                    flush_view_state(false); // do not send message to backend, we want to skip the rrweb events occured when the page was hidden
+                    is_in_background = false;
+                }
             }
-        }
-        );
+        });
     }
 });
 

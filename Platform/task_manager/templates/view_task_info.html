@@ -10,21 +10,30 @@
     <div class="row">
         <div class="col-xs-offset-1 col-xs-10">
             {% csrf_token %}
-            <div class="col-xs-12" style="border:1px dashed #000; border-radius:10px">
-                <div class="question-wrapper">
-                        <span class="col-xs-12 list_row">
-                            1. <b>Task Description</b>: You need to answer the following question:
-                            </span>
+            <div class="col-xs-12" style="border:1px dashed #000; border-radius:10px; padding: 10px 5px;">
+                <div class="question-wrapper col-xs-12">
+                        <span class="col-xs-12 list-row question-text">
+                            <b>1. Task Description</b>: You need to answer the following question:
+                        </span>
                     <br/>
                     <div class="static-task-info">{{ question }}</div>
                 </div>
 
-                <div class="question-wrapper">
-                        <span class="col-xs-12 list_row">
-                            2. <b>Task Completion Criteria</b>: The criteria for task completion.</span>
+                <div class="question-wrapper col-xs-12">
+                        <span class="col-xs-12 list-row question-text">
+                            <b>2. Task Completion Criteria</b>: The criteria for task completion.</span>
                     <br/>
                     <div class="static-task-info">Exact Match (EM)</div>
-                    <p> Notice: You don't need to reformulate the question into a complete sentence, just provide the answer directly.</p>
+                    <i class="notice col-xs-12 list-row"> Notice: You don't need to reformulate the question into a complete sentence, just provide the answer directly.</i>
+                    <div class="col-xs-12 list-row">
+                        <b>Example:</b>
+                        <div style="margin-left: 20px;">
+                            <em>Question:</em> What is the capital of France?<br>
+                            <em>Expected Answer:</em> Paris<br>
+                            <em>Wrong Answer 1:</em> The capital of France is Paris.<br>
+                            <em>Wrong Answer 2:</em> Beijing
+                        </div>
+                    </div>
                 </div>
 
             </div>

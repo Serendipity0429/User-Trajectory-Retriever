@@ -41,9 +41,6 @@ def decompress_json_data(compressed_data):
 def store_data(message):
     # is_storing_data = True
     
-    # decompress the message if it is compressed
-    message = decompress_json_data(message)
-    
     print_json_debug(message)
     if message['url'].startswith(f'{ip_to_launch}'):  # ip_to_launch should be set manually
         print_debug("Skipping storing data for local URL:", message['url'])

@@ -17,7 +17,11 @@
 
 .list-header {
     background: #edeff1;
-    border-bottom: 2px solid #2f4154;
+    border-bottom: 2px solid #007087;
+}
+
+.list-header b {
+    color: #045363;
 }
 
 .list-row {
@@ -31,32 +35,35 @@
 
 .control-panel {
     background: #edeff1;
-    border-top: 2px solid #2f4154;
+    border-top: 2px solid #007087;
     border-radius: 0 0 4px 4px;
     margin-bottom: 10px;
 }
 
-.post-task {
-    border: 1px dotted #2f4154;
-    padding: 2px 2px 2px 10px;
-}
-
-label {
-    margin-bottom: 1px;
-}
 
 .btn-primary {
-    background-color: #2e718d;
+    background-color: #007087;
     margin-top: 10px;
     margin-bottom: 10px;
+    font-size: large;
+    font-weight: bold;
 }
 
 .btn-primary:hover {
-    background-color: #448ab4;
+    background-color: #5a8ea7;
 }
 
 .btn-primary:active {
-    background-color: #5183ad;
+    background-color: #4a7b8c;
+}
+
+.btn-primary:focus {
+    background-color: #4a7b8c;
+    outline: none;
+}
+
+h1, h2, h3, h4, h5, h6, b {
+    color: #007087;
 }
 
 div.question-wrapper {
@@ -71,14 +78,14 @@ div.question-wrapper .notice {
     font-style: italic;
 }
 
-div.question-wrapper > :not(.question-text) {
+div.question-wrapper > :not(.question-text, input, textarea) {
     padding-left: 20px;
 }
 
-
-div.question-wrapper .static-task-info {
-    color: #ef2e3c;
+.static-task-info {
+    color: #cb4f02;
     font-weight: bold;
+    font-size: larger;
 }
 
 .rrweb-player-wrapper {
@@ -130,13 +137,198 @@ div.question-wrapper .static-task-info {
     margin-bottom: 10px;
 }
 
-.question-wrapper textarea {
-    padding: 10px;
-    font-size: large;
+.question-wrapper textarea, input[type="text"], input[type="url"] {
+    padding: 5px 7px !important;
+    font-size: medium;
+    line-height: normal;
+}
+
+.question-wrapper textarea{
     max-width: 100%;
     min-width: 100%;
 }
 
+
 details:hover {
     cursor: pointer;
 }
+
+input {
+    accent-color: #007087;
+}
+
+input {
+    accent-color: #007087;
+}
+
+label {
+    margin-bottom: 0 !important;
+    line-height: 2;
+}
+
+.navbar-brand:hover {
+    color: #e79562 !important;
+}
+
+a {
+    color: #007087 !important;
+    text-decoration: none !important;
+}
+
+a:hover {
+    color: #e79562 !important;
+}
+
+
+details:hover {
+    cursor: pointer !important;
+}
+
+button.add-source {
+    background-color: #227fae !important;
+    color: white !important;
+}
+
+button.add-source:hover {
+    background-color: #1a5f7f !important;
+}
+
+button.remove-source {
+    background-color: #b3502f !important;
+    color: white !important;
+}
+
+button.remove-source:hover {
+    background-color: #9e3a24 !important;
+}
+
+.sortable-list {
+    list-style: none;
+    padding: 0;
+    position: relative;
+}
+.drag-option {
+    display: flex;
+    align-items: center;
+    padding: 2px 10px;
+    margin: 4px 0;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    cursor: move;
+    background: #f9f9f9;
+    user-select: none;
+    position: relative;
+}
+.drag-option.selected {
+    background:rgb(206, 227, 251) !important;
+    border-color: #0056b3;
+}
+.drag-handle {
+    margin-right: 8px;
+    color: #999;
+    font-weight: bold;
+    cursor: grab;
+}
+.drag-handle:active {
+    cursor: grabbing;
+}
+.drag-option input[type="checkbox"] {
+    margin-right: 8px;
+}
+/* Style for the priority number overlay on selected checkboxes */
+.drag-option.selected input[type="checkbox"] {
+    position: relative;
+}
+.drag-option.selected input[type="checkbox"]::before {
+    content: attr(data-priority);
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background: #0056b3;
+    color: white;
+    font-weight: bold;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 2px;
+}
+.drag-option label {
+    flex: 1;
+    margin: 0;
+    cursor: pointer;
+}
+.ui-sortable-helper {
+    opacity: 0.8;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+.sortable-placeholder {
+    height: 40px;
+    background: #f0f0f0;
+    border: 2px dashed #ccc;
+    margin: 4px 0;
+}
+
+.navbar-collapse a {
+    color: white;
+}
+
+.navbar {
+    margin-bottom: 0;
+}
+
+.task-process-container details {
+        margin-bottom: 20px;
+        border: 1px solid #c2c9c9;
+        border-radius: 4px;
+    }
+    .task-process-container summary {
+        font-size: 1.5em; /* Larger text for summary */
+        font-weight: bold;
+        cursor: pointer;
+        padding: 10px 15px;
+        /* Using list-header style from your CSS */
+        background: #edeff1;
+        border-bottom: 2px solid #007087;
+        color: #045363;
+        list-style: none; /* Remove default arrow/marker */
+        display: block;
+    }
+    .task-process-container summary::-webkit-details-marker {
+        display: none; /* Remove arrow in Chrome/Safari */
+    }
+    .task-process-container details[open] > summary {
+         border-bottom: 1px solid #ddd;
+    }
+    .annotation-body {
+        padding: 20px;
+        border-top: 1px dashed #000;
+    }
+    .annotation-block {
+        margin-bottom: 20px;
+    }
+    .annotation-block .question-text {
+        font-size: large;
+        font-weight: bold;
+        color: #007087;
+        margin-bottom: 5px;
+    }
+    .annotation-value {
+        padding: 10px;
+        background-color: #fff;
+        border: 1px solid #eee;
+        border-radius: 4px;
+        display: block;
+        width: 100%;
+        word-wrap: break-word;
+        font-size: medium;
+    }
+    .annotation-value ul {
+        padding-left: 20px;
+        margin-bottom: 0;
+    }
+    .status-right { color: #4CAF50; }
+    .status-wrong { color: #F44336; }
+    .status-cancelled { color: #f0ad4e; }

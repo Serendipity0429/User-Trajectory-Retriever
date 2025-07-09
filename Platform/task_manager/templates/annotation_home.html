@@ -13,7 +13,7 @@
                 Completed Tasks
             </div>
             {% for task_id, webpages in annotated_tasks_to_webpages %}
-                <div class="col-xs-12 list_row task_wrapper">
+                <div class="col-xs-12 list-row task_wrapper">
                     <h6>Task ID: {{ task_id }}</h6>
                     <ul class="col-xs-12">
                         {% for webpage in webpages %}
@@ -60,7 +60,7 @@
                 Ongoing Tasks
             </div>
             {% for task_id, webpages in unannotated_tasks_to_webpages %}
-                <div class="col-xs-12 list_row">
+                <div class="col-xs-12 list-row">
                     <ul>
                         {% for webpage in webpages %}
                             <li class="col-xs-12">{{ webpage.title }}</li>

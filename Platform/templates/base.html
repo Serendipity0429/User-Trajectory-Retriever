@@ -5,22 +5,24 @@
     <title>{% block title %} base {% endblock %}</title>
     <link rel="icon" href="/static/img/IR4.png" type="image/png"/>
 
-    <!-- Loading Bootstrap -->
+
     <link href="/static/flat-ui/css/vendor/bootstrap.min.css" rel="stylesheet">
-    <!-- Loading Flat UI -->
     <link href="/static/flat-ui/css/flat-ui.min.css" rel="stylesheet">
     <link href="/static/css/style.css" rel="stylesheet">
-    <link href="/static/css/rrweb.css" rel="stylesheet"> <!-- rrweb -->
-
-    <!-- Loading Jquery -->
+    <link href="/static/css/jquery-ui.css" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/rrweb-player.css"/>
+    <link rel="stylesheet" href="/static/css/rrweb.css"/>
     <script src="/static/flat-ui/js/vendor/jquery.min.js"></script>
-
-    <!-- Loading rrweb -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/rrweb-player@latest/dist/style.css"/>
-    <script src="https://cdn.jsdelivr.net/npm/rrweb-player@latest/dist/index.js"></script>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/rrweb@latest/dist/style.css"/>
+    <script src="/static/js/rrweb-index.js"></script>
     <script src="/static/js/rrweb.umd.min.cjs"></script>
     <script src="/static/js/rrweb-player.js"></script>
+    <script src="/static/flat-ui/js/flat-ui.min.js"></script>
+    <script src="/static/js/jquery-ui.min.js"></script>
+
+    {% comment %} <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/rrweb-player@latest/dist/style.css"/> {% endcomment %}
+    {% comment %} <script src="https://cdn.jsdelivr.net/npm/rrweb-player@latest/dist/index.js"></script> {% endcomment %}
+    {% comment %} <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/rrweb@latest/dist/style.css"/> {% endcomment %}
+    
     <style>
     {% block css %}
     {% endblock %}
@@ -38,7 +40,7 @@
               </button>
               <span class="navbar-brand" href="#">THUIR Annotation Platform</span>
             </div>
-            <div class="collapse navbar-collapse" id="navbar-collapse-01">
+            {% comment %} <div class="collapse navbar-collapse" id="navbar-collapse-01">
               <ul class="nav navbar-nav navbar-right">
                   {% if cur_user %}
                       <li><a href="/task/home/">
@@ -69,7 +71,7 @@
                       </a></li>
                   {% endif %}
               </ul>
-            </div><!-- /.navbar-collapse -->
+            </div><!-- /.navbar-collapse --> {% endcomment %}
           </nav><!-- /navbar -->
         </div>
     </div>
@@ -84,9 +86,6 @@
     <br />
     <br />
     </section>
-
-    <script src="/static/flat-ui/js/vendor/jquery.min.js"></script>
-    <script src="/static/flat-ui/js/flat-ui.min.js"></script>
     {% block scripts %}
     {% endblock %}
 </body>

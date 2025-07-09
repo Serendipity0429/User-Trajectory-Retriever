@@ -7,22 +7,20 @@
             Your answer is <span style="color:red">WRONG!</span>
         </h3>
         <h3>
-            Please provide your feedback & reflection on this trial.
+            Please provide your feedback & reflection on this trial
         </h3>
     </div>
     <div class="row">
         <div class="col-xs-offset-1 col-xs-10">
             <details>
                 <summary class="col-xs-12 list-header">
-                    Trajectories of this trial
+                    <b>Trajectories of this task...</b> (Click to expand)
                 </summary>
                 <div class="col-xs-offset-1 col-xs-10" id="trajectories">
                     {% for webpage in webpages %}
-                        <div class="col-xs-12 list_row webpage-wrapper">
+                        <div class="col-xs-12 list-row webpage-wrapper">
                             {#                style="padding: 3% 0 3% 0;border-bottom: 1px solid #cccccc;">#}
-                            <p style="font-size: 20px">Webpage {{ forloop.counter }}:&ensp;<a href="{{ webpage.url }}"
-                                                                                              target="_blank">{{ webpage.title }}</a>
-                            </p>
+                            <p style="font-size: 20px">Webpage {{ forloop.counter }}:&ensp;<a href="{{ webpage.url }}" target="_blank">{{ webpage.title }}</a></p>
                             <!-- create a div to store the rrweb player -->
                             <div class="rrweb-player-wrapper" id="rrweb-player-{{ webpage.id }}"></div>
                             <script>
@@ -43,65 +41,324 @@
                 </div>
             </details>
             <div class="col-xs-12 list-header">
-                Feedback & Reflection
+                <b>Feedback & Reflection</b>
             </div>
             <form id="query-form" action="" method="post" onsubmit="validateForm()"
                   enctype='multipart/form-data'>
                 {% csrf_token %}
                 <div class="col-xs-12 sheet">
-                    <div class="question-wrapper">
-                        <span class="col-xs-12 list_row">
-                            1. <b>Task Description</b>: You need to answer the following question:
+                    <div class="question-wrapper col-xs-12">
+                        <span class="col-xs-12 list-row question-text">
+                            <b>1. Task Description</b>: You need to answer the following question:
                             </span>
                         <br/>
                         <div class="static-task-info">{{ question }}</div>
                     </div>
 
-                    <div class="question-wrapper">
-                        <span class="col-xs-12 list_row">
-                            2. <b>Task Completion Criteria</b>: The criteria for task completion.</span>
+                    <div class="question-wrapper col-xs-12">
+                        <span class="col-xs-12 list-row question-text">
+                            <b>2. Task Completion Criteria</b>: The criteria for task completion.</span>
                         <br/>
-                        <div class="static-task-info">exact match</div>
-                    </div>
-
-                    <div class="question-wrapper">
-                        <label class="col-xs-12 list_row">
-                        3. <b>Primary Reason for Failure</b>: What do you think that might be the main reason your answer was wrong?
-                        </label>
-                        <div class="ratio col-xs-12 list_row">
-                            <label><input type="radio" name="failure_category" value="bad_query" required/> My search query was ineffective or misleading.</label><br>
-                            <label><input type="radio" name="failure_category" value="misinterpreted_info"/> I found the right page, but misinterpreted the information.</label><br>
-                            <label><input type="radio" name="failure_category" value="info_not_found"/> I could not find the necessary information on the websites I visited.</label><br>
-                            <label><input type="radio" name="failure_category" value="logic_error"/> I made a logical or calculation error based on the information I found.</label><br>
-                            <label><input type="radio" name="failure_category" value="ambiguous_info"/> The information I found was ambiguous, contradictory, or outdated.</label><br>
-                            <label><input type="radio" name="failure_category" value="other"/> Other (please specify below).</label><br>
+                        <div class="static-task-info">Exact Match (EM)</div>
+                        <div class="col-xs-12 list-row">
+                            <b>Example:</b>
+                            <div style="margin-left: 20px;">
+                                <em>Question:</em> What is the capital of France?<br>
+                                <em>Expected Answer:</em> Paris<br>
+                                <em>Wrong Answer 1:</em> The capital of France is Paris.<br>
+                                <em>Wrong Answer 2:</em> Beijing
+                            </div>
                         </div>
                     </div>
 
-                    <div class="question-wrapper">
-                        <label for="failure_reason" class="col-xs-12 list_row">
-                            4. <b>Failure Analysis</b>: Please elaborate on what do you think might have gone wrong. (e.g., "I trusted an outdated blog post," "I misread the column header in the table.")
+                    <div class="question-wrapper col-xs-12">
+                        <label class="col-xs-12 list-row question-text">
+                        <b>3. Primary Reasons for Failure</b>: What do you think that might be the <b class="notice">main</b> reasons your answer was wrong? (Select at least one and drag to reorder by priority)
                         </label>
-                        <div><textarea class="col-xs-12 list_row" id="failure_reason" name="failure_reason" rows="3" required></textarea></div>
+                        <div class="ratio col-xs-12 list-row">
+                            <div id="failure-categories" class="sortable-list">
+                                <div class="drag-option" data-value="bad_query">
+                                    <input type="checkbox" name="failure_category" value="bad_query" required/>
+                                    <span class="drag-handle">≡</span>
+                                    <span class="priority-number" style="display:none; margin-right: 8px; font-weight: bold; color: #0056b3;">1</span>
+                                    <label>My search query was ineffective or misleading.</label>
+                                </div>
+                                <div class="drag-option" data-value="misinterpreted_info">
+                                    <input type="checkbox" name="failure_category" value="misinterpreted_info"/>
+                                    <span class="drag-handle">≡</span>
+                                    <span class="priority-number" style="display:none; margin-right: 8px; font-weight: bold; color: #0056b3;">2</span>
+                                    <label>I found the right page, but misinterpreted the information.</label>
+                                </div>
+                                <div class="drag-option" data-value="info_not_found">
+                                    <input type="checkbox" name="failure_category" value="info_not_found"/>
+                                    <span class="drag-handle">≡</span>
+                                    <span class="priority-number" style="display:none; margin-right: 8px; font-weight: bold; color: #0056b3;">3</span>
+                                    <label>I could not find the necessary information on the websites I visited.</label>
+                                </div>
+                                <div class="drag-option" data-value="logic_error">
+                                    <input type="checkbox" name="failure_category" value="logic_error"/>
+                                    <span class="drag-handle">≡</span>
+                                    <span class="priority-number" style="display:none; margin-right: 8px; font-weight: bold; color: #0056b3;">4</span>
+                                    <label>I made a logical or calculation error based on the information I found.</label>
+                                </div>
+                                <div class="drag-option" data-value="ambiguous_info">
+                                    <input type="checkbox" name="failure_category" value="ambiguous_info"/>
+                                    <span class="drag-handle">≡</span>
+                                    <span class="priority-number" style="display:none; margin-right: 8px; font-weight: bold; color: #0056b3;">5</span>
+                                    <label>The information I found was ambiguous.</label>
+                                </div>
+                                <div class="drag-option" data-value="outdated_info">
+                                    <input type="checkbox" name="failure_category" value="outdated_info"/>
+                                    <span class="drag-handle">≡</span>
+                                    <span class="priority-number" style="display:none; margin-right: 8px; font-weight: bold; color: #0056b3;">6</span>
+                                    <label>The information I found was outdated or no longer accurate.</label>
+                                </div>
+                                <div class="drag-option" data-value="trusting_source">
+                                    <input type="checkbox" name="failure_category" value="trusting_source"/>
+                                    <span class="drag-handle">≡</span>
+                                    <span class="priority-number" style="display:none; margin-right: 8px; font-weight: bold; color: #0056b3;">7</span>
+                                    <label>I trusted a source that was not reliable or authoritative.</label>
+                                </div>
+                                <div class="drag-option" data-value="time_pressure">
+                                    <input type="checkbox" name="failure_category" value="time_pressure"/>
+                                    <span class="drag-handle">≡</span>
+                                    <span class="priority-number" style="display:none; margin-right: 8px; font-weight: bold; color: #0056b3;">8</span>
+                                    <label>I was under time pressure and could not verify the information thoroughly.</label>
+                                </div>
+                                <div class="drag-option" data-value="lack_expertise">
+                                    <input type="checkbox" name="failure_category" value="lack_expertise"/>
+                                    <span class="drag-handle">≡</span>
+                                    <span class="priority-number" style="display:none; margin-right: 8px; font-weight: bold; color: #0056b3;">9</span>
+                                    <label>I lacked the necessary expertise to understand or evaluate the information.</label>
+                                </div>
+                                <div class="drag-option" data-value="other">
+                                    <input type="checkbox" name="failure_category" value="other"/>
+                                    <span class="drag-handle">≡</span>
+                                    <span class="priority-number" style="display:none; margin-right: 8px; font-weight: bold; color: #0056b3;">10</span>
+                                    <label>Other (please specify below).</label>
+                                </div>
+                            </div>
+                            <input type="hidden" name="failure_category_list" id="failure_category_list" />
+                        </div>
+                    </div>
+
+                    <script>
+                        $(document).ready(function() {
+                            // Initialize sortable after DOM is ready
+                            $("#failure-categories").sortable({
+                                cursor: "grabbing",
+                                opacity: 0.8,
+                                placeholder: "sortable-placeholder",
+                                tolerance: "pointer",
+                                items: ".drag-option.selected",
+                                helper: "clone",
+                                cursorAt: { left: 5 },
+                                start: function(event, ui) {
+                                    // Set placeholder height to match dragged item
+                                    ui.placeholder.height(ui.item.height());
+                                },
+                                update: function(event, ui) {
+                                    updateOrder();
+                                    updatePriorityNumbers();
+                                }
+                            });
+
+                            // Handle checkbox changes
+                            $('input[name="failure_category"]').change(function() {
+                                var option = $(this).closest('.drag-option');
+                                if ($(this).is(':checked')) {
+                                    option.addClass('selected');
+                                } else {
+                                    option.removeClass('selected');
+                                    $(this).attr('data-priority', '');
+                                }
+                                
+                                // Reorder the list to keep selected items at the top.
+                                var container = $('#failure-categories');
+                                container.append(container.children('.drag-option:not(.selected)'));
+                                container.sortable('refresh');
+
+                                updateOrder();
+                                updatePriorityNumbers();
+                            });
+
+                            function updateOrder() {
+                                var order = [];
+                                $('#failure-categories .drag-option.selected').each(function() {
+                                    order.push($(this).data('value'));
+                                });
+                                $('#failure_category_list').val(JSON.stringify(order));
+                            }
+
+                            function updatePriorityNumbers() {
+                                $('#failure-categories .drag-option.selected').each(function(index) {
+                                    $(this).find('input[type="checkbox"]').attr('data-priority', index + 1);
+                                });
+                            }
+                        });
+                    </script>
+                        
+
+                    <div class="question-wrapper col-xs-12">
+                        <label for="failure_reason" class="col-xs-12 list-row question-text">
+                            <b>4. Failure Analysis</b>: Please elaborate on what do you think might have gone wrong. (e.g., "I trusted an outdated blog post," "I misread the column header in the table.", "I made a calculation error in my reasoning.")
+                        </label>
+                        <div><textarea class="col-xs-12 list-row" id="failure_reason" name="failure_reason" rows="3" required></textarea></div>
                     </div>
                 
 
-                    <div class="question-wrapper">
-                        <label class="col-xs-12 list_row">
-                            5. <b>Corrective Plan</b>: What will you do differently in your next attempt? (Check all that apply)
+                    <div class="question-wrapper col-xs-12">
+                        <label class="col-xs-12 list-row question-text">
+                            <b>5. Corrective Plan</b>: What will you do in your next attempt? (Select at least one and drag to reorder by priority)
                         </label>
-                        <div class="ratio col-xs-12 list_row">
-                            <label><input type="checkbox" name="future_plan_actions" value="refine_query"/> Use different or more specific search keywords.</label><br>
-                            <label><input type="checkbox" name="future_plan_actions" value="broaden_query"/> Use more general search keywords.</label><br>
-                            <label><input type="checkbox" name="future_plan_actions" value="find_new_source_type"/> Look for a different type of source (e.g., official report, news, academic paper).</label><br>
-                            <label><input type="checkbox" name="future_plan_actions" value="re-evaluate_info"/> Re-examine the information I've already found more carefully.</label><br>
-                            <label><input type="checkbox" name="future_plan_actions" value="check_recency"/> Specifically look for more recent information.</label><br>
-                            <label><input type="checkbox" name="future_plan_actions" value="validate_source"/> Try to find the same information on a second, independent source to validate it.</label><br>
-                            <label>
-                                <input type="checkbox" name="future_plan_actions" value="other"/> Other (please specify):
-                                <input type="text" name="future_plan_other" style="width: 70%;" />
-                            </label><br>
+                        <div class="ratio col-xs-12 list-row">
+                            <div id="corrective-actions" class="sortable-list">
+                                <div class="drag-option" data-value="refine_query">
+                                    <input type="checkbox" name="future_plan_actions" value="refine_query" required/>
+                                    <span class="drag-handle">≡</span>
+                                    <span class="priority-number" style="display:none; margin-right: 8px; font-weight: bold; color: #0056b3;">1</span>
+                                    <label>Use different or more specific search keywords.</label>
+                                </div>
+                                <div class="drag-option" data-value="broaden_query">
+                                    <input type="checkbox" name="future_plan_actions" value="broaden_query"/>
+                                    <span class="drag-handle">≡</span>
+                                    <span class="priority-number" style="display:none; margin-right: 8px; font-weight: bold; color: #0056b3;">2</span>
+                                    <label>Use more general search keywords.</label>
+                                </div>
+                                <div class="drag-option" data-value="find_new_source_type">
+                                    <input type="checkbox" name="future_plan_actions" value="find_new_source_type"/>
+                                    <span class="drag-handle">≡</span>
+                                    <span class="priority-number" style="display:none; margin-right: 8px; font-weight: bold; color: #0056b3;">3</span>
+                                    <label>Look for a different type of source (e.g., official report, news, academic paper).</label>
+                                </div>
+                                <div class="drag-option" data-value="re-evaluate_info">
+                                    <input type="checkbox" name="future_plan_actions" value="re-evaluate_info"/>
+                                    <span class="drag-handle">≡</span>
+                                    <span class="priority-number" style="display:none; margin-right: 8px; font-weight: bold; color: #0056b3;">4</span>
+                                    <label>Re-examine the information I've already found more carefully.</label>
+                                </div>
+                                <div class="drag-option" data-value="check_recency">
+                                    <input type="checkbox" name="future_plan_actions" value="check_recency"/>
+                                    <span class="drag-handle">≡</span>
+                                    <span class="priority-number" style="display:none; margin-right: 8px; font-weight: bold; color: #0056b3;">5</span>
+                                    <label>Specifically look for more recent information.</label>
+                                </div>
+                                <div class="drag-option" data-value="check_reliability">
+                                    <input type="checkbox" name="future_plan_actions" value="check_reliability"/>
+                                    <span class="drag-handle">≡</span>
+                                    <span class="priority-number" style="display:none; margin-right: 8px; font-weight: bold; color: #0056b3;">6</span>
+                                    <label>Check the reliability and authority of the sources I use.</label>
+                                </div>
+                                <div class="drag-option" data-value="improve_logic">
+                                    <input type="checkbox" name="future_plan_actions" value="improve_logic"/>
+                                    <span class="drag-handle">≡</span>
+                                    <span class="priority-number" style="display:none; margin-right: 8px; font-weight: bold; color: #0056b3;">7</span>
+                                    <label>Improve my logical reasoning or calculation methods.</label>
+                                </div>
+                                <div class="drag-option" data-value="validate_source">
+                                    <input type="checkbox" name="future_plan_actions" value="validate_source"/>
+                                    <span class="drag-handle">≡</span>
+                                    <span class="priority-number" style="display:none; margin-right: 8px; font-weight: bold; color: #0056b3;">8</span>
+                                    <label>Try to find the same information on a second, independent source to validate it.</label>
+                                </div>
+                                <div class="drag-option" data-value="other">
+                                    <input type="checkbox" name="future_plan_actions" value="other"/>
+                                    <span class="drag-handle">≡</span>
+                                    <span class="priority-number" style="display:none; margin-right: 8px; font-weight: bold; color: #0056b3;">9</span>
+                                    <label>Other:</label>
+                                    <input type="text" name="future_plan_other" id="future_plan_other_text" style="margin-left: 10px; font-size: normal; width: 100%;" disabled placeholder="Please specify..." />
+                                </div>
+                            </div>
+                            <input type="hidden" name="future_plan_actions_list" id="future_plan_actions_list" />
                         </div>
+                    </div>
+
+                    <script>
+                        $(document).ready(function() {
+                            // Initialize sortable for corrective actions
+                            $("#corrective-actions").sortable({
+                                cursor: "grabbing",
+                                opacity: 0.8,
+                                placeholder: "sortable-placeholder",
+                                tolerance: "pointer",
+                                items: ".drag-option.selected",
+                                helper: "clone",
+                                cursorAt: { left: 5 },
+                                start: function(event, ui) {
+                                    ui.placeholder.height(ui.item.height());
+                                },
+                                update: function(event, ui) {
+                                    updateCorrectiveOrder();
+                                    updateCorrectivePriorityNumbers();
+                                }
+                            });
+
+                            // Handle checkbox changes for corrective actions
+                            $('input[name="future_plan_actions"]').change(function() {
+                                var option = $(this).closest('.drag-option');
+                                if ($(this).is(':checked')) {
+                                    option.addClass('selected');
+                                    // Enable text input if "other" is selected
+                                    if ($(this).val() === 'other') {
+                                        $('#future_plan_other_text').prop('disabled', false);
+                                    }
+                                } else {
+                                    option.removeClass('selected');
+                                    $(this).attr('data-priority', '');
+                                    // Disable text input if "other" is deselected
+                                    if ($(this).val() === 'other') {
+                                        $('#future_plan_other_text').prop('disabled', true).val('');
+                                    }
+                                }
+                                
+                                // Reorder the list to keep selected items at the top
+                                var container = $('#corrective-actions');
+                                container.append(container.children('.drag-option:not(.selected)'));
+                                container.sortable('refresh');
+
+                                updateCorrectiveOrder();
+                                updateCorrectivePriorityNumbers();
+                            });
+
+                            function updateCorrectiveOrder() {
+                                var order = [];
+                                $('#corrective-actions .drag-option.selected').each(function() {
+                                    order.push($(this).data('value'));
+                                });
+                                $('#future_plan_actions_list').val(JSON.stringify(order));
+                            }
+
+                            function updateCorrectivePriorityNumbers() {
+                                $('#corrective-actions .drag-option.selected').each(function(index) {
+                                    $(this).find('input[type="checkbox"]').attr('data-priority', index + 1);
+                                });
+                            }
+                        });
+                    </script>
+
+                    <div class="question-wrapper col-xs-12">
+                        <label for="remaining_effort" class="ratio col-xs-12 list-row question-text question-text"><b>6. Remaining Effort</b>: How much time <b class="notice">remaining</b> do you expect to spend on this task?&ensp;<span class="notice">(Current choice:&ensp;<b><span id="effort_val">10</span></b>)</span></label>
+                        <div class="ratio col-xs-12 list-row">
+                        <span style="display:flex;">
+                            Three minutes or slower&emsp;
+                            <input type="range" style="width: 40%" name="remaining_effort" id="remaining_effort" min="3" max="60" value="10" step="1" list="effort_marks" oninput="setEffort()" onchange="setEffort()"/>
+                            &emsp; Sixty minutes or longer</span>
+                            <datalist id="effort_marks">
+                                {% for i in "3456789" %}
+                                    <option>{{ i }}</option>
+                                {% endfor %}
+                                {% for i in "123456" %}
+                                    {% for j in "0123456789" %}
+                                        <option>{{ i }}{{ j }}</option>
+                                    {% endfor %}
+                                {% endfor %}
+                            </datalist>
+                        </div>
+                    </div>
+                    <div class="question-wrapper col-xs-12">
+                        <label for="cancel_additional_reflection" class="col-xs-12 list-row question-text">
+                            <b>7. (Optional) Additional Reflection</b>: Do you have any additional thoughts or reflections on this failure?
+                        <textarea class="col-xs-12 list-row" id="reflection" name="additional_reflection" rows="3" required></textarea>
                     </div>
                 </div>
             </form>
@@ -119,6 +376,11 @@
         <script>
         </script>
         <script>
+            function setEffort() {
+                let effort = document.getElementById("effort_val");
+                effort.innerText = document.getElementsByName("remaining_effort")[0].value;
+            }
+
             function validateForm() {
                 let checks = $('input[type="checkbox"]:checked').map(function () {
                     return $(this).val();

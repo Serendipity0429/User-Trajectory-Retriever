@@ -7,19 +7,19 @@
             Your answer is
             <span style="color:limegreen">RIGHT!</span>
         </h2>
-        <h3>
-            Please annotate the following questions
-        </h3>
+        <h4>
+            Please review the search process and select the appropriate options.
+        </h4>
     </div>
     <div class="row">
         <div class="col-xs-offset-1 col-xs-10">
             <details>
                 <summary class="col-xs-12 list-header">
-                    Trajectories of this task... <b>(Click to expand)</b>
+                    <b>Trajectories of this task...</b> (Click to expand)
                 </summary>
                 <div class="col-xs-offset-1 col-xs-10" id="trajectories">
                     {% for webpage in webpages %}
-                        <div class="col-xs-12 list_row webpage-wrapper">
+                        <div class="col-xs-12 list-row webpage-wrapper">
                             {#                style="padding: 3% 0 3% 0;border-bottom: 1px solid #cccccc;">#}
                             <p style="font-size: 20px">Webpage {{ forloop.counter }}:&ensp;<a href="{{ webpage.url }}"
                                                                                               target="_blank">{{ webpage.title }}</a>
@@ -46,41 +46,91 @@
         </div>
         <div class="col-xs-offset-1 col-xs-10">
             <div class="col-xs-12 list-header">
-                Please review the search process and select the appropriate options.
+                <b>Task Completion Annotation</b>
             </div>
             <form id="query-form" action="" method="post" onsubmit="validateForm()"
                   enctype='multipart/form-data'>
                 {% csrf_token %}
                 <div class="col-xs-12 sheet">
-                    <h4>Task Completion Annotation</h4>
-
-                    <div class="question-wrapper">
-                        <span class="col-xs-12 list_row">
-                            1. <b>Task Description</b>: You need to answer the following question:
+                    <div class="question-wrapper col-xs-12">
+                        <span class="col-xs-12 list-row question-text">
+                            <b>1. Task Description</b>: You need to answer the following question:
                             </span>
                         <br/>
                         <div class="static-task-info">{{ question }}</div>
-                        <span class="col-xs-12 list_row">
-                            &emsp;<b>Whose answer is: (Multiple answers are separated by semicolons)</b>
+                        <span class="col-xs-12 list-row question-text">
+                            &emsp;<b>Whose answer is:</b>
                         </span>
-                        <br/>
-                        <div class="static-task-info">
-                            {% for item in answer %}
-                                {{ item }}
-                                {% if not forloop.last %}; {% endif %}
-                            {% endfor %}
-                        </div>
+                        <div class="static-task-info" style="font-size: 16px;">
+                            <ul id="answer-list" style="padding-left: 20px; margin-top: 5px; list-style-position: inside; column-count: 1; -webkit-column-count: 1; -moz-column-count: 1; margin-bottom: 5px;">
+                                {% for item in answer %}
+                                    <li>{{ item }}</li>
+                                {% endfor %}
+                            </ul>
+                            <a href="#" id="show-all-answers" style="display: none; margin-top: 10px; cursor: pointer;">Click here to see all possible correct answers</a>
+                            <a href="#" id="show-fewer-answers" style="display: none; margin-top: 10px; cursor: pointer;">Show fewer answers</a>
+                        </div> 
+                        <script type="application/x-javascript">
+                            $(function () {
+                                // --- Updated logic for expanding and collapsing the answer list ---
+                                var answerList = $('#answer-list');
+                                var listItems = answerList.find('li');
+                                var showAllButton = $('#show-all-answers');
+                                var showFewerButton = $('#show-fewer-answers');
+                                var initialItemCount = 2; // Show 2 items initially
+
+                                // Check if there are more answers than the initial count
+                                if (listItems.length > initialItemCount) {
+                                    // Hide items after the initial count
+                                    listItems.slice(initialItemCount).hide();
+                                    // Show the "show all" button
+                                    showAllButton.show();
+                                }
+
+                                // Add click event to the "show all" button
+                                showAllButton.on('click', function(e) {
+                                    e.preventDefault(); // Prevent default link behavior
+                                    // Show all hidden list items
+                                    answerList.find('li:hidden').show();
+                                    // Hide this button and show the "show fewer" button
+                                    $(this).hide();
+                                    showFewerButton.show();
+                                    // Set to two columns when all are shown
+                                    answerList.css({
+                                        'column-count': 2,
+                                        '-webkit-column-count': 2,
+                                        '-moz-column-count': 2
+                                    });
+                                });
+
+                                // Add click event to the "show fewer" button
+                                showFewerButton.on('click', function(e) {
+                                    e.preventDefault(); // Prevent default link behavior
+                                    // Hide items after the initial count
+                                    listItems.slice(initialItemCount).hide();
+                                    // Hide this button and show the "show all" button
+                                    $(this).hide();
+                                    showAllButton.show();
+                                    // Restore to single column when fewer are shown
+                                    answerList.css({
+                                        'column-count': 1,
+                                        '-webkit-column-count': 1,
+                                        '-moz-column-count': 1
+                                    });
+                                });
+                            });
+                            </script>
                     </div>
 
-                    <div class="question-wrapper">
-                        <span class="col-xs-12 list_row">
-                            2. <b>Task Completion Criteria</b>: The criteria for task completion.</span>
+                    <div class="question-wrapper col-xs-12">
+                        <span class="col-xs-12 list-row question-text">
+                            <b>2. Task Completion Criteria</b>: The criteria for task completion.</span>
                         <br/>
                         <div class="static-task-info">Exact Match (EM)</div>
                     </div>
 
-                    <div class="question-wrapper">
-                        <label class="ratio col-xs-12 list_row">
+                    <div class="question-wrapper col-xs-12">
+                        <label class="ratio col-xs-12 list-row question-text">
                             <b>3. Overall Difficulty</b>: How would you rate the actual difficulty of the search process you completed?
                         </label>
                         <div class="ratio col-xs-12 user_fill">
@@ -92,59 +142,124 @@
                         </div>
                     </div>
 
-                    <div class="question-wrapper">
-                        <label class="col-xs-12 list_row">
+                    <div class="question-wrapper col-xs-12">
+                        <label class="col-xs-12 list-row question-text">
                             <b>4. The "Aha!" Moment</b>: What type of information was most critical to solving this task?
                         </label>
-                        <div class="ratio col-xs-12 list_row">
+                        <div class="ratio col-xs-12 list-row">
                             <label><input type="radio" name="aha_moment_type" value="data_table" required/> A data table or chart with the exact answer.</label><br>
                             <label><input type="radio" name="aha_moment_type" value="direct_statement"/> A direct statement in a paragraph.</label><br>
                             <label><input type="radio" name="aha_moment_type" value="official_document"/> Finding an official document or report (e.g., PDF, government site).</label><br>
                             <label><input type="radio" name="aha_moment_type" value="key_definition"/> Understanding a key definition or concept.</label><br>
                             <label><input type="radio" name="aha_moment_type" value="synthesis"/> Connecting two pieces of information that finally made sense together.</label><br>
-                            <label>
-                                <input type="radio" name="aha_moment_type" value="other"/> Other (please specify):
-                                <input type="text" name="aha_moment_other" style="width: 70%;" />
-                            </label><br>
+                            <label><input type="radio" name="aha_moment_type" value="other"/> Other (please specify):</label>
+                            <label><input type="text" name="aha_moment_other" style="margin-left: 10px; font-size: normal; width: 100%;" disabled placeholder="Please specify..." /></label>
+                            <script>
+                            $(function() {
+                                // Enable/disable the "other" text input based on radio selection
+                                $('input[name="aha_moment_type"]').change(function() {
+                                    if ($(this).val() === 'other' && $(this).is(':checked')) {
+                                        $('input[name="aha_moment_other"]').prop('disabled', false);
+                                    } else {
+                                        $('input[name="aha_moment_other"]').prop('disabled', true).val('');
+                                    }
+                                });
+                            });
+                            </script>
+                            <br>
                         </div>
-                        <label for="aha_moment_source" class="col-xs-12 list_row" style="margin-top: 5px;">
-                            Optional: Paste the source URL or search query for this "Aha!" moment.
+                        <label for="aha_moment_source" class="col-xs-12 list-row" style="margin-top: 5px;">
+                            (Optional) Paste the source URL or search query for this "Aha!" moment.
                         </label>
-                        <input type="text" class="col-xs-12 list_row" id="aha_moment_source" name="aha_moment_source">
+                        <input type="text" class="col-xs-12 list-row" id="aha_moment_source" name="aha_moment_source" style="margin:0 20px;">
                     </div>
 
 
-                    <div class="question-wrapper">
-                        <label class="col-xs-12 list_row">
+                    <div class="question-wrapper col-xs-12">
+                        <label class="col-xs-12 list-row question-text">
                             <b>5. Unhelpful Paths</b>: Which of these roadblocks did you encounter? (Check all that apply)
                         </label>
-                        <div class="ratio col-xs-12 list_row">
+                        <div class="ratio col-xs-12 list-row">
+                            <label><input type="checkbox" name="unhelpful_paths" value="no_major_roadblocks"/> I did not encounter any major roadblocks.</label><br>
                             <label><input type="checkbox" name="unhelpful_paths" value="irrelevant_results"/> Search results were mostly irrelevant.</label><br>
                             <label><input type="checkbox" name="unhelpful_paths" value="outdated_info"/> Found sites with outdated information.</label><br>
                             <label><input type="checkbox" name="unhelpful_paths" value="low_quality"/> Visited low-quality, spam, or untrustworthy sites.</label><br>
                             <label><input type="checkbox" name="unhelpful_paths" value="paywall"/> Hit a paywall or login requirement.</label><br>
                             <label><input type="checkbox" name="unhelpful_paths" value="contradictory_info"/> Found contradictory information on different sites.</label><br>
-                            <label><input type="checkbox" name="unhelpful_paths" value="no_major_roadblocks"/> I did not encounter any major roadblocks.</label><br>
+                            <label><input type="checkbox" name="unhelpful_paths" value="other"/> Other (please specify):</label>
+                            <label><input type="text" name="unhelpful_paths_other" style="margin-left: 10px; font-size: normal; width: 100%;" disabled placeholder="Please specify..." /></label><br>
+                            <script>
+                            $(function() {
+                                // Enable/disable the "other" text input based on checkbox selection
+                                $('input[name="unhelpful_paths"]').change(function() {
+                                    var otherChecked = $('input[name="unhelpful_paths"][value="other"]:checked').length > 0;
+                                    if (otherChecked) {
+                                        $('input[name="unhelpful_paths_other"]').prop('disabled', false);
+                                    } else {
+                                        $('input[name="unhelpful_paths_other"]').prop('disabled', true).val('');
+                                    }
+                                });
+                                
+                                // Handle mutual exclusivity for "no major roadblocks" option
+                                $('input[name="unhelpful_paths"]').change(function() {
+                                    if ($(this).val() === 'no_major_roadblocks' && $(this).is(':checked')) {
+                                        // If "no major roadblocks" is checked, uncheck all others
+                                        $('input[name="unhelpful_paths"]').not(this).prop('checked', false);
+                                        // Also disable the "other" text input
+                                        $('input[name="unhelpful_paths_other"]').prop('disabled', true).val('');
+                                    } else if ($(this).val() !== 'no_major_roadblocks' && $(this).is(':checked')) {
+                                        // If any other option is checked, uncheck "no major roadblocks"
+                                        $('input[name="unhelpful_paths"][value="no_major_roadblocks"]').prop('checked', false);
+                                    }
+                                });
+                            });
+                            $(function() {
+                                // Handle mutual exclusivity for "no major roadblocks" option
+                                $('input[name="unhelpful_paths"]').change(function() {
+                                    if ($(this).val() === 'no_major_roadblocks' && $(this).is(':checked')) {
+                                        // If "no major roadblocks" is checked, uncheck all others
+                                        $('input[name="unhelpful_paths"]').not(this).prop('checked', false);
+                                    } else if ($(this).val() !== 'no_major_roadblocks' && $(this).is(':checked')) {
+                                        // If any other option is checked, uncheck "no major roadblocks"
+                                        $('input[name="unhelpful_paths"][value="no_major_roadblocks"]').prop('checked', false);
+                                    }
+                                });
+                            });
+                            </script>
                         </div>
                     </div>
 
-                    <div class="question-wrapper">
-                        <label class="col-xs-12 list_row">
+                    <div class="question-wrapper col-xs-12">
+                        <label class="col-xs-12 list-row question-text">
                             <b>6. Strategic Shift</b>: How did your successful strategy evolve from your initial plan?
                         </label>
-                        <div class="ratio col-xs-12 list_row">
+                        <div class="ratio col-xs-12 list-row">
                             <label><input type="radio" name="strategy_shift" value="no_change" required/> It didn't change much; my first approach worked.</label><br>
                             <label><input type="radio" name="strategy_shift" value="narrowed_search"/> I had to significantly narrow my search to be more specific.</label><br>
                             <label><input type="radio" name="strategy_shift" value="broadened_search"/> I had to broaden my search to find related concepts first.</label><br>
                             <label><input type="radio" name="strategy_shift" value="changed_source_type"/> I realized I was looking at the wrong type of sources and switched.</label><br>
                             <label><input type="radio" name="strategy_shift" value="re-evaluated_assumption"/> I realized my initial assumption was wrong and changed my approach.</label><br>
+                            <label><input type="radio" name="strategy_shift" value="other"/> Other (please specify):</label>
+                            <label><input type="text" name="strategy_shift_other" style="margin-left: 10px; font-size: normal; width: 100%;" disabled placeholder="Please specify..." /></label>
+                            <script>
+                            $(function() {
+                                // Enable/disable the "other" text input based on radio selection
+                                $('input[name="strategy_shift"]').change(function() {
+                                    if ($(this).val() === 'other' && $(this).is(':checked')) {
+                                        $('input[name="strategy_shift_other"]').prop('disabled', false);
+                                    } else {
+                                        $('input[name="strategy_shift_other"]').prop('disabled', true).val('');
+                                    }
+                                });
+                            });
+                            </script>
                         </div>
                     </div>
 
-                    <div class="question-wrapper">
-                        <label for="additional_reflection" class="col-xs-12 list_row">
+                    <div class="question-wrapper col-xs-12">
+                        <label for="additional_reflection" class="col-xs-12 list-row question-text">
                             <b>7. (Optional) Additional Reflection</b>: Do you have any additional thoughts or reflections on this task?
-                        <textarea class="col-xs-12 list_row" id="reflection" name="additional_reflection" rows="3" required></textarea>
+                        <textarea class="col-xs-12 list-row" id="reflection" name="additional_reflection" rows="3" required></textarea>
                     </div>
 
                 </div>

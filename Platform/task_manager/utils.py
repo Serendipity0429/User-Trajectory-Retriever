@@ -59,17 +59,17 @@ def store_data(message):
     # webpage = Webpage()
     # if existing_webpage: # if the webpage already exists, update it
     #     webpage = existing_webpage
-    if not len(message['event_list']) or not len(message['mouse_moves']):
-        print_debug("Empty webpage data, skipping storing.")
-        return
-    
     webpage = Webpage()
+    if message['event_list'] == '[]' or message['mouse_moves'] == '[]' or message['rrweb_events'] == '[]':
+        print_debug("Redirect detected, setting is_redirected to True")
+        webpage.is_redirected = True
 
     webpage.belong_task = task
     webpage.user = user
     webpage.title = message['title']
     webpage.url = message['url']
     webpage.referrer = message['referrer']
+    webpage.html = message['html']
     webpage.start_timestamp = message['start_timestamp']
     webpage.end_timestamp = message['end_timestamp']
     webpage.dwell_time = message['dwell_time']

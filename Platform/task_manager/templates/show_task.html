@@ -6,16 +6,83 @@
 <div class="row">
     <div class="col-xs-offset-1 col-xs-10 task-process-container">
         <!-- General Task Information -->
-        <div class="sheet" style="margin-bottom: 20px; border: 1px solid #c2c9c9;">
-            <div class="question-wrapper col-xs-12">
-                <div class="question-text">Task Question</div>
+        <details open>
+            <summary>Basic Information</summary>
+            <div class="annotation-body">
+            <div class="annotation-block question-wrapper">
+                <div class="question-text"><b>1. Task Description</b>: You need to answer the following question:</div>
                 <div class="static-task-info">{{ task_question }}</div>
+                <span class="question-text">
+                &emsp;<b>Whose answer is:</b>
+                </span>
+                <div class="static-task-info" style="font-size: 16px;">
+                <ul id="answer-list" style="padding-left: 20px; margin-top: 5px; list-style-position: inside; column-count: 1; -webkit-column-count: 1; -moz-column-count: 1; margin-bottom: 5px;">
+                    {% for item in task_answer %}
+                    <li>{{ item }}</li>
+                    {% endfor %}
+                </ul>
+                <a href="#" id="show-all-answers" style="display: none; margin-top: 10px; cursor: pointer;">Click here to see all possible correct answers</a>
+                <a href="#" id="show-fewer-answers" style="display: none; margin-top: 10px; cursor: pointer;">Show fewer answers</a>
+                </div> 
+                <script type="application/x-javascript">
+                $(function () {
+                    // --- Updated logic for expanding and collapsing the answer list ---
+                    var answerList = $('#answer-list');
+                    var listItems = answerList.find('li');
+                    var showAllButton = $('#show-all-answers');
+                    var showFewerButton = $('#show-fewer-answers');
+                    var initialItemCount = 2; // Show 2 items initially
+
+                    // Check if there are more answers than the initial count
+                    if (listItems.length > initialItemCount) {
+                    // Hide items after the initial count
+                    listItems.slice(initialItemCount).hide();
+                    // Show the "show all" button
+                    showAllButton.show();
+                    }
+
+                    // Add click event to the "show all" button
+                    showAllButton.on('click', function(e) {
+                    e.preventDefault(); // Prevent default link behavior
+                    // Show all hidden list items
+                    answerList.find('li:hidden').show();
+                    // Hide this button and show the "show fewer" button
+                    $(this).hide();
+                    showFewerButton.show();
+                    // Set to two columns when all are shown
+                    answerList.css({
+                        'column-count': 2,
+                        '-webkit-column-count': 2,
+                        '-moz-column-count': 2
+                    });
+                    });
+
+                    // Add click event to the "show fewer" button
+                    showFewerButton.on('click', function(e) {
+                    e.preventDefault(); // Prevent default link behavior
+                    // Hide items after the initial count
+                    listItems.slice(initialItemCount).hide();
+                    // Hide this button and show the "show all" button
+                    $(this).hide();
+                    showAllButton.show();
+                    // Restore to single column when fewer are shown
+                    answerList.css({
+                        'column-count': 1,
+                        '-webkit-column-count': 1,
+                        '-moz-column-count': 1
+                    });
+                    });
+                });
+                </script>
             </div>
-            <div class="question-wrapper col-xs-12">
-                <div class="question-text">Task Completion Criteria</div>
-                <div class="static-task-info" style="font-size: medium; color: #333;">Exact Match (EM)</div>
+            <div class="annotation-block question-wrapper">
+                <div class="question-text"><b>2. Task Completion Criteria</b>: The criteria for task completion.</div>
+                <div class="static-task-info">Exact Match (EM)</div>
             </div>
-        </div>
+            </div>
+        </details>
+    </div>
+    <div class="col-xs-offset-1 col-xs-10 task-process-container">
 
         <!-- Pre-Task Annotation -->
         {% if pre_task_annotation %}
@@ -23,19 +90,19 @@
             <summary>Pre-Task Annotation</summary>
             <div class="annotation-body">
                 <div class="annotation-block">
-                    <div class="question-text">Domain Familiarity</div>
+                    <div class="question-text"><b>1. Domain Familiarity</b>: How familiar are you with the topic of this question?</div>
                     <div class="annotation-value">{{ pre_task_annotation.familiarity }}</div>
                 </div>
                 <div class="annotation-block">
-                    <div class="question-text">Predicted Difficulty</div>
+                    <div class="question-text"><b>2.  Difficulty</b>: How do you evaluate the difficulty of the task？</div>
                     <div class="annotation-value">{{ pre_task_annotation.difficulty }}</div>
                 </div>
                 <div class="annotation-block">
-                    <div class="question-text">Predicted Effort (minutes)</div>
-                    <div class="annotation-value">{{ pre_task_annotation.effort }}</div>
+                    <div class="question-text"><b>3. Effort</b>: How much time do you expect to spend on this task?</div>
+                    <div class="annotation-value">{{ pre_task_annotation.effort }} minutes</div>
                 </div>
                 <div class="annotation-block">
-                    <div class="question-text">Initial Strategy</div>
+                    <div class="question-text"><b>4. Initial Strategy</b>: Briefly describe your initial plan. For example, what search queries or keywords will you start with? (e.g. "search for A and B, then look for C")</div>
                     <div class="annotation-value">{{ pre_task_annotation.initial_strategy }}</div>
                 </div>
             </div>
@@ -56,90 +123,101 @@
             <div class="annotation-body">
                 <!-- Session Replay for this Trial -->
                 <div class="annotation-block">
-                     <div class="question-text" style="font-size: 1.4em; color: #337ab7;">Session Replay</div>
-                     {% for webpage in trial.webpages %}
-                        <div class="webpage-wrapper">
-                            <p style="font-size: 18px">Webpage {{ forloop.counter }}: <a href="{{ webpage.url }}" target="_blank">{{ webpage.title }}</a></p>
-                            <div class="rrweb-player-wrapper" id="rrweb-player-trial{{trial.num_trial}}-{{ webpage.id }}"></div>
-                            <script>
-                                new rrwebPlayer({
-                                    target: document.getElementById('rrweb-player-trial{{trial.num_trial}}-{{ webpage.id }}'),
-                                    props: {
-                                        events: {{ webpage.rrweb_events|safe }},
-                                        autoPlay: false,
-                                        width: 800,
-                                        height: 377,
-                                    },
-                                });
-                            </script>
+                    <details>
+                        <summary class="question-text" style="color:#007087; cursor: pointer; display: list-item;">Session Replay</summary>
+                        <div style="padding-left: 20px; margin-top: 10px;">
+                         {% for webpage in trial.webpages %}
+                            <div class="webpage-wrapper">
+                                <p style="font-size: 18px">Webpage {{ forloop.counter }}: <a href="{{ webpage.url }}" target="_blank">{{ webpage.title }}</a></p>
+                                <div class="rrweb-player-wrapper" id="rrweb-player-trial{{trial.num_trial}}-{{ webpage.id }}"></div>
+                                <script>
+                                    new rrwebPlayer({
+                                        target: document.getElementById('rrweb-player-trial{{trial.num_trial}}-{{ webpage.id }}'),
+                                        props: {
+                                            events: {{ webpage.rrweb_events|safe }},
+                                            autoPlay: false,
+                                            width: 800,
+                                            height: 377,
+                                        },
+                                    });
+                                </script>
+                            </div>
+                         {% empty %}
+                            <p>No recorded webpages for this trial.</p>
+                         {% endfor %}
                         </div>
-                     {% empty %}
-                        <p>No recorded webpages for this trial.</p>
-                     {% endfor %}
+                    </details>
                 </div>
 
                 <!-- Submitted Answer -->
                 <div class="annotation-block">
-                    <div class="question-text" style="font-size: 1.4em; color: #337ab7;">Submitted Answer</div>
-                    <div class="question-text">Answer:</div>
-                    <div class="annotation-value">{{ trial.submitted_answer.answer }}</div>
-                    
-                    <div class="question-text" style="margin-top:15px;">Confidence:</div>
-                    <div class="annotation-value">{{ trial.submitted_answer.confidence }}</div>
+                    <details open>
+                        <summary class="question-text" style="color:#007087; cursor: pointer; display: list-item;">Submitted Answer</summary>
+                        <div style="padding-left: 20px; margin-top: 10px;">
+                            <div class="question-text" style="margin-top:15px;"><b>1. Your Answer</b>:</div>
+                            <div class="annotation-value">{{ trial.submitted_answer.answer }}</div>
+                            
+                            <div class="question-text" style="margin-top:15px;"><b>2. Confidence</b>: How confident are you in this answer?</div>
+                            <div class="annotation-value">{{ trial.submitted_answer.confidence }}</div>
 
-                    <div class="question-text" style="margin-top:15px;">Justification:</div>
-                    <div class="annotation-value">
-                        <ul>
-                        {% for source in trial.submitted_answer.sources %}
-                            <li>
-                                <strong>URL:</strong> <a href="{{ source.url }}" target="_blank">{{ source.url }}</a><br>
-                                <strong>Text:</strong> {{ source.text }}
-                            </li>
-                        {% endfor %}
-                        </ul>
-                    </div>
-                    
-                    <div class="question-text" style="margin-top:15px;">Reasoning Method:</div>
-                    <div class="annotation-value">{{ trial.submitted_answer.reasoning_method }}</div>
-                    
-                    {% if trial.submitted_answer.additional_explanation %}
-                    <div class="question-text" style="margin-top:15px;">Additional Explanation:</div>
-                    <div class="annotation-value">{{ trial.submitted_answer.additional_explanation }}</div>
-                    {% endif %}
+                            <div class="question-text" style="margin-top:15px;"><b>1. Justification</b>: Please provide the primary source URL and source text that you used to answer the question.</div>
+                            <div class="annotation-value">
+                                <ul>
+                                {% for source in trial.submitted_answer.sources %}
+                                    <li>
+                                        <strong>URL:</strong> <a href="{{ source.url }}" target="_blank">{{ source.url }}</a><br>
+                                        <strong>Text:</strong> {{ source.text }}
+                                    </li>
+                                {% endfor %}
+                                </ul>
+                            </div>
+                            
+                            <div class="question-text" style="margin-top:15px;"><b>2.  Reasoning Method</b>: How did you derive the answer from the source?</div>
+                            <div class="annotation-value">{{ trial.submitted_answer.reasoning_method }}</div>
+                            
+                            {% if trial.submitted_answer.additional_explanation %}
+                            <div class="question-text" style="margin-top:15px;"><b>3. (Optional) Additional Explanation</b>: Please provide any additional explanation or context for your answer here.</div>
+                            <div class="annotation-value">{{ trial.submitted_answer.additional_explanation }}</div>
+                            {% endif %}
+                        </div>
+                    </details>
                 </div>
 
                 <!-- Reflection Annotation (if wrong) -->
                 {% if not trial.is_correct and trial.reflection_annotation %}
                 <div class="annotation-block">
-                    <div class="question-text" style="font-size: 1.4em; color: #337ab7;">Reflection (Incorrect Answer)</div>
-                    <div class="question-text">Primary Reasons for Failure:</div>
-                    <div class="annotation-value">
-                        <ul>
-                        {% for reason in trial.reflection_annotation.failure_reasons %}
-                            <li>{{ reason }}</li>
-                        {% endfor %}
-                        </ul>
-                    </div>
+                    <details open>
+                        <summary class="question-text" style="color:#007087; cursor: pointer; display: list-item;">Reflection</summary>
+                        <div style="padding-left: 20px; margin-top: 10px;">
+                        <div class="question-text" style="margin-top:15px;"><b>1. Primary Reasons for Failure</b>: What do you think that might be the main reasons your answer was wrong?</div>
+                        <div class="annotation-value">
+                            <ul>
+                            {% for reason in trial.reflection_annotation.failure_reasons %}
+                                <li>{{ reason }}</li>
+                            {% endfor %}
+                            </ul>
+                        </div>
 
-                    <div class="question-text" style="margin-top:15px;">Failure Analysis:</div>
-                    <div class="annotation-value">{{ trial.reflection_annotation.failure_analysis }}</div>
+                        <div class="question-text" style="margin-top:15px;"><b>2.  Failure Analysis</b>: Please elaborate on what do you think might have gone wrong. (e.g., "I trusted an outdated blog post," "I misread the column header in the table.", "I made a calculation error in my reasoning.")</div>
+                        <div class="annotation-value">{{ trial.reflection_annotation.failure_analysis }}</div>
 
-                    <div class="question-text" style="margin-top:15px;">Corrective Plan:</div>
-                    <div class="annotation-value">
-                         <ul>
-                        {% for plan in trial.reflection_annotation.corrective_plan %}
-                            <li>{{ plan }}</li>
-                        {% endfor %}
-                        </ul>
-                    </div>
+                        <div class="question-text" style="margin-top:15px;"><b>3. Corrective Plan</b>: What will you do in your next attempt?</div>
+                        <div class="annotation-value">
+                            <ul>
+                            {% for plan in trial.reflection_annotation.corrective_plan %}
+                                <li>{{ plan }}</li>
+                            {% endfor %}
+                            </ul>
+                        </div>
 
-                    <div class="question-text" style="margin-top:15px;">Expected Remaining Effort (minutes):</div>
-                    <div class="annotation-value">{{ trial.reflection_annotation.remaining_effort }}</div>
-                    
-                    {% if trial.reflection_annotation.additional_reflection %}
-                    <div class="question-text" style="margin-top:15px;">Additional Reflection:</div>
-                    <div class="annotation-value">{{ trial.reflection_annotation.additional_reflection }}</div>
-                    {% endif %}
+                        <div class="question-text" style="margin-top:15px;"><b>4. Remaining Effort</b>: How much time remaining do you expect to spend on this task?</div>
+                        <div class="annotation-value">{{ trial.reflection_annotation.remaining_effort }} minutes</div>
+                        
+                        {% if trial.reflection_annotation.additional_reflection %}
+                        <div class="question-text" style="margin-top:15px;"><b>5. (Optional) Additional Reflection</b>: Do you have any additional thoughts or reflections on this failure?</div>
+                        <div class="annotation-value">{{ trial.reflection_annotation.additional_reflection }}</div>
+                        {% endif %}
+                    </details>
                 </div>
                 {% endif %}
             </div>
@@ -152,19 +230,19 @@
             <summary>Final Annotation (Successful Completion)</summary>
             <div class="annotation-body">
                 <div class="annotation-block">
-                    <div class="question-text">Overall Difficulty</div>
+                    <div class="question-text"><b>1. Overall Difficulty</b>: How would you rate the actual difficulty of the search process you completed?</div>
                     <div class="annotation-value">{{ post_task_annotation.difficulty_actual }}</div>
                 </div>
                 <div class="annotation-block">
-                    <div class="question-text">"Aha!" Moment</div>
+                    <div class="question-text"><b>2.  The "Aha!" Moment</b>: What type of information was most critical to solving this task?</div>
                     <div class="annotation-value">{{ post_task_annotation.aha_moment_type }}</div>
                      {% if post_task_annotation.aha_moment_source %}
-                    <div class="question-text" style="margin-top:15px;">"Aha!" Moment Source:</div>
+                    <div class="question-text" style="margin-top:15px;">(Optional) Paste the source URL or search query for this "Aha!" moment.</div>
                     <div class="annotation-value">{{ post_task_annotation.aha_moment_source }}</div>
                     {% endif %}
                 </div>
                 <div class="annotation-block">
-                    <div class="question-text">Unhelpful Paths Encountered</div>
+                    <div class="question-text"><b>3. Unhelpful Paths</b>: Which of these roadblocks did you encounter?</div>
                     <div class="annotation-value">
                         <ul>
                         {% for path in post_task_annotation.unhelpful_paths %}
@@ -174,12 +252,12 @@
                     </div>
                 </div>
                 <div class="annotation-block">
-                    <div class="question-text">Strategic Shift</div>
+                    <div class="question-text"><b>4. Strategic Shift</b>: How did your successful strategy evolve from your initial plan?</div>
                     <div class="annotation-value">{{ post_task_annotation.strategy_shift }}</div>
                 </div>
                  {% if post_task_annotation.additional_reflection %}
                 <div class="annotation-block">
-                    <div class="question-text">Additional Reflection</div>
+                    <div class="question-text"><b>5. (Optional) Additional Reflection</b>: Do you have any additional thoughts or reflections on this task?</div>
                     <div class="annotation-value">{{ post_task_annotation.additional_reflection }}</div>
                 </div>
                 {% endif %}
@@ -193,15 +271,15 @@
             <summary>Task Status: <span class="status-cancelled">Cancelled</span></summary>
             <div class="annotation-body">
                 <div class="annotation-block">
-                    <div class="question-text">Primary Reason for Cancellation</div>
+                    <div class="question-text"><b>2.  Primary Reason for Cancellation</b>: Please select the primary reason you are cancelling this task.</div>
                     <div class="annotation-value">{{ cancel_annotation.cancel_category }}</div>
                 </div>
                 <div class="annotation-block">
-                    <div class="question-text">Detailed Explanation</div>
+                    <div class="question-text"><b>3. Detailed Explanation</b>: Please explain what specific obstacle prevented you from completing the task. What was your final attempt before deciding to cancel?</div>
                     <div class="annotation-value">{{ cancel_annotation.cancel_reason }}</div>
                 </div>
                 <div class="annotation-block">
-                    <div class="question-text">Missing Resources</div>
+                    <div class="question-text"><b>4. Missing Resources</b>: What do you believe was needed to make this task solvable?</div>
                     <div class="annotation-value">
                         <ul>
                         {% for resource in cancel_annotation.missing_resources %}
@@ -212,7 +290,7 @@
                 </div>
                 {% if cancel_annotation.additional_reflection %}
                 <div class="annotation-block">
-                    <div class="question-text">Additional Reflection</div>
+                    <div class="question-text"><b>5. (Optional) Additional Reflection</b>: Do you have any additional thoughts or reflections on this task?</div>
                     <div class="annotation-value">{{ cancel_annotation.additional_reflection }}</div>
                 </div>
                 {% endif %}

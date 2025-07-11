@@ -72,6 +72,14 @@
                     </div>
 
                     <div class="question-wrapper col-xs-12">
+                        <span class="col-xs-12 list-row question-text">
+                            <b>3. Your Answer</b>: Your answer to the question is:
+                            </span>
+                        <br/>
+                        <div class="static-task-info">{{ user_answer }}</div>
+                    </div>
+
+                    <div class="question-wrapper col-xs-12">
                         <label class="col-xs-12 list-row question-text">
                         <b>3. Primary Reasons for Failure</b>: What do you think that might be the <b class="notice">main</b> reasons your answer was wrong? (Select at least one and drag to reorder by priority)
                         </label>
@@ -361,17 +369,17 @@
                         <textarea class="col-xs-12 list-row" id="reflection" name="additional_reflection" rows="3" required></textarea>
                     </div>
                 </div>
-            </form>
-            <div class="col-xs-12">
+                <div class="col-xs-12">
                 <div id="query-btn" class="col-xs-6 submit-btn btn btn-block btn-lg btn-primary">
                     Submit
                 </div>
-            </div>
-            <div class="col-xs-12">
-                <div id="cancel-btn" class="col-xs-6 submit-btn btn btn-block btn-lg btn-primary cancel-button">
-                    Cancel
                 </div>
-            </div>
+                <div class="col-xs-12">
+                    <div id="cancel-btn" class="col-xs-6 submit-btn btn btn-block btn-lg btn-primary cancel-button">
+                        Cancel
+                    </div>
+                </div>
+            </form>
         </div>
         <script>
         </script>

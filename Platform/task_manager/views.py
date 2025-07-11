@@ -117,7 +117,7 @@ def post_task_annotation(user, request, task_id):
         return HttpResponse(f'No task found with task_id={task_id}')
 
     # filter relevant webpages
-    webpages = Webpage.objects.filter(belong_task=task)
+    webpages = Webpage.objects.filter(belong_task=task, is_redirected=False)
     # sort by start_timestamp
     webpages = sorted(webpages, key=lambda item: item.start_timestamp)
     # print_debug(webpages[0].event_list)
@@ -206,14 +206,14 @@ def annotation_home(user, request):
         # Convert to human-readable time
         # end_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(end_timestamp))
         unannotated_tasks_to_webpages.append((task.id, sorted(
-            Webpage.objects.filter(user=user, belong_task=task), key=lambda item: item.start_timestamp))
+            Webpage.objects.filter(user=user, belong_task=task, is_redirected=False), key=lambda item: item.start_timestamp))
                                              )
     for task in annotated_tasks:
         # end_timestamp = task.end_timestamp
         # Convert to human-readable time
         # end_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(end_timestamp))
         annotated_tasks_to_webpages.append((task.id, sorted(
-            Webpage.objects.filter(user=user, belong_task=task), key=lambda item: item.start_timestamp))
+            Webpage.objects.filter(user=user, belong_task=task, is_redirected=False), key=lambda item: item.start_timestamp))
                                            )
 
     return render(
@@ -226,70 +226,173 @@ def annotation_home(user, request):
         }
     )
 
+FAMILIARITY_MAP = {
+    0: "0 - Not familiar at all", 1: "1 - Slightly familiar", 2: "2 - Moderately familiar",
+    3: "3 - Familiar", 4: "4 - Very familiar",
+}
 
+DIFFICULTY_MAP = {
+    0: "0 - Very easy", 1: "1 - Easy", 2: "2 - Moderately difficult",
+    3: "3 - Difficult", 4: "4 - Very difficult",
+}
+
+CONFIDENCE_MAP = {
+    1: "1 - Just a guess", 2: "2 - Not very confident", 3: "3 - Fairly confident",
+    4: "4 - Very confident", 5: "5 - Certain",
+}
+
+REASONING_METHOD_MAP = {
+    "direct_fact": "The answer was a direct fact or number stated clearly on the page.",
+    "synthesis_single_page": "I had to combine multiple pieces of information from the same page.",
+    "synthesis_multi_page": "I had to combine information from different webpages.",
+    "calculation": "I had to perform a calculation based on data I found.",
+    "inference": "I had to make an inference or deduction that was not explicitly stated.",
+    "other": "Other",
+}
+
+FAILURE_CATEGORY_MAP = {
+    "bad_query": "My search query was ineffective or misleading.",
+    "misinterpreted_info": "I found the right page, but misinterpreted the information.",
+    "info_not_found": "I could not find the necessary information on the websites I visited.",
+    "logic_error": "I made a logical or calculation error based on the information I found.",
+    "ambiguous_info": "The information I found was ambiguous.",
+    "outdated_info": "The information I found was outdated or no longer accurate.",
+    "trusting_source": "I trusted a source that was not reliable or authoritative.",
+    "time_pressure": "I was under time pressure and could not verify the information thoroughly.",
+    "lack_expertise": "I lacked the necessary expertise to understand or evaluate the information.",
+    "other": "Other (please specify below).",
+}
+
+CORRECTIVE_PLAN_MAP = {
+    "refine_query": "Use different or more specific search keywords.",
+    "broaden_query": "Use more general search keywords.",
+    "find_new_source_type": "Look for a different type of source (e.g., official report, news, academic paper).",
+    "re-evaluate_info": "Re-examine the information I've already found more carefully.",
+    "check_recency": "Specifically look for more recent information.",
+    "check_reliability": "Check the reliability and authority of the sources I use.",
+    "improve_logic": "Improve my logical reasoning or calculation methods.",
+    "validate_source": "Try to find the same information on a second, independent source to validate it.",
+    "other": "Other:",
+}
+
+AHA_MOMENT_MAP = {
+    "data_table": "A data table or chart with the exact answer.",
+    "direct_statement": "A direct statement in a paragraph.",
+    "official_document": "Finding an official document or report (e.g., PDF, government site).",
+    "key_definition": "Understanding a key definition or concept.",
+    "synthesis": "Connecting two pieces of information that finally made sense together.",
+    "other": "Other (please specify):",
+}
+
+UNHELPFUL_PATHS_MAP = {
+    "no_major_roadblocks": "I did not encounter any major roadblocks.",
+    "irrelevant_results": "Search results were mostly irrelevant.",
+    "outdated_info": "Found sites with outdated information.",
+    "low_quality": "Visited low-quality, spam, or untrustworthy sites.",
+    "paywall": "Hit a paywall or login requirement.",
+    "contradictory_info": "Found contradictory information on different sites.",
+    "other": "Other (please specify):",
+}
+
+STRATEGY_SHIFT_MAP = {
+    "no_change": "It didn't change much; my first approach worked.",
+    "narrowed_search": "I had to significantly narrow my search to be more specific.",
+    "broadened_search": "I had to broaden my search to find related concepts first.",
+    "changed_source_type": "I realized I was looking at the wrong type of sources and switched.",
+    "re-evaluated_assumption": "I realized my initial assumption was wrong and changed my approach.",
+    "other": "Other (please specify):",
+}
+
+CANCEL_CATEGORY_MAP = {
+    "info_unavailable": "I believe the information is not publicly available online.",
+    "too_difficult": "The task is too complex or difficult for me to solve.",
+    "no_idea": "I am completely stuck and have no idea how to proceed.",
+    "too_long": "The task is taking too much time to complete.",
+    "technical_issue": "I encountered a technical barrier (e.g., paywall, login, broken site).",
+    "other": "Other (please specify below).",
+}
+
+MISSING_RESOURCES_MAP = {
+    "expert_knowledge": "Deep, specialized domain knowledge.",
+    "paid_access": "Access to a paid subscription, database, or service.",
+    "better_tools": "A more powerful or specialized search tool.",
+    "different_question": "The question itself was too ambiguous or unanswerable.",
+    "info_not_online": "The information is unlikely to exist publicly online.",
+    "time_limit": "More time to research and explore.",
+    "team_help": "Help from a team or community.",
+    "guidance": "Guidance or mentorship from an expert.",
+    "better_question": "A better-formulated question or clearer instructions.",
+    "other": "Other (please specify):",
+}
+
+# Helper function to map lists of keys to lists of values
+def map_json_list(json_string, mapping):
+    try:
+        keys = json.loads(json_string) if json_string else []
+        return [mapping.get(key, key) for key in keys]
+    except (json.JSONDecodeError, TypeError):
+        return []
+
+# =============================================
+# =        Updated show_task Function         =
+# =============================================
 @require_login
 def show_task(user, request, task_id):
     """
-    获取与特定任务相关的所有数据，并在详细视图中呈现。
-    此函数收集任务前问卷、所有尝试及其各自的网页、
-    提交的答案、反思以及任务后或取消问卷。
+    Fetches all data related to a specific task and renders it in a detail view.
+    This function gathers the pre-task survey, all trials with their respective
+    webpages, submitted answers, reflections, and the post-task or cancellation survey.
     """
     print_debug(f"function show_task for task_id: {task_id}")
     task = Task.objects.filter(id=task_id, user=user).first()
     if task is None:
         return HttpResponse(f'No task found with task_id={task_id}')
 
-    # 1. 获取常规任务信息
+    # 1. Fetch general task information
     task_question = task.content.question
+    task_answer = json.loads(task.content.answer) if task.content.answer else {}
 
-    # 2. 获取任务前问卷
-    pre_task_annotation = PreTaskAnnotation.objects.filter(belong_task=task).first()
+    # 2. Fetch and create context for Pre-Task Annotation
+    pre_task_annotation_obj = PreTaskAnnotation.objects.filter(belong_task=task).first()
+    pre_task_annotation_context = None
+    if pre_task_annotation_obj:
+        pre_task_annotation_context = {
+            'familiarity': FAMILIARITY_MAP.get(pre_task_annotation_obj.familiarity, pre_task_annotation_obj.familiarity),
+            'difficulty': DIFFICULTY_MAP.get(pre_task_annotation_obj.difficulty, pre_task_annotation_obj.difficulty),
+            'effort': pre_task_annotation_obj.effort,
+            'initial_strategy': pre_task_annotation_obj.initial_strategy,
+        }
 
-    # 3. 获取所有尝试及相关数据
+    # 3. Fetch all trials and related data
     task_trials = TaskTrial.objects.filter(belong_task=task).order_by('num_trial')
     trials_context = []
     for trial in task_trials:
-        # 获取此特定尝试的所有网页
-        trial_webpages = Webpage.objects.filter(belong_task_trial=trial).order_by('start_timestamp')
+        trial_webpages = Webpage.objects.filter(belong_task_trial=trial, is_redirected=False).order_by('start_timestamp')
 
-        # 格式化提交的答案来源
         submitted_sources = []
         try:
-            # 该字段存储一个JSON字符串，格式如：{"url1": ["text1", "text2"], "url2": ["text3"]}
             sources_dict = json.loads(trial.source_url_and_text)
             for url, texts in sources_dict.items():
                 for text in texts:
                     submitted_sources.append({'url': url, 'text': text})
         except (json.JSONDecodeError, TypeError):
-            # 处理数据不是有效JSON或不存在的情况
             submitted_sources = []
             
         submitted_answer_context = {
             'answer': trial.answer,
-            'confidence': trial.confidence,
+            'confidence': CONFIDENCE_MAP.get(trial.confidence, trial.confidence),
             'sources': submitted_sources,
-            'reasoning_method': trial.reasoning_method,
+            'reasoning_method': REASONING_METHOD_MAP.get(trial.reasoning_method, trial.reasoning_method),
             'additional_explanation': trial.additional_explanation,
         }
 
-        # 如果尝试不正确，则格式化反思问卷
         reflection_context = None
         if not trial.is_correct and trial.reflection_annotation:
             reflection = trial.reflection_annotation
-            try:
-                failure_reasons = json.loads(reflection.failure_category) if reflection.failure_category else []
-            except (json.JSONDecodeError, TypeError):
-                failure_reasons = []
-            
-            try:
-                corrective_plan = json.loads(reflection.future_plan_actions) if reflection.future_plan_actions else []
-            except (json.JSONDecodeError, TypeError):
-                corrective_plan = []
-
             reflection_context = {
-                'failure_reasons': failure_reasons,
+                'failure_reasons': map_json_list(reflection.failure_category, FAILURE_CATEGORY_MAP),
                 'failure_analysis': reflection.failure_reason,
-                'corrective_plan': corrective_plan,
+                'corrective_plan': map_json_list(reflection.future_plan_actions, CORRECTIVE_PLAN_MAP),
                 'remaining_effort': reflection.remaining_effort,
                 'additional_reflection': reflection.additional_reflection,
             }
@@ -302,54 +405,42 @@ def show_task(user, request, task_id):
             'reflection_annotation': reflection_context,
         })
 
-    # 4. 获取任务后或取消问卷
+    # 4. Fetch Post-Task or Cancellation Annotation
     final_annotation = PostTaskAnnotation.objects.filter(belong_task=task).first()
     post_task_annotation_context = None
     cancel_annotation_context = None
 
     if final_annotation:
         if task.cancelled:
-            # 这是取消问卷
-            try:
-                missing_resources = json.loads(final_annotation.cancel_missing_resources) if final_annotation.cancel_missing_resources else []
-            except (json.JSONDecodeError, TypeError):
-                missing_resources = []
-
             cancel_annotation_context = {
-                'cancel_category': final_annotation.cancel_category,
+                'cancel_category': CANCEL_CATEGORY_MAP.get(final_annotation.cancel_category, final_annotation.cancel_category),
                 'cancel_reason': final_annotation.cancel_reason,
-                'missing_resources': missing_resources,
+                'missing_resources': map_json_list(final_annotation.cancel_missing_resources, MISSING_RESOURCES_MAP),
                 'additional_reflection': final_annotation.cancel_additional_reflection,
             }
         else:
-            # 这是成功完成的问卷
-            try:
-                unhelpful_paths = json.loads(final_annotation.unhelpful_paths) if final_annotation.unhelpful_paths else []
-            except (json.JSONDecodeError, TypeError):
-                unhelpful_paths = []
-
             post_task_annotation_context = {
-                'difficulty_actual': final_annotation.difficulty_actual,
-                'aha_moment_type': final_annotation.aha_moment_type,
+                'difficulty_actual': DIFFICULTY_MAP.get(final_annotation.difficulty_actual, final_annotation.difficulty_actual),
+                'aha_moment_type': AHA_MOMENT_MAP.get(final_annotation.aha_moment_type, final_annotation.aha_moment_type),
                 'aha_moment_source': final_annotation.aha_moment_source,
-                'unhelpful_paths': unhelpful_paths,
-                'strategy_shift': final_annotation.strategy_shift,
+                'unhelpful_paths': map_json_list(final_annotation.unhelpful_paths, UNHELPFUL_PATHS_MAP),
+                'strategy_shift': STRATEGY_SHIFT_MAP.get(final_annotation.strategy_shift, final_annotation.strategy_shift),
                 'additional_reflection': final_annotation.additional_reflection,
             }
 
-    # 5. 组装最终上下文并渲染模板
+    # 5. Assemble the final context and render the template
     context = {
         'cur_user': user,
         'task_id': task.id,
         'task_question': task_question,
-        'pre_task_annotation': pre_task_annotation,
+        'task_answer': task_answer,
+        'pre_task_annotation': pre_task_annotation_context,
         'trials': trials_context,
         'post_task_annotation': post_task_annotation_context,
         'cancel_annotation': cancel_annotation_context,
-        'task': task, # 如果需要，传递整个任务对象
+        'task': task, 
     }
     return render(request, 'show_task.html', context)
-
 
 @require_login
 def show_tool_use_page(user, request):
@@ -452,9 +543,12 @@ def reflection_annotation(user, request, task_id, end_timestamp):
 
     # Filter the webpage whose timestamp is within the range of start_timestamp and timestamp
     webpages = Webpage.objects.filter(belong_task=task, start_timestamp__gte=task_trial.start_timestamp,
-                                      start_timestamp__lt=end_timestamp)
+                                      start_timestamp__lt=end_timestamp, is_redirected=False)
     # Sort by start_timestamp
     webpages = sorted(webpages, key=lambda item: item.start_timestamp)
+    
+    # User answer
+    user_answer = task_trial.answer if task_trial.answer else ""
 
     return render(
         request,
@@ -464,6 +558,7 @@ def reflection_annotation(user, request, task_id, end_timestamp):
             'task_id': task_id,
             'question': question,
             'webpages': webpages,
+            'user_answer': user_answer,
         }
     )
 
@@ -481,14 +576,15 @@ def submit_answer(user, request, task_id, timestamp):
     question = task.content.question
     start_timestamp = task.start_timestamp
     num_trial = task.num_trial
-    if num_trial > 1:
-        last_task_trial = TaskTrial.objects.filter(belong_task=task, num_trial=num_trial - 1).first()
+    if num_trial > 0:
+        last_task_trial = TaskTrial.objects.filter(belong_task=task, num_trial=num_trial).first()
         assert last_task_trial is not None  # Ensure that the last task trial exists, which should always be the case
         start_timestamp = last_task_trial.end_timestamp
         
     # Filter the webpage whose timestamp is within the range of start_timestamp and timestamp
-    webpages = Webpage.objects.filter(belong_task=task, start_timestamp__gte=start_timestamp,
+    all_webpages = Webpage.objects.filter(belong_task=task, start_timestamp__gte=start_timestamp,
                                       start_timestamp__lt=timestamp)
+    webpages = all_webpages.filter(is_redirected=False)
     # Sort by start_timestamp
     webpages = sorted(webpages, key=lambda item: item.start_timestamp)
 
@@ -534,7 +630,7 @@ def submit_answer(user, request, task_id, timestamp):
         task_trial.save()
         task.save()
         
-        for webpage in webpages:
+        for webpage in all_webpages:
             webpage.belong_task_trial = task_trial
             webpage.save()
         

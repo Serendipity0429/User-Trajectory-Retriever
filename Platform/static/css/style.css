@@ -169,14 +169,14 @@ label {
 .navbar-brand:hover {
     color: #e79562 !important;
 }
-
 a {
-    color: #007087 !important;
-    text-decoration: none !important;
+
+    color: #007087;
+    text-decoration: none;
 }
 
 a:hover {
-    color: #e79562 !important;
+    color: #e79562;
 }
 
 
@@ -275,8 +275,17 @@ button.remove-source:hover {
     color: white;
 }
 
+.form-group a{
+    color: white;
+}
+
+a.btn {
+    color: white;
+}
+
+
 .navbar {
-    margin-bottom: 0;
+    margin-bottom: 10px;
 }
 
 .task-process-container details {
@@ -284,51 +293,46 @@ button.remove-source:hover {
         border: 1px solid #c2c9c9;
         border-radius: 4px;
     }
-    .task-process-container summary {
-        font-size: 1.5em; /* Larger text for summary */
-        font-weight: bold;
-        cursor: pointer;
-        padding: 10px 15px;
-        /* Using list-header style from your CSS */
-        background: #edeff1;
-        border-bottom: 2px solid #007087;
-        color: #045363;
-        list-style: none; /* Remove default arrow/marker */
-        display: block;
-    }
-    .task-process-container summary::-webkit-details-marker {
-        display: none; /* Remove arrow in Chrome/Safari */
-    }
-    .task-process-container details[open] > summary {
-         border-bottom: 1px solid #ddd;
-    }
-    .annotation-body {
-        padding: 20px;
-        border-top: 1px dashed #000;
-    }
-    .annotation-block {
-        margin-bottom: 20px;
-    }
-    .annotation-block .question-text {
-        font-size: large;
-        font-weight: bold;
-        color: #007087;
-        margin-bottom: 5px;
-    }
-    .annotation-value {
-        padding: 10px;
-        background-color: #fff;
-        border: 1px solid #eee;
-        border-radius: 4px;
-        display: block;
-        width: 100%;
-        word-wrap: break-word;
-        font-size: medium;
-    }
-    .annotation-value ul {
-        padding-left: 20px;
-        margin-bottom: 0;
-    }
-    .status-right { color: #4CAF50; }
-    .status-wrong { color: #F44336; }
-    .status-cancelled { color: #f0ad4e; }
+.task-process-container summary, .summary {
+    font-size: large; /* Larger text for summary */
+    font-weight: bold;
+    cursor: pointer;
+    padding: 5px 10px;
+    /* Using list-header style from your CSS */
+    background: #edeff1;
+    border-bottom: 2px solid #007087;
+    color: #045363;
+    list-style: none; /* Remove default arrow/marker */
+    display: block;
+}
+.task-process-container summary::-webkit-details-marker {
+    display: none; /* Remove arrow in Chrome/Safari */
+}
+.summary, .task-process-container details[open] > summary {
+        border-bottom: 1px solid #ddd;
+}
+.annotation-body {
+    padding: 20px;
+    border-top: 1px dashed #000;
+}
+.annotation-block {
+    margin-bottom: 20px;
+}
+
+.annotation-value {
+    padding: 10px;
+    background-color: #fff;
+    border: 1px solid #eee;
+    border-radius: 4px;
+    display: block;
+    width: 100%;
+    word-wrap: break-word;
+    font-size: medium;
+}
+.annotation-value ul {
+    padding-left: 20px;
+    margin-bottom: 0;
+}
+.status-right { color: #4CAF50; }
+.status-wrong { color: #F44336; }
+.status-cancelled { color: #f0ad4e; }

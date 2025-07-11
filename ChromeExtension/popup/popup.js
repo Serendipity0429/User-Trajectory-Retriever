@@ -9,8 +9,53 @@ var taskSniff = null;
 var logged_in = false;
 var task_id = -1;
 
-function displayActiveTask() {
-    task_id = getActiveTask();
+
+// 封装通用的API请求函数
+async function makeApiRequest(url, data = {}) {
+    try {
+        const response = await $.ajax({
+            type: "POST",
+            url: url,
+            dataType: 'json',
+            data: data
+        });
+        return response;
+    } catch (error) {
+        console.error(`API request failed: ${url}`, error);
+        return -1;
+    }
+}
+
+// 封装用户认证数据获取
+function getUserCredentials() {
+    return {
+        username: localStorage['username'],
+        password: localStorage['password']
+    };
+}
+
+// 封装消息显示逻辑
+function showFailMessage(messageType) {
+    $("#failMsg1, #failMsg2, #failMsg3").hide();
+    if (messageType >= 1 && messageType <= 3) {
+        $(`#failMsg${messageType}`).show();
+    }
+}
+
+// 封装UI切换逻辑
+function switchUIState(showLogin) {
+    if (showLogin) {
+        $("#logged").hide();
+        $("#login").show();
+    } else {
+        $("#login").hide();
+        $("#logged").show();
+    }
+    showFailMessage(0); // 隐藏所有错误消息
+}
+
+async function displayActiveTask() {
+    task_id = await getActiveTask();
     if (task_id == -1) {
         // No active task
         switchTaskButtonStatus('off');
@@ -29,12 +74,7 @@ function displayActiveTask() {
 }
 
 function userTab() {
-
-    $("#failMsg1").hide();
-    $("#failMsg2").hide();
-    $("#failMsg3").hide();
-    $("#login").hide();
-    $("#logged").show();
+    switchUIState(false);
     $("#username_text_logged").text("User " + localStorage['username']);
     $("#bt_end_task").hide();
     displayActiveTask();
@@ -43,126 +83,70 @@ function userTab() {
 }
 
 function loginTab() {
-    $("#logged").hide();
-    $("#failMsg1").hide();
-    $("#failMsg2").hide();
-    $("#failMsg3").hide();
-    $("#login").show();
+    switchUIState(true);
 }
 
-function initializeServer() {
-    //console.log("initializing...");
-    var result = -1;
-    $.ajax({
-        type: "POST",
-        url: baseUrl + "/task/initialize/",
-        dataType: 'json',
-        async: false,
-        data: {username: localStorage['username'], password: localStorage['password']},
-        success: function (data, textStatus) {
-            if (data != -1) // There is an active task
-            {
-                switchTaskButtonStatus('on');
-            }
-        },
-        error: function () {
-            result = -1;
-        }
-    });
-    return result;
-}
-
-function verifyUser() {
-    //console.log("checking...");
-    var result = -1;
-    if (localStorage['username'] != undefined && localStorage['password'] != undefined) {
-        var name = localStorage['username'];
-        var psw = localStorage['password'];
-        //console.log("POSTing...");
-        $.ajax({
-            type: "POST",
-            url: checkUrl,
-            dataType: 'json',
-            async: false,
-            data: {username: name, password: psw},
-            success: function (data, textStatus) {
-                if (data == 0) {
-                    result = 0;
-                }
-                if (data == 1) {
-                    result = 1;
-                }
-                if (data == 2) {
-                    result = 2;
-                }
-            },
-            error: function () {
-                result = -1;
-            }
-        });
+async function initializeServer() {
+    const credentials = getUserCredentials();
+    const result = await makeApiRequest(baseUrl + "/task/initialize/", credentials);
+    
+    if (result != -1) { // There is an active task
+        switchTaskButtonStatus('on');
     }
     return result;
 }
 
-function userLogin() {
-    if (localStorage['username'] != undefined && localStorage['password'] != undefined) {
-        var name = localStorage['username'];
-        var psw = localStorage['password'];
-        //console.log("POSTing...");
-        $.ajax({
-            type: "POST",
-            url: loginUrl,
-            dataType: 'json',
-            async: false,
-            data: {username: name, password: psw, ext: true},
-            success: function (data, textStatus) {
-
-            },
-            error: function () {
-
-            }
-        });
-        chrome.runtime.sendMessage({log_request: 'on'});
+async function verifyUser() {
+    if (!localStorage['username'] || !localStorage['password']) {
+        return -1;
     }
+    
+    const credentials = getUserCredentials();
+    const result = await makeApiRequest(checkUrl, credentials);
+    
+    // 返回具体的验证结果
+    return result
+}
+
+async function userLogin() {
+    if (!localStorage['username'] || !localStorage['password']) {
+        return;
+    }
+    
+    const credentials = getUserCredentials();
+    credentials.ext = true;
+    
+    await makeApiRequest(loginUrl, credentials);
+    chrome.runtime.sendMessage({log_request: 'on'});
 }
 
 function register() {
     window.open(registerUrl);
 }
 
-function trylogin() {
-    //console.log("logging...");
+async function trylogin() {
     localStorage['password'] = "" + $("#psw").val();
     localStorage['username'] = "" + $("#username").val();
-    var verified = verifyUser();
+    
+    const verified = await verifyUser();
+    
     if (verified == 0) {
         userTab();
-        userLogin();
-        initializeServer();
+        await userLogin();
+        await initializeServer();
         chrome.browserAction.setBadgeText({text: 'on'});
         chrome.browserAction.setBadgeBackgroundColor({color: [202, 181, 225, 255]});
     } else {
         chrome.browserAction.setBadgeText({text: ''});
-        if (verified == 1) {
-            $("#failMsg2").hide();
-            $("#failMsg3").hide();
-            $("#failMsg1").show();
-        }
-        if (verified == 2) {
-            $("#failMsg1").hide();
-            $("#failMsg3").hide();
-            $("#failMsg2").show();
-        }
-        if (verified == -1) {
-            $("#failMsg1").hide();
-            $("#failMsg2").hide();
-            $("#failMsg3").show();
-        }
+        const messageMap = {1: 1, 2: 2, [-1]: 3};
+        showFailMessage(messageMap[verified]);
     }
 }
 
 function feedback() {
-    if (confirm("Tip: If the task process is on-going (the relevant pages are not closed), please close the pages before annotating!\nIf not, ignore this message.")) window.open(feedbackUrl);
+    if (confirm("Tip: If the task process is on-going (the relevant pages are not closed), please close the pages before annotating!\nIf not, ignore this message.")) {
+        window.open(feedbackUrl);
+    }
 }
 
 function download() {
@@ -170,7 +154,7 @@ function download() {
 }
 
 function logout() {
-    clearInterval(taskSniff)
+    clearInterval(taskSniff);
     localStorage['username'] = null;
     localStorage['password'] = null;
     chrome.browserAction.setBadgeText({text: ''});
@@ -179,87 +163,88 @@ function logout() {
 }
 
 // Get the active task
-function getActiveTask(task_id = null) {
-    var username = localStorage['username'];
-    var password = localStorage['password'];
-    var send_data = {username: username, password: password};
-    if (!(task_id == null || task_id == -1 || task_id == undefined)) {
-        send_data = {username: username, password: password, task_id: task_id};
+async function getActiveTask(task_id = null) {
+    const credentials = getUserCredentials();
+    let send_data = credentials;
+    
+    if (task_id != null && task_id != -1 && task_id != undefined) {
+        send_data = {...credentials, task_id: task_id};
     }
-    var result = -1;
-    $.ajax({
-        type: "POST",
-        url: baseUrl + '/task/active_task/',
-        dataType: 'json',
-        async: false,
-        data: send_data,
-        success: function (data, textStatus) {
-            result = data;
-            chrome.runtime.sendMessage({ task_active: "request" });
-        },
-        error: function () {
-            result = -2;
-        }
-    });
-    return result;
+    
+    try {
+        const result = await makeApiRequest(baseUrl + '/task/active_task/', send_data);
+        chrome.runtime.sendMessage({ task_active: "request" });
+        return result;
+    } catch (error) {
+        return -2;
+    }
+}
+
+// 封装窗口打开逻辑
+function openTaskWindow(path, params = '') {
+    const url = baseUrl + path + params;
+    const windowOptions = 'height=1000,width=1200,top=0,left=0,toolbar=no,menubar=no,scrollbars=no,resizable=no,location=no,status=no';
+    window.open(url, 'newwindow', windowOptions);
 }
 
 // Start a task
-function starttask() {
-    // Ask back-end to start a task
-    // Disable the start task button
+async function starttask() {
     $("#bt_start_task").attr("disabled", true);
     chrome.runtime.sendMessage({start_task: true});
-    task_id = getActiveTask();
+    
+    task_id = await getActiveTask();
+    
     if (task_id == -2) {
         alert("The server is not available. Please try again later.");
         switchTaskButtonStatus('off');
         return;
     }
+    
     if (task_id != -1) {
         alert("There is an active task. Please end the task first.");
         switchTaskButtonStatus('on');
         return;
     }
-    var isConfirm = confirm("Do you want to start a task?");
+    
+    const isConfirm = confirm("Do you want to start a task?");
     if (isConfirm) {
-        timestamp = (new Date()).getTime();
-        window.open(baseUrl + '/task/pre_task_annotation/' + timestamp, 'newwindow', 'height=1000,width=1200,top=0,left=0,toolbar=no,menubar=no,scrollbars=no, resizable=no,location=no, status=no');
+        const timestamp = (new Date()).getTime();
+        openTaskWindow('/task/pre_task_annotation/', timestamp);
     } else {
         switchTaskButtonStatus('off');
     }
 }
 
 // End a task
-function endtask() {
-    // Ask back-end to end a task
-
-    // Disable the end task button
+async function endtask() {
     $("#bt_end_task").attr("disabled", true);
     chrome.runtime.sendMessage({end_task: true});
-    task_id = getActiveTask();
+    
+    task_id = await getActiveTask();
+    
     if (task_id == -2) {
         alert("The server is not available. Please try again later.");
         switchTaskButtonStatus('on');
         return;
     }
+    
     if (task_id == -1) {
         alert("There is no active task. Please start a task first.");
         switchTaskButtonStatus('off');
         return;
     }
-    // var isConfirm = confirm("Do you want to end the task?");
-    var isConfirm = confirm("Do you want to submit the answer?");
+    
+    const isConfirm = confirm("Do you want to submit the answer?");
     if (isConfirm && task_id != -1) {
-        // TODO: Ask webpages to send data back to server
-        // Send message to content.js to send webpage data back to server\
         chrome.tabs.query({active: true, currentWindow: true}, function (tabs) {
-            chrome.tabs.sendMessage(tabs[0].id, {type: "msg_from_popup", update_webpage_info: true}, function (response) {
+            chrome.tabs.sendMessage(tabs[0].id, {type: "msg_from_popup", update_webpage_info: true}, async function (response) {
                 if (debug) console.log(response);
-                let timestamp = (new Date()).getTime();
-                window.open(baseUrl + '/task/submit_answer/' + task_id + '/' + timestamp, 'newwindow', 'height=1000,width=1200,top=0,left=0,toolbar=no,menubar=no,scrollbars=no, resizable=no,location=no, status=no');
-                if (getActiveTask() < 0)
+                const timestamp = (new Date()).getTime();
+                openTaskWindow('/task/submit_answer/', `${task_id}/${timestamp}`);
+                const activeTask = await getActiveTask();
+                if (activeTask < 0) {
                     switchTaskButtonStatus('off');
+                }
             });
         });
     } else {
@@ -267,90 +252,83 @@ function endtask() {
     }
 }
 
-
-
-function canceltask() {
-    task_id = getActiveTask();
-    let isConfirm = confirm("Do you want to cancel the task?");
+async function canceltask() {
+    task_id = await getActiveTask();
+    const isConfirm = confirm("Do you want to cancel the task?");
     if (isConfirm && task_id != -1) {
-        // Ask back-end to cancel a task
-        let timestamp = (new Date()).getTime();
-        window.open(baseUrl + '/task/cancel_task/' + task_id + '/' + timestamp, 'newwindow', 'height=1000,width=1200,top=0,left=0,toolbar=no,menubar=no,scrollbars=no, resizable=no,location=no, status=no');
+        const timestamp = (new Date()).getTime();
+        openTaskWindow('/task/cancel_task/', `${task_id}/${timestamp}`);
     }
 }
 
-function viewtask() {
-    task_id = getActiveTask();
+async function viewtask() {
+    task_id = await getActiveTask();
     if (task_id != -1) {
-         let url = baseUrl + '/task/view_task_info/' + task_id + '/?username=' + localStorage['username'] + '&password=' + localStorage['password'];
-        window.open(url, 'newwindow', 'height=600,width=930,top=0,left=0,toolbar=no,menubar=no,scrollbars=no, resizable=no,location=no, status=no');
+        const credentials = getUserCredentials();
+        const url = `${baseUrl}/task/view_task_info/${task_id}/?username=${credentials.username}&password=${credentials.password}`;
+        const windowOptions = 'height=600,width=930,top=0,left=0,toolbar=no,menubar=no,scrollbars=no,resizable=no,location=no,status=no';
+        window.open(url, 'newwindow', windowOptions);
     }
 }
 
 function tooluse() {
-    window.open(baseUrl + '/task/show_tool_use_page', 'newwindow', 'height=520,width=620,top=0,left=0,toolbar=no,menubar=no,scrollbars=no, resizable=no,location=no, status=no');
+    const windowOptions = 'height=520,width=620,top=0,left=0,toolbar=no,menubar=no,scrollbars=no,resizable=no,location=no,status=no';
+    window.open(baseUrl + '/task/show_tool_use_page', 'newwindow', windowOptions);
 }
-
 
 // Switch task button status
 function switchTaskButtonStatus(task_status) {
-    if (task_status == 'on') {
-        $("#bt_start_task").attr("disabled", true);
-        $("#bt_end_task").attr("disabled", false);
-        $("#bt_end_task").show();
-        $("#bt_start_task").hide();
-        $("#bt_cancel_task").attr("disabled", false);
-        $("#bt_view_task_info").attr("disabled", false);
-        $("#bt_tool_use").attr("disabled", false);
-    } else if (task_status == 'off') {
-        $("#bt_start_task").attr("disabled", false);
-        $("#bt_end_task").attr("disabled", true);
-        $("#bt_end_task").hide();
-        $("#bt_start_task").show();
-        $("#bt_cancel_task").attr("disabled", true);
-        $("#bt_view_task_info").attr("disabled", true);
-        $("#bt_tool_use").attr("disabled", true);
-    }
+    const isActive = task_status === 'on';
+    
+    $("#bt_start_task").attr("disabled", isActive).toggle(!isActive);
+    $("#bt_end_task").attr("disabled", !isActive).toggle(isActive);
+    $("#bt_cancel_task").attr("disabled", !isActive);
+    $("#bt_view_task_info").attr("disabled", !isActive);
+    $("#bt_tool_use").attr("disabled", !isActive);
 }
 
-
 chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
-    if (request == "task_start_fail") {
-        alert("The task has not been started successfully.");
-        switchTaskButtonStatus('off');
-    } else if (request == "task_end_fail") {
-        alert("The task has not been ended successfully.");
-        switchTaskButtonStatus('on');
-    } else if (request == "task_start_success") {
-        alert("The task has been started successfully.");
-        switchTaskButtonStatus('on');
-    } else if (request == "task_end_success") {
-        alert("The task has been ended successfully.");
-        switchTaskButtonStatus('off');
+    const messageMap = {
+        "task_start_fail": ["The task has not been started successfully.", 'off'],
+        "task_end_fail": ["The task has not been ended successfully.", 'on'],
+        "task_start_success": ["The task has been started successfully.", 'on'],
+        "task_end_success": ["The task has been ended successfully.", 'off']
+    };
+    
+    if (messageMap[request]) {
+        const [message, status] = messageMap[request];
+        alert(message);
+        switchTaskButtonStatus(status);
     }
 });
 
-if (jQuery) {
-    loginTab();
-    $("#bt1").click(register);
-    $("#bt2").click(trylogin);
-    $("#bt4").click(feedback);
-    $("#bt8").click(feedback);
-    $("#bt6").click(logout);
-    $("#bt_start_task").click(starttask);
-    $("#bt_end_task").click(endtask);
-    $("#bt_cancel_task").click(canceltask);
-    $("#bt_view_task_info").click(viewtask);
-    $("#bt_tool_use").click(tooluse);
-    if (verifyUser() == 0) {
-        userTab();
-        chrome.browserAction.setBadgeText({text: 'on'});
-        chrome.browserAction.setBadgeBackgroundColor({color: [202, 181, 225, 255]});
+// 初始化
+(async function init() {
+    if (jQuery) {
+        loginTab();
+        
+        // 绑定事件
+        $("#bt1").click(register);
+        $("#bt2").click(trylogin);
+        $("#bt4").click(feedback);
+        $("#bt8").click(feedback);
+        $("#bt6").click(logout);
+        $("#bt_start_task").click(starttask);
+        $("#bt_end_task").click(endtask);
+        $("#bt_cancel_task").click(canceltask);
+        $("#bt_view_task_info").click(viewtask);
+        $("#bt_tool_use").click(tooluse);
+        
+        // 验证用户
+        const verified = await verifyUser();
+        if (verified === 0) {
+            userTab();
+            chrome.browserAction.setBadgeText({text: 'on'});
+            chrome.browserAction.setBadgeBackgroundColor({color: [202, 181, 225, 255]});
+        } else {
+            chrome.browserAction.setBadgeText({text: ''});
+        }
     } else {
-        chrome.browserAction.setBadgeText({text: ''});
+        console.log("jQuery is needed!");
     }
-} else {
-    console.log("jQuery is needed!");
-}
-
-
+})();

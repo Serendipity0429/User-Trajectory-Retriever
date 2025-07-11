@@ -69,7 +69,7 @@ class PreTaskAnnotation(models.Model):
     difficulty = models.IntegerField(null=True)  # 0->4, easy -> hard
     effort = models.IntegerField(null=True)  # time effort to complete the task, 3 to 60
     
-    initial_strategy = models.CharField(max_length=10000, null=True)  # initial strategy for the task
+    initial_strategy = models.TextField(null=True)  # initial strategy to solve the task
 
 # Reflection annotation
 class ReflectionAnnotation(models.Model):
@@ -78,10 +78,10 @@ class ReflectionAnnotation(models.Model):
     failure_reason = models.CharField(max_length=10000) # reason for failure
     failure_category = models.CharField(max_length=100)  # category of failure, e.g. "lack of resources", "lack of knowledge", etc.
     future_plan_actions = models.CharField(max_length=100)  # actions to take in the future
-    future_plan_other = models.CharField(max_length=1000)  # text for future plan
+    future_plan_other = models.TextField(null=True)  # other future plan actions
     remaining_effort = models.IntegerField()  # remaining effort to complete the task, 3 to 60
 
-    additional_reflection = models.CharField(max_length=10000, null=True)  # additional reflection on the task
+    additional_reflection = models.TextField(null=True)  # additional reflection on the task
 
 # Post-task annotation
 class PostTaskAnnotation(models.Model):
@@ -94,41 +94,40 @@ class PostTaskAnnotation(models.Model):
     difficulty_actual = models.IntegerField(null=True)  # 0->4, easy -> hard
     
     aha_moment_type = models.CharField(max_length=100, null=True)  # type of aha moment, e.g. "insight", "realization", etc.
-    aha_moment_other = models.CharField(max_length=10000, null=True)  # other type of aha moment
-    aha_moment_source = models.CharField(max_length=10000, null=True)  # source of the aha moment
+    aha_moment_other = models.TextField(null=True)  # other type of aha moment
+    aha_moment_source = models.TextField(null=True)  # source of aha moment, e.g. "webpage", "trial-and-error", etc.
 
     unhelpful_paths = models.JSONField(null=True)  # paths that were not helpful, e.g. ["path1", "path2"]
-    unhelpful_paths_other = models.CharField(max_length=10000, null=True)  # other unhelpful paths
+    unhelpful_paths_other = models.TextField(null=True)  # other unhelpful paths
 
     strategy_shift = models.CharField(max_length=100, null=True)  # strategy shift during the task
-    strategy_shift_other = models.CharField(max_length=10000, null=True)  # other strategy shift
+    strategy_shift_other = models.TextField(null=True)  # other strategy shift
         
-    additional_reflection = models.CharField(max_length=10000, null=True)  # reflection on the task
+    additional_reflection = models.TextField(null=True)  # reflection on the task
 
     # If task is cancelled
     cancel_category = models.CharField(max_length=100, null=True)  # refer to post_task_annotation.html
     cancel_reason = models.CharField(max_length=10000, null=True)  # reason for cancellation
-    cancel_reflection = models.CharField(max_length=10000, null=True)  # reflection on cancellation
+    cancel_reflection = models.TextField(null=True)  # reflection on cancellation
     cancel_missing_resources = models.CharField(max_length=10000, null=True)  # missing resources that led to cancellation
-    cancel_missing_resources_other = models.CharField(max_length=10000, null=True)  # other missing resources
-    cancel_additional_reflection = models.CharField(max_length=10000, null=True)  # additional reflection on cancellation
+    cancel_missing_resources_other = models.TextField(null=True)  # other missing resources
+    cancel_additional_reflection = models.TextField(null=True)  # additional reflection on cancellation
 
 
 # Task Trial
 class TaskTrial(models.Model):
-    id = models.AutoField(primary_key=True)
     start_timestamp = models.IntegerField()
     end_timestamp = models.IntegerField()
     num_trial = models.IntegerField()  # number of trials
 
-    answer = models.CharField(max_length=10000)
+    answer = models.CharField(max_length=1000)
     is_correct = models.BooleanField(default=False)
     
     confidence = models.IntegerField()  # confidence level, 0->4, low -> high
     source_url_and_text = models.JSONField()
     reasoning_method = models.CharField(max_length=100)  # reasoning method used, e.g. "deductive", "inductive", etc.
     
-    additional_explanation = models.CharField(max_length=10000, null=True)  # explanation of the answer
+    additional_explanation = models.TextField(null=True)  # explanation of the answer
 
     reflection_annotation = models.ForeignKey(
         ReflectionAnnotation,
@@ -162,13 +161,16 @@ class Webpage(models.Model):
 
     title = models.CharField(max_length=100)
     url = models.CharField(max_length=1000)
+    html = models.TextField()  # HTML content of the webpage
     referrer = models.CharField(max_length=1000)
     start_timestamp = models.IntegerField()
     end_timestamp = models.IntegerField()
     dwell_time = models.IntegerField()
-    mouse_moves = models.CharField(max_length=1000000)
-    event_list = models.CharField(max_length=1000000)
-    rrweb_events = models.CharField(max_length=100000000)
+    mouse_moves = models.TextField()  # mouse move data in JSON format
+    event_list = models.TextField()  # list of events in JSON format
+    rrweb_events = models.TextField()  # rrweb events in JSON format
+    
+    is_redirected = models.BooleanField(default=False)  # whether the webpage is redirected
 
 
 # Annotation of certain behaviors

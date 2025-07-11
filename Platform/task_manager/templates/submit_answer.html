@@ -116,19 +116,18 @@
 
                 <script>
                     $(document).ready(function() {
-                        let sourceIndex = 1;
-
                         $('#add-source').click(function() {
+                            const currentCount = $('.source-entry').length;
                             const newSource = `
-                                <div class="source-entry" data-index="${sourceIndex}">
+                                <div class="source-entry" data-index="${currentCount}">
                                     <div class="question-wrapper col-xs-12">
-                                        <label for="source_url_${sourceIndex}" class="col-xs-12 list-row" style="padding-left: 0;"><b>Source URL:</b></label>
-                                        <input type="url" class="col-xs-12 list-row source-url" id="source_url_${sourceIndex}" name="source_url_${sourceIndex}" required>
+                                        <label for="source_url_${currentCount}" class="col-xs-12 list-row" style="padding-left: 0;"><b>Source URL:</b></label>
+                                        <input type="url" class="col-xs-12 list-row source-url" id="source_url_${currentCount}" name="source_url_${currentCount}" required>
                                     </div>
 
                                     <div class="question-wrapper col-xs-12">
-                                        <label for="source_text_${sourceIndex}" class="col-xs-12 list-row" style="padding-left: 0;"><b>Source Text:</b></label>
-                                        <textarea class="col-xs-12 list-row source-text" id="source_text_${sourceIndex}" name="source_text_${sourceIndex}" rows="3" required></textarea>
+                                        <label for="source_text_${currentCount}" class="col-xs-12 list-row" style="padding-left: 0;"><b>Source Text:</b></label>
+                                        <textarea class="col-xs-12 list-row source-text" id="source_text_${currentCount}" name="source_text_${currentCount}" rows="3" required></textarea>
                                     </div>
 
                                     <div class="question-wrapper col-xs-12">
@@ -137,14 +136,24 @@
                                 </div>
                             `;
                             $('#source-container').append(newSource);
-                            sourceIndex++;
                             updateRemoveButtons();
                         });
 
                         $(document).on('click', '.remove-source', function() {
                             $(this).closest('.source-entry').remove();
+                            reindexSources();
                             updateRemoveButtons();
                         });
+
+                        function reindexSources() {
+                            $('.source-entry').each(function(index) {
+                                $(this).attr('data-index', index);
+                                $(this).find('label[for^="source_url_"]').attr('for', `source_url_${index}`);
+                                $(this).find('input[name^="source_url_"]').attr('id', `source_url_${index}`).attr('name', `source_url_${index}`);
+                                $(this).find('label[for^="source_text_"]').attr('for', `source_text_${index}`);
+                                $(this).find('textarea[name^="source_text_"]').attr('id', `source_text_${index}`).attr('name', `source_text_${index}`);
+                            });
+                        }
 
                         function updateRemoveButtons() {
                             const sourceEntries = $('.source-entry');
@@ -206,7 +215,12 @@
         </div>
         <script>
             function validateForm() {
-
+                let answer = document.getElementById("answer").value;
+                if (answer === '') {
+                    alert('Please fill in the answer!');
+                    return false;
+                }
+                return true;
             }
         </script>
         <script type="application/x-javascript">

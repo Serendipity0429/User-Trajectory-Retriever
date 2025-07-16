@@ -171,6 +171,8 @@ class Webpage(models.Model):
     rrweb_events = models.TextField()  # rrweb events in JSON format
     
     is_redirected = models.BooleanField(default=False)  # whether the webpage is redirected
+    during_annotation = models.BooleanField(default=False)  # whether the webpage is during annotation
+    annotation_name = models.CharField(max_length=100, null=True)  # name of the annotation, e.g. "pre_task", "post_task", etc.
 
 
 # Annotation of certain behaviors

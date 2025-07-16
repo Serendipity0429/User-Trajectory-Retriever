@@ -17,7 +17,8 @@ import zlib
 ip_to_launch = "http://127.0.0.1:8000/"
 
 __DEBUG__ = True
-is_storing_data = False
+is_annotating = False
+annotation_name = 'none'
 
 # Refined
 def print_debug(*args, **kwargs):
@@ -37,6 +38,20 @@ def decompress_json_data(compressed_data):
     decompressed_bytes = zlib.decompress(compressed_bytes).decode('utf-8')
     decompressed_json = json.loads(decompressed_bytes)
     return decompressed_json
+
+def start_annotating(name):
+    global is_annotating
+    global annotation_name
+    annotation_name = name
+    is_annotating = True
+    print_debug("Started annotating.")
+    
+def stop_annotating():
+    global is_annotating
+    global annotation_name
+    annotation_name = 'none'
+    is_annotating = False
+    print_debug("Stopped annotating.")
 
 def store_data(message):
     # is_storing_data = True
@@ -59,11 +74,16 @@ def store_data(message):
     # webpage = Webpage()
     # if existing_webpage: # if the webpage already exists, update it
     #     webpage = existing_webpage
+    
     webpage = Webpage()
-    if message['event_list'] == '[]' or message['mouse_moves'] == '[]' or message['rrweb_events'] == '[]':
+    if message['mouse_moves'] == '[]' or message['rrweb_events'] == '[]':
         print_debug("Redirect detected, setting is_redirected to True")
         webpage.is_redirected = True
-
+    
+    print_debug("Annotating:", is_annotating)
+    webpage.during_annotation = is_annotating
+    webpage.annotation_name = annotation_name
+    
     webpage.belong_task = task
     webpage.user = user
     webpage.title = message['title']

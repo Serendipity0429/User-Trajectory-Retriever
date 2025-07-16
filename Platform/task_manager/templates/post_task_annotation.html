@@ -282,6 +282,7 @@
         </script>
         <script type="application/x-javascript">
             $(function () {
+                let is_submitted = false;
                 $('#query-btn').click(
                     function () {
                         let difficulty_actual = $('input[name="difficulty_actual"]:checked');
@@ -326,10 +327,16 @@
                         }
 
                         if (confirm("Are you sure to submit all the annotations?")) {
+                            is_submitted = true;
                             $('#query-form').submit();
                         }
                     }
                 );
+                window.addEventListener('beforeunload', function (e) {
+                    if (!is_submitted) {
+                        navigator.sendBeacon('/task/stop_annotation/', new Blob());
+                    }
+                });
             });
         </script>
     </div>

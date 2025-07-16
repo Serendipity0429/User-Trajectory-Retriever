@@ -259,7 +259,8 @@
                         $(this).find('input[type="checkbox"]').removeAttr('data-priority');
                     });
                 }
-
+                
+                let is_submitted = false;
 
                 // Handle form submission
                 $('#query-btn').click(
@@ -296,10 +297,18 @@
                         if (confirm("Are you sure to cancel the ongoing task?")) {
                             // Before submitting, ensure the hidden field is up-to-date
                             updateMissingResourcesOrder();
+                            is_submitted = true;
                             $('#query-form').submit();
                         }
                     }
                 );
+
+                window.addEventListener('beforeunload', function (e) {
+                    if (!is_submitted) {
+                        navigator.sendBeacon('/task/stop_annotation/', new Blob());
+                    }
+                });
+
             });
         </script>
     </div>

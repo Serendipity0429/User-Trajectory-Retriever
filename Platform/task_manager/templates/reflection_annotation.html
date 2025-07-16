@@ -65,8 +65,8 @@
                             <div style="margin-left: 20px;">
                                 <em>Question:</em> What is the capital of France?<br>
                                 <em>Expected Answer:</em> Paris<br>
-                                <em>Wrong Answer 1:</em> The capital of France is Paris.<br>
-                                <em>Wrong Answer 2:</em> Beijing
+                                <em>Wrong Answer 1:</em> The capital of France is Paris. (Redundant information)<br>
+                                <em>Wrong Answer 2:</em> Beijing (Incorrect answer)
                             </div>
                         </div>
                     </div>
@@ -138,6 +138,12 @@
                                     <span class="drag-handle">≡</span>
                                     <span class="priority-number" style="display:none; margin-right: 8px; font-weight: bold; color: #0056b3;">9</span>
                                     <label>I lacked the necessary expertise to understand or evaluate the information.</label>
+                                </div>
+                                <div class="drag-option" data-value="format_error">
+                                    <input type="checkbox" name="failure_category" value="format_error"/>
+                                    <span class="drag-handle">≡</span>
+                                    <span class="priority-number" style="display:none; margin-right: 8px; font-weight: bold; color: #0056b3;">10</span>
+                                    <label>I made a formatting error in my answer (e.g., missing units, incorrect decimal places).</label>
                                 </div>
                                 <div class="drag-option" data-value="other">
                                     <input type="checkbox" name="failure_category" value="other"/>
@@ -269,6 +275,12 @@
                                     <span class="priority-number" style="display:none; margin-right: 8px; font-weight: bold; color: #0056b3;">8</span>
                                     <label>Try to find the same information on a second, independent source to validate it.</label>
                                 </div>
+                                <div class="drag-option" data-value="reformulate_answer">
+                                    <input type="checkbox" name="future_plan_actions" value="reformulate_answer"/>
+                                    <span class="drag-handle">≡</span>
+                                    <span class="priority-number" style="display:none; margin-right: 8px; font-weight: bold; color: #0056b3;">9</span>
+                                    <label>Reformulate my answer to meet the format requirements (e.g., adding units, correcting decimal places).</label>
+                                </div>
                                 <div class="drag-option" data-value="other">
                                     <input type="checkbox" name="future_plan_actions" value="other"/>
                                     <span class="drag-handle">≡</span>
@@ -397,6 +409,7 @@
         </script>
         <script type="application/x-javascript">
             $(function () {
+                let is_submitted = false;
                 $('#query-btn').click(
                     function () {
                         var failure_reason = $("[name='failure_reason']");
@@ -435,11 +448,17 @@
                         }
 
                         if (confirm("Are you sure to submit your reflections?")) {
+                            is_submitted = true;
                             $('#query-form').submit();
                         }
 
                     }
                 );
+                window.addEventListener('beforeunload', function (e) {
+                    if (!is_submitted) {
+                        navigator.sendBeacon('/task/stop_annotation/', new Blob());
+                    }
+                });
             });
         </script>
     </div>

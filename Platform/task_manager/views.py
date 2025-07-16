@@ -11,9 +11,21 @@ try:
 except ImportError:
     import json
 
-# =============================================
-# =         Below is newly added code         =
-# =============================================
+@csrf_exempt
+@require_login
+def stop_annotation_api(user, request):
+    """
+    一个专门的API端点，用于从前端接收停止标注的信号。
+    使用 @csrf_exempt 是因为我们将通过 navigator.sendBeacon (一个简单的POST请求) 来调用它，
+    这个请求不会包含标准的Django CSRF令牌。
+    """
+    print_debug("stop_annotation_api called")
+    if request.method == 'POST':
+        print_debug(f"Received stop annotation signal for user {user.username}.")
+        stop_annotating()
+        return HttpResponse('Annotation stopped.', status=200)
+    return HttpResponse('Invalid request method.', status=405)
+
 
 # Store data
 @csrf_exempt
@@ -33,6 +45,8 @@ def data(request):
 # Pre-Task Annotation Fetcher
 @require_login
 def pre_task_annotation(user, request, timestamp):
+    print_debug("function pre_task_annotation")
+    start_annotating("pre_task_annotation")
     if request.method == 'POST':
         # Start a new task
         print_debug("start_task")
@@ -58,6 +72,8 @@ def pre_task_annotation(user, request, timestamp):
         pre_annotation.effort = request.POST.get('effort')
         pre_annotation.initial_strategy = request.POST.get('initial_strategy')
         pre_annotation.save()
+
+        stop_annotating()
 
         return close_window()
 
@@ -89,6 +105,8 @@ def pre_task_annotation(user, request, timestamp):
 # Post-Task Annotation Fetcher
 @require_login
 def post_task_annotation(user, request, task_id):
+    print_debug("function post_task_annotation")
+    start_annotating("post_task_annotation")
     if request.method == 'POST':
         # End a task
         print_debug("end_task")
@@ -107,8 +125,10 @@ def post_task_annotation(user, request, task_id):
             post_annotation.save()
 
             task.save()
+            stop_annotating()
             return close_window()
         # error
+        stop_annotating()
         print_debug("error in post_task_annotation")
         return close_window()
 
@@ -117,7 +137,7 @@ def post_task_annotation(user, request, task_id):
         return HttpResponse(f'No task found with task_id={task_id}')
 
     # filter relevant webpages
-    webpages = Webpage.objects.filter(belong_task=task, is_redirected=False)
+    webpages = Webpage.objects.filter(belong_task=task, is_redirected=False, during_annotation=False)
     # sort by start_timestamp
     webpages = sorted(webpages, key=lambda item: item.start_timestamp)
     # print_debug(webpages[0].event_list)
@@ -206,14 +226,14 @@ def annotation_home(user, request):
         # Convert to human-readable time
         # end_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(end_timestamp))
         unannotated_tasks_to_webpages.append((task.id, sorted(
-            Webpage.objects.filter(user=user, belong_task=task, is_redirected=False), key=lambda item: item.start_timestamp))
+            Webpage.objects.filter(user=user, belong_task=task, is_redirected=False, during_annotation=False), key=lambda item: item.start_timestamp))
                                              )
     for task in annotated_tasks:
         # end_timestamp = task.end_timestamp
         # Convert to human-readable time
         # end_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(end_timestamp))
         annotated_tasks_to_webpages.append((task.id, sorted(
-            Webpage.objects.filter(user=user, belong_task=task, is_redirected=False), key=lambda item: item.start_timestamp))
+            Webpage.objects.filter(user=user, belong_task=task, is_redirected=False, during_annotation=False), key=lambda item: item.start_timestamp))
                                            )
 
     return render(
@@ -260,6 +280,7 @@ FAILURE_CATEGORY_MAP = {
     "trusting_source": "I trusted a source that was not reliable or authoritative.",
     "time_pressure": "I was under time pressure and could not verify the information thoroughly.",
     "lack_expertise": "I lacked the necessary expertise to understand or evaluate the information.",
+    "format_error": "I made a formatting error in my answer (e.g., missing units, incorrect decimal places).",
     "other": "Other (please specify below).",
 }
 
@@ -272,6 +293,7 @@ CORRECTIVE_PLAN_MAP = {
     "check_reliability": "Check the reliability and authority of the sources I use.",
     "improve_logic": "Improve my logical reasoning or calculation methods.",
     "validate_source": "Try to find the same information on a second, independent source to validate it.",
+    "reformulate_answer": "Reformulate my answer to meet the format requirements (e.g., adding units, correcting decimal places).",
     "other": "Other:",
 }
 
@@ -367,7 +389,7 @@ def show_task(user, request, task_id):
     task_trials = TaskTrial.objects.filter(belong_task=task).order_by('num_trial')
     trials_context = []
     for trial in task_trials:
-        trial_webpages = Webpage.objects.filter(belong_task_trial=trial, is_redirected=False).order_by('start_timestamp')
+        trial_webpages = Webpage.objects.filter(belong_task_trial=trial, is_redirected=False, during_annotation=False).order_by('start_timestamp')
 
         submitted_sources = []
         try:
@@ -479,6 +501,7 @@ def tool_use(user, request):
 @require_login
 def cancel_task(user, request, task_id, end_timestamp):
     print_debug("function cancel_task")
+    start_annotating("cancel_task")
     task = Task.objects.filter(id=task_id, user=user).first()
     if task is None:
         return HttpResponse(f'No task found with task_id={task_id}')
@@ -493,7 +516,8 @@ def cancel_task(user, request, task_id, end_timestamp):
         cancel_annotation.cancel_missing_resources_other = request.POST.get('cancel_missing_resources_other')
         cancel_annotation.cancel_additional_reflection = request.POST.get('cancel_additional_reflection')
         cancel_annotation.save()
-        return close_window()
+        stop_annotating()
+        return HttpResponseRedirect("https://bing.com")
     
     task.active = False
     task.end_timestamp = end_timestamp
@@ -519,6 +543,7 @@ def cancel_task(user, request, task_id, end_timestamp):
 @require_login
 def reflection_annotation(user, request, task_id, end_timestamp):
     print_debug("function reflection_annotation")
+    start_annotating("reflection_annotation")
     task = Task.objects.filter(id=task_id, user=user).first()
     if task is None:
         return HttpResponse(f'No task found with task_id={task_id}')
@@ -538,12 +563,14 @@ def reflection_annotation(user, request, task_id, end_timestamp):
         ref_annotation.save()
         task_trial.reflection_annotation = ref_annotation
         task_trial.save()
+        
+        stop_annotating()
 
         return close_window()
 
     # Filter the webpage whose timestamp is within the range of start_timestamp and timestamp
     webpages = Webpage.objects.filter(belong_task=task, start_timestamp__gte=task_trial.start_timestamp,
-                                      start_timestamp__lt=end_timestamp, is_redirected=False)
+                                      start_timestamp__lt=end_timestamp, is_redirected=False, during_annotation=False)
     # Sort by start_timestamp
     webpages = sorted(webpages, key=lambda item: item.start_timestamp)
     
@@ -566,7 +593,7 @@ def reflection_annotation(user, request, task_id, end_timestamp):
 @require_login
 def submit_answer(user, request, task_id, timestamp):
     print_debug("function submit_answer")
-    
+    start_annotating("submit_answer")
     # Wait until the storage is ready
     # wait_until_storing_data_done()
 
@@ -582,9 +609,8 @@ def submit_answer(user, request, task_id, timestamp):
         start_timestamp = last_task_trial.end_timestamp
         
     # Filter the webpage whose timestamp is within the range of start_timestamp and timestamp
-    all_webpages = Webpage.objects.filter(belong_task=task, start_timestamp__gte=start_timestamp,
-                                      start_timestamp__lt=timestamp)
-    webpages = all_webpages.filter(is_redirected=False)
+    all_webpages = Webpage.objects.filter(belong_task=task, start_timestamp__gte=start_timestamp)
+    webpages = all_webpages.filter(start_timestamp__lt=timestamp,is_redirected=False, during_annotation=False)
     # Sort by start_timestamp
     webpages = sorted(webpages, key=lambda item: item.start_timestamp)
 
@@ -633,6 +659,7 @@ def submit_answer(user, request, task_id, timestamp):
         for webpage in all_webpages:
             webpage.belong_task_trial = task_trial
             webpage.save()
+        stop_annotating()
         
         return HttpResponseRedirect(redirect_url)
 

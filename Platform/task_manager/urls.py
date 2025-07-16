@@ -11,6 +11,7 @@ urlpatterns = [
     path('initialize/', views.initialize),
     path('show_tool_use_page/', views.show_tool_use_page), # Show tool use page
     path('tool_use/', views.tool_use), # Tool use
+    path('stop_annotation/', views.stop_annotation_api), # Stop annotation API
     
     re_path(r'^pre_task_annotation/([0-9]+)/$', views.pre_task_annotation), # Preliminary task annotation
     re_path(r'^reflection_annotation/([0-9]+)/([0-9]+)/$', views.reflection_annotation), # Reflection annotation

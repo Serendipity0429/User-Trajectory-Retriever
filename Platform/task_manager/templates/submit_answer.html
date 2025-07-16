@@ -65,8 +65,8 @@
                             <div style="margin-left: 20px;">
                                 <em>Question:</em> What is the capital of France?<br>
                                 <em>Expected Answer:</em> Paris<br>
-                                <em>Wrong Answer 1:</em> The capital of France is Paris.<br>
-                                <em>Wrong Answer 2:</em> Beijing
+                                <em>Wrong Answer 1:</em> The capital of France is Paris. (Redundant information)<br>
+                                <em>Wrong Answer 2:</em> Beijing (Incorrect answer)
                             </div>
                         </div>
                     </div>
@@ -225,6 +225,7 @@
         </script>
         <script type="application/x-javascript">
             $(function () {
+                let is_submitted = false;
                 $('#query-btn').click(
                     function () {
                         let answer = $("[name='answer']");
@@ -232,7 +233,14 @@
                         let source_url = $("[name='source_url_0']");
                         let source_text = $("[name='source_text_0']");
                         let reasoning_method = $("[name='reasoning_method']:checked");
-
+                        if (reasoning_method.val() === 'other') {
+                            let reasoning_other_text = $("[name='reasoning_method_other']");
+                            if (reasoning_other_text.val() === '') {
+                                alert('Please fill in the specific reasoning method!');
+                                reasoning_other_text.focus();
+                                return
+                            }
+                        }
                         if (answer.val() === '') {
                             alert('Please fill in the answer!');
                             answer.focus();
@@ -260,6 +268,7 @@
                         }
 
                         if (confirm("Are you sure to submit all annotations?")) {
+                            is_submitted = true;
                             $('#query-form').submit();
                         }
 
@@ -272,6 +281,11 @@
                         }
                     }
                 );
+                window.addEventListener('beforeunload', function (e) {
+                    if (!is_submitted) {
+                        navigator.sendBeacon('/task/stop_annotation/', new Blob());
+                    }
+                });
             });
         </script>
     </div>

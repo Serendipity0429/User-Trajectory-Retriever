@@ -11,7 +11,13 @@ function checkIsTaskActive() {
     chrome.runtime.sendMessage({ task_active: "request" }, function (response) {
         is_task_active = response.task_active;
         console.log("Task is active: " + is_task_active);
+        console.log("Task ID: " + response.task_id);
     })
+}
+
+function getTaskActiveStatus() {
+    // This function is used to check if the task is active
+    return is_task_active;
 }
 
 checkIsTaskActive();
@@ -124,6 +130,55 @@ chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
 // Display a "content.js loaded" box on the upper right corner for 3 seconds
 // should have a class named 'rr-ignore' to avoid being recorded by rrweb
 // When DOM loaded
+function displayLoadedBox(script_name) {
+    if(!getTaskActiveStatus()) {
+        return; // Do not display the box if the task is not active
+    }
+    var current_url = window.location.href;
+    if (current_url.substring(0, 22) == "http://127.0.0.1:8000/")
+        return; // Avoid displaying the box on the local server
+    const box = document.createElement('div');
+    box.className = 'rr-block loaded-box';
+    box.style.opacity = '0';
+    box.style.transition = 'opacity 0.5s ease-in-out';
+    
+    // Fade in
+    setTimeout(() => {
+        box.style.opacity = '1';
+    }, 10);
+    box.style.position = 'fixed';
+    box.style.right = '10px';
+    box.style.backgroundColor = 'white';
+    box.style.color = 'black';
+    box.style.padding = '10px';
+    box.style.border = '2px solid rgb(151, 67, 219)';
+    box.style.zIndex = '1000000';
+    box.innerText = `${script_name} loaded!`;
+    
+    // Check for existing loaded boxes and position accordingly
+    const existingBoxes = document.querySelectorAll('.loaded-box');
+    let topPosition = 10;
+    
+    existingBoxes.forEach(existingBox => {
+        const rect = existingBox.getBoundingClientRect();
+        if (rect.bottom > topPosition) {
+            topPosition = rect.bottom + 10;
+        }
+    });
+    
+    box.style.top = `${topPosition}px`;
+    
+    document.body.appendChild(box);
+    
+    setTimeout(() => {
+        box.style.opacity = '0';
+        setTimeout(() => {
+            box.remove();
+        }, 500);
+    }, 3000);
+}
+
+
 document.addEventListener("DOMContentLoaded", function (event) {
     displayLoadedBox("content.js");
 });

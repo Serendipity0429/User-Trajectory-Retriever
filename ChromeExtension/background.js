@@ -35,14 +35,14 @@ function closeAllIrrelevantTabs() {      // 获取所有标签页
     });
 }
 
-function checkTaskActive() {
+function checkActiveTaskID() {
     if (localStorage['username'] == undefined || localStorage['password'] == undefined || !logged_in) {
-        return false;
+        return -1;
     }
     var username = localStorage['username'];
     var password = localStorage['password'];
     var send_data = { username: username, password: password };
-    var result = false;
+    var result = -1 ;
     $.ajax({
         type: "POST",
         url: baseUrl + '/task/active_task/',
@@ -113,6 +113,7 @@ chrome.runtime.onMessage.addListener(function (Msg, sender, sendResponse) {
             chrome.browserAction.setBadgeBackgroundColor({ color: [202, 181, 225, 255] });
             sendResponse({ log_status: true });
         } else chrome.browserAction.setBadgeText({ text: '' });
+        sendResponse({ log_status: false });
         return;
     } else if (Msg.link_store == "request_update") { // store the link
         var now_time = new Date().getTime();
@@ -154,7 +155,7 @@ chrome.runtime.onMessage.addListener(function (Msg, sender, sendResponse) {
     }
 
     if (Msg.task_active == "request") {
-        let task_id = checkTaskActive();
+        let task_id = checkActiveTaskID();
         let task_active = task_id != -1;
         sendResponse({ task_active: task_active, task_id: task_id });
         return;

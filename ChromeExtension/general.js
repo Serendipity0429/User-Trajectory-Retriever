@@ -411,15 +411,15 @@ setTimeout(mPage.init_content, 3000); // wait for the page to load
 document.addEventListener("DOMContentLoaded", function (event) {
     if (debug) console.log("DOM fully loaded and parsed");
     mPage.init_content();
+    // Setup listeners once the script is running
+    chrome.runtime.sendMessage({ log_status: "request" }, function (response) {
+        if (!is_server_page) {
+            setupEventListeners();
+            setInterval(checkIsTaskActive, 60000);
+        }
+    });
 });
 
-// Setup listeners once the script is running
-chrome.runtime.sendMessage({ log_status: "request" }, function (response) {
-    if (!is_server_page) {
-        setupEventListeners();
-        setInterval(checkIsTaskActive, 60000);
-    }
-});
 
 // Display a "general.js loaded" box on the upper right corner for 3 seconds
 // should have a class named 'rr-ignore' to avoid being recorded by rrweb

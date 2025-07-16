@@ -1,7 +1,7 @@
 var baseUrl = "http://127.0.0.1:8000";
 var taskUrl = baseUrl + "/task/";
 var dataUrl = taskUrl + "data/";
-if (debug) console.log("General Page is Loade;d!");
+if (debug) console.log("General Page is Loaded!");
 
 var last_active_event_timestamp = -1;
 var last_passive_event_timestamp = -1;
@@ -16,13 +16,25 @@ var on_annotation = false; // whether the annotation window is on
 
 var is_server_page = window.location.href.substring(0, 21) == baseUrl;
 
-// TODO: enable drag and drop for the annotation window
+function throttle(func, limit) {
+    let inThrottle;
+    return function () {
+        const args = arguments;
+        const context = this;
+        if (!inThrottle) {
+            func.apply(context, args);
+            inThrottle = true;
+            setTimeout(() => inThrottle = false, limit);
+        }
+    };
+}
 
 // get the element hierarchy in HTML format
 // leave only the tag name, id, and class name
 function getElementHierarchyHTML(element) {
+    if (!element || !element.tagName) return ['<html>']; // Return root if no element is provided
     let current = element;
-    let html = [];
+    let hierarchy = [];
 
     while (current) {
         let tagName = current.tagName.toLowerCase();
@@ -30,10 +42,10 @@ function getElementHierarchyHTML(element) {
         for (let attr of current.attributes) {
             attributes += ` ${attr.name}="${attr.value}"`;
         }
-        html.unshift(`<${tagName}${attributes}>`);
+        hierarchy.push(`<${tagName}${attributes}>`);
         current = current.parentElement;
     }
-    return html;
+    return hierarchy;
 }
 
 // display the annotation window
@@ -42,110 +54,21 @@ function displayAnnotationWindow(event, target, type, event_time, screen_x, scre
     freezePage();
     const style = document.createElement('style');
     style.innerHTML = `
-        :root {
-            --primary-purple: #6A1B9A;
-            --secondary-purple: #9C27B0;
-            --light-purple: #E1BEE7;
-        }
-        
-        .annotation-wrapper {
-            position: fixed;
-        }
-        
-        .annotation-modal {
-            background: white;
-            padding: 5%;
-            border-radius: 10px;
-            box-shadow: 0 0 20px rgba(0,0,0,0.2);
-            width: 90%;
-            height: 90%;
-            max-width: 500px;
-            border: 2px solid var(--primary-purple);
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            font-size: 16px;
-            box-sizing: initial;
-            color: #000;
-        }
-
-        .annotation-modal .question-container {
-            margin-bottom: 0;
-            padding-left: 2%;
-        }
-        
-        .annotation-modal .question-container:has(textarea) {
-            padding-left: 0;
-        }
-
-        .annotation-modal h2 {
-            color: var(--accent-purple);
-            margin-top: 0;
-            margin-bottom: 5px;
-            display: block;
-            font-size: 20px;
-            font-weight: bold;
-            unicode-bidi: isolate;
-        }
-        
-        .annotation-modal h2 div.event-type {
-            color: var(--primary-purple);
-            display: inline;
-        }
-
-        .annotation-modal textarea {
-            width: 96%;
-            padding: 2%;
-            border: 1px solid var(--light-purple);
-            border-radius: 5px;
-            resize: none;
-            min-height: 90px;
-            margin: 10px 0;
-            font-size: 16px; 
-        }
-
-        .annotation-modal .checkbox-group {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .annotation-modal input[type="checkbox"] {
-            accent-color: var(--secondary-purple);
-            width: 18px;
-            height: 18px;
-        }
-
-        .annotation-modal button {
-            background: var(--secondary-purple);
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 5px;
-            cursor: pointer;
-            transition: background 0.3s ease;
-            font-size: 16px;
-        }
-
-        .annotation-modal button:hover {
-            background: var(--primary-purple);
-        }
-
-        .annotation-modal .btn-ignore {
-            background: #6c757d; /* Grey color */
-            color: white;
-        }
-
-        .annotation-modal .btn-ignore:hover {
-            background: #5a6268; /* Darker grey */
-        }
-
-
-        .annotation-modal .form-footer {
-            padding-top: 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            bottom: 0;
-        }
+        :root { --primary-purple: #6A1B9A; --secondary-purple: #9C27B0; --light-purple: #E1BEE7; }
+        .annotation-wrapper { position: fixed; }
+        .annotation-modal { background: white; padding: 5%; border-radius: 10px; box-shadow: 0 0 20px rgba(0,0,0,0.2); width: 90%; height: 90%; max-width: 500px; border: 2px solid var(--primary-purple); font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 16px; box-sizing: initial; color: #000; }
+        .annotation-modal .question-container { margin-bottom: 0; padding-left: 2%; }
+        .annotation-modal .question-container:has(textarea) { padding-left: 0; }
+        .annotation-modal h2 { color: var(--accent-purple); margin-top: 0; margin-bottom: 5px; display: block; font-size: 20px; font-weight: bold; unicode-bidi: isolate; }
+        .annotation-modal h2 div.event-type { color: var(--primary-purple); display: inline; }
+        .annotation-modal textarea { width: 96%; padding: 2%; border: 1px solid var(--light-purple); border-radius: 5px; resize: none; min-height: 90px; margin: 10px 0; font-size: 16px; }
+        .annotation-modal .checkbox-group { display: flex; align-items: center; gap: 10px; }
+        .annotation-modal input[type="checkbox"] { accent-color: var(--secondary-purple); width: 18px; height: 18px; }
+        .annotation-modal button { background: var(--secondary-purple); color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; transition: background 0.3s ease; font-size: 16px; }
+        .annotation-modal button:hover { background: var(--primary-purple); }
+        .annotation-modal .btn-ignore { background: #6c757d; color: white; }
+        .annotation-modal .btn-ignore:hover { background: #5a6268; }
+        .annotation-modal .form-footer { padding-top: 20px; display: flex; justify-content: space-between; align-items: center; bottom: 0; }
         `;
     style.innerHTML.replaceAll(';', ' !important;'); // override all styles
     const overlay = $('<div class="annotation-overlay rr-ignore"></div>');
@@ -153,14 +76,11 @@ function displayAnnotationWindow(event, target, type, event_time, screen_x, scre
     <div class="annotation-wrapper rr-ignore">
         <div class="annotation-modal">
             <div class="questions-container">
-                <!-- Question 1 - Purpose -->
                 <div class="question-container">
                     <h2>What is the purpose of this <div class="event-type">${type}</div> event?</h2>
                     <textarea id="purpose" placeholder="Describe the event purpose..."></textarea>
                 </div>
             </div>
-    
-            <!-- Question 2 - Key Event -->
             <div class="question-container">
                 <h2>Event Classification</h2>
                 <div class="checkbox-group">
@@ -168,7 +88,6 @@ function displayAnnotationWindow(event, target, type, event_time, screen_x, scre
                     <label for="key-event">Mark as Key Event</label>
                 </div>
             </div>
-    
             <div class="form-footer">
                 <button type="button" id="submit-btn">Submit</button>
                 <button type="button" id="ignore-btn" class="btn-ignore">Ignore this event</button>
@@ -262,7 +181,7 @@ function displayAnnotationWindow(event, target, type, event_time, screen_x, scre
         $('#key-event').prop('checked', false);
 
         endAnnotation();
-        activeEventEnd(type, event_time, screen_x, screen_y, client_x, client_y, tag, content, hierachy, related_info, annotation);
+        activeEventEnd(type, event_time, screen_x, screen_y, client_x, client_y, tag, content, hierarchy, related_info, annotation);
     });
 
     // Ignore button handler
@@ -313,13 +232,15 @@ function unfreezePage() {
 
 // recover the absolute hyperlink given the relative hyperlink
 function recoverAbsoluteLink(relative_link) {
-    if (relative_link == undefined) {
+    if (typeof relative_link !== 'string') {
         return "";
     }
-    if (relative_link[0] !== "h") {
-        var url = window.location.href;
-        var start_id = url.search('.com');
-        relative_link = url.slice(0, start_id + 4) + relative_link;
+    if (relative_link && !relative_link.startsWith('http') && !relative_link.startsWith('//')) {
+        try {
+            return new URL(relative_link, window.location.href).href;
+        } catch (e) {
+            return relative_link;
+        }
     }
     return relative_link;
 }
@@ -328,27 +249,19 @@ function recoverAbsoluteLink(relative_link) {
     Event handlers
  */
 
+    
 // !important !important
 var PASSIVE_MODE = true; // whether to annotate the events
 
-// Active event handler
-function activeEventHandler(event, type) {
+function handleEvent(event, type) {
     if (on_annotation) return;
 
-    console.log(type + " active event", event);
-    if (pending_default && pending_target == event.target) { // if the default action is pending, do nothing
-        console.log("pending default");
-        pending_default = false;
-        pending_target = null;
-        console.log(pending_default);
+    const target = event.target;
+    if (!target || !target.tagName) return;
+
+    // 忽略插件自身UI的事件
+    if (target.closest('.annotation-overlay') || target.closest('.freeze-overlay')) {
         return;
-    }
-    var event_time = (new Date()).getTime();
-    // filter out the repeated active event
-    if (event_time - last_active_event_timestamp < min_active_event_interval) {
-        return;
-    } else {
-        last_active_event_timestamp = event_time;
     }
 
     checkIsTaskActive();
@@ -356,215 +269,122 @@ function activeEventHandler(event, type) {
         return;
     }
 
+    const event_time = new Date().getTime();
+    const is_active = isElementActive(target, type);
+
+    if (is_active) {
+        // if (event_time - last_active_event_timestamp < min_active_event_interval) {
+        //     return;
+        // }
+        // last_active_event_timestamp = event_time;
+        activeEventHandler(event, type);
+    } else {
+        passiveEventHandler(event, type);
+    }
+}
+
+function isElementActive(element, eventType) {
+    if (eventType !== 'click') return false;
+    const tagName = element.tagName.toLowerCase();
+    const type = element.getAttribute('type');
+    if (tagName === 'a' && element.hasAttribute('href')) return true;
+    if (tagName === 'button' || (tagName === 'input' && (type === 'submit' || type === 'button' || type === 'reset'))) return true;
+    if (element.closest('a[href], button')) return true; // Also check parents
+    return false;
+}
+
+function activeEventHandler(event, type) {
     if (!PASSIVE_MODE) {
         event.preventDefault();
-        event.stopPropagation(); // stop the event from bubbling up
+        event.stopPropagation();
     }
 
-    let e = event || window.event;
-    let screen_x = e.screenX;
-    let screen_y = e.screenY;
-    let client_x = e.clientX;
-    let client_y = e.clientY;
-    let target = e.currentTarget;
-    let tag = e.target.tagName; // tag name
+    const e = event || window.event;
+    const target = e.target;
+    const hierarchy = getElementHierarchyHTML(target);
+    const related_info = getRelatedInfo(target, type);
 
-    if (client_x == undefined) {
-        // set the position to the center of the webpage
-        console.log("client_x is undefined");
-        screen_x = window.screen.width;
-        screen_y = window.screen.height;
-        client_x = window.innerWidth / 2;
-        client_y = window.innerHeight / 2;
-    }
+    mPage.addActiveEvent(type, new Date().getTime(), e.screenX, e.screenY, e.clientX, e.clientY, target.tagName, getElementContent(target), hierarchy, related_info, '');
+}
 
-    if (debug) console.log("client_x: " + client_x + " client_y: " + client_y);
+function passiveEventHandler(event, type) {
+    const e = event || window.event;
+    const target = e.target;
+    const hierarchy = getElementHierarchyHTML(target);
+    const related_info = getRelatedInfo(target, type, e);
 
-    let content = "";
-    if (tag == "img") {
-        content = e.target.src;
-    } else if (tag == "input" || tag == "textarea") {
-        content = e.target.value;
-    } else {
-        content = e.target.innerText;
-    }
+    mPage.addPassiveEvent(type, new Date().getTime(), e.screenX, e.screenY, e.clientX, e.clientY, target.tagName, getElementContent(target), hierarchy, related_info);
+}
 
+function getElementContent(target) {
+    const tagName = target.tagName ? target.tagName.toLowerCase() : '';
+    if (tagName === "img") return target.src;
+    if (tagName === "input" || tagName === "textarea") return target.value;
+    return target.innerText;
+}
 
-    let href = $($(this).get(0)).attr("href");
-    href = recoverAbsoluteLink(href);
+function getRelatedInfo(target, type, event = null) {
+    let related_info = {};
+    const tagName = target.tagName ? target.tagName.toLowerCase() : '';
 
-    related_info = { 'href': href };
-    // set related_info according to the event type and target
     switch (type) {
         case 'click':
-            if (tag == 'input' || tag == 'button') {
-                // get the form element that the button belongs to
-                let form = $(target).closest('form');
-                if (form.length > 0) {
-                    let form_href = form.attr('action');
-                    // parse the form link
-                    form_href = recoverAbsoluteLink(related_info);
-                    related_info = { 'href': form_href };
+            const anchor = target.closest('a[href]');
+            if (anchor) {
+                related_info.href = recoverAbsoluteLink(anchor.getAttribute('href'));
+            } else if (tagName === 'input' || tagName === 'button') {
+                const form = target.closest('form');
+                if (form && form.hasAttribute('action')) {
+                    related_info.href = recoverAbsoluteLink(form.getAttribute('action'));
                 }
             }
             break;
-        default:
-            break;
-    }
-
-    if (PASSIVE_MODE) {
-        let hierachy = getElementHierarchyHTML(e.target);
-        activeEventEnd(type, event_time, screen_x, screen_y, client_x, client_y, tag, content, hierachy, related_info, '');
-    } else {
-        // open an annotation window at the clicked position
-        displayAnnotationWindow(event, target, type, event_time, screen_x, screen_y, client_x, client_y, tag, content, related_info);
-    }
-}
-
-function activeEventEnd(type, event_time, screen_x, screen_y, client_x, client_y, tag, content, hierachy, related_info, annotation) {
-    // add the event to the event list
-    mPage.addActiveEvent(type, event_time, screen_x, screen_y, client_x, client_y, tag, content, hierachy, related_info, annotation);
-}
-
-
-function passiveEventHandler(event, type) {
-    if (on_annotation) return;
-    var event_time = (new Date()).getTime();
-    // filter out the repeated or too frequent passive event
-    if (event_time - last_passive_event_timestamp < min_passive_event_interval) {
-        return;
-    } else {
-        last_passive_event_timestamp = event_time;
-    }
-    if (debug) console.log(type + " passive event", event);
-    // checkIsTaskActive();
-    if (!is_task_active && !debug) {
-        return;
-    }
-
-    // event.preventDefault();
-    // event.stopPropagation(); // stop the event from bubbling up
-
-    var e = event || window.event;
-    var screen_x = e.screenX;
-    var screen_y = e.screenY;
-    var client_x = e.clientX;
-    var client_y = e.clientY;
-    var target = e.currentTarget;
-    var tag = e.target.tagName; // tag name
-    if (tag == undefined) {
-        tag = e.target.nodeName;
-    }
-    var content = "";
-    if (tag == "IMG") {
-        content = e.target.src;
-    } else if (tag == "INPUT" || tag == "TEXTAREA") {
-        content = e.target.value;
-    } else {
-        content = e.target.innerText;
-    }
-
-    var related_info = {};
-    // set related_info according to the event type and target
-    switch (type) {
         case 'scroll':
             related_info = { 'scrollX': window.scrollX, 'scrollY': window.scrollY };
-        case 'hover':
-            break;
-        case 'right click':
             break;
         case 'key press':
-            related_info = {
-                'ctrlKey': e.ctrlKey, 'shiftKey': e.shiftKey, 'altKey': e.altKey, 'metaKey': e.metaKey, 'key': e.key,
+            if (event) {
+                related_info = { 'ctrlKey': event.ctrlKey, 'shiftKey': event.shiftKey, 'altKey': event.altKey, 'metaKey': event.metaKey, 'key': event.key };
             }
             break;
         case 'copy':
-            var copied_text = window.getSelection().toString();
-            related_info = { 'copied_text': copied_text };
+            related_info = { 'copied_text': window.getSelection().toString() };
             break;
         case 'paste':
-            var pasted_text = e.clipboardData.getData('text');
-            related_info = { 'pasted_text': pasted_text };
+            if (event && event.clipboardData) {
+                related_info = { 'pasted_text': event.clipboardData.getData('text') };
+            }
             break;
         case 'change':
-            // get the original value of the input element and the new value
-            var new_value = e.target.value;
-            related_info = { 'new_value': new_value };
-            break;
-        case 'blur':
-            break;
-        case 'focus':
-            break;
-        case 'drag':
-            break;
-        default:
+            related_info = { 'new_value': target.value };
             break;
     }
-
-    let hierachy = getElementHierarchyHTML(e.target);
-
-    // add the event to the event list
-    mPage.addPassiveEvent(type, event_time, screen_x, screen_y, client_x, client_y, tag, content, hierachy, related_info);
+    return related_info;
 }
 
-function clickEvent(event, is_active = true) {
-    if (is_active) {
-        activeEventHandler(event, 'click');
-    } else {
-        passiveEventHandler(event, 'click');
-    }
-}
+function setupEventListeners() {
+    if (is_server_page) return;
 
-function activeClickEvent(event) {
-    clickEvent(event, true);
-}
+    // Active/Passive Events
+    document.body.addEventListener('click', (e) => handleEvent(e, 'click'), true); // Use capture phase to potentially prevent default
 
-function passiveClickEvent(event) {
-    clickEvent(event, false);
-}
+    // Passive Events with throttling
+    document.body.addEventListener('mouseover', throttle((e) => passiveEventHandler(e, 'hover'), 50), true);
+    document.addEventListener('scroll', throttle((e) => passiveEventHandler(e, 'scroll'), 50), true);
 
-function hoverEvent(event) {
-    passiveEventHandler(event, 'hover');
-}
+    // Other passive events
+    document.body.addEventListener('contextmenu', (e) => passiveEventHandler(e, 'right click'), true);
+    document.body.addEventListener('change', (e) => passiveEventHandler(e, 'change'), true);
+    document.addEventListener('keypress', (e) => passiveEventHandler(e, 'key press'), true);
+    document.addEventListener('copy', (e) => passiveEventHandler(e, 'copy'), true);
+    document.addEventListener('paste', (e) => passiveEventHandler(e, 'paste'), true);
+    document.addEventListener('drag', (e) => passiveEventHandler(e, 'drag'), true);
+    document.addEventListener('drop', (e) => passiveEventHandler(e, 'drop'), true);
 
-function rightClickEvent(event) {
-    passiveEventHandler(event, 'right click');
-}
+    window.addEventListener('blur', (e) => passiveEventHandler(e, 'blur'), true);
+    window.addEventListener('focus', (e) => passiveEventHandler(e, 'focus'), true);
 
-function keyPressEvent(event) {
-    passiveEventHandler(event, 'key press');
-}
-
-function changeEvent(event) {
-    passiveEventHandler(event, 'change');
-}
-
-function scrollEvent(event) {
-    passiveEventHandler(event, 'scroll');
-}
-
-function copyEvent(event) {
-    passiveEventHandler(event, 'copy');
-}
-
-function pasteEvent(event) {
-    passiveEventHandler(event, 'paste');
-}
-
-function dragEvent(event) {
-    passiveEventHandler(event, 'drag');
-}
-
-function dropEvent(event) {
-    passiveEventHandler(event, 'drop');
-}
-
-function windowBlurEvent(event) {
-    passiveEventHandler(event, 'blur');
-}
-
-function windowFocusEvent(event) {
-    passiveEventHandler(event, 'focus');
+    if (debug) console.log("Event listeners set up using delegation.");
 }
 
 /*
@@ -584,85 +404,25 @@ mPage.initialize = function () {
 
 mPage.initialize();
 
-setTimeout(mPage.init_content, 500); // wait for the page to load
 setTimeout(mPage.init_content, 3000); // wait for the page to load
 
 
-chrome.runtime.sendMessage({ log_status: "request" }, function (response) {
-    if (current_url.substring(0, 21) == baseUrl) {
-        mPage.update = function () {
-        };
-    } else {
-        // var interactive_element = "div, a, button, input, textarea, select, img";
-        var interactive_element = "*";
-        var excluded_element = ".annotation-overlay *, .annotation-overlay, body, html, .freeze-overlay"
-        mPage.update = function () {
-            is_server_page = window.location.href.substring(0, 21) == baseUrl;
-            $(interactive_element).not(excluded_element).each(function (id, element) {
-                // click event
-                if ($(element).attr("bindClick") == undefined) {
-                    var tag_name = $(element).prop("tagName");
-                    var type = $(element).attr("type");
-                    // if ($(element).attr('href') != undefined || tag_name == 'BUTTON' || type == 'submit' || type == 'button') {
-                    if ($(element).attr('href') != undefined && tag_name == 'A') {
-                        $(element).attr("bindClick", true);
-                        $(element).on("click", activeClickEvent);
-                    } else {
-                        // judge if it is wrapped by <a> or <button>
-                        if (($(element).closest('a').length > 0 && $(element).closest('a').attr('href') != undefined)
-                            || $(element).closest('button').length > 0 || $(element).closest('input').length > 0) {
-                            return; // it is already binded by the parent element
-                        }
-                        $(element).on("click", passiveClickEvent);
-                    }
-                }
-                // hover event
-                if ($(element).attr("bindHover") == undefined) {
-                    $(element).attr("bindHover", true);
-                    $(element).on("mouseover", hoverEvent);
-                }
-                // right click event
-                if ($(element).attr("bindRightClick") == undefined) {
-                    $(element).attr("bindRightClick", true);
-                    $(element).on("contextmenu", rightClickEvent);
-                }
-                // change event
-                if ($(element).attr("bindChange") == undefined) {
-                    var tag_name = $(element).prop("tagName");
-                    if (tag_name == 'TEXTAREA' || tag_name == 'INPUT') {
-                        $(element).attr("bindChange", true);
-                        $(element).on("change", changeEvent);
-                    }
-                }
-            }
-            );
-
-        }
-            ;
-        addEventListener("scroll", scrollEvent);
-        addEventListener("keypress", keyPressEvent);
-        addEventListener("copy", copyEvent);
-        addEventListener("paste", pasteEvent);
-        addEventListener("blur", windowBlurEvent);
-        addEventListener("focus", windowFocusEvent);
-        addEventListener("drag", dragEvent);
-        addEventListener("drop", dropEvent);
-    }
-
-    addEventListener("DOMContentLoaded", function (event) {
-        if (debug) console.log("DOM fully loaded and parsed");
-        mPage.update();
-        const observer = new MutationObserver(function (mutations) {
-            // if (debug) console.log("DOM changed: " + mutations);
-            mPage.update();
-        });
-        if (debug) console.log(document.body);
-        // observe all <a> elements
-        observer.observe(document.body, { childList: true, subtree: true, attributes: true });
-    });
-
-    setTimeout(mPage.update, 1500);
-    setInterval(checkIsTaskActive, 60000);
+// Initialize after DOM is loaded
+document.addEventListener("DOMContentLoaded", function (event) {
+    if (debug) console.log("DOM fully loaded and parsed");
+    mPage.init_content();
 });
 
-// setTimeout(viewState.sendMessage, 1500);
+// Setup listeners once the script is running
+chrome.runtime.sendMessage({ log_status: "request" }, function (response) {
+    if (!is_server_page) {
+        setupEventListeners();
+        setInterval(checkIsTaskActive, 60000);
+    }
+});
+
+// Display a "general.js loaded" box on the upper right corner for 3 seconds
+// should have a class named 'rr-ignore' to avoid being recorded by rrweb
+document.addEventListener("DOMContentLoaded", function (event) {
+    displayLoadedBox("general.js");
+});

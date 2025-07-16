@@ -22,7 +22,7 @@ async function makeApiRequest(url, data = {}) {
         return response;
     } catch (error) {
         console.error(`API request failed: ${url}`, error);
-        return -1;
+        return -2;
     }
 }
 
@@ -66,7 +66,7 @@ async function displayActiveTask() {
         $("#bt_start_task").attr("disabled", true);
         $("#active_task").text("Fail to connect to server");
         $("#active_task").css("color", "#e13636");
-    } else if (task_id != -1) { // There is an active task
+    } else { // There is an active task
         switchTaskButtonStatus('on');
         $("#active_task").text("Active task ID: " + task_id);
         $("#active_task").css("color", "#000");
@@ -149,9 +149,6 @@ function feedback() {
     }
 }
 
-function download() {
-    window.open(downloadLink, '_blank');
-}
 
 function logout() {
     clearInterval(taskSniff);
@@ -181,10 +178,15 @@ async function getActiveTask(task_id = null) {
 }
 
 // 封装窗口打开逻辑
-function openTaskWindow(path, params = '') {
+function openTaskWindow(path, params = '', newWindow = false) {
     const url = baseUrl + path + params;
-    const windowOptions = 'height=1000,width=1200,top=0,left=0,toolbar=no,menubar=no,scrollbars=no,resizable=no,location=no,status=no';
-    window.open(url, 'newwindow', windowOptions);
+    if (debug) console.log("Opening task window:", url);
+    if (newWindow) {
+        const windowOptions = 'height=1000,width=1200,top=0,left=0,toolbar=no,menubar=no,scrollbars=no,resizable=no,location=no,status=no';
+        window.open(url, 'newwindow', windowOptions);
+    } else {
+        window.open(url, '_blank');
+    }
 }
 
 // Start a task
@@ -255,9 +257,9 @@ async function endtask() {
 async function canceltask() {
     task_id = await getActiveTask();
     const isConfirm = confirm("Do you want to cancel the task?");
-    if (isConfirm && task_id != -1) {
+    if (isConfirm) {
         const timestamp = (new Date()).getTime();
-        openTaskWindow('/task/cancel_task/', `${task_id}/${timestamp}`);
+        openTaskWindow('/task/cancel_task/', `${task_id}/${timestamp}`, false);
     }
 }
 
@@ -266,13 +268,13 @@ async function viewtask() {
     if (task_id != -1) {
         const credentials = getUserCredentials();
         const url = `${baseUrl}/task/view_task_info/${task_id}/?username=${credentials.username}&password=${credentials.password}`;
-        const windowOptions = 'height=600,width=930,top=0,left=0,toolbar=no,menubar=no,scrollbars=no,resizable=no,location=no,status=no';
+        const windowOptions = 'height=700,width=930,top=0,left=0,toolbar=no,menubar=no,scrollbars=no,resizable=no,location=no,status=no';
         window.open(url, 'newwindow', windowOptions);
     }
 }
 
 function tooluse() {
-    const windowOptions = 'height=520,width=620,top=0,left=0,toolbar=no,menubar=no,scrollbars=no,resizable=no,location=no,status=no';
+    const windowOptions = 'height=570,width=620,top=0,left=0,toolbar=no,menubar=no,scrollbars=no,resizable=no,location=no,status=no';
     window.open(baseUrl + '/task/show_tool_use_page', 'newwindow', windowOptions);
 }
 

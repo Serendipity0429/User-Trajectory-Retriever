@@ -1,6 +1,7 @@
 var baseUrl = "http://127.0.0.1:8000";
 var checkUrl = baseUrl + "/user/check/";
 var dataUrl = baseUrl + "/task/data/";
+var cancelUrl = baseUrl + "/task/cancel_task/";
 var username, password;
 var version = "1.0";
 var debug1 = true;
@@ -10,7 +11,7 @@ var lastReminder = 0;
 
 var current_task = -1;
 
-function storgeInfo(Msg) {
+function storeInfo(Msg) {
     var key = (new Date()).getTime();
     localStorage["" + key] = Msg;
     return "" + key;
@@ -24,7 +25,10 @@ function closeAllIrrelevantTabs() {      // 获取所有标签页
     chrome.tabs.query({}, (tabs) => {
         // 关闭所有标签页
         const tabIds = tabs.filter(tab => !tab.url.startsWith(baseUrl)).map(tab => tab.id);
-        chrome.tabs.create({ url: "https://bing.com" });
+        const homeTabIds = tabs.filter(tab => tab.url.startsWith(baseUrl)).map(tab => tab.id);
+        if (homeTabIds.length == 0) {
+            chrome.tabs.create({ url: "https://bing.com" });
+        }
         chrome.tabs.remove(tabIds, () => {
 
         });
@@ -66,7 +70,7 @@ function sendInfo(Msg) {
     var verified = verifyUser();
     if (verified != 0) return;
 
-    // var key = storgeInfo(Msg);
+    // var key = storeInfo(Msg);
     $.ajax({
         type: "POST", dataType: "text", //dataType: 'json',
         url: dataUrl, data: { message: Msg }, //contentType: "application/json; charset=utf-8",
@@ -99,7 +103,6 @@ function uint8ArrayToBase64(bytes) {
 }
 
 
-flush();
 
 chrome.runtime.onMessage.addListener(function (Msg, sender, sendResponse) {
     if (debug1) console.log(Msg);
@@ -224,6 +227,8 @@ function clearlocalStorage() {
 
 }
 
+
+flush();
 setInterval(function () {
     clearlocalStorage();
 }, 60000);

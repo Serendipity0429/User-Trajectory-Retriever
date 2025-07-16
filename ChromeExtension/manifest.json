@@ -20,7 +20,8 @@
     "unlimitedStorage",
     "storage",
     "cookies",
-    "notifications"
+    "notifications",
+    "history"
   ],
   "background": {
     "scripts": [

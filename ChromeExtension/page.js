@@ -85,6 +85,15 @@ var mPage = {
     }
 
 };
+
+
+
 // var debug = true;
 var debug = false;
 if (debug) console.log("page.js is loaded");
+
+// Display a "page.js loaded" box on the upper right corner for 3 seconds
+// should have a class named 'rr-ignore' to avoid being recorded by rrweb
+document.addEventListener("DOMContentLoaded", function (event) {
+    displayLoadedBox("page.js");
+});

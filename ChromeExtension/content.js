@@ -31,6 +31,50 @@ function flush_view_state(send_message = true) {
     rrweb.record.takeFullSnapshot();
 }
 
+(function(history){
+    var pushState = history.pushState;
+    var replaceState = history.replaceState;
+
+    history.pushState = function(state) {
+        if (typeof history.onpushstate == "function") {
+            history.onpushstate({state: state});
+        }
+        setTimeout(() => {
+            if (current_url !== window.location.href) {
+                current_referrer = current_url;
+                current_url = window.location.href;
+                flush_view_state();
+                if (debug) console.log("URL changed (pushState), re-initializing.");
+            }
+        }, 0);
+        return pushState.apply(history, arguments);
+    };
+    
+    history.replaceState = function(state) {
+        if (typeof history.onreplacestate == "function") {
+            history.onreplacestate({state: state});
+        }
+        setTimeout(() => {
+            if (current_url !== window.location.href) {
+                current_referrer = current_url;
+                current_url = window.location.href;
+                flush_view_state();
+                if (debug) console.log("URL changed (replaceState), re-initializing.");
+            }
+        }, 0);
+        return replaceState.apply(history, arguments);
+    };
+})(window.history);
+
+window.addEventListener('popstate', () => {
+    if (current_url !== window.location.href) {
+        current_referrer = current_url;
+        current_url = window.location.href;
+        flush_view_state();
+        if (debug) console.log("URL changed (popstate), re-initializing.");
+    }
+});
+
 
 chrome.runtime.sendMessage({ log_status: "request" }, function (response) {
     console.log(current_url.substring(0, 22))
@@ -44,23 +88,9 @@ chrome.runtime.sendMessage({ log_status: "request" }, function (response) {
         rrweb.record({
             emit(event) {
                 mPage.addRRWebEvent(event);
-                viewState.update();
             },
         });
         if (debug) console.log("initialize done");
-
-        let observer = new MutationObserver(function (mutations) {
-            if (current_url !== window.location.href) {
-                current_referrer = current_url;
-                current_url = window.location.href;
-                flush_view_state();
-                if (debug) console.log("initialize again");
-            } else {
-                viewState.update();
-            }
-        });
-        let config = { childList: true, subtree: true, attributes: true };
-        observer.observe(document.body, config);
 
         document.addEventListener("visibilitychange", function () {
             if (document.visibilityState === 'hidden') {
@@ -90,3 +120,10 @@ chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
         }
     }
 })
+
+// Display a "content.js loaded" box on the upper right corner for 3 seconds
+// should have a class named 'rr-ignore' to avoid being recorded by rrweb
+// When DOM loaded
+document.addEventListener("DOMContentLoaded", function (event) {
+    displayLoadedBox("content.js");
+});

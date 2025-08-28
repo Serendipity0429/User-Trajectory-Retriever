@@ -1,0 +1,80 @@
+* {
+    text-align: center;
+}
+
+label {
+    font: 12px Arial;
+}
+
+input {
+    font: 12px Arial;
+    width: 90%;
+}
+
+.popup-title {
+    color: rgb(151, 67, 219);
+    padding-top: 3px;
+    padding-bottom: 6px;
+    font: 14px Arial;
+    width: 100%;
+    text-align: center;
+    font-weight: bold;
+}
+
+button {
+    display: inline-block;
+    padding: 3px 6px;
+    font-size: 12px;
+    cursor: pointer;
+    text-align: center;
+    text-decoration: none;
+    outline: none;
+    color: #fff;
+    background-color: rgb(151, 67, 219);
+    border: none;
+    border-radius: 4px;
+    box-shadow: 0 3px #999;
+    width: 100%;
+}
+
+button:hover {
+    background-color: #a75ad8;
+}
+
+button:active {
+    background-color: #5b0b8d;
+    box-shadow: 0 1px #666;
+    transform: translateY(1px);
+}
+
+button:disabled {
+    background-color: #cccccc;
+    color: #666666;
+    cursor: not-allowed;
+}
+
+button:disabled:active {
+    box-shadow: 0 3px #999;
+    transform: none;
+}
+
+
+
+#username_text_logged {
+    color: rgb(151, 67, 219);
+    padding-top: 3px;
+    padding-bottom: 6px;
+    font: 14px Arial;
+    width: 100%;
+    text-align: center;
+    font-weight: bold;
+}
+
+#active_task {
+    color: #000000;
+    padding-top: 3px;
+    padding-bottom: 6px;
+    font: 14px Arial;
+    width: 100%;
+    text-align: center;
+}

@@ -122,7 +122,7 @@ class SignupForm(forms.Form):
             }
         )
     )
-    field = forms.CharField(
+    occupation = forms.CharField(
         required=True,
         label=u'Occupation',
         widget=forms.TextInput(

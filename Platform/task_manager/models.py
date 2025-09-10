@@ -161,14 +161,13 @@ class Webpage(models.Model):
 
     title = models.CharField(max_length=100)
     url = models.CharField(max_length=1000)
-    html = models.TextField()  # HTML content of the webpage
     referrer = models.CharField(max_length=1000)
     start_timestamp = models.IntegerField()
     end_timestamp = models.IntegerField()
     dwell_time = models.IntegerField()
     mouse_moves = models.TextField()  # mouse move data in JSON format
     event_list = models.TextField()  # list of events in JSON format
-    rrweb_events = models.TextField()  # rrweb events in JSON format
+    rrweb_record = models.TextField()  # rrweb record in JSON format
     
     is_redirected = models.BooleanField(default=False)  # whether the webpage is redirected
     during_annotation = models.BooleanField(default=False)  # whether the webpage is during annotation

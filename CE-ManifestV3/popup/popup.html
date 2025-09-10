@@ -3,8 +3,10 @@
     <head>
         <meta charset="UTF-8">
         <title>User Interface</title>
+        <!-- jQuery is kept for DOM manipulation -->
         <script src="jquery-3.3.1.min.js"></script>
-        <link type="text/css" rel="stylesheet" href="popup.css"></link>
+        <!-- Link to the external CSS file -->
+        <link type="text/css" rel="stylesheet" href="popup.css">
     </head>
     <body style="min-width: 150px;">
         <div id="login">
@@ -25,13 +27,10 @@
             <br/>
             <button id="bt4">Go to Platform</button>
             <p id="failMsg1" hidden style="color:red">Username does not exist!</p>
-
             <p id="failMsg2" hidden style="color:red">Password error!</p>
-
-            <p id="failMsg3" hidden style="color:red">Request failed. Please check the server, refresh the page and try
-                again.</p>
+            <p id="failMsg3" hidden style="color:red">Request failed. Please check the server and try again.</p>
         </div>
-        <div id="logged">
+        <div id="logged" hidden>
             <div id="username_text_logged"></div>
             <div id="active_task">No active task</div>
             <button id="bt_start_task">Start Task</button>
@@ -52,7 +51,11 @@
             <br/>
             <button id="bt6">Logout</button>
         </div>
+        <!-- This container is for dynamically generated modals -->
+        <div id="modal-container"></div>
 
+        <script src="../utils.js"></script> 
         <script src="popup.js"></script>
     </body>
 </html>
+

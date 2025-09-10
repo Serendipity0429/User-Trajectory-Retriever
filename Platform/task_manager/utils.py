@@ -76,7 +76,7 @@ def store_data(message):
     #     webpage = existing_webpage
     
     webpage = Webpage()
-    if message['mouse_moves'] == '[]' or message['rrweb_events'] == '[]':
+    if message['mouse_moves'] == '[]' or message['rrweb_record'] == '[]':
         print_debug("Redirect detected, setting is_redirected to True")
         webpage.is_redirected = True
     
@@ -89,13 +89,12 @@ def store_data(message):
     webpage.title = message['title']
     webpage.url = message['url']
     webpage.referrer = message['referrer']
-    webpage.html = message['html']
     webpage.start_timestamp = message['start_timestamp']
     webpage.end_timestamp = message['end_timestamp']
     webpage.dwell_time = message['dwell_time']
     webpage.mouse_moves = message['mouse_moves']
     webpage.event_list = message['event_list']
-    webpage.rrweb_events = message['rrweb_events']
+    webpage.rrweb_record = message['rrweb_record']
     task.end_timestamp = message['end_timestamp']
     
     webpage.save()

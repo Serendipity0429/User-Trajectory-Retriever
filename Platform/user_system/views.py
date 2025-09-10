@@ -8,9 +8,7 @@ from django.template import RequestContext
 from .forms import *
 from .models import User, ResetPasswordRequest, TimestampGenerator
 from .utils import *
-
-
-import datetime
+from django.utils.timezone import now
 
 
 __DEBUG__ = True
@@ -21,6 +19,8 @@ def check(request):
     if request.method == 'POST':
         username = request.POST.get('username')
         password = request.POST.get('password')
+        print('username: ', username)
+        print('password: ', password)   
         error_code, user = authenticate(username, password)
         if __DEBUG__:
             print('error_code: ', error_code)
@@ -42,7 +42,7 @@ def login(request):
                 error_code, user = authenticate(username, password)
                 if error_code == 0:
                     user.login_num += 1
-                    user.last_login = datetime.datetime.now()
+                    user.last_login = now()
                     user.save()
                     store_in_session(request, user)
                     return redirect_to_prev_page(request, '/task/home/')
@@ -61,7 +61,7 @@ def login(request):
             'form': form,
             'error_message': error_message,
         }
-        )
+    )
 
 
 def signup(request):
@@ -79,11 +79,11 @@ def signup(request):
             user.age = form.cleaned_data['age']
             user.phone = form.cleaned_data['phone']
             user.email = form.cleaned_data['email']
-            user.field = form.cleaned_data['field']
+            user.occupation = form.cleaned_data['occupation']
             user.llm_frequency = form.cleaned_data['llm_frequency']
             user.llm_history = form.cleaned_data['llm_history']
-            user.signup_time = datetime.datetime.now()
-            user.last_login = datetime.datetime.now()
+            user.signup_time = now()
+            user.last_login = now()
             user.login_num = 0
             user.save()
             return HttpResponseRedirect('/user/login/')

@@ -17,7 +17,7 @@ var Point=function(x,y,time){
     }
 
     this.getSpd = function(bPoint){
-        if(debug) console.log("Speed = "+(this.getDis(bPoint)/(bPoint.time-this.time)));
+        printDebug("Speed = "+(this.getDis(bPoint)/(bPoint.time-this.time)));
         return this.getDis(bPoint)/(bPoint.time-this.time);
     }
 
@@ -52,7 +52,7 @@ var Path=function(startPoint,name){
             this.window[0]=this.window[1];
             this.window[1]=nPoint;
             this.keyPoint=nPoint;
-            if(debug) console.log("move number = "+this.moves.length);
+            printDebug("move number = "+this.moves.length);
         }else{
             if( this.window[1].disFrom(this.window[0],nPoint) >= this.keyPoint.disFrom(this.window[0],nPoint) )
                 this.keyPoint = this.window[1];
@@ -76,45 +76,45 @@ var Path=function(startPoint,name){
     this.add(startPoint);
 }
 
-var mRec={
+var mouseRecord={
 
     movePath:null,
     scrollPath:null,
     pause:function(){
-        if(mRec.movePath != null) mRec.movePath.flush((new Date()).getTime());
-        if(mRec.scrollPath != null) mRec.scrollPath.flush((new Date()).getTime());
+        if(mouseRecord.movePath != null) mouseRecord.movePath.flush((new Date()).getTime());
+        if(mouseRecord.scrollPath != null) mouseRecord.scrollPath.flush((new Date()).getTime());
     },
 
     end:function(){
-        mRec.pause();
+        mouseRecord.pause();
     },
 
     getData:function(){
         var ret = new Array();
-        if(mRec.movePath != null) ret=ret.concat(mRec.movePath.getData());
-        if(mRec.scrollPath != null) ret=ret.concat(mRec.scrollPath.getData());
+        if(mouseRecord.movePath != null) ret=ret.concat(mouseRecord.movePath.getData());
+        if(mouseRecord.scrollPath != null) ret=ret.concat(mouseRecord.scrollPath.getData());
         return ret;
     },
 
     move:function (e){
         var oPoint= new Point(e.pageX,e.pageY,(new Date()).getTime());
-        if(mRec.movePath == null)
-            mRec.movePath = new Path(oPoint,"move");
+        if(mouseRecord.movePath == null)
+            mouseRecord.movePath = new Path(oPoint,"move");
         else
-            mRec.movePath.add(oPoint);
+            mouseRecord.movePath.add(oPoint);
     },
 
     scroll:function(){
         var oPoint= new Point($(window).scrollLeft(),$(window).scrollTop(),(new Date()).getTime());
-        if(mRec.scrollPath == null)
-            mRec.scrollPath = new Path(oPoint,"scroll");
+        if(mouseRecord.scrollPath == null)
+            mouseRecord.scrollPath = new Path(oPoint,"scroll");
         else
-            mRec.scrollPath.add(oPoint);
+            mouseRecord.scrollPath.add(oPoint);
     },
     initialize: function () {
-        mRec.movePath = null;
-        mRec.scrollPath = null;
-        if (debug) console.log("mRec initialize");
+        mouseRecord.movePath = null;
+        mouseRecord.scrollPath = null;
+        if (debug) console.log("mouseRecord initialize");
     },
 
     controlMouse:function(x,y){
@@ -130,24 +130,24 @@ var mRec={
         controller(move.Sx+dx,move.Sy+dy);
     },
     replayLine:function(move,controler){
-        var key =setInterval(mRec.reRun,10,move,(new Date()).getTime(),controler);
+        var key =setInterval(mouseRecord.reRun,10,move,(new Date()).getTime(),controler);
         setTimeout(function(key){window.clearInterval(key)},move.Et-move.St,key);
     },
     replay:function(){
         $("body").append('<div id="box" style="left: 43px; top: 47px;position:absolute;width:10px;height:10px;background:red;z-index:999999;"></div>')
-        mRec.pause();
+        mouseRecord.pause();
         var moveRec,scrollRec,moveT0=1e18,scrollT0=1e18;
-        if(mRec.movePath!=null ) moveRec=mRec.movePath.getData(),moveT0=moveRec[0].St;
-        if(mRec.scrollPath!=null) scrollRec=mRec.scrollPath.getData(),scrollT0=scrollRec[0].St;
+        if(mouseRecord.movePath!=null ) moveRec=mouseRecord.movePath.getData(),moveT0=moveRec[0].St;
+        if(mouseRecord.scrollPath!=null) scrollRec=mouseRecord.scrollPath.getData(),scrollT0=scrollRec[0].St;
         moveT0=scrollT0=Math.min(moveT0,scrollT0);
         if(moveRec != undefined){
             moveRec.forEach(function(e,id){
-                setTimeout(mRec.replayLine,e.St-moveT0,e,mRec.controlMouse);
+                setTimeout(mouseRecord.replayLine,e.St-moveT0,e,mouseRecord.controlMouse);
             });
         }
         if(scrollRec != undefined){
             scrollRec.forEach(function(e,id){
-                setTimeout(mRec.replayLine,e.St-scrollT0,e,mRec.controlScroll);
+                setTimeout(mouseRecord.replayLine,e.St-scrollT0,e,mouseRecord.controlScroll);
             });
         }
     }

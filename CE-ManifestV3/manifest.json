@@ -1,7 +1,7 @@
 {
   "name": "Alpha-UTRT: THUIR User Trajectory Retriever Toolkit",
   "version": "1.0",
-  "manifest_version": 2,
+  "manifest_version": 3,
   "description": "A simple chrome extension to collect user behaviors of certain tasks",
   "icons": {
     "16": "popup/THUIR16.png",
@@ -9,42 +9,54 @@
     "64": "popup/THUIR64.png",
     "128": "popup/THUIR128.png"
   },
-  "browser_action": {
+  "action": {
     "default_title": "THUIR Chrome Extension",
     "default_icon": "popup/THUIR19.png",
     "default_popup": "popup/popup.html"
   },
   "permissions": [
     "tabs",
-    "*://*/*",
     "unlimitedStorage",
     "storage",
     "cookies",
     "notifications",
-    "history"
+    "history",
+    "scripting",
+    "alarms"
+  ],
+  "host_permissions": [
+    "http://127.0.0.1:8000/*",
+    "http://101.6.41.59:32904/*"
   ],
   "background": {
-    "scripts": [
-      "jquery-3.3.1.min.js",
-      "pako.min.js",
-      "background.js"
-    ]
+    "service_worker": "background.js"
   },
   "content_scripts": [
     {
       "matches": [
         "<all_urls>"
       ],
+      "exclude_matches": [
+        "file:///*",
+        "http://localhost/*",
+        "https://localhost/*",
+        "http://127.0.0.1/*",
+        "https://127.0.0.1/*",
+        "http://0.0.0.0/*",
+        "https://0.0.0.0/*"
+      ],
       "js": [
-        "jquery-3.3.1.min.js",
-        "pako.min.js",
-        "rrweb.min.js",
-        "rrweb-player.js",
+        "scripts/jquery-3.3.1.min.js",
+        "scripts/rrweb.min.js",
         "mouseMove.js",
-        "basic.js",
+        "utils.js",
+        "message.js",
         "page.js",
-        "content.js",
-        "general.js"
+        "general.js",
+        "content.js"
+      ],
+      "css": [
+        "css/rrweb-player.css"
       ],
       "run_at": "document_start"
     }

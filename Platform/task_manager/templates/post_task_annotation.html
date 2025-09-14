@@ -27,12 +27,12 @@
                             <!-- create a div to store the rrweb player -->
                             <div class="rrweb-player-wrapper" id="rrweb-player-{{ webpage.id }}"></div>
                             <script>
-                                var rrweb_events_{{ webpage.id }} = {{ webpage.rrweb_events | safe }};
+                                var rrweb_record_{{ webpage.id }} = {{ webpage.rrweb_record | safe }};
                                 // create a rrweb player
                                 const player_{{ webpage.id }} = new rrwebPlayer({
                                     target: document.getElementById(`rrweb-player-{{ webpage.id }}`),
                                     props: {
-                                        events: rrweb_events_{{ webpage.id }},
+                                        events: rrweb_record_{{ webpage.id }},
                                         autoPlay: false,
                                         width: 800,
                                         height: 377,

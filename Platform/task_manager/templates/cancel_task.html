@@ -241,6 +241,17 @@
                     updateMissingResourcesPriorityNumbers();
                 });
 
+                // Handle clicking on drag-option to toggle checkbox
+                $('.drag-option').click(function(e) {
+                    // Don't trigger if clicking on checkbox or text input directly
+                    if ($(e.target).is('input[type="checkbox"], input[type="text"]')) {
+                        return;
+                    }
+                    
+                    var checkbox = $(this).find('input[type="checkbox"]');
+                    checkbox.prop('checked', !checkbox.prop('checked')).trigger('change');
+                });
+
                 // Function to update the hidden input with the sorted order of selected items
                 function updateMissingResourcesOrder() {
                     var order = [];
@@ -304,6 +315,13 @@
                 );
 
                 window.addEventListener('beforeunload', function (e) {
+                    if (!is_submitted) {
+                        navigator.sendBeacon('/task/stop_annotation/', new Blob());
+                    }
+                });
+
+                // Before unloading the page, send a beacon to stop annotation
+                window.addEventListener('unload', function() {
                     if (!is_submitted) {
                         navigator.sendBeacon('/task/stop_annotation/', new Blob());
                     }

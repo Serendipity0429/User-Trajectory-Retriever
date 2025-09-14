@@ -61,8 +61,10 @@ def auth_failed_redirect(request, missing_group):
 def require_login(func):
     def ret(*args):
         req = args[0]
+        # print the request value
         assert isinstance(req, HttpRequest)
         if 'username' not in req.session:
+            print(req.session.keys())
             return login_redirect(req)
         try:
             user = User.objects.get(username=req.session['username'])

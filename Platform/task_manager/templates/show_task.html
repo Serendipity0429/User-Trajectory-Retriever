@@ -134,7 +134,7 @@
                                     new rrwebPlayer({
                                         target: document.getElementById('rrweb-player-trial{{trial.num_trial}}-{{ webpage.id }}'),
                                         props: {
-                                            events: {{ webpage.rrweb_events|safe }},
+                                            events: {{ webpage.rrweb_record|safe }},
                                             autoPlay: false,
                                             width: 800,
                                             height: 377,

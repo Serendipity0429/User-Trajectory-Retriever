@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 from django.db import models
+from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 from .forms import *
 from hashlib import sha512
 from uuid import uuid4
@@ -32,10 +33,36 @@ class KeyGenerator(object):
         return str(key)
 
 
-class User(models.Model):
+class MyUserManager(BaseUserManager):
+    """
+    A custom user manager to deal with emails as unique identifiers for auth.
+    """
+    def create_user(self, username, password, **extra_fields):
+        if not username:
+            raise ValueError('The username must be set')
+        user = self.model(username=username, **extra_fields)
+        user.set_password(password) # Hashes the password
+        user.save(using=self._db)
+        return user
+
+    def create_superuser(self, username, password, **extra_fields):
+        extra_fields.setdefault('is_staff', True)
+        extra_fields.setdefault('is_superuser', True)
+        extra_fields.setdefault('is_active', True)
+
+        if extra_fields.get('is_staff') is not True:
+            raise ValueError('Superuser must have is_staff=True.')
+        if extra_fields.get('is_superuser') is not True:
+            raise ValueError('Superuser must have is_superuser=True.')
+        return self.create_user(username, password, **extra_fields)
+
+class User(AbstractBaseUser, PermissionsMixin):
     id = models.AutoField(primary_key=True)
     username = models.CharField(unique=True, max_length=50)
     password = models.CharField(max_length=50)
+
+    objects = MyUserManager()
+
     name = models.CharField(max_length=50)
     sex = models.CharField(max_length=50)
     age = models.IntegerField()
@@ -47,6 +74,9 @@ class User(models.Model):
     signup_time = models.DateTimeField()
     last_login = models.DateTimeField()
     login_num = models.IntegerField()
+    
+    USERNAME_FIELD = 'username'
+    REQUIRED_FIELDS = ['name', 'email']
 
 
 class ResetPasswordRequest(models.Model):

@@ -24,12 +24,12 @@
                             <!-- create a div to store the rrweb player -->
                             <div class="rrweb-player-wrapper" id="rrweb-player-{{ webpage.id }}"></div>
                             <script>
-                                var rrweb_events_{{ webpage.id }} = {{ webpage.rrweb_events | safe }};
+                                var rrweb_record_{{ webpage.id }} = {{ webpage.rrweb_record | safe }};
                                 // create a rrweb player
                                 const player_{{ webpage.id }} = new rrwebPlayer({
                                     target: document.getElementById(`rrweb-player-{{ webpage.id }}`),
                                     props: {
-                                        events: rrweb_events_{{ webpage.id }},
+                                        events: rrweb_record_{{ webpage.id }},
                                         autoPlay: false,
                                         width: 800,
                                         height: 377,
@@ -295,7 +295,7 @@
 
                     <script>
                         $(document).ready(function() {
-                            // Initialize sortable for corrective actions
+                            // Initialize sortable for corrective actions - only allow dragging selected items
                             $("#corrective-actions").sortable({
                                 cursor: "grabbing",
                                 opacity: 0.8,
@@ -459,7 +459,19 @@
                         navigator.sendBeacon('/task/stop_annotation/', new Blob());
                     }
                 });
+
+                // Handle clicking on drag-option to toggle checkbox
+                $('.drag-option').click(function(e) {
+                    // Don't trigger if clicking on checkbox or text input directly
+                    if ($(e.target).is('input[type="checkbox"], input[type="text"]')) {
+                        return;
+                    }
+                    
+                    var checkbox = $(this).find('input[type="checkbox"]');
+                    checkbox.prop('checked', !checkbox.prop('checked')).trigger('change');
+                });
             });
+            
         </script>
     </div>
 

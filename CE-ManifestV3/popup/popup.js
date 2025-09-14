@@ -1,12 +1,11 @@
 // --- Configuration ---
 const base_url = config.urls.base;
 const check_url = config.urls.check;
-const login_url = config.urls.login;
+const token_login_url = config.urls.token_login;
 const register_url = config.urls.register;
 const feedback_url = config.urls.home;
 
 // --- Global State ---
-let task_sniffer_interval = null;
 let active_task_id = -1;
 
 // --- Manifest V3 COMPATIBILITY HELPERS ---
@@ -88,17 +87,6 @@ function showConfirm(message) {
 }
 
 
-/**
- * Retrieves user credentials from local storage.
- * @returns {Promise<object>} A promise that resolves with user credentials.
- */
-async function getUserCredentials() {
-    const result = await chrome.storage.local.get(['username', 'password']);
-    return {
-        username: result.username || null,
-        password: result.password || null
-    };
-}
 
 // --- UI LOGIC ---
 
@@ -154,38 +142,20 @@ async function displayActiveTask() {
         switchTaskButtonStatus('on');
         $("#active_task").text("Active task ID: " + active_task_id).css("color", "#000");
     }
+    switchUiState(false);
 }
 
 // Sets up the UI for a logged-in user.
 async function showUserTab() {
-    switchUiState(false);
-    const { username } = await getUserCredentials();
+    const { username } = await _get_local(['username']);
     $("#username_text_logged").text("User: " + username);
     $("#bt_end_task").hide();
     await displayActiveTask();
-    if (task_sniffer_interval) clearInterval(task_sniffer_interval);
-    task_sniffer_interval = setInterval(displayActiveTask, 3000);
 }
 
 // Sets up the UI for logging in.
 function showLoginTab() {
     switchUiState(true);
-}
-
-/**
- * Verifies user credentials against the server.
- * @returns {Promise<number>} Server status code (0 for success).
- */
-async function verifyUser() {
-    const credentials = await getUserCredentials();
-    printDebugOfPopup("Verifying user credentials:", credentials);
-    if (!credentials.username || !credentials.password) {
-        return -1;
-    }
-    const verified_status = await _post(check_url, credentials);
-    if (verified_status == null)
-        return -2;
-    return verified_status;
 }
 
 // --- EVENT HANDLERS ---
@@ -195,45 +165,41 @@ function handleRegister() {
     window.open(register_url);
 }
 
-// Handles the user login attempt.
 async function handleLoginAttempt() {
     let username = $("#username").val();
-    let password = $("#psw").val();
-
-    printDebugOfPopup("Attempting login with:", { username, password });
+    let password = $("#password").val();
 
     if (!username || !password) {
         showAlert("Please enter both username and password.");
         return;
     }
 
-    await chrome.storage.local.set({ username, password });
+    const credentials = { username: username, password: password, ext: true };
+    const login_response = await _post(token_login_url, credentials, true);
 
+    if (login_response && login_response.access) {
+        await _set_local({
+            'username': username,
+            'access_token': login_response.access,
+            'refresh_token': login_response.refresh
+        });
 
-    const verified_status = await verifyUser();
-
-    if (verified_status === 0) {
-        // Correctly call the login_url after successful verification.
-        const credentials = { username, password, ext: true };
-        const login_result = await _post(login_url, credentials, false);
-        if (login_result !== null) {
-            await showUserTab();
-            await sendMessageFromPopup({ command: "alter_logging_status", log_status: true });
-            chrome.action.setBadgeText({ text: 'on' });
-            chrome.action.setBadgeBackgroundColor({ color: [202, 181, 225, 255] });
-        } else {
-            showAlert("Login failed due to server error. Please try again later.");
-        }
+        await sendMessageFromPopup({ command: "alter_logging_status", log_status: true });
+        await showUserTab();
+        chrome.action.setBadgeText({ text: 'on' });
+        chrome.action.setBadgeBackgroundColor({ color: [202, 181, 225, 255] });
     } else {
         chrome.action.setBadgeText({ text: '' });
+        const error_code = login_response ? login_response.error_code : -1;
         const message_map = { 1: 1, 2: 2, default: 3 };
-        showFailMessage(message_map[verified_status] || message_map.default);
+        showFailMessage(message_map[error_code] || message_map.default);
     }
 }
 
 // Opens the platform feedback page.
 async function handleFeedback() {
-    const confirmed = await showConfirm("Tip: If the task is ongoing, please close the relevant pages before annotating!\nIf not, ignore this message.");
+    const message = "You are about to go to the task homepage. If you are in the middle of a task, this might interrupt your workflow. Continue?";
+    const confirmed = await showConfirm(message);
     if (confirmed) {
         window.open(feedback_url);
     }
@@ -241,17 +207,51 @@ async function handleFeedback() {
 
 // Logs the user out.
 async function handleLogout() {
-    if (task_sniffer_interval) clearInterval(task_sniffer_interval);
-    await chrome.storage.local.remove(['username', 'password', 'logged_in']);
-    await sendMessageFromPopup({ command: "alter_logging_status", log_status: false });
-    chrome.action.setBadgeText({ text: '' });
-    location.reload();
+    chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
+        if (tabs[0]) {
+            chrome.tabs.sendMessage(tabs[0].id, { type: "msg_from_popup", update_webpage_info: true });
+        }
+        await _remove_local(['username', 'access_token', 'refresh_token', 'logged_in']);
+        await sendMessageFromPopup({ command: "alter_logging_status", log_status: false });
+        chrome.action.setBadgeText({ text: '' });
+        location.reload();
+    });
 }
 
-// Opens a new window with a specified URL path.
-function openTaskWindow(path, is_new_window = false) {
-    const url = base_url + path;
-    printDebugOfPopup("Opening task window:", url);
+// // Opens a new window with a specified URL path.
+// function openTaskWindow(path, is_new_window = false) {
+//     const url = base_url + path;
+//     printDebugOfPopup("Opening task window:", url);
+//     const window_options = 'height=1000,width=1200,top=0,left=0,toolbar=no,menubar=no,scrollbars=no,resizable=no,location=no,status=no';
+//     window.open(url, is_new_window ? 'newwindow' : '_blank', is_new_window ? window_options : undefined);
+// }
+
+/**
+ * Opens a new window/tab after authenticating the user via a redirect endpoint.
+ * This function retrieves the JWT access token and passes it to a server endpoint
+ * that validates the token, establishes a session, and redirects to the final destination.
+ * * @param {string} path The server path to redirect to after authentication (e.g., '/task/home/').
+ * @param {boolean} [is_new_window=false] Whether to open in a new, styled window or a new tab.
+ */
+async function openTaskWindow(path, is_new_window = false) {
+    // 1. Retrieve the access token from storage.
+    const { access_token } = await _get_local(['access_token']);
+
+    // 2. Handle the case where the user is not logged in.
+    if (!access_token) {
+        showAlert("Authentication failed. Please log out and log in again.");
+        return;
+    }
+
+    // 3. Construct the URL for the authentication bridge endpoint.
+    // The target path is encoded to ensure it's safely passed as a query parameter.
+    // NOTE: '/user/auth_redirect/' is a new endpoint you'll need to create on your Django backend.
+    const encodedPath = encodeURIComponent(path);
+    const url = `${base_url}/task/auth_redirect/?token=${access_token}&next=${encodedPath}`;
+
+    printDebugOfPopup("Opening authenticated window via redirect:", url);
+
+    // 4. Open the new window or tab.
     const window_options = 'height=1000,width=1200,top=0,left=0,toolbar=no,menubar=no,scrollbars=no,resizable=no,location=no,status=no';
     window.open(url, is_new_window ? 'newwindow' : '_blank', is_new_window ? window_options : undefined);
 }
@@ -299,12 +299,12 @@ async function handleEndTask() {
 
     const is_confirmed = await showConfirm("Do you want to submit the answer?");
     if (is_confirmed) {
+        const active_task = await getActiveTask();
         chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
             if (tabs[0]) {
-                chrome.tabs.sendMessage(tabs[0].id, { type: "msg_from_popup", update_webpage_info: true }, async () => {
+                chrome.tabs.sendMessage(tabs[0].id, { type: "msg_from_popup", update_webpage_info: true }, () => {
                     const timestamp = _time_now();
                     openTaskWindow(`/task/submit_answer/${current_task_id}/${timestamp}/`);
-                    const active_task = await getActiveTask();
                     if (active_task < 0) switchTaskButtonStatus('off');
                 });
             }
@@ -328,8 +328,7 @@ async function handleCancelTask() {
 async function handleViewTask() {
     let current_task_id = await getActiveTask();
     if (current_task_id !== -1) {
-        const credentials = await getUserCredentials();
-        const url = `/task/view_task_info/${current_task_id}/?username=${credentials.username}&password=${credentials.password}`;
+        const url = `/task/view_task_info/${current_task_id}/`
         openTaskWindow(url, true);
     }
 }
@@ -356,14 +355,14 @@ function switchTaskButtonStatus(task_status) {
     // Set the disabled states for all buttons
     $("#bt_start_task").attr("disabled", is_active);
     $("#bt_end_task").attr("disabled", !is_active);
-    $("#bt_cancel_task, #bt_view_task_info, #bt_tool_use").attr("disabled", !is_active);
+    $("#bt_cancel_task").attr("disabled", !is_active);
+    $("#bt_view_task_info").attr("disabled", !is_active);
+    // $("#bt_tool_use").attr("disabled", !is_active); 
 }
 
 // --- INITIALIZATION ---
 // Main function to set up the popup.
 (async function initialize() {
-    showLoginTab();
-
     // Bind event listeners
     $("#bt1").click(handleRegister);
     $("#bt2").click(handleLoginAttempt);
@@ -373,16 +372,73 @@ function switchTaskButtonStatus(task_status) {
     $("#bt_end_task").click(handleEndTask);
     $("#bt_cancel_task").click(handleCancelTask);
     $("#bt_view_task_info").click(handleViewTask);
-    $("#bt_tool_use").click(handleToolUse);
+    // $("#bt_tool_use").click(handleToolUse);
 
     // Check if the user is already logged in.
-    const verified_status = await verifyUser();
-    if (verified_status === 0) {
+    const { access_token } = await _get_local(['access_token']);
+    if (access_token) {
         await showUserTab();
+        await displayActiveTask();
         chrome.action.setBadgeText({ text: 'on' });
         chrome.action.setBadgeBackgroundColor({ color: [202, 181, 225, 255] });
     } else {
+        showLoginTab();
         chrome.action.setBadgeText({ text: '' });
     }
 })();
 
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message.command === "force_logout_and_reload") {
+        location.reload();
+    }
+});
+
+
+// Load saved credentials when popup opens
+document.addEventListener('DOMContentLoaded', function () {
+    chrome.storage.local.get(['savedUsername', 'savedPassword', 'rememberCredentials', 'tempUsername', 'tempPassword'], function (result) {
+        // Populate fields with temporary credentials if available
+        document.getElementById('username').value = result.tempUsername || '';
+        document.getElementById('password').value = result.tempPassword || '';
+
+        // If "Remember Me" was checked, restore saved credentials
+        if (result.rememberCredentials) {
+            document.getElementById('remember').checked = true;
+            if (!result.tempUsername && result.savedUsername) {
+                document.getElementById('username').value = result.savedUsername;
+            }
+            if (!result.tempPassword && result.savedPassword) {
+                document.getElementById('password').value = result.savedPassword;
+            }
+        }
+    });
+
+    const usernameInput = document.getElementById('username');
+    const passwordInput = document.getElementById('password');
+    const rememberCheckbox = document.getElementById('remember');
+
+    // Save temporary credentials on input change
+    function saveTempCredentials() {
+        chrome.storage.local.set({
+            tempUsername: usernameInput.value,
+            tempPassword: passwordInput.value
+        });
+    }
+
+    // Save / clear saved credentials based on checkbox state
+    function saveRememberedCredentials() {
+        if (rememberCheckbox.checked) {
+            chrome.storage.local.set({
+                rememberCredentials: true
+            });
+        } else {
+            chrome.storage.local.set({
+                rememberCredentials: false
+            });
+        }
+    }
+
+    usernameInput.addEventListener('input', saveTempCredentials);
+    passwordInput.addEventListener('input', saveTempCredentials);
+    rememberCheckbox.addEventListener('change', saveRememberedCredentials);
+});

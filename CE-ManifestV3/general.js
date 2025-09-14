@@ -330,3 +330,5 @@ const event_tracker = {
     }
 };
 
+// Main body
+printDebug("general.js is loaded");

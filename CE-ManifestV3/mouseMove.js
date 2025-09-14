@@ -114,7 +114,7 @@ var mouseRecord={
     initialize: function () {
         mouseRecord.movePath = null;
         mouseRecord.scrollPath = null;
-        if (debug) console.log("mouseRecord initialize");
+        printDebug("mouseRecord initialize");
     },
 
     controlMouse:function(x,y){
@@ -152,3 +152,6 @@ var mouseRecord={
         }
     }
 }
+
+// Main body
+printDebug("mouseMove.js is loaded");

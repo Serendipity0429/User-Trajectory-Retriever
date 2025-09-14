@@ -43,13 +43,15 @@
         "http://127.0.0.1/*",
         "https://127.0.0.1/*",
         "http://0.0.0.0/*",
-        "https://0.0.0.0/*"
+        "https://0.0.0.0/*",
+        "http://101.6.41.59:32904/*",
+        "https://101.6.41.59:32904/*"
       ],
       "js": [
         "scripts/jquery-3.3.1.min.js",
         "scripts/rrweb.min.js",
-        "mouseMove.js",
         "utils.js",
+        "mouseMove.js",
         "message.js",
         "page.js",
         "general.js",

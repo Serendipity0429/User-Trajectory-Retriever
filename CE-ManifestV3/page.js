@@ -119,6 +119,7 @@ var pageManager = {
 // Manage the current state of the page
 var viewState = {
     is_sent: false, // If true, the current state has been sent to the server
+    sent_when_active: false, // If true, the current state was active when sent
     is_visible: true,
     time_last_op: 0,
     time_limit: 60000, // The time limit for user inactivity in milliseconds (1 minute now)
@@ -212,9 +213,18 @@ var viewState = {
             document.addEventListener("visibilitychange", function (event) {
                 // NOTICE: the visibilitychange event is also triggered when the page is closed, so we don't need to use onbeforeunload
                 let hidden = event.target.webkitHidden;
-                if (hidden) viewState.tabLeave();
-                else viewState.tabEnter();
-                viewState.flush(); // Flush the view state and send the message
+                if (hidden) {
+                    viewState.tabLeave();
+                    if (viewState.sent_when_active === true) {
+                        printDebug("viewState: already sent when active, skipping flush on tab leave.");
+                        viewState.sent_when_active = false;
+                        return;
+                    } else {
+                        viewState.flush();
+                    }
+                } else {
+                    viewState.tabEnter();
+                }
             }, false);
 
             viewState._is_visibility_listener_added = true;
@@ -233,7 +243,8 @@ var viewState = {
         $(window).focus(viewState.focus);
         $(window).blur(viewState.blur);
 
-        viewState.is_visible = true;
+        // Judge if the page is currently visible
+        viewState.is_visible = !document.hidden;
         viewState.time_last_op = _time_now();
 
         printDebug(viewState);
@@ -249,8 +260,10 @@ var viewState = {
 
     sendMessage: function () {
         printDebug("viewState: send message");
-        if (viewState.is_sent == true || _is_server_page(_content_vars.url_now))  // avoid redundancy and the local server
+        if (viewState.is_sent == true || _is_server_page(_content_vars.url_now)) { // avoid redundancy and the local server
+            printDebug("viewState: message already sent or on server page, skipping sendMessage.");
             return;
+        }
 
         pageManager.pageLeave();
         mouseRecord.end(); // End mouse recording
@@ -271,8 +284,8 @@ var viewState = {
         message.mouse_moves = JSON.stringify(mouseRecord.getData());
         message.event_list = JSON.stringify(unitPage.getEventList());
         message.rrweb_record = JSON.stringify(unitPage.getRRWebEvents());
+        message.sent_when_active = viewState.sent_when_active;
 
-        // Use the Manifest V3 asynchronous message passing.
         chrome.runtime.sendMessage(message, (response) => {
             if (response && response.success) printDebug("viewState: message sent to background script successfully.");
             else printDebug("viewState: failed to send message to background script.");
@@ -281,10 +294,8 @@ var viewState = {
         viewState.is_sent = true;
     },
 
-    flush: function (send_message = true) {
-        if (send_message) {
-            viewState.sendMessage();
-        }
+    flush: function () {
+        viewState.sendMessage();
         viewState.initialize();
         unitPage.rrweb_record = []; // clear the rrweb events
         rrweb.record.takeFullSnapshot(); // take a full snapshot of DOM

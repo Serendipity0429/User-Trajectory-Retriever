@@ -26,6 +26,7 @@ class Message {
         this.mouse_moves = "";
         this.event_list = "";
         this.rrweb_record = "";
+        this.sent_when_active = false;
     }
 
     initialize() {
@@ -41,6 +42,7 @@ class Message {
         this.mouse_moves = "";
         this.event_list = "";
         this.rrweb_record = "";
+        this.sent_when_active = false;
     }
 }
 

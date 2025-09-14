@@ -6,7 +6,7 @@ label {
     font: 12px Arial;
 }
 
-input {
+input[type=text], input[type=password] {
     font: 12px Arial;
     width: 90%;
 }

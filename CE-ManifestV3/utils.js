@@ -15,11 +15,14 @@ const urls = {
     base: _url_base,
     check: `${_url_base}/user/check/`,
     login: `${_url_base}/user/login/`,
+    token_login: `${_url_base}/user/token_login/`,
+    token_refresh: `${_url_base}/user/token_refresh/`,
     data: `${_url_base}/task/data/`,
     cancel: `${_url_base}/task/cancel_task/`,
     active_task: `${_url_base}/task/active_task/`,
     register: `${_url_base}/user/signup/`,
     home: `${_url_base}/task/home/`,
+    stop_annotation: `${_url_base}/task/stop_annotation/`,
     initial_page: "https://www.bing.com/",
 }
 
@@ -55,35 +58,153 @@ function printDebugOfPopup(...messages) {
     }
 }
 
+// utils.js
 
-// Make POST requests
-async function _post(url, data, json_response = true) {
-    try {
-        // If username and password are not in data, add them from local storage
-        if (!data.username || !data.password) {
-            const creds = await _get_local(['username', 'password']);
-            if (creds.username) data.username = creds.username;
-            if (creds.password) data.password = creds.password;
+// 添加一个全局变量来跟踪刷新状态
+let isRefreshing = false;
+// 用于存储等待新令牌的请求
+let failedQueue = [];
+
+const processQueue = (error, token = null) => {
+    failedQueue.forEach(prom => {
+        if (error) {
+            prom.reject(error);
+        } else {
+            prom.resolve(token);
         }
+    });
+    failedQueue = [];
+};
+
+/**
+ * Use the refresh_token to get a new access_token.
+ * @returns {Promise<string|null>} The new access token, or null if refresh failed.
+ */
+async function refreshToken() {
+    // If already refreshing, return a Promise that resolves when done
+    if (isRefreshing) {
+        return new Promise(function(resolve, reject) {
+            failedQueue.push({ resolve, reject });
+        });
+    }
+
+    isRefreshing = true;
+
+    const { refresh_token } = await _get_local('refresh_token');
+    if (!refresh_token) {
+        console.error("Refresh token not found. User needs to log in again.");
+        isRefreshing = false;
+        processQueue(new Error("No refresh token available"), null);
+        return null;
+    }
+
+    try {
+        const response = await fetch(urls.token_refresh, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: new URLSearchParams({ 'refresh': refresh_token }),
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            const new_access_token = data.access;
+            await _set_local({ 'access_token': new_access_token });
+            
+            printDebug("Token refreshed successfully.");
+            processQueue(null, new_access_token);
+            return new_access_token;
+        } else {
+             // Refresh token is invalid or expired - force logout
+            console.error("Failed to refresh token. Status:", response.status);
+            await _remove_local(['access_token', 'refresh_token', 'username','logged_in']);
+            chrome.runtime.sendMessage({ command: "alter_logging_status", log_status: false });
+            chrome.runtime.sendMessage({ command: "force_logout_and_reload" });
+            chrome.action.setBadgeText({ text: '' });
+            processQueue(new Error("Refresh token is invalid"), null);
+            return null;
+        }
+    } catch (error) {
+        console.error("Error during token refresh:", error);
+        processQueue(error, null);
+        return null;
+    } finally {
+        isRefreshing = false;
+    }
+}
+
+
+
+// utils.js
+async function _post(url, data={}, json_response = true, raw_data = false) {
+    try {
+        printDebug("Making API request:", url, data);
+
+        // 1. Fetch the access token from local storage
+        const token_data = await _get_local('access_token');
+        const token = token_data.access_token;
+
+        let headers = {};
+        let body;
+
+        // 2. Prepare headers and body based on raw_data flag
+        if (!raw_data) {
+            headers["Content-Type"] = "application/x-www-form-urlencoded";
+            body = new URLSearchParams(data);
+        } else {
+            headers["Content-Type"] = "text/plain";
+            body = typeof data === "string" ? data : String(data);
+        }
+
+        // 3. Add Authorization header if token is available
+        if (token) {
+            headers["Authorization"] = `Bearer ${token}`;
+        }
+        
         const response = await fetch(url, {
             method: "POST",
-            headers: {
-                "Content-Type": "application/x-www-form-urlencoded",
-            },
-            body: new URLSearchParams(data),
+            headers,
+            body,
         });
 
         if (!response.ok) {
+            if (response.status === 401) { // Unauthorized - token might be expired
+                printDebug("Access token expired. Attempting to refresh...");
+                const new_token = await refreshToken();
+                
+                if (new_token) {
+                    printDebug("Retrying the original request with new token.");
+                    // Retry the original request with the new token
+                    headers["Authorization"] = `Bearer ${new_token}`;
+                    const retry_response = await fetch(url, {
+                        method: "POST",
+                        headers,
+                        body,
+                    });
+
+                    if (!retry_response.ok) {
+                         throw new Error(`HTTP error after retry! status: ${retry_response.status}`);
+                    }
+                    
+                    if (json_response) return await retry_response.json();
+                    return retry_response;
+                } else {
+                    printDebug("Token refresh failed. Could not complete the request.");
+                    throw new Error("Token refresh failed. Could not complete the request.");
+                }
+            }
+            // Other HTTP errors
             throw new Error(`HTTP error! status: ${response.status}`);
         }
 
         if (json_response) {
             return await response.json();
         } else {
-            return await response;
+            return await response; // Return the original response object
         }
     } catch (error) {
-        console.error(`API request failed: ${url}`, error);
+        printDebug(`API request failed: ${url}`, error, "Data:", data);
         return null;
     }
 }
@@ -101,11 +222,6 @@ async function _set_local(kv_pairs) {
 // Remove data from local storage
 async function _remove_local(key) {
     return chrome.storage.local.remove(key);
-}
-
-// Clear all data from local storage
-async function _clear_local() {
-    return chrome.storage.local.clear();
 }
 
 // Helper to convert Uint8Array to Base64 string
@@ -137,12 +253,12 @@ function _time_now() {
 // Display a "content.js loaded" box on the upper right corner for 3 seconds
 // should have a class named 'rr-ignore' to avoid being recorded by rrweb
 // When DOM loaded
-function displayLoadedBox(script_name) {
+function displayLoadedBox(message) {
     var current_url = window.location.href;
     if (current_url.startsWith(config.urls.base))
         return; // Avoid displaying the box on the local server
     const box = document.createElement('div');
-    box.className = 'rr-ignore loaded-box';
+    box.className = 'rr-ignore loaded-box rr-block';
     box.style.opacity = '0.2';
     box.style.transition = 'opacity 0.5s ease-in-out';
 
@@ -156,8 +272,9 @@ function displayLoadedBox(script_name) {
     box.style.color = 'black';
     box.style.padding = '10px';
     box.style.border = '2px solid rgb(151, 67, 219)';
-    box.style.zIndex = '1000000';
-    box.innerText = `${script_name} loaded!`;
+    box.style.zIndex = '2147483647';
+    box.style.contentVisibility = 'visible';
+    box.innerText = `${message}`;
 
     // Check for existing loaded boxes and position accordingly
     const existingBoxes = document.querySelectorAll('.loaded-box');
@@ -238,3 +355,11 @@ function GENERATE_ANNOTATION_MODAL_HTML(type) {
     `;
     return ANNOTATION_MODAL_HTML;
 }
+
+
+function _e(...selector) {
+    return document.querySelector(...selector);
+}
+
+// Main body
+printDebug("utils.js is loaded");   

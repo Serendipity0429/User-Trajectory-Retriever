@@ -113,8 +113,7 @@ async function main() {
         viewState.initialize();
         event_tracker.initialize();
 
-        // Periodically check task status
-        setInterval(() => updateTaskStatus(), 30000); // Every 30 seconds
+        updateTaskStatus();
 
         if (!_is_server_page(_content_vars.url_now)) {
             printDebug("User is logged in.");
@@ -127,7 +126,8 @@ async function main() {
             printDebug("rrweb recording started.");
 
             if (_content_vars.is_task_active) {
-                displayLoadedBox("Started Recording");
+                displayLoadedBox("Start Recording");
+                printDebug("Start Recording");
             }
         }
     }
@@ -147,6 +147,8 @@ chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
             sendResponse({ success: false });
         } else {
             if (message.update_webpage_info) {
+                printDebug("Received update_webpage_info message from popup.");
+                viewState.sent_when_active = true;
                 viewState.flush();
             }
             sendResponse({ success: true });
@@ -154,3 +156,7 @@ chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
     }
 });
 
+
+
+// Main body
+printDebug("content.js is loaded");

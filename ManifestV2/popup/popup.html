@@ -1,0 +1,58 @@
+<!doctype html>
+<html>
+    <head>
+        <meta charset="UTF-8">
+        <title>User Interface</title>
+        <script src="jquery-3.3.1.min.js"></script>
+        <link type="text/css" rel="stylesheet" href="popup.css"></link>
+    </head>
+    <body style="min-width: 150px;">
+        <div id="login">
+            <div class="popup-title" > <em>THUIR</em> </div>
+            <div class="popup-title"> User Trajectory Retriever Toolkit </div>
+            <label for="username">Username</label>
+            <input id="username" name="username">
+            <br/>
+            <label for="psw">Password</label>
+            <input id="psw" name="psw" type="password">
+            <br/>
+            <br/>
+            <button id="bt2">Login</button>
+            <br/>
+            <br/>
+            <button id="bt1">Signup</button>
+            <br/>
+            <br/>
+            <button id="bt4">Go to Platform</button>
+            <p id="failMsg1" hidden style="color:red">Username does not exist!</p>
+
+            <p id="failMsg2" hidden style="color:red">Password error!</p>
+
+            <p id="failMsg3" hidden style="color:red">Request failed. Please check the server, refresh the page and try
+                again.</p>
+        </div>
+        <div id="logged">
+            <div id="username_text_logged"></div>
+            <div id="active_task">No active task</div>
+            <button id="bt_start_task">Start Task</button>
+            <button id="bt_end_task">Submit Answer</button>
+            <br/>
+            <br/>
+            <button id="bt_view_task_info">View Task Info</button>
+            <br/>
+            <br/>
+            <button id="bt_cancel_task">Cancel Task</button>
+            <br/>
+            <br/>
+            <button id="bt_tool_use">Use Tool</button>
+            <br/>
+            <br/>
+            <button id="bt8">Go to Platform</button>
+            <br/>
+            <br/>
+            <button id="bt6">Logout</button>
+        </div>
+
+        <script src="popup.js"></script>
+    </body>
+</html>

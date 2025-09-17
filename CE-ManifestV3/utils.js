@@ -4,7 +4,8 @@
 //NOTICE: Configurations
 // Whether the extension is in development mode
 // TODO: Change to false before deployment
-const is_dev = !('update_url' in chrome.runtime.getManifest());
+// const is_dev = !('update_url' in chrome.runtime.getManifest());
+const is_dev = false;
 
 // Whether the user annotation event on the fly
 const is_passive_mode = true;

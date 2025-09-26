@@ -2,32 +2,26 @@
  * @fileoverview General event listeners for content scripts.
  */
 
-// --- MODULE: Annotation Manager ---
-// Handles the UI and logic for annotating user events. This is only used
-// if event_tracker.is_passive_mode is set to false.
 const annotation_module = {
-    // State
     is_annotating: false,
     freeze_overlay: null,
 
-    // Constants for the annotation modal UI
-    // ANNOTATION_MODAL_STYLE and GENERATE_ANNOTATION_MODAL_HTML is defined in utils/resources.js
     MODAL_STYLE: ANNOTATION_MODAL_STYLE,
     MODAL_HTML: (type) => GENERATE_ANNOTATION_MODAL_HTML(type),
 
-    /**
-     * Displays the annotation window for an event.
-     */
     display(event, target, type, eventTime, screenX, screenY, clientX, clientY, tag, content, relatedInfo) {
         this.is_annotating = true;
         this.freezePage();
         const style = document.createElement('style');
         style.innerHTML = this.MODAL_STYLE.replaceAll(';', ' !important;');
 
-        const overlay = $('<div class="annotation-overlay rr-ignore"></div>');
-        const modal = $(this.MODAL_HTML(type));
+        const overlay = document.createElement('div');
+        overlay.className = 'annotation-overlay rr-ignore';
 
-        // Position the modal near the event coordinates
+        const modalHTML = this.MODAL_HTML(type);
+        const modal = document.createElement('div');
+        modal.innerHTML = modalHTML;
+
         const popup_width = 500;
         const popup_height = 350;
         let viewport_left = clientX;
@@ -37,7 +31,7 @@ const annotation_module = {
         viewport_left = Math.max(0, viewport_left);
         viewport_top = Math.max(0, viewport_top);
 
-        modal.css({
+        Object.assign(modal.style, {
             'position': 'fixed',
             'top': `${viewport_top}px`,
             'left': `${viewport_left}px`,
@@ -46,28 +40,28 @@ const annotation_module = {
             'z-index': '100000',
         });
 
-        $('head').append(style);
-        overlay.append(modal).appendTo('body');
-        overlay.show();
+        document.head.appendChild(style);
+        overlay.appendChild(modal);
+        document.body.appendChild(overlay);
+        overlay.style.display = 'block';
 
         const endAnnotation = () => {
             overlay.remove();
             this.unfreezePage();
             if (type === 'click') {
                 const anchor = target.closest('a[href]');
-                // If it's a link, navigate to it after annotation
                 if (anchor && anchor.href) {
                     window.location.href = anchor.href;
                 } else {
-                    target.click(); // Otherwise, trigger the original click
+                    target.click();
                 }
             }
             this.is_annotating = false;
         };
 
-        $('#submit-btn').on('click', () => {
-            const purpose = $('#purpose').val().trim();
-            const is_key_event = $('#key-event').is(':checked');
+        document.getElementById('submit-btn').addEventListener('click', () => {
+            const purpose = document.getElementById('purpose').value.trim();
+            const is_key_event = document.getElementById('key-event').checked;
             if (!purpose) {
                 alert('Please describe the event purpose.');
                 return;
@@ -78,16 +72,13 @@ const annotation_module = {
             endAnnotation();
         });
 
-        $('#ignore-btn').on('click', () => {
+        document.getElementById('ignore-btn').addEventListener('click', () => {
             const hierarchy = event_tracker.getElementHierarchyHTML(target);
             unitPage.addActiveEvent(type, eventTime, screenX, screenY, clientX, clientY, tag, content, hierarchy, relatedInfo, null);
             endAnnotation();
         });
     },
 
-    /**
-     * Freezes the page with an overlay to prevent interaction during annotation.
-     */
     freezePage() {
         this.freeze_overlay = document.createElement("div");
         this.freeze_overlay.className = "freeze-overlay rr-ignore";
@@ -101,9 +92,6 @@ const annotation_module = {
         this.freeze_overlay.addEventListener("click", () => alert("Please annotate the event first!"));
     },
 
-    /**
-     * Unfreezes the page by removing the overlay.
-     */
     unfreezePage() {
         if (this.freeze_overlay) {
             document.documentElement.style.overflow = '';
@@ -114,17 +102,9 @@ const annotation_module = {
     }
 };
 
-// --- MODULE: Event Tracker ---
-// Manages the setup and handling of all DOM event listeners for tracking user behavior.
 const event_tracker = {
-    is_passive_mode: config.is_passive_mode, // If false, enables the annotation feature on "active" events.
+    is_passive_mode: config.is_passive_mode,
 
-
-    /**
-     * Utility to limit the rate at which a function gets called.
-     * @param {Function} func The function to throttle.
-     * @param {number} limit The throttle interval in milliseconds.
-     */
     throttle(func, limit) {
         let in_throttle;
         return function(...args) {
@@ -136,30 +116,20 @@ const event_tracker = {
         };
     },
     
-    /**
-     * Gets the element's hierarchy as an array of HTML strings.
-     * @param {HTMLElement} element The starting element.
-     * @returns {string[]}
-     */
-    getElementHierarchyHTML(element) {
-        if (!element || !element.tagName) return ['<html>'];
+    getElementHierarchyHTML(element, depth = 10) {
+        if (!element || !element.tagName || depth <= 0) return ['<html>'];
         const hierarchy = [];
         let current = element;
-        while (current) {
+        while (current && depth > 0) {
             const tag_name = current.tagName.toLowerCase();
             const attributes = Array.from(current.attributes).map(attr => ` ${attr.name}="${attr.value}"`).join('');
             hierarchy.push(`<${tag_name}${attributes}>`);
             current = current.parentElement;
+            depth--;
         }
         return hierarchy;
     },
 
-    /**
-     * Determines if an element interaction is considered "active" (e.g., clicking a link).
-     * @param {HTMLElement} element The event target element.
-     * @param {string} eventType The type of event.
-     * @returns {boolean}
-     */
     isElementActive(element, eventType) {
         if (eventType !== 'click') return false;
         const tag_name = element.tagName.toLowerCase();
@@ -171,11 +141,6 @@ const event_tracker = {
         return !!element.closest('a[href], button');
     },
 
-    /**
-     * Extracts the visible content from a target element.
-     * @param {HTMLElement} target The element to extract content from.
-     * @returns {string}
-     */
     getElementContent(target) {
         const tag_name = target.tagName ? target.tagName.toLowerCase() : '';
         if (tag_name === "img") return target.src;
@@ -183,11 +148,6 @@ const event_tracker = {
         return target.innerText;
     },
     
-    /**
-     * Recovers the absolute URL from a relative link.
-     * @param {string} relativeLink The relative URL path.
-     * @returns {string} The absolute URL.
-     */
     recoverAbsoluteLink(relativeLink) {
         if (typeof relativeLink !== 'string' || !relativeLink) return "";
         if (relativeLink.startsWith('http') || relativeLink.startsWith('//')) return relativeLink;
@@ -198,13 +158,6 @@ const event_tracker = {
         }
     },
 
-    /**
-     * Gathers context-specific information related to an event.
-     * @param {HTMLElement} target The event target element.
-     * @param {string} type The event type.
-     * @param {Event} [event=null] The original DOM event object.
-     * @returns {object}
-     */
     getRelatedInfo(target, type, event = null) {
         const related_info = {};
         const tag_name = target.tagName ? target.tagName.toLowerCase() : '';
@@ -247,9 +200,6 @@ const event_tracker = {
         return related_info;
     },
     
-    /**
-     * Records an "active" user event, potentially triggering an annotation.
-     */
     activeEventHandler(event, type) {
         if (!this.is_passive_mode) {
             event.preventDefault();
@@ -268,9 +218,6 @@ const event_tracker = {
         }
     },
 
-    /**
-     * Records a "passive" user event without interrupting the user.
-     */
     passiveEventHandler(event, type) {
         const e = event || window.event;
         const target = e.target;
@@ -279,9 +226,6 @@ const event_tracker = {
         unitPage.addPassiveEvent(type, Date.now(), e.screenX, e.screenY, e.clientX, e.clientY, target.tagName, this.getElementContent(target), hierarchy, related_info);
     },
 
-    /**
-     * Main event handler that routes events to active or passive handlers.
-     */
     handleEvent(event, type) {
         if (annotation_module.is_annotating) return;
 
@@ -301,22 +245,16 @@ const event_tracker = {
         }
     },
 
-    /**
-     * Sets up all the necessary event listeners on the page.
-     */
     initialize() {
         if (_is_server_page(_content_vars.url_now)) return;
         
-        // Use capture phase for click to potentially prevent default action for annotation
         document.body.addEventListener('click', (e) => this.handleEvent(e, 'click'), true);
 
-        // Passive Events with throttling
         const throttled_hover = this.throttle((e) => this.passiveEventHandler(e, 'hover'), 50);
         const throttled_scroll = this.throttle((e) => this.passiveEventHandler(e, 'scroll'), 50);
         document.body.addEventListener('mouseover', throttled_hover, true);
         document.addEventListener('scroll', throttled_scroll, true);
         
-        // Other passive events
         const passive_events = ['contextmenu', 'change', 'keypress', 'copy', 'paste', 'drag', 'drop'];
         passive_events.forEach(eventType => {
             const handler = (e) => this.passiveEventHandler(e, eventType.replace('contextmenu', 'right click'));
@@ -330,5 +268,4 @@ const event_tracker = {
     }
 };
 
-// Main body
-printDebug("general.js is loaded");
+printDebug("general", "general.js is loaded");

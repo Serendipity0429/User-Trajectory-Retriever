@@ -5,26 +5,21 @@ from django.db import models
 
 from user_system.models import User
 
-try:
-    import simplejson as json
-except ImportError:
-    import json
+import json
  
 
 # Task Dataset
 class TaskDataset(models.Model):
-    id = models.AutoField(primary_key=True)
     name = models.CharField(max_length=1000)
     path = models.CharField(max_length=1000)
 
 
 class TaskDatasetEntry(models.Model):
-    id = models.AutoField(primary_key=True)
     belong_dataset = models.ForeignKey(
         TaskDataset,
         on_delete=models.CASCADE,
     )
-    question = models.CharField(max_length=10000)
+    question = models.TextField()
     answer = models.JSONField()
 
     num_associated_tasks = models.IntegerField(default=0)  # number of tasks associated with this entry
@@ -32,7 +27,6 @@ class TaskDatasetEntry(models.Model):
 
 # Task
 class Task(models.Model):
-    id = models.AutoField(primary_key=True)
     user = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
@@ -41,8 +35,8 @@ class Task(models.Model):
     # basic information
     cancelled = models.BooleanField(default=False)  # whether the task is cancelled
     active = models.BooleanField(default=True)  # whether the task is active
-    start_timestamp = models.IntegerField()
-    end_timestamp = models.IntegerField(null=True)
+    start_timestamp = models.DateTimeField(auto_now_add=True)
+    end_timestamp = models.DateTimeField(auto_now=True)
 
     # task content
     content = models.ForeignKey(
@@ -57,14 +51,12 @@ class Task(models.Model):
 
 # Pre-task annotation
 class PreTaskAnnotation(models.Model):
-    id = models.AutoField(primary_key=True)
-    belong_task = models.ForeignKey(
+    belong_task = models.OneToOneField(
         Task,
         on_delete=models.CASCADE,
     )
 
-    description = models.CharField(max_length=1000, null=True)
-    completion_criteria = models.CharField(max_length=1000, null=True)
+
     familiarity = models.IntegerField(null=True)  # 0->4, unfamiliar -> familiar
     difficulty = models.IntegerField(null=True)  # 0->4, easy -> hard
     effort = models.IntegerField(null=True)  # time effort to complete the task, 3 to 60
@@ -73,11 +65,14 @@ class PreTaskAnnotation(models.Model):
 
 # Reflection annotation
 class ReflectionAnnotation(models.Model):
-    id = models.AutoField(primary_key=True)
+    belong_task_trial = models.OneToOneField(
+        'TaskTrial',
+        on_delete=models.CASCADE,
+    )
 
-    failure_reason = models.CharField(max_length=10000) # reason for failure
-    failure_category = models.CharField(max_length=100)  # category of failure, e.g. "lack of resources", "lack of knowledge", etc.
-    future_plan_actions = models.CharField(max_length=100)  # actions to take in the future
+    failure_reason = models.TextField() # reason for failure
+    failure_category = models.JSONField(null=True)  # category of failure, e.g. "lack of resources", "lack of knowledge", etc.
+    future_plan_actions = models.JSONField(null=True)  # actions to take in the future
     future_plan_other = models.TextField(null=True)  # other future plan actions
     remaining_effort = models.IntegerField()  # remaining effort to complete the task, 3 to 60
 
@@ -85,8 +80,7 @@ class ReflectionAnnotation(models.Model):
 
 # Post-task annotation
 class PostTaskAnnotation(models.Model):
-    id = models.AutoField(primary_key=True)
-    belong_task = models.ForeignKey(
+    belong_task = models.OneToOneField(
         Task,
         on_delete=models.CASCADE,
     )
@@ -107,17 +101,16 @@ class PostTaskAnnotation(models.Model):
 
     # If task is cancelled
     cancel_category = models.CharField(max_length=100, null=True)  # refer to post_task_annotation.html
-    cancel_reason = models.CharField(max_length=10000, null=True)  # reason for cancellation
-    cancel_reflection = models.TextField(null=True)  # reflection on cancellation
-    cancel_missing_resources = models.CharField(max_length=10000, null=True)  # missing resources that led to cancellation
+    cancel_reason = models.TextField(null=True)  # reason for cancellation
+    cancel_additional_reflection = models.TextField(null=True)  # reflection on cancellation
+    cancel_missing_resources = models.JSONField(null=True)  # missing resources that led to cancellation
     cancel_missing_resources_other = models.TextField(null=True)  # other missing resources
-    cancel_additional_reflection = models.TextField(null=True)  # additional reflection on cancellation
 
 
 # Task Trial
 class TaskTrial(models.Model):
-    start_timestamp = models.IntegerField()
-    end_timestamp = models.IntegerField()
+    start_timestamp = models.DateTimeField(auto_now_add=True)
+    end_timestamp = models.DateTimeField(auto_now=True)
     num_trial = models.IntegerField()  # number of trials
 
     answer = models.CharField(max_length=1000)
@@ -129,12 +122,6 @@ class TaskTrial(models.Model):
     
     additional_explanation = models.TextField(null=True)  # explanation of the answer
 
-    reflection_annotation = models.ForeignKey(
-        ReflectionAnnotation,
-        on_delete=models.CASCADE,
-        null=True,
-    )
-
     belong_task = models.ForeignKey(
         Task,
         on_delete=models.CASCADE,
@@ -143,7 +130,6 @@ class TaskTrial(models.Model):
 
 # Webpages
 class Webpage(models.Model):
-    id = models.AutoField(primary_key=True)
     user = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
@@ -159,15 +145,15 @@ class Webpage(models.Model):
     )
 
 
-    title = models.CharField(max_length=100)
-    url = models.CharField(max_length=1000)
-    referrer = models.CharField(max_length=1000)
-    start_timestamp = models.IntegerField()
-    end_timestamp = models.IntegerField()
+    title = models.CharField(max_length=512)
+    url = models.URLField(max_length=1000)
+    referrer = models.URLField(max_length=1000)
+    start_timestamp = models.DateTimeField()
+    end_timestamp = models.DateTimeField()
     dwell_time = models.IntegerField()
-    mouse_moves = models.TextField()  # mouse move data in JSON format
-    event_list = models.TextField()  # list of events in JSON format
-    rrweb_record = models.TextField()  # rrweb record in JSON format
+    mouse_moves = models.JSONField()  # mouse move data in JSON format
+    event_list = models.JSONField()  # list of events in JSON format
+    rrweb_record = models.JSONField()  # rrweb record in JSON format
     
     is_redirected = models.BooleanField(default=False)  # whether the webpage is redirected
     during_annotation = models.BooleanField(default=False)  # whether the webpage is during annotation
@@ -177,11 +163,6 @@ class Webpage(models.Model):
 # Annotation of certain behaviors
 # e.g. click, hover, scroll, etc.
 class EventAnnotation(models.Model):
-    id = models.AutoField(primary_key=True)
-    user = models.ForeignKey(
-        User,
-        on_delete=models.CASCADE,
-    )
     belong_task = models.ForeignKey(
         Task,
         on_delete=models.CASCADE,
@@ -191,7 +172,26 @@ class EventAnnotation(models.Model):
 
     type = models.CharField(max_length=50)
     target = models.CharField(max_length=50)
-    timestamp = models.IntegerField()
+    timestamp = models.DateTimeField()
     detail = models.CharField(max_length=1000)  # description of the event
     is_key_event = models.BooleanField(default=False)  # whether this event is a key event
     remarks = models.CharField(max_length=1000)  # remarks of the event
+
+
+# Annotation of certain moments during the task trial
+class MomentAnnotation(models.Model):
+    belong_task_trial = models.ForeignKey(
+        TaskTrial,
+        on_delete=models.CASCADE
+    )
+    # We can link it to a specific webpage visit if needed, or just the trial
+    # belong_webpage = models.ForeignKey(Webpage, on_delete=models.CASCADE, null=True)
+
+    timestamp = models.FloatField()  # The timestamp (in seconds) within the rrweb replay
+    
+    # Structured annotation fields we discussed
+    sub_goal = models.TextField(null=True)
+    action_rationale = models.TextField(null=True)
+    hypothesis = models.TextField(null=True)
+    confidence = models.IntegerField(null=True)  # 1-5 rating
+    reflection = models.TextField(null=True) # "Looking back, was this a good step?"

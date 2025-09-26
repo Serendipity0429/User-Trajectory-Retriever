@@ -1,7 +1,63 @@
 {% extends "base.html" %}
+{% load task_manager_extras %}
 {% block title %} Pre-Task Annotation {% endblock %}
 {% block content_title %} Pre-Task Annotation {% endblock %}
 {% block content %}
+    <style>
+        .choice-container {
+            display: flex;
+            align-items: center;
+            margin-right: 20px; /* Add space between options */
+        }
+        .tooltip-container {
+            position: relative;
+            display: inline-block;
+            cursor: pointer;
+        }
+        .tooltip-button {
+            background-color: #f0f0f0;
+            border: 1px solid #ccc;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            font-size: 12px;
+            margin-left: 5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .tooltip-text {
+            visibility: hidden;
+            min-width: 220px;
+            max-width: 300px;
+            background-color: #555;
+            color: #fff;
+            text-align: center;
+            border-radius: 6px;
+            padding: 8px 12px;
+            position: absolute;
+            z-index: 1;
+            bottom: 125%;
+            left: 50%;
+            transform: translateX(-50%);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        .tooltip-text::after {
+            content: "";
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            margin-left: -5px;
+            border-width: 5px;
+            border-style: solid;
+            border-color: #555 transparent transparent transparent;
+        }
+        .tooltip-container:hover .tooltip-text {
+            visibility: visible;
+            opacity: 1;
+        }
+    </style>
     <div class="row text-center">
         <h3>
             Please annotate the following questions before task
@@ -42,11 +98,17 @@
                     <div class="question-wrapper col-xs-12">
                         <div class="ratio col-xs-12 list-row question-text"><b>3. Domain Familiarity</b>: How familiar are you with the topic of this question?</div>
                         <div class="ratio col-xs-12 list-row ">
-                            <label><input type="radio" name="familiarity" value="0"/> 0：Not familiar at all</label><br>
-                            <label><input type="radio" name="familiarity" value="1"/> 1：Slightly familiar</label><br>
-                            <label><input type="radio" name="familiarity" value="2"/> 2：Moderately familiar</label><br>
-                            <label><input type="radio" name="familiarity" value="3"/> 3：Familiar</label><br>
-                            <label><input type="radio" name="familiarity" value="4"/> 4：Very familiar</label><br>
+                            {% for key, value in FAMILIARITY_MAP.items %}
+                                <div class="choice-container">
+                                    <label>
+                                        <input type="radio" name="familiarity" value="{{ key }}"/> {{ value }}
+                                    </label>
+                                    <div class="tooltip-container">
+                                        <span class="tooltip-button">?</span>
+                                        <span class="tooltip-text">{{ FAMILIARITY_EXPLANATION_MAP|get_item:key }}</span>
+                                    </div>
+                                </div>
+                            {% endfor %}
                         </div>
                     </div>
 
@@ -54,11 +116,17 @@
                         <div class="ratio col-xs-12 list-row question-text"><b>4. Difficulty</b>: How do
                             you evaluate the difficulty of the task？</div>
                         <div class="ratio col-xs-12 list-row ">
-                            <label><input type="radio" name="difficulty" value="0"/> 0：Very easy</label><br>
-                            <label><input type="radio" name="difficulty" value="1"/> 1：Easy</label><br>
-                            <label><input type="radio" name="difficulty" value="2"/> 2：Moderately difficult</label><br>
-                            <label><input type="radio" name="difficulty" value="3"/> 3：Difficult</label><br>
-                            <label><input type="radio" name="difficulty" value="4"/> 4：Very difficult</label><br>
+                            {% for key, value in DIFFICULTY_MAP.items %}
+                                <div class="choice-container">
+                                    <label>
+                                        <input type="radio" name="difficulty" value="{{ key }}"/> {{ value }}
+                                    </label>
+                                    <div class="tooltip-container">
+                                        <span class="tooltip-button">?</span>
+                                        <span class="tooltip-text">{{ DIFFICULTY_EXPLANATION_MAP|get_item:key }}</span>
+                                    </div>
+                                </div>
+                            {% endfor %}
                         </div>
                     </div>
 
@@ -100,8 +168,6 @@
                 </div>
             </div>
         </div>
-        <script>
-        </script>
         <script>
             function setEffort() {
                 let effort = document.getElementById("effort_val");

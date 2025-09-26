@@ -1,12 +1,35 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+import logging
+from datetime import datetime
+from django.utils import timezone
+
 from django.shortcuts import render
-from django.views.decorators.csrf import csrf_exempt
-from user_system.utils import *
-from .utils import *
-from rest_framework.decorators import api_view, permission_classes
+
+from .utils import (
+    print_debug,
+    stop_annotating,
+    decompress_json_data,
+    store_data,
+    close_window,
+    get_active_task_dataset,
+    start_annotating,
+    wait_until_data_stored,
+    check_answer,
+)
+from .models import (
+    Task,
+    TaskDatasetEntry,
+    PreTaskAnnotation,
+    PostTaskAnnotation,
+    Webpage,
+    TaskTrial,
+    ReflectionAnnotation,
+)
+from rest_framework.decorators import api_view, permission_classes, authentication_classes
 from rest_framework.permissions import IsAuthenticated
+from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework_simplejwt.tokens import AccessToken
 from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from django.contrib.auth import get_user_model
@@ -14,6 +37,7 @@ from django.views.decorators.csrf import (
     csrf_exempt,
     ensure_csrf_cookie,
 )  # Add ensure_csrf_cookie here
+from django.urls import reverse
 
 try:
     import simplejson as json
@@ -64,8 +88,9 @@ def auth_redirect(request):
         # 2. Log the user into a Django session
         # This will set the session cookie in the user's browser
         if user.is_active:
+            user.backend = 'django.contrib.auth.backends.ModelBackend'  # Explicitly set backend
             login(request, user)
-            # 3. Redirect to the intended page with token in header
+            # 3. Redirect to the intended page
             response = HttpResponseRedirect(redirect_path)
             return response
         else:
@@ -77,7 +102,6 @@ def auth_redirect(request):
 
 
 # Store data
-@csrf_exempt
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def data(request):
@@ -86,14 +110,6 @@ def data(request):
     # decompress the message if it is compressed
     message = decompress_json_data(message)
     user = request.user
-    if user.username != message["username"]:
-        print_debug(
-            "Username mismatch! Request user:",
-            user.username,
-            "Message has:",
-            message["username"],
-        )
-        return HttpResponse("Username mismatch", status=400)
     store_data(message, user)
     return HttpResponse("data storage succeeded")
 
@@ -110,7 +126,7 @@ def pre_task_annotation(request, timestamp):
         task = Task()
         task.user = user
         task.active = True
-        task.start_timestamp = timestamp
+        task.start_timestamp = timezone.make_aware(datetime.fromtimestamp(timestamp / 1000))
         entry_id = int(request.POST.get("entry_id"))
         entry = TaskDatasetEntry.objects.filter(id=entry_id).first()
         if entry is None:
@@ -122,8 +138,6 @@ def pre_task_annotation(request, timestamp):
 
         pre_annotation = PreTaskAnnotation()
         pre_annotation.belong_task = task
-        pre_annotation.description = request.POST.get("description")
-        pre_annotation.completion_criteria = request.POST.get("completion_criteria")
         pre_annotation.familiarity = request.POST.get("familiarity")
         pre_annotation.difficulty = request.POST.get("difficulty")
         pre_annotation.effort = request.POST.get("effort")
@@ -158,6 +172,10 @@ def pre_task_annotation(request, timestamp):
                 "task_timestamp": timestamp,
                 "question": entry.question,
                 "entry_id": entry.id,
+                "FAMILIARITY_MAP": FAMILIARITY_MAP,
+                "DIFFICULTY_MAP": DIFFICULTY_MAP,
+                "FAMILIARITY_EXPLANATION_MAP": FAMILIARITY_EXPLANATION_MAP,
+                "DIFFICULTY_EXPLANATION_MAP": DIFFICULTY_EXPLANATION_MAP,
             },
         )
 
@@ -180,7 +198,10 @@ def post_task_annotation(request, task_id):
             post_annotation.aha_moment_type = request.POST.get("aha_moment_type")
             post_annotation.aha_moment_other = request.POST.get("aha_moment_other")
             post_annotation.aha_moment_source = request.POST.get("aha_moment_source")
-            post_annotation.unhelpful_paths = request.POST.get("unhelpful_paths")
+            post_annotation.unhelpful_paths = request.POST.getlist("unhelpful_paths")
+            post_annotation.unhelpful_paths_other = request.POST.get("unhelpful_paths_other")
+            post_annotation.strategy_shift = request.POST.get("strategy_shift")
+            post_annotation.strategy_shift_other = request.POST.get("strategy_shift_other")
             post_annotation.additional_reflection = request.POST.get(
                 "additional_reflection"
             )
@@ -190,10 +211,9 @@ def post_task_annotation(request, task_id):
             task.save()
             stop_annotating()
             return close_window()
-        # error
-        stop_annotating()
-        print_debug("error in post_task_annotation")
-        return close_window()
+        else:
+            stop_annotating()
+            return HttpResponse("Task not found or already inactive", status=404)
 
     else:
         # Fetch task and relevant webpages
@@ -223,12 +243,21 @@ def post_task_annotation(request, task_id):
                 "webpages": webpages,
                 "question": question,
                 "answer": answer,
+                "DIFFICULTY_MAP": DIFFICULTY_MAP,
+                "AHA_MOMENT_MAP": AHA_MOMENT_MAP,
+                "UNHELPFUL_PATHS_MAP": UNHELPFUL_PATHS_MAP,
+                "STRATEGY_SHIFT_MAP": STRATEGY_SHIFT_MAP,
+                "DIFFICULTY_EXPLANATION_MAP": DIFFICULTY_EXPLANATION_MAP,
+                "AHA_MOMENT_EXPLANATION_MAP": AHA_MOMENT_EXPLANATION_MAP,
+                "UNHELPFUL_PATHS_EXPLANATION_MAP": UNHELPFUL_PATHS_EXPLANATION_MAP,
+                "STRATEGY_SHIFT_EXPLANATION_MAP": STRATEGY_SHIFT_EXPLANATION_MAP,
             },
         )
 
 
 # Return active tasks
 @api_view(["POST"])
+@authentication_classes([JWTAuthentication])
 @permission_classes([IsAuthenticated])
 def active_task(request):
     # Return active tasks
@@ -267,7 +296,6 @@ def initialize(request):
     return HttpResponse(-1)
 
 
-@api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def task_home(request):
     print_debug("function task_home")
@@ -363,6 +391,22 @@ DIFFICULTY_MAP = {
     4: "4 - Very difficult",
 }
 
+FAMILIARITY_EXPLANATION_MAP = {
+    0: "You have no prior knowledge or experience with this topic.",
+    1: "You have heard of the topic, but know very little about it.",
+    2: "You have some basic knowledge of the topic.",
+    3: "You are comfortable with the topic and have a good understanding of it.",
+    4: "You have a deep understanding of the topic and could explain it to others.",
+}
+
+DIFFICULTY_EXPLANATION_MAP = {
+    0: "You expect to find the answer almost immediately.",
+    1: "You expect to find the answer with a simple search.",
+    2: "You expect to need to browse a few pages or perform a few searches.",
+    3: "You expect to need to do some in-depth research and synthesis.",
+    4: "You expect this to be a very challenging task that may require significant effort.",
+}
+
 CONFIDENCE_MAP = {
     1: "1 - Just a guess",
     2: "2 - Not very confident",
@@ -435,6 +479,84 @@ STRATEGY_SHIFT_MAP = {
     "other": "Other (please specify):",
 }
 
+AHA_MOMENT_EXPLANATION_MAP = {
+    "data_table": "You found a table or chart that contained the answer.",
+    "direct_statement": "You found a sentence or paragraph that directly stated the answer.",
+    "official_document": "You found an official document, such as a PDF from a government agency or a scientific paper, that contained the answer.",
+    "key_definition": "Understanding a specific term or concept was the key to finding the answer.",
+    "synthesis": "You had to combine information from multiple sources or sections to arrive at the answer.",
+    "other": "None of the above.",
+}
+
+UNHELPFUL_PATHS_EXPLANATION_MAP = {
+    "no_major_roadblocks": "The search process was straightforward.",
+    "irrelevant_results": "Your search queries returned results that were not relevant to the task.",
+    "outdated_info": "You found information that was no longer accurate.",
+    "low_quality": "You encountered websites that were untrustworthy or difficult to use.",
+    "paywall": "You were blocked by a paywall or a login requirement.",
+    "contradictory_info": "You found conflicting information on different websites.",
+    "other": "None of the above.",
+}
+
+STRATEGY_SHIFT_EXPLANATION_MAP = {
+    "no_change": "Your initial plan was effective and you did not need to change it.",
+    "narrowed_search": "You made your search queries more specific to narrow down the results.",
+    "broadened_search": "You made your search queries more general to get a broader overview of the topic.",
+    "changed_source_type": "You switched from looking at one type of source (e.g., news articles) to another (e.g., academic papers).",
+    "re-evaluated_assumption": "You realized that one of your initial assumptions was wrong, which led you to change your search strategy.",
+    "other": "None of the above.",
+}
+
+CANCEL_CATEGORY_EXPLANATION_MAP = {
+    "info_unavailable": "You have searched, but cannot find the required information on the public web.",
+    "too_difficult": "The task requires a level of analysis, synthesis, or understanding that is beyond your current capabilities.",
+    "no_idea": "You have exhausted your initial ideas and are unsure how to approach the problem differently.",
+    "too_long": "The task is consuming an excessive amount of time relative to its expected difficulty or importance.",
+    "technical_issue": "You are blocked by a non-information-related problem, such as a website that is down, a required login, or a paywall.",
+    "other": "None of the above categories accurately describe the reason for cancellation.",
+}
+
+MISSING_RESOURCES_EXPLANATION_MAP = {
+    "expert_knowledge": "The task requires understanding of a specialized field that you do not possess.",
+    "paid_access": "The information is likely behind a paywall or in a subscription-only database.",
+    "better_tools": "A standard search engine is insufficient; a specialized tool (e.g., a scientific database, code interpreter) is needed.",
+    "different_question": "The question is poorly phrased, ambiguous, or contains incorrect assumptions.",
+    "info_not_online": "The information is likely to exist only in offline sources (e.g., books, private archives).",
+    "time_limit": "You could likely solve it, but not within a reasonable timeframe.",
+    "team_help": "The task requires collaboration or brainstorming with others.",
+    "guidance": "You need a hint or direction from someone who knows the answer or the path to it.",
+    "better_question": "The instructions for the task are unclear or incomplete.",
+    "other": "A resource not listed here was needed.",
+}
+
+FAILURE_CATEGORY_EXPLANATION_MAP = {
+    "bad_query": "Your search terms were too broad, too narrow, or did not capture the intent of the question.",
+    "misinterpreted_info": "You found the correct data but misunderstood its meaning or context.",
+    "info_not_found": "The information does not appear to be available on the pages you visited.",
+    "logic_error": "You made a mistake in reasoning, calculation, or synthesis of the information.",
+    "ambiguous_info": "The information you found was unclear, contradictory, or could be interpreted in multiple ways.",
+    "outdated_info": "The information was once correct but is no longer valid.",
+    "trusting_source": "You relied on a source that was biased, incorrect, or not authoritative.",
+    "time_pressure": "You rushed and did not have enough time to find or verify the best answer.",
+    "lack_expertise": "You could not understand the subject matter well enough to answer correctly.",
+    "format_error": "Your answer was factually correct but did not follow the required format.",
+    "other": "A reason for failure not listed here.",
+}
+
+CORRECTIVE_ACTION_EXPLANATION_MAP = {
+    "refine_query": "Make your search terms more specific to narrow down the results.",
+    "broaden_query": "Use more general terms to get a broader understanding of the topic first.",
+    "find_new_source_type": "Switch from looking at blogs or forums to official reports, news, or academic papers.",
+    "re-evaluate_info": "Read the pages you have already visited again, more slowly and carefully.",
+    "check_recency": "Filter your search results by date to find the most current information.",
+    "check_reliability": "Prioritize well-known, authoritative sources over anonymous or biased ones.",
+    "improve_logic": "Double-check your calculations or the steps in your reasoning process.",
+    "validate_source": "Confirm the information by finding at least one other independent source that says the same thing.",
+    "reformulate_answer": "Check the instructions again to ensure your answer is in the correct format.",
+    "other": "A corrective action not listed here.",
+}
+
+
 CANCEL_CATEGORY_MAP = {
     "info_unavailable": "I believe the information is not publicly available online.",
     "too_difficult": "The task is too complex or difficult for me to solve.",
@@ -488,108 +610,26 @@ def show_task(request, task_id):
     task_question = task.content.question
     task_answer = json.loads(task.content.answer) if task.content.answer else {}
 
-    # 2. Fetch and create context for Pre-Task Annotation
-    pre_task_annotation_obj = PreTaskAnnotation.objects.filter(belong_task=task).first()
-    pre_task_annotation_context = None
-    if pre_task_annotation_obj:
-        pre_task_annotation_context = {
-            "familiarity": FAMILIARITY_MAP.get(
-                pre_task_annotation_obj.familiarity, pre_task_annotation_obj.familiarity
-            ),
-            "difficulty": DIFFICULTY_MAP.get(
-                pre_task_annotation_obj.difficulty, pre_task_annotation_obj.difficulty
-            ),
-            "effort": pre_task_annotation_obj.effort,
-            "initial_strategy": pre_task_annotation_obj.initial_strategy,
-        }
+    # 2. Fetch Pre-Task Annotation
+    pre_task_annotation = PreTaskAnnotation.objects.filter(belong_task=task).first()
 
     # 3. Fetch all trials and related data
     task_trials = TaskTrial.objects.filter(belong_task=task).order_by("num_trial")
-    trials_context = []
     for trial in task_trials:
-        trial_webpages = Webpage.objects.filter(
+        trial.webpages = Webpage.objects.filter(
             belong_task_trial=trial, is_redirected=False, during_annotation=False
         ).order_by("start_timestamp")
-
-        submitted_sources = []
         try:
+            trial.submitted_sources = []
             sources_dict = json.loads(trial.source_url_and_text)
             for url, texts in sources_dict.items():
                 for text in texts:
-                    submitted_sources.append({"url": url, "text": text})
+                    trial.submitted_sources.append({"url": url, "text": text})
         except (json.JSONDecodeError, TypeError):
-            submitted_sources = []
-
-        submitted_answer_context = {
-            "answer": trial.answer,
-            "confidence": CONFIDENCE_MAP.get(trial.confidence, trial.confidence),
-            "sources": submitted_sources,
-            "reasoning_method": REASONING_METHOD_MAP.get(
-                trial.reasoning_method, trial.reasoning_method
-            ),
-            "additional_explanation": trial.additional_explanation,
-        }
-
-        reflection_context = None
-        if not trial.is_correct and trial.reflection_annotation:
-            reflection = trial.reflection_annotation
-            reflection_context = {
-                "failure_reasons": map_json_list(
-                    reflection.failure_category, FAILURE_CATEGORY_MAP
-                ),
-                "failure_analysis": reflection.failure_reason,
-                "corrective_plan": map_json_list(
-                    reflection.future_plan_actions, CORRECTIVE_PLAN_MAP
-                ),
-                "remaining_effort": reflection.remaining_effort,
-                "additional_reflection": reflection.additional_reflection,
-            }
-
-        trials_context.append(
-            {
-                "num_trial": trial.num_trial,
-                "is_correct": trial.is_correct,
-                "webpages": trial_webpages,
-                "submitted_answer": submitted_answer_context,
-                "reflection_annotation": reflection_context,
-            }
-        )
+            pass
 
     # 4. Fetch Post-Task or Cancellation Annotation
     final_annotation = PostTaskAnnotation.objects.filter(belong_task=task).first()
-    post_task_annotation_context = None
-    cancel_annotation_context = None
-
-    if final_annotation:
-        if task.cancelled:
-            cancel_annotation_context = {
-                "cancel_category": CANCEL_CATEGORY_MAP.get(
-                    final_annotation.cancel_category, final_annotation.cancel_category
-                ),
-                "cancel_reason": final_annotation.cancel_reason,
-                "missing_resources": map_json_list(
-                    final_annotation.cancel_missing_resources, MISSING_RESOURCES_MAP
-                ),
-                "additional_reflection": final_annotation.cancel_additional_reflection,
-            }
-        else:
-            post_task_annotation_context = {
-                "difficulty_actual": DIFFICULTY_MAP.get(
-                    final_annotation.difficulty_actual,
-                    final_annotation.difficulty_actual,
-                ),
-                "aha_moment_type": AHA_MOMENT_MAP.get(
-                    final_annotation.aha_moment_type, final_annotation.aha_moment_type
-                ),
-                "aha_moment_source": final_annotation.aha_moment_source,
-                "unhelpful_paths": map_json_list(
-                    final_annotation.unhelpful_paths, UNHELPFUL_PATHS_MAP
-                ),
-                "strategy_shift": STRATEGY_SHIFT_MAP.get(
-                    final_annotation.strategy_shift, final_annotation.strategy_shift
-                ),
-                "additional_reflection": final_annotation.additional_reflection,
-            }
 
     # 5. Assemble the final context and render the template
     context = {
@@ -597,11 +637,22 @@ def show_task(request, task_id):
         "task_id": task.id,
         "task_question": task_question,
         "task_answer": task_answer,
-        "pre_task_annotation": pre_task_annotation_context,
-        "trials": trials_context,
-        "post_task_annotation": post_task_annotation_context,
-        "cancel_annotation": cancel_annotation_context,
+        "pre_task_annotation": pre_task_annotation,
+        "trials": task_trials,
+        "post_task_annotation": final_annotation if (final_annotation and not task.cancelled) else None,
+        "cancel_annotation": final_annotation if (final_annotation and task.cancelled) else None,
         "task": task,
+        "FAMILIARITY_MAP": FAMILIARITY_MAP,
+        "DIFFICULTY_MAP": DIFFICULTY_MAP,
+        "CONFIDENCE_MAP": CONFIDENCE_MAP,
+        "REASONING_METHOD_MAP": REASONING_METHOD_MAP,
+        "FAILURE_CATEGORY_MAP": FAILURE_CATEGORY_MAP,
+        "CORRECTIVE_PLAN_MAP": CORRECTIVE_PLAN_MAP,
+        "AHA_MOMENT_MAP": AHA_MOMENT_MAP,
+        "UNHELPFUL_PATHS_MAP": UNHELPFUL_PATHS_MAP,
+        "STRATEGY_SHIFT_MAP": STRATEGY_SHIFT_MAP,
+        "CANCEL_CATEGORY_MAP": CANCEL_CATEGORY_MAP,
+        "MISSING_RESOURCES_MAP": MISSING_RESOURCES_MAP,
     }
     return render(request, "show_task.html", context)
 
@@ -638,9 +689,7 @@ def tool_use(request):
         elif tool == "code":
             for_url = "https://www.jdoodle.com/start-coding"
 
-        return HttpResponse(
-            f'<html><head><meta http-equiv="refresh" content="0;url={for_url}"></head><body></body></html>'
-        )
+        return HttpResponseRedirect(for_url)
 
 
 @permission_classes([IsAuthenticated])
@@ -653,12 +702,13 @@ def cancel_task(request, task_id, end_timestamp):
 
     if request.method == "POST":
         task.cancelled = True
+        task.save()
         cancel_annotation = PostTaskAnnotation()
         cancel_annotation.belong_task = task
         cancel_annotation.cancel_category = request.POST.get("cancel_category")
         cancel_annotation.cancel_reason = request.POST.get("cancel_reason")
         cancel_annotation.cancel_missing_resources = request.POST.get(
-            "cancel_missing_resources"
+            "cancel_missing_resources_list"
         )
         cancel_annotation.cancel_missing_resources_other = request.POST.get(
             "cancel_missing_resources_other"
@@ -668,11 +718,11 @@ def cancel_task(request, task_id, end_timestamp):
         )
         cancel_annotation.save()
         stop_annotating()
-        return HttpResponseRedirect("https://bing.com")
+        return close_window()
 
     else:
         task.active = False
-        task.end_timestamp = end_timestamp
+        task.end_timestamp = timezone.make_aware(datetime.fromtimestamp(end_timestamp / 1000))
         task.save()
 
         entry = task.content
@@ -688,6 +738,8 @@ def cancel_task(request, task_id, end_timestamp):
                 "task_id": task_id,
                 "question": question,
                 "answer": answer,
+                "CANCEL_CATEGORY_EXPLANATION_MAP": CANCEL_CATEGORY_EXPLANATION_MAP,
+                "MISSING_RESOURCES_EXPLANATION_MAP": MISSING_RESOURCES_EXPLANATION_MAP,
             },
         )
 
@@ -702,7 +754,7 @@ def reflection_annotation(request, task_id, end_timestamp):
     entry = task.content
     question = entry.question
     task_trial = TaskTrial.objects.filter(
-        belong_task=task, end_timestamp=end_timestamp
+        belong_task=task, end_timestamp=timezone.make_aware(datetime.fromtimestamp(end_timestamp / 1000))
     ).first()
     if task_trial is None:
         return HttpResponse(
@@ -718,6 +770,7 @@ def reflection_annotation(request, task_id, end_timestamp):
         )
         ref_annotation.future_plan_other = request.POST.get("future_plan_other")
         ref_annotation.remaining_effort = request.POST.get("remaining_effort")
+        ref_annotation.additional_reflection = request.POST.get("additional_reflection")
         ref_annotation.save()
         task_trial.reflection_annotation = ref_annotation
         task_trial.save()
@@ -728,10 +781,11 @@ def reflection_annotation(request, task_id, end_timestamp):
 
     else:
         # Filter the webpage whose timestamp is within the range of start_timestamp and timestamp
+        end_datetime = timezone.make_aware(datetime.fromtimestamp(end_timestamp / 1000))
         webpages = Webpage.objects.filter(
             belong_task=task,
             start_timestamp__gte=task_trial.start_timestamp,
-            start_timestamp__lt=end_timestamp,
+            start_timestamp__lt=end_datetime,
             is_redirected=False,
             during_annotation=False,
         )
@@ -751,6 +805,8 @@ def reflection_annotation(request, task_id, end_timestamp):
                 "question": question,
                 "webpages": webpages,
                 "user_answer": user_answer,
+                "FAILURE_CATEGORY_EXPLANATION_MAP": FAILURE_CATEGORY_EXPLANATION_MAP,
+                "CORRECTIVE_ACTION_EXPLANATION_MAP": CORRECTIVE_ACTION_EXPLANATION_MAP,
             },
         )
 
@@ -776,11 +832,12 @@ def submit_answer(request, task_id, timestamp):
         start_timestamp = last_task_trial.end_timestamp
 
     # Filter the webpage whose timestamp is within the range of start_timestamp and timestamp
+    end_datetime = timezone.make_aware(datetime.fromtimestamp(timestamp / 1000))
     all_webpages = Webpage.objects.filter(
         belong_task=task, start_timestamp__gte=start_timestamp
     )
     webpages = all_webpages.filter(
-        start_timestamp__lte=timestamp, is_redirected=False, during_annotation=False
+        start_timestamp__lte=end_datetime, is_redirected=False, during_annotation=False
     )
     # Sort by start_timestamp
     webpages = sorted(webpages, key=lambda item: item.start_timestamp)
@@ -797,7 +854,7 @@ def submit_answer(request, task_id, timestamp):
         task.num_trial += 1
         task_trial.answer = answer
         task_trial.start_timestamp = start_timestamp
-        task_trial.end_timestamp = timestamp
+        task_trial.end_timestamp = timezone.make_aware(datetime.fromtimestamp(timestamp / 1000))
         task_trial.additional_explanation = additional_explanation
         task_trial.confidence = confidence
         task_trial.reasoning_method = reasoning_method
@@ -816,13 +873,13 @@ def submit_answer(request, task_id, timestamp):
         source_url_and_text = json.dumps(source_url_and_text)
         task_trial.source_url_and_text = source_url_and_text
 
-        redirect_url = f"/task/post_task_annotation/{task_id}"
+        redirect_url = reverse('task_manager:post_task_annotation', args=[task_id])
         if check_answer(task.content, answer):
             task_trial.is_correct = True
-            task.end_timestamp = timestamp
+            task.end_timestamp = timezone.make_aware(datetime.fromtimestamp(timestamp / 1000))
         else:
             task_trial.is_correct = False
-            redirect_url = f"/task/reflection_annotation/{task_id}/{timestamp}"
+            redirect_url = reverse('task_manager:reflection_annotation', args=[task_id, timestamp])
 
         task_trial.save()
         task.save()
@@ -880,3 +937,4 @@ def remove_task(request, task_id):
         return HttpResponse(f"No task found with task_id={task_id}")
     task.delete()
     return HttpResponse("Task removed successfully")
+

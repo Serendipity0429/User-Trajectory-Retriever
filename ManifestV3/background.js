@@ -1,95 +1,101 @@
 // background.js
 // This script runs in the background and handles communication between content scripts and the server
 
-// Import necessary scripts
-// Import third-party libraries
-// import './scripts/pako.min.js'; // For data compression 
-
 // Import config variables and utility functions
 importScripts('./utils.js');
 
-const url_base = config.urls.base;
-const url_check = config.urls.check;
-const url_data = config.urls.data;
-const url_active_task = config.urls.active_task;
-const url_stop_annotation = config.urls.stop_annotation;    
+// --- Constants ---
+const URL_CHECK = config.urls.check;
+const URL_DATA = config.urls.data;
+const URL_ACTIVE_TASK = config.urls.active_task;
+const URL_STOP_ANNOTATION = config.urls.stop_annotation;
 
-/* NOTICE: username and password are stored in local storage since the service worker's state is not persistent. */
-// Variables that stored in local storage
-// username, password, logged_in
-
-// Runtime global variables in background
-let current_task = -1;
-
-
-// NOTICE: Manifest V3 does not support synchronous AJAX requests. All network calls must be asynchronous.
-// We should replace $.ajax with the modern Fetch API, which is also a more secure approach.
-
-// Key for storing current task ID
 const TASK_STORAGE_KEY = 'current_task_id';
+
+const ALARM_CLEAR_STORAGE = 'clear_local_storage';
+const ALARM_CHECK_TASK = 'check_active_task';
+
+const MSG_CHECK_LOGGING_STATUS = 'check_logging_status';
+const MSG_ALTER_LOGGING_STATUS = 'alter_logging_status';
+const MSG_INJECT_SCRIPT = 'inject_script';
+const MSG_SEND_MESSAGE = 'send_message';
+const MSG_GET_ACTIVE_TASK = 'get_active_task';
+
+
+// --- State Management ---
+
 async function getCurrentTask() {
     const result = await _get_local(TASK_STORAGE_KEY);
     return result[TASK_STORAGE_KEY] || -1;
 }
-// Set current task ID in local storage
+
 async function setCurrentTask(task_id) {
     return await _set_local({ [TASK_STORAGE_KEY]: task_id });
 }
 
-// Get username, access_token, refresh_token, and isLoggedIn status
+// SECURITY: Avoid storing passwords in local storage.
+// The 'password' field has been removed.
 async function getUserInfo() {
     const { username, access_token, refresh_token, logged_in } = await _get_local(['username', 'access_token', 'refresh_token', 'logged_in']);
-
-    printDebugOfBackground(`User Info - Username: ${username}, Access Token: ${access_token ? access_token : 'Not Set'}, Refresh Token: ${refresh_token ? refresh_token : 'Not Set'}, Logged In: ${logged_in}`);
-
+    printDebug("background", `User Info - Username: ${username}, Access Token: ${access_token ? 'Set' : 'Not Set'}, Refresh Token: ${refresh_token ? 'Set' : 'Not Set'}, Logged In: ${logged_in}`);
     return { username, access_token, refresh_token, logged_in };
 }
 
-// Check whether the user has an active task and retrieve its ID
+
+// --- Core Logic ---
+
 async function checkActiveTaskID() {
-    printDebugOfBackground("Checking active task ID...");
+    printDebug("background", "Checking active task ID...");
     const { logged_in } = await _get_local('logged_in');
     if (!logged_in) {
-        await setCurrentTask(-1); // Reset current task if not logged in
+        await setCurrentTask(-1);
         return -1;
     }
 
     try {
-        printDebugOfBackground("Fetching active task ID from server ...");  
+        printDebug("background", "Fetching active task ID from server...");
         const old_task_id = await getCurrentTask();
-        const data = await _post(url_active_task);
+        
+        // Use a more robust API call with retry logic
+        const response = await _post(URL_ACTIVE_TASK, {}, false); // json_response = false to handle text
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.text();
         const new_task_id = (data !== null && data !== undefined && !isNaN(data)) ? parseInt(data, 10) : -1;
 
-        // Check if the task state has changed
         const is_task_started = old_task_id === -1 && new_task_id > -1;
         const is_task_finished = old_task_id > -1 && new_task_id === -1;
-        if (is_task_started || is_task_finished) { // task started or finished
-            printDebugOfBackground(`Task state changed. Old Task ID: ${old_task_id}, New Task ID: ${new_task_id}`);
-            // Close all irrelevant tabs when a task starts or finishes
+
+        if (is_task_started || is_task_finished) {
+            printDebug("background", `Task state changed. Old: ${old_task_id}, New: ${new_task_id}`);
             closeAllIrrelevantTabs();
         }
         await setCurrentTask(new_task_id);
         return new_task_id;
     } catch (error) {
         console.error("Error checking active task ID:", error);
-        // Don't clear task ID on temporary server failure, just return error code
-        return -2;
+        // Check if the error is due to token refresh failure
+        if (error.message.includes("Token refresh failed")) {
+            // Force logout if token cannot be refreshed
+            await _remove_local(['access_token', 'refresh_token', 'username', 'logged_in']);
+            chrome.runtime.sendMessage({ command: "alter_logging_status", log_status: false });
+            chrome.action.setBadgeText({ text: '' });
+        }
+        return -2; // Indicate server failure
     }
 }
 
-// Close all tabs that is not from the base URL
 function closeAllIrrelevantTabs() {
-    printDebugOfBackground("Closing all irrelevant tabs...");
-
+    printDebug("background", "Closing all irrelevant tabs...");
     chrome.tabs.query({}, (tabs) => {
-        // Log all tabs for debugging
-        printDebugOfBackground("All open tabs:", tabs);
+        printDebug("background", "All open tabs:", tabs);
         const irrelevant_tab_ids = tabs
             .filter(tab => tab.url && !_is_server_page(tab.url) && !_is_extension_page(tab.url))
             .map(tab => tab.id);
         const home_tab_ids = tabs
             .filter(tab => tab.url && _is_server_page(tab.url))
-            .map(tab => tab.id); // Not including extension pages
+            .map(tab => tab.id);
 
         if (home_tab_ids.length === 0) {
             chrome.tabs.create({ url: config.urls.initial_page, active: false });
@@ -98,48 +104,44 @@ function closeAllIrrelevantTabs() {
         if (irrelevant_tab_ids.length > 0) {
             chrome.tabs.remove(irrelevant_tab_ids);
         }
-
     });
 }
 
-
-// Send information to base url
 async function sendInfo(message) {
-    printDebugOfBackground("Sending info...");
-    const { username, access_token, refresh_token, logged_in } = await getUserInfo();
+    printDebug("background", "Sending info...");
+    const { logged_in } = await getUserInfo();
     if (!logged_in) {
-        printDebugOfBackground("User not logged in. Aborting sendInfo.");
+        printDebug("background", "User not logged in. Aborting sendInfo.");
         return;
     }
 
-    // Use Fetch API
     try {
-        await _post(url_data, { message }, raw_data = true); // Server expects raw data, not JSON
-        printDebugOfBackground("Info sent successfully.");
+        // TODO: Implement a retry mechanism for failed requests.
+        await _post(URL_DATA, { message }, true); // raw_data = true
+        printDebug("background", "Info sent successfully.");
     } catch (error) {
         console.error("Error sending info:", error);
     }
 }
 
-// Flush the local storage
 async function flush() {
     try {
-        const items = await _get_local(null); // Get all items from storage
-        const promises = []; // Array to hold promises for sending messages
+        const items = await _get_local(null);
+        const promises = [];
         const keys_to_remove = [];
 
         for (const key in items) {
             if (key.match(/^\d+$/)) {
-                // NOTICE: sendInfo is async, so this function won't wait for it to finish
                 promises.push(sendInfo(items[key]));
                 keys_to_remove.push(key);
             }
         }
 
         if (keys_to_remove.length > 0) {
-            await Promise.all(promises); // Wait for all messages to be sent
-            await _remove_local(keys_to_remove); // Remove all sent items from storage
-            printDebugOfBackground(`Flushed ${keys_to_remove.length} items from local storage.`);
+            // TODO: Implement more robust error handling for failed sends.
+            await Promise.all(promises);
+            await _remove_local(keys_to_remove);
+            printDebug("background", `Flushed ${keys_to_remove.length} items from local storage.`);
         }
     }
     catch (error) {
@@ -147,10 +149,8 @@ async function flush() {
     }
 }
 
-
-// Clear expired items from local storage
 async function clearLocalStorage() {
-    const items = await _get_local(null); // Get all items from storage
+    const items = await _get_local(null);
     const keys_to_remove = [];
 
     for (const key in items) {
@@ -167,27 +167,14 @@ async function clearLocalStorage() {
 }
 
 
-// Main part of service worker
-// Periodically check task status
-// Create an alarm when the extension starts up
-chrome.runtime.onStartup.addListener(() => {
-    console.log("Creating check-task alarm on startup.");
-    chrome.alarms.create('check_active_task', {
-        delayInMinutes: 1, // Start after 1 minute
-        periodInMinutes: 5 // Repeat every 5 minutes
-    });
-});
+// --- Event Listeners ---
 
-// Event listeners in the service worker must be top-level.
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    // Handling synchronous responses is more complex in Manifest V3.
-    // We use sendResponse but must return true to indicate we will send a response asynchronously.
-    printDebugOfBackground(`Received message typed ${message.type || 'unknown source'}:`, message);
-    let response;
+    printDebug("background", `Received message: ${message.command || 'unknown'}:`, message);
     (async () => {
+        let response;
         switch (message.command) {
-            case "check_logging_status":
-                printDebugOfBackground("Checking logging status...");
+            case MSG_CHECK_LOGGING_STATUS:
                 const { logged_in } = await _get_local(['logged_in']);
                 if (logged_in) {
                     chrome.action.setBadgeText({ text: 'on' });
@@ -199,8 +186,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 }
                 sendResponse(response);
                 break;
-            case "alter_logging_status":
-                printDebugOfBackground("Altering logging status...");
+
+            case MSG_ALTER_LOGGING_STATUS:
                 if (message.log_status !== undefined) {
                     await _set_local({ logged_in: message.log_status });
                     sendResponse("Logging status updated");
@@ -208,93 +195,77 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     sendResponse({ error: "Invalid logging status" });
                 }
                 break;
-            case "inject_script":
-                pringDebug("Injecting script...");
+
+            case MSG_INJECT_SCRIPT:
                 if (!message.script || !sender.tab || !sender.tab.id) {
                     sendResponse({ success: false, error: "No script specified" });
-                    return false;
+                    return;
                 }
-                // Inject the script into the active tab
                 chrome.scripting.executeScript({
                     target: { tabId: sender.tab.id },
                     files: [message.script]
                 });
                 sendResponse({ success: true });
                 break;
-            case "send_message":
-                printDebugOfBackground("Sending message...");
-                printDebugOfBackground("Original message:", message);
 
+            case MSG_SEND_MESSAGE:
                 const current_task_id = await getCurrentTask();
-
-                // Check if there is a need to send the message
                 if (current_task_id === -1 || message.send_flag === false) {
                     sendResponse({ success: false, error: "No active task or send_flag is false" });
                     return;
                 }
 
                 const { username } = await _get_local(['username']);
-                message.username = username;
 
-                let msg_json = JSON.stringify(message);
-                // Encode the JSON string to a Uint8Array
+                const msg_json = JSON.stringify(message);
                 const data_to_compress = new TextEncoder().encode(msg_json);
-                // Create a compression stream for 'deflate' compression
                 const cs = new CompressionStream('deflate');
                 const writer = cs.writable.getWriter();
                 writer.write(data_to_compress);
                 writer.close();
-                // Read the compressed data from the stream
                 const compressed_data = await new Response(cs.readable).arrayBuffer();
                 const compressed_uint8 = new Uint8Array(compressed_data);
-                // Convert the Uint8Array to a base64 string
-                let compressed_base64 = uint8ArrayToBase64(compressed_uint8);
+                const compressed_base64 = uint8ArrayToBase64(compressed_uint8);
                 sendInfo(compressed_base64);
                 sendResponse({ success: true });
                 break;
-            case "get_active_task":
-                printDebugOfBackground("Getting active task...");
+
+            case MSG_GET_ACTIVE_TASK:
                 const task_id = await checkActiveTaskID();
                 const is_task_active = task_id !== -1;
-                printDebugOfBackground(`Active task ID: ${task_id}`);
+                printDebug("background", `Active task ID: ${task_id}`);
                 sendResponse({ is_task_active: is_task_active, task_id: task_id });
                 break;
         }
     })();
-    // Return true to indicate that the response will be sent asynchronously.
-    // This is required for all async operations within the listener.
-    return true;
-})
-
+    return true; // Required for async sendResponse
+});
 
 chrome.runtime.onStartup.addListener(async () => {
+    console.log("Extension starting up...");
     try {
-        // Initial flush and setup
         await flush();
-        // Set up an alarm for clearing local storage every minute
-        chrome.alarms.create('clear_local_storage', { periodInMinutes: 1 });
+        chrome.alarms.create(ALARM_CLEAR_STORAGE, { periodInMinutes: 1 });
+        chrome.alarms.create(ALARM_CHECK_TASK, { delayInMinutes: 1, periodInMinutes: 5 });
     } catch (error) {
         console.error("Error during onStartup:", error);
     }
 });
 
-// Listen for alarms
 chrome.alarms.onAlarm.addListener(async (alarm) => {
     switch (alarm.name) {
-        case 'clear_local_storage':
-            printDebugOfBackground("Clearing expired items from local storage..."); 
+        case ALARM_CLEAR_STORAGE:
+            printDebug("background", "Clearing expired items from local storage...");
             await clearLocalStorage();
             break;
-        case 'check_active_task':
-            printDebugOfBackground("Checking active task ID from alarm...");
+        case ALARM_CHECK_TASK:
+            printDebug("background", "Checking active task ID from alarm...");
             await checkActiveTaskID();
             break;
     }
 });
 
 chrome.tabs.onRemoved.addListener((tabId, removeInfo) => {
-    printDebugOfBackground(`Tab ${tabId} was closed. Forcing a check for active task status.`);
-    // Immediately re-check the active task status from the server.
-    // This will update the stored task ID if the closed tab completed a task action.
+    printDebug("background", `Tab ${tabId} was closed. Forcing a check for active task status.`);
     checkActiveTaskID();
 });

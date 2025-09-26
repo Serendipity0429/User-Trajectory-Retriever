@@ -1,6 +1,5 @@
 // --- Configuration ---
 const base_url = config.urls.base;
-const check_url = config.urls.check;
 const token_login_url = config.urls.token_login;
 const register_url = config.urls.register;
 const feedback_url = config.urls.home;
@@ -8,7 +7,129 @@ const feedback_url = config.urls.home;
 // --- Global State ---
 let active_task_id = -1;
 
-// --- Manifest V3 COMPATIBILITY HELPERS ---
+// --- UI LOGIC ---
+
+function showAlert(message) {
+    const modal_container = document.getElementById('modal-container');
+    modal_container.innerHTML = `
+        <div class="modal-overlay">
+            <div class="modal-content">
+                <p>${message}</p>
+                <div class="modal-buttons">
+                    <button class="ok-btn">OK</button>
+                </div>
+            </div>
+        </div>
+    `;
+    modal_container.querySelector('.ok-btn').addEventListener('click', () => {
+        modal_container.innerHTML = '';
+    });
+}
+
+function showConfirm(message) {
+    return new Promise(resolve => {
+        const modal_container = document.getElementById('modal-container');
+        modal_container.innerHTML = `
+            <div class="modal-overlay">
+                <div class="modal-content">
+                    <p>${message}</p>
+                    <div class="modal-buttons">
+                        <button class="confirm-btn">Yes</button>
+                        <button class="cancel-btn" style="margin-top: 10px;">No</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        modal_container.querySelector('.confirm-btn').addEventListener('click', () => {
+            modal_container.innerHTML = '';
+            resolve(true);
+        });
+        modal_container.querySelector('.cancel-btn').addEventListener('click', () => {
+            modal_container.innerHTML = '';
+            resolve(false);
+        });
+    });
+}
+
+function showFailMessage(message_type) {
+    for (let i = 1; i <= 3; i++) {
+        const failMsg = document.getElementById(`failMsg${i}`);
+        if (failMsg) {
+            failMsg.style.display = 'none';
+        }
+    }
+    if (message_type >= 1 && message_type <= 3) {
+        const failMsg = document.getElementById(`failMsg${message_type}`);
+        if (failMsg) {
+            failMsg.style.display = 'block';
+        }
+    }
+}
+
+function switchUiState(show_login) {
+    const loggedDiv = document.getElementById('logged');
+    const loginDiv = document.getElementById('login');
+    if (show_login) {
+        loggedDiv.style.display = 'none';
+        loginDiv.style.display = 'block';
+    } else {
+        loginDiv.style.display = 'none';
+        loggedDiv.style.display = 'block';
+    }
+    showFailMessage(0);
+}
+
+async function displayActiveTask() {
+    active_task_id = await getActiveTask();
+    printDebug("popup", "Active task ID:", active_task_id);
+    const activeTaskEl = document.getElementById('active_task');
+    const startTaskBtn = document.getElementById('bt_start_task');
+
+    if (active_task_id === -1) {
+        switchTaskButtonStatus('off');
+        activeTaskEl.textContent = "No active task";
+        activeTaskEl.style.color = "#000";
+    } else if (active_task_id === -2) {
+        switchTaskButtonStatus('off');
+        startTaskBtn.setAttribute("disabled", "true");
+        activeTaskEl.textContent = "Fail to connect to server";
+        activeTaskEl.style.color = "#e13636";
+    } else {
+        switchTaskButtonStatus('on');
+        activeTaskEl.textContent = "Active task ID: " + active_task_id;
+        activeTaskEl.style.color = "#000";
+    }
+}
+
+async function showUserTab() {
+    const { username } = await _get_local(['username']);
+    document.getElementById('username_text_logged').textContent = "User: " + username;
+    document.getElementById('bt_end_task').style.display = 'none';
+    await displayActiveTask();
+    switchUiState(false);
+}
+
+function showLoginTab() {
+    switchUiState(true);
+}
+
+function switchTaskButtonStatus(task_status) {
+    const is_active = task_status === 'on';
+    const startTaskBtn = document.getElementById('bt_start_task');
+    const endTaskBtn = document.getElementById('bt_end_task');
+    const cancelTaskBtn = document.getElementById('bt_cancel_task');
+    const viewTaskInfoBtn = document.getElementById('bt_view_task_info');
+
+    startTaskBtn.style.display = is_active ? 'none' : 'block';
+    endTaskBtn.style.display = is_active ? 'block' : 'none';
+
+    startTaskBtn.disabled = is_active;
+    endTaskBtn.disabled = !is_active;
+    cancelTaskBtn.disabled = !is_active;
+    viewTaskInfoBtn.disabled = !is_active;
+}
+
+// --- API CALLS ---
 
 async function sendMessageFromPopup(message) {
     return new Promise((resolve, reject) => {
@@ -25,360 +146,159 @@ async function sendMessageFromPopup(message) {
     });
 }
 
-/**
- * Creates a custom modal to replace the native `alert()` function.
- * @param {string} message The message to display.
- */
-function showAlert(message) {
-    const loggedDiv = document.getElementById('logged');
-    const originalDisplay = loggedDiv.style.display;
-    loggedDiv.style.display = 'none';
-    const modal_container = document.getElementById('modal-container');
-    modal_container.innerHTML = `
-        <div class="modal-overlay">
-            <div class="modal-content">
-                <p>${message}</p>
-                <div class="modal-buttons">
-                    <button class="ok-btn">OK</button>
-                </div>
-            </div>
-        </div>
-    `;
-    modal_container.querySelector('.ok-btn').addEventListener('click', () => {
-        modal_container.innerHTML = '';
-        loggedDiv.style.display = originalDisplay;
-    });
-}
-
-/**
- * Creates a custom modal to replace the native `confirm()` function.
- * @param {string} message The confirmation message.
- * @returns {Promise<boolean>} A promise that resolves to true if confirmed, false otherwise.
- */
-function showConfirm(message) {
-    return new Promise(resolve => {
-        const loggedDiv = document.getElementById('logged');
-        const originalDisplay = loggedDiv.style.display;
-        loggedDiv.style.display = 'none';
-
-        const modal_container = document.getElementById('modal-container');
-        modal_container.innerHTML = `
-            <div class="modal-overlay">
-            <div class="modal-content">
-                <p>${message}</p>
-                <div class="modal-buttons">
-                <button class="confirm-btn">Yes</button>
-                <button class="cancel-btn" style="margin-top: 10px;">No</button>
-                </div>
-            </div>
-            </div>
-        `;
-        modal_container.querySelector('.confirm-btn').addEventListener('click', () => {
-            modal_container.innerHTML = '';
-            loggedDiv.style.display = originalDisplay;
-            resolve(true);
-        });
-        modal_container.querySelector('.cancel-btn').addEventListener('click', () => {
-            modal_container.innerHTML = '';
-            loggedDiv.style.display = originalDisplay;
-            resolve(false);
-        });
-    });
-}
-
-
-
-// --- UI LOGIC ---
-
-// Hides or shows specific failure messages in the login form.
-function showFailMessage(message_type) {
-    $("#failMsg1, #failMsg2, #failMsg3").hide();
-    if (message_type >= 1 && message_type <= 3) {
-        $(`#failMsg${message_type}`).show();
-    }
-}
-
-// Switches between the login view and the logged-in view.
-function switchUiState(show_login) {
-    if (show_login) {
-        $("#logged").hide();
-        $("#login").show();
-    } else {
-        $("#login").hide();
-        $("#logged").show();
-    }
-    showFailMessage(0); // Hide all error messages on UI switch.
-}
-
-/**
- * Gets the active task by sending a message to the background script.
- * @returns {Promise<number>} The active task ID, or -1 for no task, -2 for error.
- */
 async function getActiveTask() {
     try {
         const response = await sendMessageFromPopup({ command: "get_active_task" });
-        if (response && response.task_id !== undefined) {
-            return response.task_id;
-        }
-        return -1;
+        return response?.task_id ?? -1;
     } catch (error) {
         console.error("Failed to get active task from background script:", error);
         return -2;
     }
 }
 
-// Updates the UI to display the current active task status.
-async function displayActiveTask() {
-    active_task_id = await getActiveTask();
-    printDebugOfPopup("Active task ID:", active_task_id);
-    if (active_task_id === -1) {
-        switchTaskButtonStatus('off');
-        $("#active_task").text("No active task").css("color", "#000");
-    } else if (active_task_id === -2) {
-        switchTaskButtonStatus('off');
-        $("#bt_start_task").attr("disabled", true);
-        $("#active_task").text("Fail to connect to server").css("color", "#e13636");
-    } else {
-        switchTaskButtonStatus('on');
-        $("#active_task").text("Active task ID: " + active_task_id).css("color", "#000");
+async function openTaskWindow(path, is_new_window = false) {
+    const { access_token } = await _get_local(['access_token']);
+    if (!access_token) {
+        showAlert("Authentication failed. Please log out and log in again.");
+        return;
     }
-    switchUiState(false);
-}
-
-// Sets up the UI for a logged-in user.
-async function showUserTab() {
-    const { username } = await _get_local(['username']);
-    $("#username_text_logged").text("User: " + username);
-    $("#bt_end_task").hide();
-    await displayActiveTask();
-}
-
-// Sets up the UI for logging in.
-function showLoginTab() {
-    switchUiState(true);
+    const encodedPath = encodeURIComponent(path);
+    const url = `${base_url}/task/auth_redirect/?token=${access_token}&next=${encodedPath}`;
+    const window_options = 'height=1000,width=1200,top=0,left=0,toolbar=no,menubar=no,scrollbars=no,resizable=no,location=no,status=no';
+    window.open(url, is_new_window ? 'newwindow' : '_blank', is_new_window ? window_options : undefined);
 }
 
 // --- EVENT HANDLERS ---
 
-// Opens the registration page in a new tab.
 function handleRegister() {
     window.open(register_url);
 }
 
 async function handleLoginAttempt() {
-    let username = $("#username").val();
-    let password = $("#password").val();
+    const username = document.getElementById('username').value;
+    const password = document.getElementById('password').value;
 
     if (!username || !password) {
         showAlert("Please enter both username and password.");
         return;
     }
 
-    const credentials = { username: username, password: password, ext: true };
-    const login_response = await _post(token_login_url, credentials, true);
-
-    if (login_response && login_response.access) {
-        await _set_local({
-            'username': username,
-            'access_token': login_response.access,
-            'refresh_token': login_response.refresh
-        });
-
-        await sendMessageFromPopup({ command: "alter_logging_status", log_status: true });
-        await showUserTab();
-        chrome.action.setBadgeText({ text: 'on' });
-        chrome.action.setBadgeBackgroundColor({ color: [202, 181, 225, 255] });
-    } else {
-        chrome.action.setBadgeText({ text: '' });
-        const error_code = login_response ? login_response.error_code : -1;
-        const message_map = { 1: 1, 2: 2, default: 3 };
-        showFailMessage(message_map[error_code] || message_map.default);
+    const credentials = { username, password, ext: true };
+    try {
+        const login_response = await _post(token_login_url, credentials, true);
+        if (login_response?.access && login_response?.refresh) {
+            await _set_local({
+                'username': username,
+                'access_token': login_response.access,
+                'refresh_token': login_response.refresh
+            });
+            await sendMessageFromPopup({ command: "alter_logging_status", log_status: true });
+            await showUserTab();
+            chrome.action.setBadgeText({ text: 'on' });
+            chrome.action.setBadgeBackgroundColor({ color: [202, 181, 225, 255] });
+        } else {
+            chrome.action.setBadgeText({ text: '' });
+            const error_code = login_response?.error_code ?? -1;
+            const message_map = { 1: 1, 2: 2, default: 3 };
+            showFailMessage(message_map[error_code] || message_map.default);
+        }
+    } catch (error) {
+        showFailMessage(3);
     }
 }
 
-// Opens the platform feedback page.
 async function handleFeedback() {
-    const message = "You are about to go to the task homepage. If you are in the middle of a task, this might interrupt your workflow. Continue?";
-    const confirmed = await showConfirm(message);
+    const confirmed = await showConfirm("You are about to go to the task homepage. If you are in the middle of a task, this might interrupt your workflow. Continue?");
     if (confirmed) {
         window.open(feedback_url);
     }
 }
 
-// Logs the user out.
 async function handleLogout() {
-    chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
-        if (tabs[0]) {
-            chrome.tabs.sendMessage(tabs[0].id, { type: "msg_from_popup", update_webpage_info: true });
-        }
-        await _remove_local(['username', 'access_token', 'refresh_token', 'logged_in']);
-        await sendMessageFromPopup({ command: "alter_logging_status", log_status: false });
-        chrome.action.setBadgeText({ text: '' });
-        location.reload();
-    });
-}
-
-// // Opens a new window with a specified URL path.
-// function openTaskWindow(path, is_new_window = false) {
-//     const url = base_url + path;
-//     printDebugOfPopup("Opening task window:", url);
-//     const window_options = 'height=1000,width=1200,top=0,left=0,toolbar=no,menubar=no,scrollbars=no,resizable=no,location=no,status=no';
-//     window.open(url, is_new_window ? 'newwindow' : '_blank', is_new_window ? window_options : undefined);
-// }
-
-/**
- * Opens a new window/tab after authenticating the user via a redirect endpoint.
- * This function retrieves the JWT access token and passes it to a server endpoint
- * that validates the token, establishes a session, and redirects to the final destination.
- * * @param {string} path The server path to redirect to after authentication (e.g., '/task/home/').
- * @param {boolean} [is_new_window=false] Whether to open in a new, styled window or a new tab.
- */
-async function openTaskWindow(path, is_new_window = false) {
-    // 1. Retrieve the access token from storage.
-    const { access_token } = await _get_local(['access_token']);
-
-    // 2. Handle the case where the user is not logged in.
-    if (!access_token) {
-        showAlert("Authentication failed. Please log out and log in again.");
-        return;
+    const tabs = await new Promise(resolve => chrome.tabs.query({ active: true, currentWindow: true }, resolve));
+    if (tabs[0]) {
+        chrome.tabs.sendMessage(tabs[0].id, { type: "msg_from_popup", update_webpage_info: true });
     }
-
-    // 3. Construct the URL for the authentication bridge endpoint.
-    // The target path is encoded to ensure it's safely passed as a query parameter.
-    // NOTE: '/user/auth_redirect/' is a new endpoint you'll need to create on your Django backend.
-    const encodedPath = encodeURIComponent(path);
-    const url = `${base_url}/task/auth_redirect/?token=${access_token}&next=${encodedPath}`;
-
-    printDebugOfPopup("Opening authenticated window via redirect:", url);
-
-    // 4. Open the new window or tab.
-    const window_options = 'height=1000,width=1200,top=0,left=0,toolbar=no,menubar=no,scrollbars=no,resizable=no,location=no,status=no';
-    window.open(url, is_new_window ? 'newwindow' : '_blank', is_new_window ? window_options : undefined);
+    await _remove_local(['username', 'access_token', 'refresh_token', 'logged_in']);
+    await sendMessageFromPopup({ command: "alter_logging_status", log_status: false });
+    chrome.action.setBadgeText({ text: '' });
+    showLoginTab();
 }
 
-// Starts a new task.
 async function handleStartTask() {
-    $("#bt_start_task").attr("disabled", true);
-    let current_task_id = await getActiveTask();
+    document.getElementById('bt_start_task').disabled = true;
+    const current_task_id = await getActiveTask();
 
     if (current_task_id === -2) {
         showAlert("The server is not available. Please try again later.");
-        switchTaskButtonStatus('off');
-        return;
-    }
-    if (current_task_id !== -1) {
+    } else if (current_task_id !== -1) {
         showAlert("There is an active task. Please end the task first.");
-        switchTaskButtonStatus('on');
-        return;
-    }
-
-    const is_confirmed = await showConfirm("Do you want to start a task?");
-    if (is_confirmed) {
-        const timestamp = _time_now();
-        openTaskWindow(`/task/pre_task_annotation/${timestamp}/`);
     } else {
-        switchTaskButtonStatus('off');
+        const is_confirmed = await showConfirm("Do you want to start a task?");
+        if (is_confirmed) {
+            const timestamp = Date.now();
+            openTaskWindow(`/task/pre_task_annotation/${timestamp}/`);
+        }
     }
+    document.getElementById('bt_start_task').disabled = false;
 }
 
-// Ends the current task.
 async function handleEndTask() {
-    $("#bt_end_task").attr("disabled", true);
-    let current_task_id = await getActiveTask();
+    document.getElementById('bt_end_task').disabled = true;
+    const current_task_id = await getActiveTask();
 
     if (current_task_id === -2) {
         showAlert("The server is not available. Please try again later.");
-        switchTaskButtonStatus('on');
-        return;
-    }
-    if (current_task_id === -1) {
+    } else if (current_task_id === -1) {
         showAlert("There is no active task to submit.");
-        switchTaskButtonStatus('off');
-        return;
-    }
-
-    const is_confirmed = await showConfirm("Do you want to submit the answer?");
-    if (is_confirmed) {
-        const active_task = await getActiveTask();
-        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    } else {
+        const is_confirmed = await showConfirm("Do you want to submit the answer?");
+        if (is_confirmed) {
+            const tabs = await new Promise(resolve => chrome.tabs.query({ active: true, currentWindow: true }, resolve));
             if (tabs[0]) {
                 chrome.tabs.sendMessage(tabs[0].id, { type: "msg_from_popup", update_webpage_info: true }, () => {
-                    const timestamp = _time_now();
+                    const timestamp = Date.now();
                     openTaskWindow(`/task/submit_answer/${current_task_id}/${timestamp}/`);
-                    if (active_task < 0) switchTaskButtonStatus('off');
                 });
             }
-        });
-    } else {
-        switchTaskButtonStatus('on');
+        }
     }
+    document.getElementById('bt_end_task').disabled = false;
 }
 
-// Cancels the current task.
 async function handleCancelTask() {
-    let current_task_id = await getActiveTask();
-    const is_confirmed = await showConfirm("Do you want to cancel the task?");
-    if (is_confirmed && current_task_id !== -1) {
-        const timestamp = _time_now();
-        openTaskWindow(`/task/cancel_task/${current_task_id}/${timestamp}/`, false);
-    }
-}
-
-// Views details of the current task.
-async function handleViewTask() {
-    let current_task_id = await getActiveTask();
+    const current_task_id = await getActiveTask();
     if (current_task_id !== -1) {
-        const url = `/task/view_task_info/${current_task_id}/`
-        openTaskWindow(url, true);
+        const is_confirmed = await showConfirm("Do you want to cancel the task?");
+        if (is_confirmed) {
+            const timestamp = Date.now();
+            openTaskWindow(`/task/cancel_task/${current_task_id}/${timestamp}/`, false);
+        }
     }
 }
 
-// Opens the tool usage page.
-function handleToolUse() {
-    openTaskWindow('/task/show_tool_use_page/', true);
-}
-
-// Manages the enabled/disabled state of task-related buttons.
-function switchTaskButtonStatus(task_status) {
-    const is_active = task_status === 'on';
-
-    if (is_active) {
-        // Task is active: show "Submit Answer" and hide "Start Task"
-        $("#bt_start_task").hide();
-        $("#bt_end_task").show();
-    } else {
-        // No active task: show "Start Task" and hide "Submit Answer"
-        $("#bt_start_task").show();
-        $("#bt_end_task").hide();
+async function handleViewTask() {
+    const current_task_id = await getActiveTask();
+    if (current_task_id !== -1) {
+        openTaskWindow(`/task/view_task_info/${current_task_id}/`, true);
     }
-
-    // Set the disabled states for all buttons
-    $("#bt_start_task").attr("disabled", is_active);
-    $("#bt_end_task").attr("disabled", !is_active);
-    $("#bt_cancel_task").attr("disabled", !is_active);
-    $("#bt_view_task_info").attr("disabled", !is_active);
-    // $("#bt_tool_use").attr("disabled", !is_active); 
 }
 
 // --- INITIALIZATION ---
-// Main function to set up the popup.
 (async function initialize() {
-    // Bind event listeners
-    $("#bt1").click(handleRegister);
-    $("#bt2").click(handleLoginAttempt);
-    $("#bt4, #bt8").click(handleFeedback);
-    $("#bt6").click(handleLogout);
-    $("#bt_start_task").click(handleStartTask);
-    $("#bt_end_task").click(handleEndTask);
-    $("#bt_cancel_task").click(handleCancelTask);
-    $("#bt_view_task_info").click(handleViewTask);
-    // $("#bt_tool_use").click(handleToolUse);
+    document.getElementById('bt1').addEventListener('click', handleRegister);
+    document.getElementById('bt2').addEventListener('click', handleLoginAttempt);
+    document.getElementById('bt4').addEventListener('click', handleFeedback);
+    document.getElementById('bt8').addEventListener('click', handleFeedback);
+    document.getElementById('bt6').addEventListener('click', handleLogout);
+    document.getElementById('bt_start_task').addEventListener('click', handleStartTask);
+    document.getElementById('bt_end_task').addEventListener('click', handleEndTask);
+    document.getElementById('bt_cancel_task').addEventListener('click', handleCancelTask);
+    document.getElementById('bt_view_task_info').addEventListener('click', handleViewTask);
 
-    // Check if the user is already logged in.
     const { access_token } = await _get_local(['access_token']);
     if (access_token) {
         await showUserTab();
-        await displayActiveTask();
         chrome.action.setBadgeText({ text: 'on' });
         chrome.action.setBadgeBackgroundColor({ color: [202, 181, 225, 255] });
     } else {
@@ -387,21 +307,17 @@ function switchTaskButtonStatus(task_status) {
     }
 })();
 
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((message) => {
     if (message.command === "force_logout_and_reload") {
-        location.reload();
+        showLoginTab();
     }
 });
 
-
-// Load saved credentials when popup opens
 document.addEventListener('DOMContentLoaded', function () {
     chrome.storage.local.get(['savedUsername', 'savedPassword', 'rememberCredentials', 'tempUsername', 'tempPassword'], function (result) {
-        // Populate fields with temporary credentials if available
         document.getElementById('username').value = result.tempUsername || '';
         document.getElementById('password').value = result.tempPassword || '';
 
-        // If "Remember Me" was checked, restore saved credentials
         if (result.rememberCredentials) {
             document.getElementById('remember').checked = true;
             if (!result.tempUsername && result.savedUsername) {
@@ -417,7 +333,6 @@ document.addEventListener('DOMContentLoaded', function () {
     const passwordInput = document.getElementById('password');
     const rememberCheckbox = document.getElementById('remember');
 
-    // Save temporary credentials on input change
     function saveTempCredentials() {
         chrome.storage.local.set({
             tempUsername: usernameInput.value,
@@ -425,15 +340,18 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // Save / clear saved credentials based on checkbox state
     function saveRememberedCredentials() {
         if (rememberCheckbox.checked) {
             chrome.storage.local.set({
-                rememberCredentials: true
+                rememberCredentials: true,
+                savedUsername: usernameInput.value,
+                savedPassword: passwordInput.value
             });
         } else {
             chrome.storage.local.set({
-                rememberCredentials: false
+                rememberCredentials: false,
+                savedUsername: '',
+                savedPassword: ''
             });
         }
     }

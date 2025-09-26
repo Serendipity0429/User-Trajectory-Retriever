@@ -72,20 +72,9 @@
             </div>
             {% endif %}
 
-            <a id="login_button" class="btn btn-primary btn-lg btn-block" href="#">Signup</a>
+            <button type="submit" class="btn btn-primary btn-lg btn-block">Signup</button>
         </form>
     </div>
     </div>
     </div>
-{% endblock %}
-
-{% block scripts %}
-    <script>
-        (function() {
-            $('#login_button').click(function(e) {
-                e.preventDefault();
-                document.login_form.submit();
-            });
-        })();
-    </script>
 {% endblock %}

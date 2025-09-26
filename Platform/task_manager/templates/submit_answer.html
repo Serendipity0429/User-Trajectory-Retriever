@@ -77,11 +77,11 @@
                         <b>2. Confidence</b>: How confident are you in this answer?
                     </label>
                     <div class="ratio col-xs-12 list-row ">
-                        <label><input type="radio" name="confidence" value="1" required/> 1: Just a guess</label><br>
-                        <label><input type="radio" name="confidence" value="2"/> 2: Not very confident</label><br>
-                        <label><input type="radio" name="confidence" value="3"/> 3: Fairly confident</label><br>
-                        <label><input type="radio" name="confidence" value="4"/> 4: Very confident</label><br>
-                        <label><input type="radio" name="confidence" value="5"/> 5: Certain</label><br>
+                        <label><input type="radio" name="confidence" value="1" required/> Just a guess</label><br>
+                        <label><input type="radio" name="confidence" value="2"/> Not very confident</label><br>
+                        <label><input type="radio" name="confidence" value="3"/> Fairly confident</label><br>
+                        <label><input type="radio" name="confidence" value="4"/> Very confident</label><br>
+                        <label><input type="radio" name="confidence" value="5"/> Certain</label><br>
                     </div>
                 </div>
 
@@ -171,12 +171,12 @@
                         <b>4. Reasoning Method</b>: How did you derive the answer from the source?
                     </label>
                     <div class="ratio col-xs-12 list-row">
-                        <label><input type="radio" name="reasoning_method" value="direct_fact" required/> The answer was a direct fact or number stated clearly on the page.</label><br>
-                        <label><input type="radio" name="reasoning_method" value="synthesis_single_page"/> I had to combine multiple pieces of information from the same page.</label><br>
-                        <label><input type="radio" name="reasoning_method" value="synthesis_multi_page"/> I had to combine information from different webpages.</label><br>
-                        <label><input type="radio" name="reasoning_method" value="calculation"/> I had to perform a calculation based on data I found.</label><br>
-                        <label><input type="radio" name="reasoning_method" value="inference"/> I had to make an inference or deduction that was not explicitly stated.</label><br>
-                        <label><input type="radio" name="reasoning_method" value="other" id="reasoning_other"> Other&emsp;</label>
+                        <label><input type="radio" name="reasoning_method" value="direct_fact" required/> Direct fact/number on page</label><br>
+                        <label><input type="radio" name="reasoning_method" value="synthesis_single_page"/> Synthesized from single page</label><br>
+                        <label><input type="radio" name="reasoning_method" value="synthesis_multi_page"/> Synthesized from multiple pages</label><br>
+                        <label><input type="radio" name="reasoning_method" value="calculation"/> Calculation from data</label><br>
+                        <label><input type="radio" name="reasoning_method" value="inference"/> Inference/deduction</label><br>
+                        <label><input type="radio" name="reasoning_method" value="other" id="reasoning_other"> Other (please specify)</label>
                         <label><input type="text" name="reasoning_method_other" id="reasoning_other_text" style="width: 300%; margin-left: 0; padding: 0 !important;" disabled /></label>
                         <script>
                             $(document).ready(function() {

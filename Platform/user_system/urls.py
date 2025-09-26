@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from django.urls import path, re_path
+from django.urls import path
+from django.views.decorators.csrf import csrf_exempt
 from rest_framework_simplejwt.views import (
     TokenObtainPairView,
     TokenRefreshView,
@@ -10,17 +11,17 @@ from rest_framework_simplejwt.views import (
 
 from . import views
 
-urlpatterns = [
-    path('check/', views.check),
-    path('login/', views.login),
-    path('token_login/', views.token_login),
-    path('logout/', views.logout),
-    path('signup/', views.signup),
-    path('info/', views.info),
-    path('edit_info/', views.edit_info),
-    path('edit_password/', views.edit_password),
-    re_path(r'^reset_password/([a-zA-Z0-9]{12})/$', views.reset_password),
-    path('forget_password/', views.forget_password),
-    path('token_refresh/', TokenRefreshView.as_view(), name='token_refresh'),
-]
+app_name = 'user_system'
 
+urlpatterns = [
+    path('login/', views.login, name='login'),
+    path('token_login/', views.token_login, name='token_login'),
+    path('logout/', views.logout, name='logout'),
+    path('signup/', views.signup, name='signup'),
+    path('info/', views.info, name='info'),
+    path('edit_info/', views.edit_info, name='edit_info'),
+    path('edit_password/', views.edit_password, name='edit_password'),
+    path('reset_password/<str:token_str>/', views.reset_password, name='reset_password'),
+    path('forget_password/', views.forget_password, name='forget_password'),
+    path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+]

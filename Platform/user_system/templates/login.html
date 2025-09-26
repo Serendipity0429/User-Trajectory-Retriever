@@ -1,11 +1,12 @@
 {% extends "base.html" %}
+{% load static %}
 {% block title %} Login  {% endblock %}
 
 {% block content %}
 <div class="row">
 <div class="col-xs-6 text-center">
     <p>
-        <img src="/static/img/IR4.png"/>
+        <img src="{% static 'img/IR4.png' %}"/>
     </p>
     <p>
         <a href="http://www.thuir.org/">Tsinghua University, Department of Computer Science and Technology, Institute for Artificial Intelligence </br>Information Retrieval Group (THUIR)</a>
@@ -31,22 +32,11 @@
         </div>
         {% endif %}
 
-        <a id="login_button" class="btn btn-primary btn-lg btn-block" href="#">Login</a>
-        <a class="login-link" href="/user/forget_password/">Forget password?</a>
-        <a class="login-link" href="/user/signup/">Create a new account</a>
+        <button type="submit" class="btn btn-primary btn-lg btn-block">Login</button>
+        <a class="login-link" href="{% url 'user_system:forget_password' %}">Forget password?</a>
+        <a class="login-link" href="{% url 'user_system:signup' %}">Create a new account</a>
     </form>
 </div>
 </div>
 </div>
-{% endblock %}
-
-{% block scripts %}
-    <script>
-        (function() {
-            $('#login_button').click(function(e) {
-                e.preventDefault();
-                document.login_form.submit();
-            });
-        })();
-    </script>
 {% endblock %}

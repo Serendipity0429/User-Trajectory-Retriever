@@ -1,4 +1,6 @@
 {% extends "base.html" %}
+{% load task_manager_extras %}
+
 {% block title %}Task Process Details{% endblock %}
 {% block content_title %}Task Process Details{% endblock %}
 
@@ -26,51 +28,39 @@
                 </div> 
                 <script type="application/x-javascript">
                 $(function () {
-                    // --- Updated logic for expanding and collapsing the answer list ---
                     var answerList = $('#answer-list');
                     var listItems = answerList.find('li');
                     var showAllButton = $('#show-all-answers');
                     var showFewerButton = $('#show-fewer-answers');
-                    var initialItemCount = 2; // Show 2 items initially
+                    var initialItemCount = 2;
 
-                    // Check if there are more answers than the initial count
                     if (listItems.length > initialItemCount) {
-                    // Hide items after the initial count
-                    listItems.slice(initialItemCount).hide();
-                    // Show the "show all" button
-                    showAllButton.show();
+                        listItems.slice(initialItemCount).hide();
+                        showAllButton.show();
                     }
 
-                    // Add click event to the "show all" button
                     showAllButton.on('click', function(e) {
-                    e.preventDefault(); // Prevent default link behavior
-                    // Show all hidden list items
-                    answerList.find('li:hidden').show();
-                    // Hide this button and show the "show fewer" button
-                    $(this).hide();
-                    showFewerButton.show();
-                    // Set to two columns when all are shown
-                    answerList.css({
-                        'column-count': 2,
-                        '-webkit-column-count': 2,
-                        '-moz-column-count': 2
-                    });
+                        e.preventDefault();
+                        answerList.find('li:hidden').show();
+                        $(this).hide();
+                        showFewerButton.show();
+                        answerList.css({
+                            'column-count': 2,
+                            '-webkit-column-count': 2,
+                            '-moz-column-count': 2
+                        });
                     });
 
-                    // Add click event to the "show fewer" button
                     showFewerButton.on('click', function(e) {
-                    e.preventDefault(); // Prevent default link behavior
-                    // Hide items after the initial count
-                    listItems.slice(initialItemCount).hide();
-                    // Hide this button and show the "show all" button
-                    $(this).hide();
-                    showAllButton.show();
-                    // Restore to single column when fewer are shown
-                    answerList.css({
-                        'column-count': 1,
-                        '-webkit-column-count': 1,
-                        '-moz-column-count': 1
-                    });
+                        e.preventDefault();
+                        listItems.slice(initialItemCount).hide();
+                        $(this).hide();
+                        showAllButton.show();
+                        answerList.css({
+                            'column-count': 1,
+                            '-webkit-column-count': 1,
+                            '-moz-column-count': 1
+                        });
                     });
                 });
                 </script>
@@ -91,11 +81,11 @@
             <div class="annotation-body">
                 <div class="annotation-block">
                     <div class="question-text"><b>1. Domain Familiarity</b>: How familiar are you with the topic of this question?</div>
-                    <div class="annotation-value">{{ pre_task_annotation.familiarity }}</div>
+                    <div class="annotation-value">{{ FAMILIARITY_MAP|get_item:pre_task_annotation.familiarity }}</div>
                 </div>
                 <div class="annotation-block">
                     <div class="question-text"><b>2.  Difficulty</b>: How do you evaluate the difficulty of the task？</div>
-                    <div class="annotation-value">{{ pre_task_annotation.difficulty }}</div>
+                    <div class="annotation-value">{{ DIFFICULTY_MAP|get_item:pre_task_annotation.difficulty }}</div>
                 </div>
                 <div class="annotation-block">
                     <div class="question-text"><b>3. Effort</b>: How much time do you expect to spend on this task?</div>
@@ -155,15 +145,15 @@
                         <summary class="question-text" style="color:#007087; cursor: pointer; display: list-item;">Submitted Answer</summary>
                         <div style="padding-left: 20px; margin-top: 10px;">
                             <div class="question-text" style="margin-top:15px;"><b>1. Your Answer</b>:</div>
-                            <div class="annotation-value">{{ trial.submitted_answer.answer }}</div>
+                            <div class="annotation-value">{{ trial.answer }}</div>
                             
                             <div class="question-text" style="margin-top:15px;"><b>2. Confidence</b>: How confident are you in this answer?</div>
-                            <div class="annotation-value">{{ trial.submitted_answer.confidence }}</div>
+                            <div class="annotation-value">{{ CONFIDENCE_MAP|get_item:trial.confidence }}</div>
 
                             <div class="question-text" style="margin-top:15px;"><b>1. Justification</b>: Please provide the primary source URL and source text that you used to answer the question.</div>
                             <div class="annotation-value">
                                 <ul>
-                                {% for source in trial.submitted_answer.sources %}
+                                {% for source in trial.submitted_sources %}
                                     <li>
                                         <strong>URL:</strong> <a href="{{ source.url }}" target="_blank">{{ source.url }}</a><br>
                                         <strong>Text:</strong> {{ source.text }}
@@ -173,11 +163,11 @@
                             </div>
                             
                             <div class="question-text" style="margin-top:15px;"><b>2.  Reasoning Method</b>: How did you derive the answer from the source?</div>
-                            <div class="annotation-value">{{ trial.submitted_answer.reasoning_method }}</div>
+                            <div class="annotation-value">{{ REASONING_METHOD_MAP|get_item:trial.reasoning_method }}</div>
                             
-                            {% if trial.submitted_answer.additional_explanation %}
+                            {% if trial.additional_explanation %}
                             <div class="question-text" style="margin-top:15px;"><b>3. (Optional) Additional Explanation</b>: Please provide any additional explanation or context for your answer here.</div>
-                            <div class="annotation-value">{{ trial.submitted_answer.additional_explanation }}</div>
+                            <div class="annotation-value">{{ trial.additional_explanation }}</div>
                             {% endif %}
                         </div>
                     </details>
@@ -193,7 +183,7 @@
                         <div class="annotation-value">
                             <ul>
                             {% for reason in trial.reflection_annotation.failure_reasons %}
-                                <li>{{ reason }}</li>
+                                <li>{{ FAILURE_CATEGORY_MAP|get_item:reason }}</li>
                             {% endfor %}
                             </ul>
                         </div>
@@ -205,7 +195,7 @@
                         <div class="annotation-value">
                             <ul>
                             {% for plan in trial.reflection_annotation.corrective_plan %}
-                                <li>{{ plan }}</li>
+                                <li>{{ CORRECTIVE_PLAN_MAP|get_item:plan }}</li>
                             {% endfor %}
                             </ul>
                         </div>
@@ -231,11 +221,11 @@
             <div class="annotation-body">
                 <div class="annotation-block">
                     <div class="question-text"><b>1. Overall Difficulty</b>: How would you rate the actual difficulty of the search process you completed?</div>
-                    <div class="annotation-value">{{ post_task_annotation.difficulty_actual }}</div>
+                    <div class="annotation-value">{{ DIFFICULTY_MAP|get_item:post_task_annotation.difficulty_actual }}</div>
                 </div>
                 <div class="annotation-block">
                     <div class="question-text"><b>2.  The "Aha!" Moment</b>: What type of information was most critical to solving this task?</div>
-                    <div class="annotation-value">{{ post_task_annotation.aha_moment_type }}</div>
+                    <div class="annotation-value">{{ AHA_MOMENT_MAP|get_item:post_task_annotation.aha_moment_type }}</div>
                      {% if post_task_annotation.aha_moment_source %}
                     <div class="question-text" style="margin-top:15px;">(Optional) Paste the source URL or search query for this "Aha!" moment.</div>
                     <div class="annotation-value">{{ post_task_annotation.aha_moment_source }}</div>
@@ -246,14 +236,14 @@
                     <div class="annotation-value">
                         <ul>
                         {% for path in post_task_annotation.unhelpful_paths %}
-                            <li>{{ path }}</li>
+                            <li>{{ UNHELPFUL_PATHS_MAP|get_item:path }}</li>
                         {% endfor %}
                         </ul>
                     </div>
                 </div>
                 <div class="annotation-block">
                     <div class="question-text"><b>4. Strategic Shift</b>: How did your successful strategy evolve from your initial plan?</div>
-                    <div class="annotation-value">{{ post_task_annotation.strategy_shift }}</div>
+                    <div class="annotation-value">{{ STRATEGY_SHIFT_MAP|get_item:post_task_annotation.strategy_shift }}</div>
                 </div>
                  {% if post_task_annotation.additional_reflection %}
                 <div class="annotation-block">
@@ -272,7 +262,7 @@
             <div class="annotation-body">
                 <div class="annotation-block">
                     <div class="question-text"><b>2.  Primary Reason for Cancellation</b>: Please select the primary reason you are cancelling this task.</div>
-                    <div class="annotation-value">{{ cancel_annotation.cancel_category }}</div>
+                    <div class="annotation-value">{{ CANCEL_CATEGORY_MAP|get_item:cancel_annotation.cancel_category }}</div>
                 </div>
                 <div class="annotation-block">
                     <div class="question-text"><b>3. Detailed Explanation</b>: Please explain what specific obstacle prevented you from completing the task. What was your final attempt before deciding to cancel?</div>
@@ -283,7 +273,7 @@
                     <div class="annotation-value">
                         <ul>
                         {% for resource in cancel_annotation.missing_resources %}
-                            <li>{{ resource }}</li>
+                            <li>{{ MISSING_RESOURCES_MAP|get_item:resource }}</li>
                         {% endfor %}
                         </ul>
                     </div>

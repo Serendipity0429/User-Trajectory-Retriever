@@ -1,7 +1,65 @@
-{% extends "base.html" %}
-{% block title %} Post-Task Annotation {% endblock %}
-{% block content_title %} Post-Task Annotation {% endblock %}
+{% extends 'base.html' %}
+
+{% block title %}Post-Task Annotation{% endblock %}
+{% block content_title %}Post-Task Annotation{% endblock %}
+
 {% block content %}
+{% load task_manager_extras %}
+    <style>
+        .choice-container {
+            display: flex;
+            align-items: center;
+            margin-right: 20px; /* Add space between options */
+        }
+        .tooltip-container {
+            position: relative;
+            display: inline-block;
+            cursor: pointer;
+        }
+        .tooltip-button {
+            background-color: #f0f0f0;
+            border: 1px solid #ccc;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            font-size: 12px;
+            margin-left: 5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .tooltip-text {
+            visibility: hidden;
+            min-width: 220px;
+            max-width: 300px;
+            background-color: #555;
+            color: #fff;
+            text-align: center;
+            border-radius: 6px;
+            padding: 8px 12px;
+            position: absolute;
+            z-index: 1;
+            bottom: 125%;
+            left: 50%;
+            transform: translateX(-50%);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        .tooltip-text::after {
+            content: "";
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            margin-left: -5px;
+            border-width: 5px;
+            border-style: solid;
+            border-color: #555 transparent transparent transparent;
+        }
+        .tooltip-container:hover .tooltip-text {
+            visibility: visible;
+            opacity: 1;
+        }
+    </style>
     <div class="row text-center">
         <h2>
             Your answer is
@@ -20,15 +78,12 @@
                 <div class="col-xs-offset-1 col-xs-10" id="trajectories">
                     {% for webpage in webpages %}
                         <div class="col-xs-12 list-row webpage-wrapper">
-                            {#                style="padding: 3% 0 3% 0;border-bottom: 1px solid #cccccc;">#}
                             <p style="font-size: 20px">Webpage {{ forloop.counter }}:&ensp;<a href="{{ webpage.url }}"
                                                                                               target="_blank">{{ webpage.title }}</a>
                             </p>
-                            <!-- create a div to store the rrweb player -->
                             <div class="rrweb-player-wrapper" id="rrweb-player-{{ webpage.id }}"></div>
                             <script>
                                 var rrweb_record_{{ webpage.id }} = {{ webpage.rrweb_record | safe }};
-                                // create a rrweb player
                                 const player_{{ webpage.id }} = new rrwebPlayer({
                                     target: document.getElementById(`rrweb-player-{{ webpage.id }}`),
                                     props: {
@@ -72,30 +127,22 @@
                         </div> 
                         <script type="application/x-javascript">
                             $(function () {
-                                // --- Updated logic for expanding and collapsing the answer list ---
                                 var answerList = $('#answer-list');
                                 var listItems = answerList.find('li');
                                 var showAllButton = $('#show-all-answers');
                                 var showFewerButton = $('#show-fewer-answers');
-                                var initialItemCount = 2; // Show 2 items initially
+                                var initialItemCount = 2;
 
-                                // Check if there are more answers than the initial count
                                 if (listItems.length > initialItemCount) {
-                                    // Hide items after the initial count
                                     listItems.slice(initialItemCount).hide();
-                                    // Show the "show all" button
                                     showAllButton.show();
                                 }
 
-                                // Add click event to the "show all" button
                                 showAllButton.on('click', function(e) {
-                                    e.preventDefault(); // Prevent default link behavior
-                                    // Show all hidden list items
+                                    e.preventDefault();
                                     answerList.find('li:hidden').show();
-                                    // Hide this button and show the "show fewer" button
                                     $(this).hide();
                                     showFewerButton.show();
-                                    // Set to two columns when all are shown
                                     answerList.css({
                                         'column-count': 2,
                                         '-webkit-column-count': 2,
@@ -103,15 +150,11 @@
                                     });
                                 });
 
-                                // Add click event to the "show fewer" button
                                 showFewerButton.on('click', function(e) {
-                                    e.preventDefault(); // Prevent default link behavior
-                                    // Hide items after the initial count
+                                    e.preventDefault();
                                     listItems.slice(initialItemCount).hide();
-                                    // Hide this button and show the "show all" button
                                     $(this).hide();
                                     showAllButton.show();
-                                    // Restore to single column when fewer are shown
                                     answerList.css({
                                         'column-count': 1,
                                         '-webkit-column-count': 1,
@@ -134,11 +177,17 @@
                             <b>3. Overall Difficulty</b>: How would you rate the actual difficulty of the search process you completed?
                         </label>
                         <div class="ratio col-xs-12 user_fill">
-                            <label><input type="radio" name="difficulty_actual" value="0" required/> 0: Very easy</label><br>
-                            <label><input type="radio" name="difficulty_actual" value="1"/> 1: Easy</label><br>
-                            <label><input type="radio" name="difficulty_actual" value="2"/> 2: Moderately difficult</label><br>
-                            <label><input type="radio" name="difficulty_actual" value="3"/> 3: Difficult</label><br>
-                            <label><input type="radio" name="difficulty_actual" value="4"/> 4: Very difficult</label><br>
+                            {% for key, value in DIFFICULTY_MAP.items %}
+                                <div class="choice-container">
+                                    <label>
+                                        <input type="radio" name="difficulty_actual" value="{{ key }}" required/> {{ value }}
+                                    </label>
+                                    <div class="tooltip-container">
+                                        <span class="tooltip-button">?</span>
+                                        <span class="tooltip-text">{{ DIFFICULTY_EXPLANATION_MAP|get_item:key }}</span>
+                                    </div>
+                                </div>
+                            {% endfor %}
                         </div>
                     </div>
 
@@ -147,16 +196,20 @@
                             <b>4. The "Aha!" Moment</b>: What type of information was most critical to solving this task?
                         </label>
                         <div class="ratio col-xs-12 list-row">
-                            <label><input type="radio" name="aha_moment_type" value="data_table" required/> A data table or chart with the exact answer.</label><br>
-                            <label><input type="radio" name="aha_moment_type" value="direct_statement"/> A direct statement in a paragraph.</label><br>
-                            <label><input type="radio" name="aha_moment_type" value="official_document"/> Finding an official document or report (e.g., PDF, government site).</label><br>
-                            <label><input type="radio" name="aha_moment_type" value="key_definition"/> Understanding a key definition or concept.</label><br>
-                            <label><input type="radio" name="aha_moment_type" value="synthesis"/> Connecting two pieces of information that finally made sense together.</label><br>
-                            <label><input type="radio" name="aha_moment_type" value="other"/> Other (please specify):</label>
+                            {% for key, value in AHA_MOMENT_MAP.items %}
+                                <div class="choice-container">
+                                    <label>
+                                        <input type="radio" name="aha_moment_type" value="{{ key }}" required/> {{ value }}
+                                    </label>
+                                    <div class="tooltip-container">
+                                        <span class="tooltip-button">?</span>
+                                        <span class="tooltip-text">{{ AHA_MOMENT_EXPLANATION_MAP|get_item:key }}</span>
+                                    </div>
+                                </div>
+                            {% endfor %}
                             <label><input type="text" name="aha_moment_other" style="margin-left: 10px; font-size: normal; width: 100%;" disabled placeholder="Please specify..." /></label>
                             <script>
                             $(function() {
-                                // Enable/disable the "other" text input based on radio selection
                                 $('input[name="aha_moment_type"]').change(function() {
                                     if ($(this).val() === 'other' && $(this).is(':checked')) {
                                         $('input[name="aha_moment_other"]').prop('disabled', false);
@@ -180,17 +233,20 @@
                             <b>5. Unhelpful Paths</b>: Which of these roadblocks did you encounter? (Check all that apply)
                         </label>
                         <div class="ratio col-xs-12 list-row">
-                            <label><input type="checkbox" name="unhelpful_paths" value="no_major_roadblocks"/> I did not encounter any major roadblocks.</label><br>
-                            <label><input type="checkbox" name="unhelpful_paths" value="irrelevant_results"/> Search results were mostly irrelevant.</label><br>
-                            <label><input type="checkbox" name="unhelpful_paths" value="outdated_info"/> Found sites with outdated information.</label><br>
-                            <label><input type="checkbox" name="unhelpful_paths" value="low_quality"/> Visited low-quality, spam, or untrustworthy sites.</label><br>
-                            <label><input type="checkbox" name="unhelpful_paths" value="paywall"/> Hit a paywall or login requirement.</label><br>
-                            <label><input type="checkbox" name="unhelpful_paths" value="contradictory_info"/> Found contradictory information on different sites.</label><br>
-                            <label><input type="checkbox" name="unhelpful_paths" value="other"/> Other (please specify):</label>
+                            {% for key, value in UNHELPFUL_PATHS_MAP.items %}
+                                <div class="choice-container">
+                                    <label>
+                                        <input type="checkbox" name="unhelpful_paths" value="{{ key }}"/> {{ value }}
+                                    </label>
+                                    <div class="tooltip-container">
+                                        <span class="tooltip-button">?</span>
+                                        <span class="tooltip-text">{{ UNHELPFUL_PATHS_EXPLANATION_MAP|get_item:key }}</span>
+                                    </div>
+                                </div>
+                            {% endfor %}
                             <label><input type="text" name="unhelpful_paths_other" style="margin-left: 10px; font-size: normal; width: 100%;" disabled placeholder="Please specify..." /></label><br>
                             <script>
                             $(function() {
-                                // Enable/disable the "other" text input based on checkbox selection
                                 $('input[name="unhelpful_paths"]').change(function() {
                                     var otherChecked = $('input[name="unhelpful_paths"][value="other"]:checked').length > 0;
                                     if (otherChecked) {
@@ -200,27 +256,11 @@
                                     }
                                 });
                                 
-                                // Handle mutual exclusivity for "no major roadblocks" option
                                 $('input[name="unhelpful_paths"]').change(function() {
                                     if ($(this).val() === 'no_major_roadblocks' && $(this).is(':checked')) {
-                                        // If "no major roadblocks" is checked, uncheck all others
                                         $('input[name="unhelpful_paths"]').not(this).prop('checked', false);
-                                        // Also disable the "other" text input
                                         $('input[name="unhelpful_paths_other"]').prop('disabled', true).val('');
                                     } else if ($(this).val() !== 'no_major_roadblocks' && $(this).is(':checked')) {
-                                        // If any other option is checked, uncheck "no major roadblocks"
-                                        $('input[name="unhelpful_paths"][value="no_major_roadblocks"]').prop('checked', false);
-                                    }
-                                });
-                            });
-                            $(function() {
-                                // Handle mutual exclusivity for "no major roadblocks" option
-                                $('input[name="unhelpful_paths"]').change(function() {
-                                    if ($(this).val() === 'no_major_roadblocks' && $(this).is(':checked')) {
-                                        // If "no major roadblocks" is checked, uncheck all others
-                                        $('input[name="unhelpful_paths"]').not(this).prop('checked', false);
-                                    } else if ($(this).val() !== 'no_major_roadblocks' && $(this).is(':checked')) {
-                                        // If any other option is checked, uncheck "no major roadblocks"
                                         $('input[name="unhelpful_paths"][value="no_major_roadblocks"]').prop('checked', false);
                                     }
                                 });
@@ -234,16 +274,20 @@
                             <b>6. Strategic Shift</b>: How did your successful strategy evolve from your initial plan?
                         </label>
                         <div class="ratio col-xs-12 list-row">
-                            <label><input type="radio" name="strategy_shift" value="no_change" required/> It didn't change much; my first approach worked.</label><br>
-                            <label><input type="radio" name="strategy_shift" value="narrowed_search"/> I had to significantly narrow my search to be more specific.</label><br>
-                            <label><input type="radio" name="strategy_shift" value="broadened_search"/> I had to broaden my search to find related concepts first.</label><br>
-                            <label><input type="radio" name="strategy_shift" value="changed_source_type"/> I realized I was looking at the wrong type of sources and switched.</label><br>
-                            <label><input type="radio" name="strategy_shift" value="re-evaluated_assumption"/> I realized my initial assumption was wrong and changed my approach.</label><br>
-                            <label><input type="radio" name="strategy_shift" value="other"/> Other (please specify):</label>
+                            {% for key, value in STRATEGY_SHIFT_MAP.items %}
+                                <div class="choice-container">
+                                    <label>
+                                        <input type="radio" name="strategy_shift" value="{{ key }}" required/> {{ value }}
+                                    </label>
+                                    <div class="tooltip-container">
+                                        <span class="tooltip-button">?</span>
+                                        <span class="tooltip-text">{{ STRATEGY_SHIFT_EXPLANATION_MAP|get_item:key }}</span>
+                                    </div>
+                                </div>
+                            {% endfor %}
                             <label><input type="text" name="strategy_shift_other" style="margin-left: 10px; font-size: normal; width: 100%;" disabled placeholder="Please specify..." /></label>
                             <script>
                             $(function() {
-                                // Enable/disable the "other" text input based on radio selection
                                 $('input[name="strategy_shift"]').change(function() {
                                     if ($(this).val() === 'other' && $(this).is(':checked')) {
                                         $('input[name="strategy_shift_other"]').prop('disabled', false);
@@ -271,8 +315,6 @@
                 </div>
             </div>
         </div>
-        <script>
-        </script>
         <script>
             function validateForm() {
                 let checks = $('input[type="checkbox"]:checked').map(function () {

@@ -1,34 +1,22 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from django.shortcuts import render
-from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
-from django.views.decorators.csrf import csrf_exempt
-from django.template import RequestContext
+from django.shortcuts import render, get_object_or_404
+from django.http import HttpResponseRedirect, JsonResponse
 from .forms import *
-from .models import User, ResetPasswordRequest, TimestampGenerator
+from .models import User, ResetPasswordRequest
 from .utils import *
 from django.utils.timezone import now
 from rest_framework_simplejwt.tokens import RefreshToken
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
-
-__DEBUG__ = True
+from django.urls import reverse
+import logging
+from django.views.decorators.csrf import csrf_exempt
+from django.contrib.auth import login as auth_login, logout as auth_logout
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth.forms import AuthenticationForm
 
 
 @csrf_exempt
-def check(request):
-    if request.method == 'POST':
-        username = request.POST.get('username')
-        password = request.POST.get('password')
-        print('username: ', username)
-        print('password: ', password)   
-        error_code, user = authenticate(username, password)
-        if __DEBUG__:
-            print('error_code: ', error_code)
-        return HttpResponse(error_code)
-
-
 def token_login(request):
     if request.method != 'POST':
         return JsonResponse({'error': 'Only POST method is allowed'}, status=405)
@@ -36,10 +24,13 @@ def token_login(request):
     username = request.POST.get('username')
     password = request.POST.get('password')
 
+    # Assuming 'authenticate' is a custom utility function you have defined in utils.py
+    # from .utils import authenticate
     error_code, user = authenticate(username, password)
 
-    if error_code == 0:
-        # 认证成功，生成JWT令牌
+    if error_code == 0 and user:
+        # Authentication successful, generate JWT token
+        logging.debug(f'User {username} authenticated successfully for token login')
         refresh = RefreshToken.for_user(user)
         user.login_num += 1
         user.last_login = now()
@@ -50,6 +41,7 @@ def token_login(request):
             'access': str(refresh.access_token),
         })
     else:
+        logging.debug(f'User {username} authentication failed with error code {error_code}')
         error_messages = {
             1: 'User does not exist',
             2: 'Incorrect password',
@@ -59,33 +51,18 @@ def token_login(request):
             'error_code': error_code
         }, status=401)
 
+
 def login(request):
-    form = LoginForm()
+    form = AuthenticationForm(request, data=request.POST or None)
     error_message = None
 
-    if request.method == 'POST':
-        form = LoginForm(request.POST)
-        if form.is_valid():
-            if not request.session.test_cookie_worked():
-                error_message = u'Cookie错误，请再试一次'
-            else:
-                username = form.cleaned_data['username']
-                password = form.cleaned_data['password']
-                error_code, user = authenticate(username, password)
-                if error_code == 0:
-                    user.login_num += 1
-                    user.last_login = now()
-                    user.save()
-                    store_in_session(request, user)
-                    return redirect_to_prev_page(request, '/task/home/')
-                elif error_code == 1:
-                    error_message = u'用户不存在，请检查用户名是否正确'
-                elif error_code == 2:
-                    error_message = u'密码错误，请重新输入密码'
-        else:
-            error_message = u'表单输入错误'
+    if request.method == 'POST' and form.is_valid():
+        user = form.get_user()
+        auth_login(request, user)  # user_logged_in signal will be triggered here
+        return redirect_to_prev_page(request, reverse('task_manager:home'))
+    elif request.method == 'POST':
+        error_message = "Invalid username or password."
 
-    request.session.set_test_cookie()
     return render(
         request,
         'login.html',
@@ -97,30 +74,14 @@ def login(request):
 
 
 def signup(request):
-    form = SignupForm()
+    form = UserCreationForm(request.POST or None)
     error_message = None
 
-    if request.method == 'POST':
-        form = SignupForm(request.POST)
-        if form.is_valid():
-            user = User()
-            user.username = form.cleaned_data['username']
-            user.password = form.cleaned_data['password']
-            user.name = form.cleaned_data['name']
-            user.sex = form.cleaned_data['sex']
-            user.age = form.cleaned_data['age']
-            user.phone = form.cleaned_data['phone']
-            user.email = form.cleaned_data['email']
-            user.occupation = form.cleaned_data['occupation']
-            user.llm_frequency = form.cleaned_data['llm_frequency']
-            user.llm_history = form.cleaned_data['llm_history']
-            user.signup_time = now()
-            user.last_login = now()
-            user.login_num = 0
-            user.save()
-            return HttpResponseRedirect('/user/login/')
-        else:
-            error_message = form.errors
+    if request.method == 'POST' and form.is_valid():
+        form.save()
+        return HttpResponseRedirect(reverse('user_system:login'))
+    elif request.method == 'POST':
+        error_message = form.errors
 
     return render(
         request,
@@ -132,137 +93,84 @@ def signup(request):
 
 
 def logout(request):
-    if 'username' in request.session:
-        del request.session['username']
-    if 'prev_page' in request.session:
-        del request.session['prev_page']
-    return HttpResponseRedirect('/user/login/')
+    auth_logout(request)
+    return HttpResponseRedirect(reverse('user_system:login'))
 
 
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def info(user, request):
-    # user_group_string = get_user_groups_string(user.user_groups)
-    llm_frequency_choices = {
-        '': u'',
-        'frequently': u'每天使用多次',
-        'usually': u'平均每天使用一次',
-        'sometimes': u'每周偶尔使用两三次',
-        'rarely': u'平均每周使用不超过一次'
-    }
-    llm_history_choices = {
-        '': u'',
-        'very long': u'5年以上',
-        'long': u'3年~5年',
-        'short': u'1年~3年',
-        'very short': u'1年以内'
-    }
-    llm_frequency = llm_frequency_choices[user.llm_frequency]
-    llm_history = llm_history_choices[user.llm_history]
+@login_required
+def info(request):
     return render(
         request,
         'info.html',
         {
-            'cur_user': user,
-            'llm_frequency': llm_frequency,
-            'llm_history': llm_history
-            # 'user_group_string': user_group_string
+            'cur_user': request.user,
         }
         )
 
 
-@api_view(['GET','POST'])
-@permission_classes([IsAuthenticated])
-def edit_info(user, request):
-    form = EditInfoForm(
+@login_required
+def edit_info(request):
+    if request.method == 'POST':
+        form = EditInfoForm(request.POST, instance=request.user)
+        if form.is_valid():
+            form.save()
+            return HttpResponseRedirect(reverse('user_system:info'))
+    else:
+        form = EditInfoForm(instance=request.user)
+
+    return render(
+        request,
+        'edit_info.html',
         {
-            'name': user.name,
-            'sex': user.sex,
-            'age': user.age,
-            'phone': user.phone,
-            'email': user.email,
-            'field': user.field,
-            'llm_frequency': user.llm_frequency,
-            'llm_history': user.llm_history
-        })
+            'cur_user': request.user,
+            'form': form,
+        }
+    )
+
+
+@login_required
+def edit_password(request):
+    form = EditPasswordForm(request.POST or None)
     error_message = None
 
-    if request.method == 'POST':
-        form = EditInfoForm(request.POST)
-        if form.is_valid():
-            user.name = form.cleaned_data['name']
-            user.sex = form.cleaned_data['sex']
-            user.age = form.cleaned_data['age']
-            user.phone = form.cleaned_data['phone']
-            user.email = form.cleaned_data['email']
-            user.field = form.cleaned_data['field']
-            user.llm_frequency = form.cleaned_data['llm_frequency']
-            user.llm_history = form.cleaned_data['llm_history']
-            user.save()
-            return HttpResponseRedirect('/user/info/')
+    if request.method == 'POST' and form.is_valid():
+        if request.user.check_password(form.cleaned_data['cur_password']):
+            request.user.set_password(form.cleaned_data['new_password'])
+            request.user.save()
+            return HttpResponseRedirect(reverse('user_system:info'))
         else:
-            error_message = form.errors
-    else:
-        return render(
-            request,
-            'edit_info.html',
-            {
-                'cur_user': user,
-                'form': form,
-                'error_message': error_message,
-            }
-            )
+            error_message = 'Incorrect current password.'
+    elif request.method == 'POST':
+        error_message = form.errors
 
 
-@api_view(['GET', 'POST'])
-@permission_classes([IsAuthenticated])
-def edit_password(user, request):
-    form = EditPasswordForm()
-    error_message = None
-
-    if request.method == 'POST':
-        form = EditPasswordForm(request.POST)
-        if form.is_valid():
-            if user.password == form.cleaned_data['cur_password']:
-                user.password = form.cleaned_data['new_password']
-                user.save()
-                return HttpResponseRedirect('/user/info/')
-            else:
-                error_message = '原密码错误'
-        else:
-            error_message = form.errors
-    else:
-        return render(
-            request,
-            'edit_password.html',
-            {
-                'cur_user': user,
-                'form': form,
-                'error_message': error_message,
-            }
-            )
+    return render(
+        request,
+        'edit_password.html',
+        {
+            'cur_user': request.user,
+            'form': form,
+            'error_message': error_message,
+        }
+        )
 
 
 def forget_password(request):
-    form = ForgetPasswordForm()
+    form = ForgetPasswordForm(request.POST or None)
     error_message = None
 
-    if request.method == 'POST':
-        form = ForgetPasswordForm(request.POST)
-        if form.is_valid():
-            user = User.objects.filter(email=form.cleaned_data['email'])
-            if user is None or len(user) == 0:
-                error_message = u'Email地址不存在'
-            else:
-                user = user[0]
-                reset_request = ResetPasswordRequest.objects.create(
-                    user=user
-                )
-                reset_request.save()
-                send_reset_password_email(request, reset_request)
-                return HttpResponseRedirect('/user/login/')
-        else:
-            error_message = form.errors
+    if request.method == 'POST' and form.is_valid():
+        try:
+            user = User.objects.get(email=form.cleaned_data['email'])
+            reset_request = ResetPasswordRequest.objects.create(user=user)
+            # Assuming send_reset_password_email is a utility function you have defined
+            # from .utils import send_reset_password_email
+            send_reset_password_email(request, reset_request)
+            return HttpResponseRedirect(reverse('user_system:login'))
+        except User.DoesNotExist:
+            error_message = 'Email address not found.'
+    elif request.method == 'POST':
+        error_message = form.errors
 
     return render(
         request,
@@ -275,39 +183,29 @@ def forget_password(request):
 
 
 def reset_password(request, token_str):
-    form = ResetPasswordForm()
-    token = None
-    error_message = None
-
-    try:
-        token = ResetPasswordRequest.objects.get(token=token_str)
-        print (TimestampGenerator(0)())
-        print (token.expire)
-        if TimestampGenerator(0)() > token.expire:
-            error_message = u'Token已失效，请重新找回密码'
-    except ResetPasswordRequest.DoesNotExist:
-        error_message = u'链接地址错误，请重新找回密码'
-
-    if error_message is not None:
+    token = get_object_or_404(ResetPasswordRequest, token=token_str)
+    
+    if token.is_expired:
         return render(
             request,
             'reset_password.html',
             {
                 'form': None,
-                'error_message': error_message
+                'error_message': 'This token has expired. Please request a new password reset.'
             }
-            )
+        )
 
-    if request.method == 'POST':
-        form = ResetPasswordForm(request.POST)
-        if form.is_valid():
-            user = token.user
-            user.password = form.cleaned_data['new_password']
-            user.save()
-            token.delete()
-            return HttpResponseRedirect('/user/login/')
-        else:
-            error_message = form.errors
+    form = ResetPasswordForm(request.POST or None)
+    error_message = None
+
+    if request.method == 'POST' and form.is_valid():
+        user = token.user
+        user.set_password(form.cleaned_data['new_password'])
+        user.save()
+        token.delete()
+        return HttpResponseRedirect(reverse('user_system:login'))
+    elif request.method == 'POST':
+        error_message = form.errors
 
     return render(
         request,

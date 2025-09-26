@@ -62,7 +62,7 @@
                 Occupation:
             </div>
             <div class="info_value col-xs-offest-6 col-xs-6">
-                {{ cur_user.field }}
+                {{ cur_user.occupation }}
             </div>
         </div>
         <div class="user-info_row row">
@@ -70,7 +70,7 @@
                 How often do you use large language models (LLMs):
             </div>
             <div class="info_value col-xs-offest-6 col-xs-6">
-                {{ llm_frequency }}
+                {{ cur_user.get_llm_frequency_display }}
             </div>
         </div>
         <div class="user-info_row row">
@@ -78,15 +78,15 @@
                 How long have you been using large language models(LLMs):
             </div>
             <div class="info_value col-xs-offest-6 col-xs-6">
-                {{ llm_history }}
+                {{ cur_user.get_llm_history_display }}
             </div>
         </div>
         <div class="row">
             <div class="col-xs-6">
-                <a href="/user/edit_info/" class="btn btn-block btn-lg btn-primary">Edit Personal Info</a>
+                <a href="{% url 'user_system:edit_info' %}" class="btn btn-block btn-lg btn-primary">Edit Personal Info</a>
             </div>
             <div class="col-xs-6">
-                <a href="/user/edit_password/" class="btn btn-block btn-lg btn-primary">Edit Password</a>
+                <a href="{% url 'user_system:edit_password' %}" class="btn btn-block btn-lg btn-primary">Edit Password</a>
             </div>
         </div>
     </div>

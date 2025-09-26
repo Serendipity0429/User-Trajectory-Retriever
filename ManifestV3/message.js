@@ -5,37 +5,13 @@
  */
 class Message {
     constructor() {
-        this.send_flag = false; // Whether to send the message to the backend
+        this.send_flag = false;
         this.username = "";
         this.command = "";
-        /* command types
-            - check_logging_status: Check the user's logging status
-            - request_link_update: A request to update a link
-            - inject_script: Inject a script into the page
-            - send_message: Send a message to the backend
-            - get_active_task: Get the active task ID
-            -
-        */
         this.start_timestamp = 0;
         this.end_timestamp = 0;
         this.dwell_time = 0;
         this.page_timestamps = [];
-        this.type = "msg_from_content"; // Three types of messages: from content, from background, from popup
-        this.url = "";
-        this.referrer = "";
-        this.mouse_moves = "";
-        this.event_list = "";
-        this.rrweb_record = "";
-        this.sent_when_active = false;
-    }
-
-    initialize() {
-        this.send_flag = false;
-        this.username = "";
-        this.start_timestamp = 0;
-        this.end_timestamp = 0;
-        this.dwell_time = 0;
-        this.page_timestamps = "";
         this.type = "msg_from_content";
         this.url = "";
         this.referrer = "";
@@ -47,4 +23,4 @@ class Message {
 }
 
 // Main body
-printDebug("message.js is loaded");
+printDebug("message", "message.js is loaded");

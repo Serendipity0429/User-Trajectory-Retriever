@@ -1,69 +1,42 @@
 // utils.js
-// Store the common configuration variables for the extension and Utility functions for the extension
 
-//NOTICE: Configurations
-// Whether the extension is in development mode
-// TODO: Change to false before deployment
-// const is_dev = !('update_url' in chrome.runtime.getManifest());
-const is_dev = false;
+// --- Configuration ---
+const IS_DEV = !('update_url' in chrome.runtime.getManifest());
+const URL_BASE = IS_DEV ? "http://127.0.0.1:8000" : "http://101.6.41.59:32904";
+const IS_PASSIVE_MODE = true;
 
-// Whether the user annotation event on the fly
-const is_passive_mode = true;
-
-// URL endpoints for the backend server
-const _url_base = is_dev ? "http://127.0.0.1:8000" : "http://101.6.41.59:32904";
-const urls = {
-    base: _url_base,
-    check: `${_url_base}/user/check/`,
-    login: `${_url_base}/user/login/`,
-    token_login: `${_url_base}/user/token_login/`,
-    token_refresh: `${_url_base}/user/token_refresh/`,
-    data: `${_url_base}/task/data/`,
-    cancel: `${_url_base}/task/cancel_task/`,
-    active_task: `${_url_base}/task/active_task/`,
-    register: `${_url_base}/user/signup/`,
-    home: `${_url_base}/task/home/`,
-    stop_annotation: `${_url_base}/task/stop_annotation/`,
+const URLS = {
+    base: URL_BASE,
+    check: `${URL_BASE}/user/check/`,
+    login: `${URL_BASE}/user/login/`,
+    token_login: `${URL_BASE}/user/token_login/`,
+    token_refresh: `${URL_BASE}/user/token/refresh/`,
+    data: `${URL_BASE}/task/data/`,
+    cancel: `${URL_BASE}/task/cancel_task/`,
+    active_task: `${URL_BASE}/task/active_task/`,
+    register: `${URL_BASE}/user/signup/`,
+    home: `${URL_BASE}/task/home/`,
+    stop_annotation: `${URL_BASE}/task/stop_annotation/`,
     initial_page: "https://www.bing.com/",
-}
+};
 
-// Version of the extension
-const version = chrome.runtime.getManifest().version;
-
-// Comprehensive config object
 const config = {
-    is_dev: is_dev,
-    is_passive_mode: is_passive_mode,
-    urls: urls,
-    version: version
+    is_dev: IS_DEV,
+    is_passive_mode: IS_PASSIVE_MODE,
+    urls: URLS,
+    version: chrome.runtime.getManifest().version,
 };
 
 
-// NOTICE: Utility functions
-// Output to console only in development mode
-function printDebug(...messages) {
+// --- Utility Functions ---
+
+function printDebug(source, ...messages) {
     if (config.is_dev) {
-        console.log(...messages);
+        console.log(`[${source}]`, ...messages);
     }
 }
 
-function printDebugOfBackground(...messages) {
-    if (config.is_dev) {
-        console.log("[Background]", ...messages);
-    }
-}
-
-function printDebugOfPopup(...messages) {
-    if (config.is_dev) {
-        console.log("[Popup]", ...messages);
-    }
-}
-
-// utils.js
-
-// 添加一个全局变量来跟踪刷新状态
 let isRefreshing = false;
-// 用于存储等待新令牌的请求
 let failedQueue = [];
 
 const processQueue = (error, token = null) => {
@@ -77,14 +50,9 @@ const processQueue = (error, token = null) => {
     failedQueue = [];
 };
 
-/**
- * Use the refresh_token to get a new access_token.
- * @returns {Promise<string|null>} The new access token, or null if refresh failed.
- */
 async function refreshToken() {
-    // If already refreshing, return a Promise that resolves when done
     if (isRefreshing) {
-        return new Promise(function(resolve, reject) {
+        return new Promise((resolve, reject) => {
             failedQueue.push({ resolve, reject });
         });
     }
@@ -93,14 +61,19 @@ async function refreshToken() {
 
     const { refresh_token } = await _get_local('refresh_token');
     if (!refresh_token) {
-        console.error("Refresh token not found. User needs to log in again.");
+        console.error("Refresh token not found. Forcing logout.");
+        // Force logout if refresh token is missing
+        await _remove_local(['access_token', 'refresh_token', 'username', 'logged_in']);
+        chrome.runtime.sendMessage({ command: "alter_logging_status", log_status: false });
+        chrome.action.setBadgeText({ text: '' });
+        
         isRefreshing = false;
         processQueue(new Error("No refresh token available"), null);
         return null;
     }
 
     try {
-        const response = await fetch(urls.token_refresh, {
+        const response = await fetch(URLS.token_refresh, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
@@ -112,16 +85,13 @@ async function refreshToken() {
             const data = await response.json();
             const new_access_token = data.access;
             await _set_local({ 'access_token': new_access_token });
-            
-            printDebug("Token refreshed successfully.");
+            printDebug("utils", "Token refreshed successfully.");
             processQueue(null, new_access_token);
             return new_access_token;
         } else {
-             // Refresh token is invalid or expired - force logout
             console.error("Failed to refresh token. Status:", response.status);
-            await _remove_local(['access_token', 'refresh_token', 'username','logged_in']);
+            await _remove_local(['access_token', 'refresh_token', 'username', 'logged_in']);
             chrome.runtime.sendMessage({ command: "alter_logging_status", log_status: false });
-            chrome.runtime.sendMessage({ command: "force_logout_and_reload" });
             chrome.action.setBadgeText({ text: '' });
             processQueue(new Error("Refresh token is invalid"), null);
             return null;
@@ -135,21 +105,13 @@ async function refreshToken() {
     }
 }
 
-
-
-// utils.js
-async function _post(url, data={}, json_response = true, raw_data = false) {
+async function _post(url, data = {}, json_response = true, raw_data = false) {
     try {
-        printDebug("Making API request:", url, data);
-
-        // 1. Fetch the access token from local storage
-        const token_data = await _get_local('access_token');
-        const token = token_data.access_token;
+        const { access_token } = await _get_local('access_token');
 
         let headers = {};
         let body;
 
-        // 2. Prepare headers and body based on raw_data flag
         if (!raw_data) {
             headers["Content-Type"] = "application/x-www-form-urlencoded";
             body = new URLSearchParams(data);
@@ -158,160 +120,63 @@ async function _post(url, data={}, json_response = true, raw_data = false) {
             body = typeof data === "string" ? data : String(data);
         }
 
-        // 3. Add Authorization header if token is available
-        if (token) {
-            headers["Authorization"] = `Bearer ${token}`;
+        if (access_token && url !== URLS.token_login) {
+            headers["Authorization"] = `Bearer ${access_token}`;
         }
-        
-        const response = await fetch(url, {
+
+        let response = await fetch(url, {
             method: "POST",
             headers,
             body,
         });
 
-        if (!response.ok) {
-            if (response.status === 401) { // Unauthorized - token might be expired
-                printDebug("Access token expired. Attempting to refresh...");
-                const new_token = await refreshToken();
-                
-                if (new_token) {
-                    printDebug("Retrying the original request with new token.");
-                    // Retry the original request with the new token
-                    headers["Authorization"] = `Bearer ${new_token}`;
-                    const retry_response = await fetch(url, {
-                        method: "POST",
-                        headers,
-                        body,
-                    });
-
-                    if (!retry_response.ok) {
-                         throw new Error(`HTTP error after retry! status: ${retry_response.status}`);
-                    }
-                    
-                    if (json_response) return await retry_response.json();
-                    return retry_response;
-                } else {
-                    printDebug("Token refresh failed. Could not complete the request.");
-                    throw new Error("Token refresh failed. Could not complete the request.");
-                }
+        if (response.status === 401) {
+            const new_token = await refreshToken();
+            if (new_token) {
+                headers["Authorization"] = `Bearer ${new_token}`;
+                response = await fetch(url, {
+                    method: "POST",
+                    headers,
+                    body,
+                });
+            } else {
+                throw new Error("Token refresh failed.");
             }
-            // Other HTTP errors
+        }
+
+        if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
 
         if (json_response) {
             return await response.json();
-        } else {
-            return await response; // Return the original response object
         }
+        return response;
     } catch (error) {
-        printDebug(`API request failed: ${url}`, error, "Data:", data);
-        return null;
+        printDebug("utils", `API request failed: ${url}`, error);
+        throw error; // Re-throw the error to be handled by the caller
     }
 }
 
-// Get data from local storage
+// --- Storage --- 
+
+// SECURITY WARNING: chrome.storage.local is not encrypted and can be accessed by other extensions or malicious scripts.
+// Do not store sensitive data here. Use chrome.storage.session for in-memory storage if possible.
 async function _get_local(key) {
     return chrome.storage.local.get(key);
 }
 
-// Save data to local storage
 async function _set_local(kv_pairs) {
     return chrome.storage.local.set(kv_pairs);
 }
 
-// Remove data from local storage
 async function _remove_local(key) {
     return chrome.storage.local.remove(key);
 }
 
-// Helper to convert Uint8Array to Base64 string
-// Pako.deflate returns a Uint8Array, which needs to be Base64 encoded for sending via fetch/chrome.runtime.sendMessage
-function uint8ArrayToBase64(bytes) {
-    var binary = '';
-    var len = bytes.byteLength;
-    for (var i = 0; i < len; i++) {
-        binary += String.fromCharCode(bytes[i]);
-    }
-    return btoa(binary);
-}
 
-// Check if a string is a valid JSON string
-function isJSONString(str) {
-    try {
-        JSON.parse(str);
-    } catch (e) {
-        return false;
-    }
-    return true;
-}
+// --- UI --- 
 
-// Get the current time
-function _time_now() {
-    return (new Date()).getTime();
-}
-
-// Display a "content.js loaded" box on the upper right corner for 3 seconds
-// should have a class named 'rr-ignore' to avoid being recorded by rrweb
-// When DOM loaded
-function displayLoadedBox(message) {
-    var current_url = window.location.href;
-    if (current_url.startsWith(config.urls.base))
-        return; // Avoid displaying the box on the local server
-    const box = document.createElement('div');
-    box.className = 'rr-ignore loaded-box rr-block';
-    box.style.opacity = '0.2';
-    box.style.transition = 'opacity 0.5s ease-in-out';
-
-    // Fade in
-    setTimeout(() => {
-        box.style.opacity = '1';
-    }, 10);
-    box.style.position = 'fixed';
-    box.style.right = '10px';
-    box.style.backgroundColor = 'white';
-    box.style.color = 'black';
-    box.style.padding = '10px';
-    box.style.border = '2px solid rgb(151, 67, 219)';
-    box.style.zIndex = '2147483647';
-    box.style.contentVisibility = 'visible';
-    box.innerText = `${message}`;
-
-    // Check for existing loaded boxes and position accordingly
-    const existingBoxes = document.querySelectorAll('.loaded-box');
-    let topPosition = 10;
-
-    existingBoxes.forEach(existingBox => {
-        const rect = existingBox.getBoundingClientRect();
-        if (rect.bottom > topPosition) {
-            topPosition = rect.bottom + 10;
-        }
-    });
-
-    box.style.top = `${topPosition}px`;
-
-    document.body.appendChild(box);
-
-    setTimeout(() => {
-        box.style.opacity = '0';
-        setTimeout(() => {
-            box.remove();
-        }, 500);
-    }, 3000);
-}
-
-// Check if a url is from the backend
-function _is_server_page(url) {
-    return url.startsWith(config.urls.base);
-}
-
-// Check if a url is from the extension 
-function _is_extension_page(url) {
-    return url.startsWith(chrome.runtime.getURL(''));
-}
-
-
-// NOTICE: Other resources
 const ANNOTATION_MODAL_STYLE = `
         :root { --primary-purple: #6A1B9A; --secondary-purple: #9C27B0; --light-purple: #E1BEE7; }
         .annotation-wrapper { position: fixed; }
@@ -357,10 +222,67 @@ function GENERATE_ANNOTATION_MODAL_HTML(type) {
     return ANNOTATION_MODAL_HTML;
 }
 
+function displayLoadedBox(message) {
+    if (window.location.href.startsWith(config.urls.base)) return;
 
-function _e(...selector) {
-    return document.querySelector(...selector);
+    const box = document.createElement('div');
+    box.className = 'rr-ignore loaded-box rr-block';
+    box.style.cssText = `
+        opacity: 0.2;
+        transition: opacity 0.5s ease-in-out;
+        position: fixed;
+        right: 10px;
+        background-color: white;
+        color: black;
+        padding: 10px;
+        border: 2px solid rgb(151, 67, 219);
+        z-index: 2147483647;
+        content-visibility: visible;
+    `;
+    box.innerText = message;
+
+    const existingBoxes = document.querySelectorAll('.loaded-box');
+    let topPosition = 10;
+    existingBoxes.forEach(existingBox => {
+        topPosition = Math.max(topPosition, existingBox.getBoundingClientRect().bottom + 10);
+    });
+    box.style.top = `${topPosition}px`;
+
+    document.body.appendChild(box);
+
+    setTimeout(() => { box.style.opacity = '1'; }, 10);
+    setTimeout(() => {
+        box.style.opacity = '0';
+        setTimeout(() => { box.remove(); }, 500);
+    }, 3000);
 }
 
-// Main body
-printDebug("utils.js is loaded");   
+
+// --- Helpers ---
+
+function uint8ArrayToBase64(bytes) {
+    return btoa(String.fromCharCode.apply(null, bytes));
+}
+
+function isJSONString(str) {
+    try {
+        JSON.parse(str);
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
+function _time_now() {
+    return Date.now();
+}
+
+function _is_server_page(url) {
+    return url.startsWith(config.urls.base);
+}
+
+function _is_extension_page(url) {
+    return url.startsWith(chrome.runtime.getURL(''));
+}
+
+printDebug("utils.js is loaded");

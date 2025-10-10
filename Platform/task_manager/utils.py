@@ -30,22 +30,25 @@ class AnnotationState:
         self.annotation_start_time = time.time()
         self.annotation_name = name
         self.is_annotating = True
-        logger.debug(f"Started annotating for {name}.")
+        logger.info(f"Started annotating for {name}.")
 
     def stop_annotating(self):
         self.annotation_start_time = float('inf')
         self.annotation_name = 'none'
         self.is_annotating = False
-        logger.debug("Stopped annotating.")
+        logger.info("Stopped annotating.")
 
 annotation_state = AnnotationState()
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
 
 # Refined
 def print_debug(*args, **kwargs):
     if settings.DEBUG:
-        logger.debug(*args, **kwargs)
+        message = " ".join(map(str, args)) + " ".join(f"{k}={v}" for k, v in kwargs.items())
+        logger.info(message)
 
 
 def print_json_debug(message):
@@ -91,6 +94,7 @@ def store_data(message, user):
     print_debug("Annotating:", annotation_state.is_annotating and not sent_when_active)  
     webpage.during_annotation = annotation_state.is_annotating and not sent_when_active
     webpage.annotation_name = annotation_state.annotation_name
+    webpage.user = user
     
     webpage.belong_task = task
     webpage.title = message['title']

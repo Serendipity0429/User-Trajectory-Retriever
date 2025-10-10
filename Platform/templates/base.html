@@ -35,6 +35,15 @@
     </div>
     </header>
 
+    <script src="{% static 'flat-ui/js/vendor/jquery.min.js' %}"></script>
+    <script src="{% static 'js/rrweb-index.js' %}"></script>
+    <script src="{% static 'js/rrweb.umd.min.cjs' %}"></script>
+    <script src="{% static 'js/rrweb-player.js' %}"></script>
+    <script src="{% static 'flat-ui/js/flat-ui.min.js' %}"></script>
+    <script src="{% static 'js/jquery-ui.min.js' %}"></script>
+    {% block scripts %}
+    {% endblock %}
+
     <section>
     <div class="container" style="width: 100%">
             {% block content %}
@@ -44,14 +53,5 @@
     <br />
     <br />
     </section>
-    
-    <script src="{% static 'flat-ui/js/vendor/jquery.min.js' %}"></script>
-    <script src="{% static 'js/rrweb-index.js' %}"></script>
-    <script src="{% static 'js/rrweb.umd.min.cjs' %}"></script>
-    <script src="{% static 'js/rrweb-player.js' %}"></script>
-    <script src="{% static 'flat-ui/js/flat-ui.min.js' %}"></script>
-    <script src="{% static 'js/jquery-ui.min.js' %}"></script>
-    {% block scripts %}
-    {% endblock %}
 </body>
 </html>

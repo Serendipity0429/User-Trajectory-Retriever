@@ -95,4 +95,4 @@ if (typeof module.exports == "object" && typeof exports == "object") {
 }
 return module.exports;
 }))
-//# sourceMappingURL=rrweb.umd.min.cjs.map
+

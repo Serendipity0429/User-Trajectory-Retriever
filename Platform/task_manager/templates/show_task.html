@@ -26,44 +26,6 @@
                 <a href="#" id="show-all-answers" style="display: none; margin-top: 10px; cursor: pointer;">Click here to see all possible correct answers</a>
                 <a href="#" id="show-fewer-answers" style="display: none; margin-top: 10px; cursor: pointer;">Show fewer answers</a>
                 </div> 
-                <script type="application/x-javascript">
-                $(function () {
-                    var answerList = $('#answer-list');
-                    var listItems = answerList.find('li');
-                    var showAllButton = $('#show-all-answers');
-                    var showFewerButton = $('#show-fewer-answers');
-                    var initialItemCount = 2;
-
-                    if (listItems.length > initialItemCount) {
-                        listItems.slice(initialItemCount).hide();
-                        showAllButton.show();
-                    }
-
-                    showAllButton.on('click', function(e) {
-                        e.preventDefault();
-                        answerList.find('li:hidden').show();
-                        $(this).hide();
-                        showFewerButton.show();
-                        answerList.css({
-                            'column-count': 2,
-                            '-webkit-column-count': 2,
-                            '-moz-column-count': 2
-                        });
-                    });
-
-                    showFewerButton.on('click', function(e) {
-                        e.preventDefault();
-                        listItems.slice(initialItemCount).hide();
-                        $(this).hide();
-                        showAllButton.show();
-                        answerList.css({
-                            'column-count': 1,
-                            '-webkit-column-count': 1,
-                            '-moz-column-count': 1
-                        });
-                    });
-                });
-                </script>
             </div>
             <div class="annotation-block question-wrapper">
                 <div class="question-text"><b>2. Task Completion Criteria</b>: The criteria for task completion.</div>
@@ -290,4 +252,44 @@
 
     </div>
 </div>
+{% endblock %}
+{% block scripts %}
+<script type="application/x-javascript">
+    $(function () {
+        var answerList = $('#answer-list');
+        var listItems = answerList.find('li');
+        var showAllButton = $('#show-all-answers');
+        var showFewerButton = $('#show-fewer-answers');
+        var initialItemCount = 2;
+
+        if (listItems.length > initialItemCount) {
+            listItems.slice(initialItemCount).hide();
+            showAllButton.show();
+        }
+
+        showAllButton.on('click', function(e) {
+            e.preventDefault();
+            answerList.find('li:hidden').show();
+            $(this).hide();
+            showFewerButton.show();
+            answerList.css({
+                'column-count': 2,
+                '-webkit-column-count': 2,
+                '-moz-column-count': 2
+            });
+        });
+
+        showFewerButton.on('click', function(e) {
+            e.preventDefault();
+            listItems.slice(initialItemCount).hide();
+            $(this).hide();
+            showAllButton.show();
+            answerList.css({
+                'column-count': 1,
+                '-webkit-column-count': 1,
+                '-moz-column-count': 1
+            });
+        });
+    });
+</script>
 {% endblock %}

@@ -279,209 +279,210 @@
                 </div>
             </div>
         </div>
-        <script type="application/x-javascript">
-            $(function () {
-                // --- Updated logic for expanding and collapsing the answer list ---
-                var answerList = $('#answer-list');
-                var listItems = answerList.find('li');
-                var showAllButton = $('#show-all-answers');
-                var showFewerButton = $('#show-fewer-answers');
-                var initialItemCount = 2; // Show 2 items initially
+    </div>
+{% endblock %}
+{% block scripts %}
+<script type="application/x-javascript">
+    $(function () {
+        // --- Updated logic for expanding and collapsing the answer list ---
+        var answerList = $('#answer-list');
+        var listItems = answerList.find('li');
+        var showAllButton = $('#show-all-answers');
+        var showFewerButton = $('#show-fewer-answers');
+        var initialItemCount = 2; // Show 2 items initially
 
-                // Check if there are more answers than the initial count
-                if (listItems.length > initialItemCount) {
-                    // Hide items after the initial count
-                    listItems.slice(initialItemCount).hide();
-                    // Show the "show all" button
-                    showAllButton.show();
+        // Check if there are more answers than the initial count
+        if (listItems.length > initialItemCount) {
+            // Hide items after the initial count
+            listItems.slice(initialItemCount).hide();
+            // Show the "show all" button
+            showAllButton.show();
+        }
+
+        // Add click event to the "show all" button
+        showAllButton.on('click', function(e) {
+            e.preventDefault(); // Prevent default link behavior
+            // Show all hidden list items
+            answerList.find('li:hidden').show();
+            // Hide this button and show the "show fewer" button
+            $(this).hide();
+            showFewerButton.show();
+            // Set to two columns when all are shown
+            answerList.css({
+                'column-count': 2,
+                '-webkit-column-count': 2,
+                '-moz-column-count': 2
+            });
+        });
+
+        // Add click event to the "show fewer" button
+        showFewerButton.on('click', function(e) {
+            e.preventDefault(); // Prevent default link behavior
+            // Hide items after the initial count
+            listItems.slice(initialItemCount).hide();
+            // Hide this button and show the "show all" button
+            $(this).hide();
+            showAllButton.show();
+            // Restore to single column when fewer are shown
+            answerList.css({
+                'column-count': 1,
+                '-webkit-column-count': 1,
+                '-moz-column-count': 1
+            });
+        });
+        // --- END UPDATED SCRIPT ---
+
+        // Initialize jQuery UI Sortable on the list of selected items
+        $("#selected-resources-list").sortable({
+            cursor: "grabbing",
+            opacity: 0.8,
+            placeholder: "sortable-placeholder",
+            tolerance: "pointer",
+            helper: "clone",
+            appendTo: "body",
+            start: function(event, ui) {
+                ui.item.css('visibility', 'hidden');
+                ui.helper.width(ui.item.outerWidth());
+                ui.helper.height(ui.item.outerHeight());
+                var itemOffset = ui.item.offset();
+                var cursorTop = event.pageY - itemOffset.top;
+                var cursorLeft = event.pageX - itemOffset.left;
+                $(this).sortable('option', 'cursorAt', { top: cursorTop, left: cursorLeft });
+            },
+            stop: function(event, ui) {
+                ui.item.css('visibility', 'visible');
+                $(this).sortable('option', 'cursorAt', false);
+            },
+            update: function(event, ui) {
+                updateMissingResourcesOrder();
+                updateMissingResourcesPriorityNumbers();
+            }
+        });
+
+        // Handle checkbox changes to move items between lists
+        $('input[name="cancel_missing_resources"]').change(function() {
+            var option = $(this).closest('.drag-option');
+            var otherTextInput = $('[name="cancel_missing_resources_other"]');
+            var selectedList = $('#selected-resources-list');
+            var unselectedList = $('#unselected-resources-list');
+            var separator = $('#selection-separator');
+
+            if ($(this).is(':checked')) {
+                option.addClass('selected');
+                option.appendTo(selectedList); // Move to selected list
+                if ($(this).val() === 'other') {
+                    otherTextInput.prop('disabled', false);
                 }
-
-                // Add click event to the "show all" button
-                showAllButton.on('click', function(e) {
-                    e.preventDefault(); // Prevent default link behavior
-                    // Show all hidden list items
-                    answerList.find('li:hidden').show();
-                    // Hide this button and show the "show fewer" button
-                    $(this).hide();
-                    showFewerButton.show();
-                    // Set to two columns when all are shown
-                    answerList.css({
-                        'column-count': 2,
-                        '-webkit-column-count': 2,
-                        '-moz-column-count': 2
-                    });
-                });
-
-                // Add click event to the "show fewer" button
-                showFewerButton.on('click', function(e) {
-                    e.preventDefault(); // Prevent default link behavior
-                    // Hide items after the initial count
-                    listItems.slice(initialItemCount).hide();
-                    // Hide this button and show the "show all" button
-                    $(this).hide();
-                    showAllButton.show();
-                    // Restore to single column when fewer are shown
-                    answerList.css({
-                        'column-count': 1,
-                        '-webkit-column-count': 1,
-                        '-moz-column-count': 1
-                    });
-                });
-                // --- END UPDATED SCRIPT ---
-
-                // Initialize jQuery UI Sortable on the list of selected items
-                $("#selected-resources-list").sortable({
-                    cursor: "grabbing",
-                    opacity: 0.8,
-                    placeholder: "sortable-placeholder",
-                    tolerance: "pointer",
-                    helper: "clone",
-                    appendTo: "body",
-                    start: function(event, ui) {
-                        ui.item.css('visibility', 'hidden');
-                        ui.helper.width(ui.item.outerWidth());
-                        ui.helper.height(ui.item.outerHeight());
-                        var itemOffset = ui.item.offset();
-                        var cursorTop = event.pageY - itemOffset.top;
-                        var cursorLeft = event.pageX - itemOffset.left;
-                        $(this).sortable('option', 'cursorAt', { top: cursorTop, left: cursorLeft });
-                    },
-                    stop: function(event, ui) {
-                        ui.item.css('visibility', 'visible');
-                        $(this).sortable('option', 'cursorAt', false);
-                    },
-                    update: function(event, ui) {
-                        updateMissingResourcesOrder();
-                        updateMissingResourcesPriorityNumbers();
-                    }
-                });
-
-                // Handle checkbox changes to move items between lists
-                $('input[name="cancel_missing_resources"]').change(function() {
-                    var option = $(this).closest('.drag-option');
-                    var otherTextInput = $('[name="cancel_missing_resources_other"]');
-                    var selectedList = $('#selected-resources-list');
-                    var unselectedList = $('#unselected-resources-list');
-                    var separator = $('#selection-separator');
-
-                    if ($(this).is(':checked')) {
-                        option.addClass('selected');
-                        option.appendTo(selectedList); // Move to selected list
-                        if ($(this).val() === 'other') {
-                            otherTextInput.prop('disabled', false);
-                        }
-                    } else {
-                        option.removeClass('selected');
-                        option.appendTo(unselectedList); // Move to unselected list
-                        $(this).attr('data-priority', '');
-                        if ($(this).val() === 'other') {
-                            otherTextInput.prop('disabled', true).val('');
-                        }
-                    }
-
-                    // Show separator if both lists have items
-                    if (selectedList.children().length > 0 && unselectedList.children().length > 0) {
-                        separator.show();
-                    } else {
-                        separator.hide();
-                    }
-
-                    // Update order and priority numbers
-                    updateMissingResourcesOrder();
-                    updateMissingResourcesPriorityNumbers();
-                });
-
-                // Handle clicking on drag-option to toggle checkbox
-                $('.drag-option').click(function(e) {
-                    // Don't trigger if clicking on checkbox or text input directly
-                    if ($(e.target).is('input[type="checkbox"], input[type="text"]')) {
-                        return;
-                    }
-                    
-                    var checkbox = $(this).find('input[type="checkbox"]');
-                    checkbox.prop('checked', !checkbox.prop('checked')).trigger('change');
-                });
-
-                // Function to update the hidden input with the sorted order of selected items
-                function updateMissingResourcesOrder() {
-                    var order = [];
-                    // Only items in the selected list are included and in order
-                    $('#selected-resources-list .drag-option').each(function() {
-                        order.push($(this).data('value'));
-                    });
-                    $('#cancel_missing_resources_list').val(JSON.stringify(order));
+            } else {
+                option.removeClass('selected');
+                option.appendTo(unselectedList); // Move to unselected list
+                $(this).attr('data-priority', '');
+                if ($(this).val() === 'other') {
+                    otherTextInput.prop('disabled', true).val('');
                 }
+            }
 
-                // Function to update the visual priority numbers on the checkboxes
-                function updateMissingResourcesPriorityNumbers() {
-                    // Add priority numbers to selected items
-                    $('#selected-resources-list .drag-option').each(function(index) {
-                        $(this).find('input[type="checkbox"]').attr('data-priority', index + 1);
-                    });
-                    // Remove priority numbers from unselected items
-                     $('#unselected-resources-list .drag-option').each(function(index) {
-                        $(this).find('input[type="checkbox"]').removeAttr('data-priority');
-                    });
+            // Show separator if both lists have items
+            if (selectedList.children().length > 0 && unselectedList.children().length > 0) {
+                separator.show();
+            } else {
+                separator.hide();
+            }
+
+            // Update order and priority numbers
+            updateMissingResourcesOrder();
+            updateMissingResourcesPriorityNumbers();
+        });
+
+        // Handle clicking on drag-option to toggle checkbox
+        $('.drag-option').click(function(e) {
+            // Don't trigger if clicking on checkbox or text input directly
+            if ($(e.target).is('input[type="checkbox"], input[type="text"]')) {
+                return;
+            }
+            
+            var checkbox = $(this).find('input[type="checkbox"]');
+            checkbox.prop('checked', !checkbox.prop('checked')).trigger('change');
+        });
+
+        // Function to update the hidden input with the sorted order of selected items
+        function updateMissingResourcesOrder() {
+            var order = [];
+            // Only items in the selected list are included and in order
+            $('#selected-resources-list .drag-option').each(function() {
+                order.push($(this).data('value'));
+            });
+            $('#cancel_missing_resources_list').val(JSON.stringify(order));
+        }
+
+        // Function to update the visual priority numbers on the checkboxes
+        function updateMissingResourcesPriorityNumbers() {
+            // Add priority numbers to selected items
+            $('#selected-resources-list .drag-option').each(function(index) {
+                $(this).find('input[type="checkbox"]').attr('data-priority', index + 1);
+            });
+            // Remove priority numbers from unselected items
+             $('#unselected-resources-list .drag-option').each(function(index) {
+                $(this).find('input[type="checkbox"]').removeAttr('data-priority');
+            });
+        }
+        
+        let is_submitted = false;
+
+        // Handle form submission
+        $('#query-btn').click(
+            function () {
+                let cancel_reason = $("[name='cancel_reason']");
+                let cancel_category = $("[name='cancel_category']:checked");
+                let selectedResources = $("#selected-resources-list .drag-option"); // Updated selector
+                
+                if (cancel_reason.val() === '') {
+                    alert('Please fill in the reason for cancellation!');
+                    cancel_reason.focus();
+                    return
+                }
+                if (cancel_category.length === 0) {
+                    alert('Please select a primary reason for cancellation!');
+                    return
+                }
+                if (selectedResources.length === 0) {
+                    alert('Please select at least one missing resource!');
+                    return;
                 }
                 
-                let is_submitted = false;
-
-                // Handle form submission
-                $('#query-btn').click(
-                    function () {
-                        let cancel_reason = $("[name='cancel_reason']");
-                        let cancel_category = $("[name='cancel_category']:checked");
-                        let selectedResources = $("#selected-resources-list .drag-option"); // Updated selector
-                        
-                        if (cancel_reason.val() === '') {
-                            alert('Please fill in the reason for cancellation!');
-                            cancel_reason.focus();
-                            return
-                        }
-                        if (cancel_category.length === 0) {
-                            alert('Please select a primary reason for cancellation!');
-                            return
-                        }
-                        if (selectedResources.length === 0) {
-                            alert('Please select at least one missing resource!');
-                            return;
-                        }
-                        
-                        // If "Other" is checked, ensure the text field is filled
-                        let otherCheckbox = selectedResources.find('input[value="other"]');
-                        if (otherCheckbox.length > 0) {
-                            let otherText = $("[name='cancel_missing_resources_other']");
-                            if (otherText.val().trim() === '') {
-                                alert('Please specify the other missing resource!');
-                                otherText.focus();
-                                return;
-                            }
-                        }
-
-                        if (confirm("Are you sure to cancel the ongoing task?")) {
-                            // Before submitting, ensure the hidden field is up-to-date
-                            updateMissingResourcesOrder();
-                            is_submitted = true;
-                            $('#query-form').submit();
-                        }
+                // If "Other" is checked, ensure the text field is filled
+                let otherCheckbox = selectedResources.find('input[value="other"]');
+                if (otherCheckbox.length > 0) {
+                    let otherText = $("[name='cancel_missing_resources_other']");
+                    if (otherText.val().trim() === '') {
+                        alert('Please specify the other missing resource!');
+                        otherText.focus();
+                        return;
                     }
-                );
+                }
 
-                window.addEventListener('beforeunload', function (e) {
-                    if (!is_submitted) {
-                        navigator.sendBeacon('/task/stop_annotation/', new Blob());
-                    }
-                });
+                if (confirm("Are you sure to cancel the ongoing task?")) {
+                    // Before submitting, ensure the hidden field is up-to-date
+                    updateMissingResourcesOrder();
+                    is_submitted = true;
+                    $('#query-form').submit();
+                }
+            }
+        );
 
-                // Before unloading the page, send a beacon to stop annotation
-                window.addEventListener('unload', function() {
-                    if (!is_submitted) {
-                        navigator.sendBeacon('/task/stop_annotation/', new Blob());
-                    }
-                });
+        window.addEventListener('beforeunload', function (e) {
+            if (!is_submitted) {
+                navigator.sendBeacon('/task/stop_annotation/', new Blob());
+            }
+        });
 
-            });
-        </script>
-    </div>
+        // Before unloading the page, send a beacon to stop annotation
+        window.addEventListener('unload', function() {
+            if (!is_submitted) {
+                navigator.sendBeacon('/task/stop_annotation/', new Blob());
+            }
+        });
 
+    });
+</script>
 {% endblock %}

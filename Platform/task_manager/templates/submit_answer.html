@@ -112,59 +112,6 @@
                         <button type="button" id="add-source" class="btn btn-success btn-primary add-source">Add Another Source</button>
                     </div>
                 </div>
-            </form>
-
-                <script>
-                    $(document).ready(function() {
-                        $('#add-source').click(function() {
-                            const currentCount = $('.source-entry').length;
-                            const newSource = `
-                                <div class="source-entry" data-index="${currentCount}">
-                                    <div class="question-wrapper col-xs-12">
-                                        <label for="source_url_${currentCount}" class="col-xs-12 list-row" style="padding-left: 0;"><b>Source URL:</b></label>
-                                        <input type="url" class="col-xs-12 list-row source-url" id="source_url_${currentCount}" name="source_url_${currentCount}" required>
-                                    </div>
-
-                                    <div class="question-wrapper col-xs-12">
-                                        <label for="source_text_${currentCount}" class="col-xs-12 list-row" style="padding-left: 0;"><b>Source Text:</b></label>
-                                        <textarea class="col-xs-12 list-row source-text" id="source_text_${currentCount}" name="source_text_${currentCount}" rows="3" required></textarea>
-                                    </div>
-
-                                    <div class="question-wrapper col-xs-12">
-                                        <button type="button" class="btn btn-danger remove-source btn-primary">Remove Source</button>
-                                    </div>
-                                </div>
-                            `;
-                            $('#source-container').append(newSource);
-                            updateRemoveButtons();
-                        });
-
-                        $(document).on('click', '.remove-source', function() {
-                            $(this).closest('.source-entry').remove();
-                            reindexSources();
-                            updateRemoveButtons();
-                        });
-
-                        function reindexSources() {
-                            $('.source-entry').each(function(index) {
-                                $(this).attr('data-index', index);
-                                $(this).find('label[for^="source_url_"]').attr('for', `source_url_${index}`);
-                                $(this).find('input[name^="source_url_"]').attr('id', `source_url_${index}`).attr('name', `source_url_${index}`);
-                                $(this).find('label[for^="source_text_"]').attr('for', `source_text_${index}`);
-                                $(this).find('textarea[name^="source_text_"]').attr('id', `source_text_${index}`).attr('name', `source_text_${index}`);
-                            });
-                        }
-
-                        function updateRemoveButtons() {
-                            const sourceEntries = $('.source-entry');
-                            if (sourceEntries.length > 1) {
-                                $('.remove-source').show();
-                            } else {
-                                $('.remove-source').hide();
-                            }
-                        }
-                    });
-                </script>
 
                 <div class="question-wrapper col-xs-12">
                     <label class="col-xs-12 list-row question-text">
@@ -178,17 +125,6 @@
                         <label><input type="radio" name="reasoning_method" value="inference"/> Inference/deduction</label><br>
                         <label><input type="radio" name="reasoning_method" value="other" id="reasoning_other"> Other (please specify)</label>
                         <label><input type="text" name="reasoning_method_other" id="reasoning_other_text" style="width: 300%; margin-left: 0; padding: 0 !important;" disabled /></label>
-                        <script>
-                            $(document).ready(function() {
-                                $('input[name="reasoning_method"]').change(function() {
-                                    if ($('#reasoning_other').is(':checked')) {
-                                        $('#reasoning_other_text').prop('disabled', false);
-                                    } else {
-                                        $('#reasoning_other_text').prop('disabled', true).val('');
-                                    }
-                                });
-                            });
-                        </script>
                     </div>
                 </div>
 
@@ -213,81 +149,142 @@
                 Cancel
             </div>
         </div>
-        <script>
-            function validateForm() {
-                let answer = document.getElementById("answer").value;
-                if (answer === '') {
-                    alert('Please fill in the answer!');
-                    return false;
-                }
-                return true;
-            }
-        </script>
-        <script type="application/x-javascript">
-            $(function () {
-                let is_submitted = false;
-                $('#query-btn').click(
-                    function () {
-                        let answer = $("[name='answer']");
-                        let confidence = $("[name='confidence']:checked");
-                        let source_url = $("[name='source_url_0']");
-                        let source_text = $("[name='source_text_0']");
-                        let reasoning_method = $("[name='reasoning_method']:checked");
-                        if (reasoning_method.val() === 'other') {
-                            let reasoning_other_text = $("[name='reasoning_method_other']");
-                            if (reasoning_other_text.val() === '') {
-                                alert('Please fill in the specific reasoning method!');
-                                reasoning_other_text.focus();
-                                return
-                            }
-                        }
-                        if (answer.val() === '') {
-                            alert('Please fill in the answer!');
-                            answer.focus();
-                            return
-                        }
-                        if (confidence.val() === undefined) {
-                            alert('Please select your confidence level!');
-                            confidence.focus();
-                            return
-                        }
-                        if (source_url.val() === '') {
-                            alert('Please fill in the source URL!');
-                            source_url.focus();
-                            return
-                        }
-                        if (source_text.val() === '') {
-                            alert('Please fill in the source text!');
-                            source_text.focus();
-                            return
-                        }
-                        if (reasoning_method.val() === undefined) {
-                            alert('Please select your reasoning method!');
-                            reasoning_method.focus();
-                            return
-                        }
-
-                        if (confirm("Are you sure to submit all annotations?")) {
-                            is_submitted = true;
-                            $('#query-form').submit();
-                        }
-
-                    }
-                );
-                $('#cancel-btn').click(
-                    function () {
-                        if (confirm("Are you sure to abort the task submission?")) {
-                            window.close();
-                        }
-                    }
-                );
-                window.addEventListener('beforeunload', function (e) {
-                    if (!is_submitted) {
-                        navigator.sendBeacon('/task/stop_annotation/', new Blob());
-                    }
-                });
-            });
-        </script>
     </div>
 
+{% endblock %}
+{% block scripts %}
+<script>
+    function validateForm() {
+        let answer = document.getElementById("answer").value;
+        if (answer === '') {
+            alert('Please fill in the answer!');
+            return false;
+        }
+        return true;
+    }
+</script>
+<script>
+    $(document).ready(function() {
+        $('#add-source').click(function() {
+            const currentCount = $('.source-entry').length;
+            const newSource = `
+                <div class="source-entry" data-index="${currentCount}">
+                    <div class="question-wrapper col-xs-12">
+                        <label for="source_url_${currentCount}" class="col-xs-12 list-row" style="padding-left: 0;"><b>Source URL:</b></label>
+                        <input type="url" class="col-xs-12 list-row source-url" id="source_url_${currentCount}" name="source_url_${currentCount}" required>
+                    </div>
+
+                    <div class="question-wrapper col-xs-12">
+                        <label for="source_text_${currentCount}" class="col-xs-12 list-row" style="padding-left: 0;"><b>Source Text:</b></label>
+                        <textarea class="col-xs-12 list-row source-text" id="source_text_${currentCount}" name="source_text_${currentCount}" rows="3" required></textarea>
+                    </div>
+
+                    <div class="question-wrapper col-xs-12">
+                        <button type="button" class="btn btn-danger remove-source btn-primary">Remove Source</button>
+                    </div>
+                </div>
+            `;
+            $('#source-container').append(newSource);
+            updateRemoveButtons();
+        });
+
+        $(document).on('click', '.remove-source', function() {
+            $(this).closest('.source-entry').remove();
+            reindexSources();
+            updateRemoveButtons();
+        });
+
+        function reindexSources() {
+            $('.source-entry').each(function(index) {
+                $(this).attr('data-index', index);
+                $(this).find('label[for^="source_url_"]').attr('for', `source_url_${index}`);
+                $(this).find('input[name^="source_url_"]').attr('id', `source_url_${index}`).attr('name', `source_url_${index}`);
+                $(this).find('label[for^="source_text_"]').attr('for', `source_text_${index}`);
+                $(this).find('textarea[name^="source_text_"]').attr('id', `source_text_${index}`).attr('name', `source_text_${index}`);
+            });
+        }
+
+        function updateRemoveButtons() {
+            const sourceEntries = $('.source-entry');
+            if (sourceEntries.length > 1) {
+                $('.remove-source').show();
+            } else {
+                $('.remove-source').hide();
+            }
+        }
+
+        $('input[name="reasoning_method"]').change(function() {
+            if ($('#reasoning_other').is(':checked')) {
+                $('#reasoning_other_text').prop('disabled', false);
+            } else {
+                $('#reasoning_other_text').prop('disabled', true).val('');
+            }
+        });
+    });
+</script>
+<script type="application/x-javascript">
+    $(function () {
+        let is_submitted = false;
+        $('#query-btn').click(
+            function () {
+                let answer = $("[name='answer']");
+                let confidence = $("[name='confidence']:checked");
+                let source_url = $("[name='source_url_0']");
+                let source_text = $("[name='source_text_0']");
+                let reasoning_method = $("[name='reasoning_method']:checked");
+                if (reasoning_method.val() === 'other') {
+                    let reasoning_other_text = $("[name='reasoning_method_other']");
+                    if (reasoning_other_text.val() === '') {
+                        alert('Please fill in the specific reasoning method!');
+                        reasoning_other_text.focus();
+                        return
+                    }
+                }
+                if (answer.val() === '') {
+                    alert('Please fill in the answer!');
+                    answer.focus();
+                    return
+                }
+                if (confidence.val() === undefined) {
+                    alert('Please select your confidence level!');
+                    confidence.focus();
+                    return
+                }
+                if (source_url.val() === '') {
+                    alert('Please fill in the source URL!');
+                    source_url.focus();
+                    return
+                }
+                if (source_text.val() === '') {
+                    alert('Please fill in the source text!');
+                    source_text.focus();
+                    return
+                }
+                if (reasoning_method.val() === undefined) {
+                    alert('Please select your reasoning method!');
+                    reasoning_method.focus();
+                    return
+                }
+
+                if (confirm("Are you sure to submit all annotations?")) {
+                    is_submitted = true;
+                    $('#query-form').submit();
+                }
+
+            }
+        );
+        $('#cancel-btn').click(
+            function () {
+                if (confirm("Are you sure to abort the task submission?")) {
+                    window.close();
+                }
+            }
+        );
+        window.addEventListener('beforeunload', function (e) {
+            if (!is_submitted) {
+                navigator.sendBeacon('/task/stop_annotation/', new Blob());
+            }
+        });
+    });
+</script>
 {% endblock %}

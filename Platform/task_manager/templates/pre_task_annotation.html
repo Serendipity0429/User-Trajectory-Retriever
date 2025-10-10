@@ -168,55 +168,57 @@
                 </div>
             </div>
         </div>
-        <script>
-            function setEffort() {
-                let effort = document.getElementById("effort_val");
-                effort.innerText = document.getElementsByName("effort")[0].value;
-            }
-
-            function validateForm() {
-                let checks = $('input[type="checkbox"]:checked').map(function () {
-                    return $(this).val();
-                }).get();
-            }
-        </script>
-        <script type="application/x-javascript">
-            $(function () {
-                let is_submitted = false;
-                $('#query-btn').click(
-                    function () {
-                        let difficulty = $("[name='difficulty']:checked");
-                        if (difficulty.val() == null) {
-                            alert('Please check a difficulty button!');
-                            $("[name='difficulty']").focus();
-                            return
-                        }
-                        let familiarity = $("[name='familiarity']:checked");
-                        if (familiarity.val() == null) {
-                            alert('Please check a familiarity button!');
-                            $("[name='familiarity']").focus();
-                            return
-                        }
-                        let initial_strategy = $('#initial_strategy').val();
-                        if (initial_strategy.trim() === '') {
-                            alert('Please fill in the initial strategy!');
-                            $('#initial_strategy').focus();
-                            return
-                        }
-
-                        if (confirm("Are you sure to submit all the annotations?")) {
-                            is_submitted = true;
-                            $('#query-form').submit();
-                        }
-                    }
-                );
-                window.addEventListener('beforeunload', function (e) {
-                    if (!is_submitted) {
-                        navigator.sendBeacon('/task/stop_annotation/', new Blob());
-                    }
-                });
-            });
-        </script>
     </div>
 
+{% endblock %}
+{% block scripts %}
+<script>
+    function setEffort() {
+        let effort = document.getElementById("effort_val");
+        effort.innerText = document.getElementsByName("effort")[0].value;
+    }
+
+    function validateForm() {
+        let checks = $('input[type="checkbox"]:checked').map(function () {
+            return $(this).val();
+        }).get();
+    }
+</script>
+<script type="application/x-javascript">
+    $(function () {
+        let is_submitted = false;
+        $('#query-btn').click(
+            function () {
+                let difficulty = $("[name='difficulty']:checked");
+                if (difficulty.val() == null) {
+                    alert('Please check a difficulty button!');
+                    $("[name='difficulty']").focus();
+                    return
+                }
+                let familiarity = $("[name='familiarity']:checked");
+                if (familiarity.val() == null) {
+                    alert('Please check a familiarity button!');
+                    $("[name='familiarity']").focus();
+                    return
+                }
+                let initial_strategy = $('#initial_strategy').val();
+                if (initial_strategy.trim() === '') {
+                    alert('Please fill in the initial strategy!');
+                    $('#initial_strategy').focus();
+                    return
+                }
+
+                if (confirm("Are you sure to submit all the annotations?")) {
+                    is_submitted = true;
+                    $('#query-form').submit();
+                }
+            }
+        );
+        window.addEventListener('beforeunload', function (e) {
+            if (!is_submitted) {
+                navigator.sendBeacon('/task/stop_annotation/', new Blob());
+            }
+        });
+    });
+</script>
 {% endblock %}

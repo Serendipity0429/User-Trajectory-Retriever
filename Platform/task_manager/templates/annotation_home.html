@@ -27,32 +27,6 @@
                         Remove Task
                     </div>
                 </div>
-                <script>
-                    $(function () {
-                        $('#see-{{ task_id }}-btn').click(
-                            function () {
-                                window.location.href = '/task/show_task/{{ task_id }}/';
-                            }
-                        );
-                        $('#remove-{{ task_id }}-btn').click(
-                            function () {
-                                if (confirm("Are you sure to remove this task?")) {
-                                    $.ajax({
-                                        type: "POST",
-                                        url: "/task/remove_task/{{ task_id }}/",
-                                        success: function (response) {
-                                            alert(response);
-                                            window.location.reload();
-                                        },
-                                        error: function (xhr, status, error) {
-                                            alert("Error removing task: " + error);
-                                        }
-                                    });
-                                }
-                            }
-                        );
-                    });
-                </script>
             {% endfor %}
         </div>
         <div class="col-xs-5">
@@ -71,4 +45,35 @@
         </div>
     </div>
 
+{% endblock %}
+
+{% block scripts %}
+<script>
+    $(function () {
+        {% for task_id, webpages in annotated_tasks_to_webpages %}
+        $('#see-{{ task_id }}-btn').click(
+            function () {
+                window.location.href = '/task/show_task/{{ task_id }}/';
+            }
+        );
+        $('#remove-{{ task_id }}-btn').click(
+            function () {
+                if (confirm("Are you sure to remove this task?")) {
+                    $.ajax({
+                        type: "POST",
+                        url: "/task/remove_task/{{ task_id }}/",
+                        success: function (response) {
+                            alert(response);
+                            window.location.reload();
+                        },
+                        error: function (xhr, status, error) {
+                            alert("Error removing task: " + error);
+                        }
+                    });
+                }
+            }
+        );
+        {% endfor %}
+    });
+</script>
 {% endblock %}

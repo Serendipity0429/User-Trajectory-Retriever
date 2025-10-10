@@ -252,106 +252,6 @@
                             <input type="hidden" name="failure_category_list" id="failure_category_list" />
                         </div>
                     </div>
-
-                    <script>
-                        $(document).ready(function() {
-                            function initializeSortable(selectedListId, unselectedListId, inputName, hiddenInputId, separatorId) {
-                                // Initialize jQuery UI Sortable on the list of selected items
-                                $("#" + selectedListId).sortable({
-                                    cursor: "grabbing",
-                                    opacity: 0.8,
-                                    placeholder: "sortable-placeholder",
-                                    tolerance: "pointer",
-                                    helper: "clone",
-                                    appendTo: "body",
-                                    start: function(event, ui) {
-                                        ui.item.css('visibility', 'hidden');
-                                        ui.helper.width(ui.item.outerWidth());
-                                        ui.helper.height(ui.item.outerHeight());
-                                        var itemOffset = ui.item.offset();
-                                        var cursorTop = event.pageY - itemOffset.top;
-                                        var cursorLeft = event.pageX - itemOffset.left;
-                                        $(this).sortable('option', 'cursorAt', { top: cursorTop, left: cursorLeft });
-                                    },
-                                    stop: function(event, ui) {
-                                        ui.item.css('visibility', 'visible');
-                                        $(this).sortable('option', 'cursorAt', false);
-                                    },
-                                    update: function(event, ui) {
-                                        updateOrder(selectedListId, hiddenInputId);
-                                        updatePriorityNumbers(selectedListId, unselectedListId);
-                                    }
-                                });
-
-                                // Handle checkbox changes to move items between lists
-                                $('input[name="' + inputName + '"]').change(function() {
-                                    var option = $(this).closest('.drag-option');
-                                    var selectedList = $('#' + selectedListId);
-                                    var unselectedList = $('#' + unselectedListId);
-                                    var separator = $('#' + separatorId);
-
-                                    if ($(this).is(':checked')) {
-                                        option.addClass('selected');
-                                        option.appendTo(selectedList); // Move to selected list
-                                    } else {
-                                        option.removeClass('selected');
-                                        option.appendTo(unselectedList); // Move to unselected list
-                                    }
-
-                                    // Show separator if both lists have items
-                                    if (selectedList.children().length > 0 && unselectedList.children().length > 0) {
-                                        separator.show();
-                                    } else {
-                                        separator.hide();
-                                    }
-
-                                    updateOrder(selectedListId, hiddenInputId);
-                                    updatePriorityNumbers(selectedListId, unselectedListId);
-                                });
-                            }
-
-                            function updateOrder(selectedListId, hiddenInputId) {
-                                var order = [];
-                                $('#' + selectedListId + ' .drag-option').each(function() {
-                                    order.push($(this).data('value'));
-                                });
-                                $('#' + hiddenInputId).val(JSON.stringify(order));
-                            }
-
-                            function updatePriorityNumbers(selectedListId, unselectedListId) {
-                                $('#' + selectedListId + ' .drag-option').each(function(index) {
-                                    $(this).find('.priority-number').text(index + 1).show();
-                                });
-                                $('#' + unselectedListId + ' .drag-option').each(function() {
-                                    $(this).find('.priority-number').hide();
-                                });
-                            }
-
-                            // Initialize for both sections
-                            initializeSortable("selected-failure-categories", "unselected-failure-categories", "failure_category", "failure_category_list", "failure-separator");
-                            initializeSortable("selected-corrective-actions", "unselected-corrective-actions", "future_plan_actions", "future_plan_actions_list", "corrective-separator");
-
-                            // Handle the 'other' text input for corrective actions
-                            $('input[name="future_plan_actions"][value="other"]').change(function() {
-                                if ($(this).is(':checked')) {
-                                    $('#future_plan_other_text').prop('disabled', false);
-                                } else {
-                                    $('#future_plan_other_text').prop('disabled', true).val('');
-                                }
-                            });
-
-                            // Handle clicking on drag-option to toggle checkbox
-                            $('.drag-option').click(function(e) {
-                                // Don't trigger if clicking on checkbox or text input directly
-                                if ($(e.target).is('input[type="checkbox"], input[type="text"]')) {
-                                    return;
-                                }
-                                
-                                var checkbox = $(this).find('input[type="checkbox"]');
-                                checkbox.prop('checked', !checkbox.prop('checked')).trigger('change');
-                            });
-                        });
-                    </script>
                         
 
                     <div class="question-wrapper col-xs-12">
@@ -513,127 +413,194 @@
                 </div>
             </form>
         </div>
-        <script>
-            document.querySelectorAll('.explanation-button').forEach(button => {
-                button.addEventListener('click', (e) => {
-                    const targetId = button.getAttribute('data-target');
-                    const target = document.getElementById(targetId);
-                    if (target) {
-                        target.style.display = target.style.display === 'none' ? 'block' : 'none';
-                    }
-                    e.stopPropagation();
-                });
-            });
-        </script>
-        <script>
-            function setEffort() {
-                let effort = document.getElementById("effort_val");
-                effort.innerText = document.getElementsByName("remaining_effort")[0].value;
-            }
-
-            function validateForm() {
-                let checks = $('input[type="checkbox"]:checked').map(function () {
-                    return $(this).val();
-                }).get();
-            }
-        </script>
-        <script type="application/x-javascript">
-            $(function () {
-                let is_submitted = false;
-                $('#query-btn').click(
-                    function () {
-                        var failure_reason = $("[name='failure_reason']");
-                        var future_plan_actions = $("[name='future_plan_actions']:checked");
-                        var failure_category = $("[name='failure_category']:checked");
-                        if (failure_reason.val() === '') {
-                            alert('Please fill in the failure analysis!');
-                            failure_reason.focus();
-                            return
-                        }
-                        if (future_plan_actions.length === 0) {
-                            alert('Please select at least one corrective action for future attempts!');
-                            $("[name='future_plan_actions']").focus();
-                            return
-                        }
-                        // If select "Other" in failure_category, check if the input is filled
-                        else
-                        {
-                            if (failure_category.val() === 'other') {
-                            var future_plan_other = $("[name='future_plan_other']");
-                            if (future_plan_other.val() === '') {
-                                alert('Please specify the corrective action for future attempts!');
-                                future_plan_other.focus();
-                                return
-                            }
-                        }else
-                        {
-                            var future_plan_other = $("[name='future_plan_other']");
-                            future_plan_other.val('');
-                        }
-                    }
-                        if (failure_category.val() == null) {
-                            alert('Please select a primary reason for failure!');
-                            $("[name='failure_category']").focus();
-                            return
-                        }
-
-                        if (confirm("Are you sure to submit your reflections?")) {
-                            is_submitted = true;
-                            $('#query-form').submit();
-                        }
-
-                    }
-                );
-                window.addEventListener('beforeunload', function (e) {
-                    if (!is_submitted) {
-                        navigator.sendBeacon('/task/stop_annotation/', new Blob());
-                    }
-                });
-
-                // Handle clicking on drag-option to toggle checkbox
-                $('.drag-option').click(function(e) {
-                    // Don't trigger if clicking on checkbox or text input directly
-                    if ($(e.target).is('input[type="checkbox"], input[type="text"]')) {
-                        return;
-                    }
-                    
-                    var checkbox = $(this).find('input[type="checkbox"]');
-                    checkbox.prop('checked', !checkbox.prop('checked')).trigger('change');
-                });
-            });
-            
-        </script>
     </div>
 
 {% endblock %}
-                    <div class="question-wrapper col-xs-12">
-                        <label for="remaining_effort" class="ratio col-xs-12 list-row question-text question-text"><b>6. Remaining Effort</b>: How much time <b class="notice">remaining</b> do you expect to spend on this task?&ensp;<span class="notice">(Current choice:&ensp;<b><span id="effort_val">10</span></b>)</span>
-                            <div class="tooltip-container">
-                                <span class="tooltip-button">?</span>
-                                <span class="tooltip-text">This is an estimate of how much more time you believe is needed to successfully complete the task, assuming you continue working on it.</span>
-                            </div>
-                        </label>
-                        <div class="ratio col-xs-12 list-row">
-                        <span style="display:flex;">
-                            Three minutes or slower&emsp;
-                            <input type="range" style="width: 40%" name="remaining_effort" id="remaining_effort" min="3" max="60" value="10" step="1" list="effort_marks" oninput="setEffort()" onchange="setEffort()"/>
-                            &emsp; Sixty minutes or longer</span>
-                            <datalist id="effort_marks">
-                                {% for i in "3456789" %}
-                                    <option>{{ i }}</option>
-                                {% endfor %}
-                                {% for i in "123456" %}
-                                    {% for j in "0123456789" %}
-                                        <option>{{ i }}{{ j }}</option>
-                                    {% endfor %}
-                                {% endfor %}
-                            </datalist>
-                        </div>
-                    </div>
-                    <div class="question-wrapper col-xs-12">
-                        <label for="cancel_additional_reflection" class="col-xs-12 list-row question-text">
-                            <b>7. (Optional) Additional Reflection</b>: Do you have any additional thoughts or reflections on this failure?
-                            <div class="tooltip-container">
-                                <span class="tooltip-button">?</span>
-                                <span class="tooltip-text">This is an estimate of how much more time you believe is needed to successfully complete the task, assuming you continue working on it.</span>
-                            </div>
+{% block scripts %}
+<script>
+    document.querySelectorAll('.explanation-button').forEach(button => {
+        button.addEventListener('click', (e) => {
+            const targetId = button.getAttribute('data-target');
+            const target = document.getElementById(targetId);
+            if (target) {
+                target.style.display = target.style.display === 'none' ? 'block' : 'none';
+            }
+            e.stopPropagation();
+        });
+    });
+</script>
+<script>
+    function setEffort() {
+        let effort = document.getElementById("effort_val");
+        effort.innerText = document.getElementsByName("remaining_effort")[0].value;
+    }
+
+    function validateForm() {
+        let checks = $('input[type="checkbox"]:checked').map(function () {
+            return $(this).val();
+        }).get();
+    }
+</script>
+<script type="application/x-javascript">
+    $(function () {
+        function initializeSortable(selectedListId, unselectedListId, inputName, hiddenInputId, separatorId) {
+            // Initialize jQuery UI Sortable on the list of selected items
+            $("#" + selectedListId).sortable({
+                cursor: "grabbing",
+                opacity: 0.8,
+                placeholder: "sortable-placeholder",
+                tolerance: "pointer",
+                helper: "clone",
+                appendTo: "body",
+                start: function(event, ui) {
+                    ui.item.css('visibility', 'hidden');
+                    ui.helper.width(ui.item.outerWidth());
+                    ui.helper.height(ui.item.outerHeight());
+                    var itemOffset = ui.item.offset();
+                    var cursorTop = event.pageY - itemOffset.top;
+                    var cursorLeft = event.pageX - itemOffset.left;
+                    $(this).sortable('option', 'cursorAt', { top: cursorTop, left: cursorLeft });
+                },
+                stop: function(event, ui) {
+                    ui.item.css('visibility', 'visible');
+                    $(this).sortable('option', 'cursorAt', false);
+                },
+                update: function(event, ui) {
+                    updateOrder(selectedListId, hiddenInputId);
+                    updatePriorityNumbers(selectedListId, unselectedListId);
+                }
+            });
+
+            // Handle checkbox changes to move items between lists
+            $('input[name="' + inputName + '"]').change(function() {
+                var option = $(this).closest('.drag-option');
+                var selectedList = $('#' + selectedListId);
+                var unselectedList = $('#' + unselectedListId);
+                var separator = $('#' + separatorId);
+
+                if ($(this).is(':checked')) {
+                    option.addClass('selected');
+                    option.appendTo(selectedList); // Move to selected list
+                } else {
+                    option.removeClass('selected');
+                    option.appendTo(unselectedList); // Move to unselected list
+                }
+
+                // Show separator if both lists have items
+                if (selectedList.children().length > 0 && unselectedList.children().length > 0) {
+                    separator.show();
+                } else {
+                    separator.hide();
+                }
+
+                updateOrder(selectedListId, hiddenInputId);
+                updatePriorityNumbers(selectedListId, unselectedListId);
+            });
+        }
+
+        function updateOrder(selectedListId, hiddenInputId) {
+            var order = [];
+            $('#' + selectedListId + ' .drag-option').each(function() {
+                order.push($(this).data('value'));
+            });
+            $('#' + hiddenInputId).val(JSON.stringify(order));
+        }
+
+        function updatePriorityNumbers(selectedListId, unselectedListId) {
+            $('#' + selectedListId + ' .drag-option').each(function(index) {
+                $(this).find('.priority-number').text(index + 1).show();
+            });
+            $('#' + unselectedListId + ' .drag-option').each(function() {
+                $(this).find('.priority-number').hide();
+            });
+        }
+
+        // Initialize for both sections
+        initializeSortable("selected-failure-categories", "unselected-failure-categories", "failure_category", "failure_category_list", "failure-separator");
+        initializeSortable("selected-corrective-actions", "unselected-corrective-actions", "future_plan_actions", "future_plan_actions_list", "corrective-separator");
+
+        // Handle the 'other' text input for corrective actions
+        $('input[name="future_plan_actions"][value="other"]').change(function() {
+            if ($(this).is(':checked')) {
+                $('#future_plan_other_text').prop('disabled', false);
+            } else {
+                $('#future_plan_other_text').prop('disabled', true).val('');
+            }
+        });
+
+        // Handle clicking on drag-option to toggle checkbox
+        $('.drag-option').click(function(e) {
+            // Don't trigger if clicking on checkbox or text input directly
+            if ($(e.target).is('input[type="checkbox"], input[type="text"]')) {
+                return;
+            }
+            
+            var checkbox = $(this).find('input[type="checkbox"]');
+            checkbox.prop('checked', !checkbox.prop('checked')).trigger('change');
+        });
+
+        let is_submitted = false;
+        $('#query-btn').click(
+            function () {
+                var failure_reason = $("[name='failure_reason']");
+                var future_plan_actions = $("[name='future_plan_actions']:checked");
+                var failure_category = $("[name='failure_category']:checked");
+                if (failure_reason.val() === '') {
+                    alert('Please fill in the failure analysis!');
+                    failure_reason.focus();
+                    return
+                }
+                if (future_plan_actions.length === 0) {
+                    alert('Please select at least one corrective action for future attempts!');
+                    $("[name='future_plan_actions']").focus();
+                    return
+                }
+                // If select "Other" in failure_category, check if the input is filled
+                else
+                {
+                    if (failure_category.val() === 'other') {
+                    var future_plan_other = $("[name='future_plan_other']");
+                    if (future_plan_other.val() === '') {
+                        alert('Please specify the corrective action for future attempts!');
+                        future_plan_other.focus();
+                        return
+                    }
+                }else
+                {
+                    var future_plan_other = $("[name='future_plan_other']");
+                    future_plan_other.val('');
+                }
+            }
+                if (failure_category.val() == null) {
+                    alert('Please select a primary reason for failure!');
+                    $("[name='failure_category']").focus();
+                    return
+                }
+
+                if (confirm("Are you sure to submit your reflections?")) {
+                    is_submitted = true;
+                    $('#query-form').submit();
+                }
+
+            }
+        );
+        window.addEventListener('beforeunload', function (e) {
+            if (!is_submitted) {
+                navigator.sendBeacon('/task/stop_annotation/', new Blob());
+            }
+        });
+
+        // Handle clicking on drag-option to toggle checkbox
+        $('.drag-option').click(function(e) {
+            // Don't trigger if clicking on checkbox or text input directly
+            if ($(e.target).is('input[type="checkbox"], input[type="text"]')) {
+                return;
+            }
+            
+            var checkbox = $(this).find('input[type="checkbox"]');
+            checkbox.prop('checked', !checkbox.prop('checked')).trigger('change');
+        });
+    });
+    
+</script>
+{% endblock %}

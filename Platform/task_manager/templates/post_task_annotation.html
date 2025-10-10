@@ -125,44 +125,6 @@
                             <a href="#" id="show-all-answers" style="display: none; margin-top: 10px; cursor: pointer;">Click here to see all possible correct answers</a>
                             <a href="#" id="show-fewer-answers" style="display: none; margin-top: 10px; cursor: pointer;">Show fewer answers</a>
                         </div> 
-                        <script type="application/x-javascript">
-                            $(function () {
-                                var answerList = $('#answer-list');
-                                var listItems = answerList.find('li');
-                                var showAllButton = $('#show-all-answers');
-                                var showFewerButton = $('#show-fewer-answers');
-                                var initialItemCount = 2;
-
-                                if (listItems.length > initialItemCount) {
-                                    listItems.slice(initialItemCount).hide();
-                                    showAllButton.show();
-                                }
-
-                                showAllButton.on('click', function(e) {
-                                    e.preventDefault();
-                                    answerList.find('li:hidden').show();
-                                    $(this).hide();
-                                    showFewerButton.show();
-                                    answerList.css({
-                                        'column-count': 2,
-                                        '-webkit-column-count': 2,
-                                        '-moz-column-count': 2
-                                    });
-                                });
-
-                                showFewerButton.on('click', function(e) {
-                                    e.preventDefault();
-                                    listItems.slice(initialItemCount).hide();
-                                    $(this).hide();
-                                    showAllButton.show();
-                                    answerList.css({
-                                        'column-count': 1,
-                                        '-webkit-column-count': 1,
-                                        '-moz-column-count': 1
-                                    });
-                                });
-                            });
-                            </script>
                     </div>
 
                     <div class="question-wrapper col-xs-12">
@@ -208,17 +170,6 @@
                                 </div>
                             {% endfor %}
                             <label><input type="text" name="aha_moment_other" style="margin-left: 10px; font-size: normal; width: 100%;" disabled placeholder="Please specify..." /></label>
-                            <script>
-                            $(function() {
-                                $('input[name="aha_moment_type"]').change(function() {
-                                    if ($(this).val() === 'other' && $(this).is(':checked')) {
-                                        $('input[name="aha_moment_other"]').prop('disabled', false);
-                                    } else {
-                                        $('input[name="aha_moment_other"]').prop('disabled', true).val('');
-                                    }
-                                });
-                            });
-                            </script>
                             <br>
                         </div>
                         <label for="aha_moment_source" class="col-xs-12 list-row" style="margin-top: 5px;">
@@ -245,27 +196,6 @@
                                 </div>
                             {% endfor %}
                             <label><input type="text" name="unhelpful_paths_other" style="margin-left: 10px; font-size: normal; width: 100%;" disabled placeholder="Please specify..." /></label><br>
-                            <script>
-                            $(function() {
-                                $('input[name="unhelpful_paths"]').change(function() {
-                                    var otherChecked = $('input[name="unhelpful_paths"][value="other"]:checked').length > 0;
-                                    if (otherChecked) {
-                                        $('input[name="unhelpful_paths_other"]').prop('disabled', false);
-                                    } else {
-                                        $('input[name="unhelpful_paths_other"]').prop('disabled', true).val('');
-                                    }
-                                });
-                                
-                                $('input[name="unhelpful_paths"]').change(function() {
-                                    if ($(this).val() === 'no_major_roadblocks' && $(this).is(':checked')) {
-                                        $('input[name="unhelpful_paths"]').not(this).prop('checked', false);
-                                        $('input[name="unhelpful_paths_other"]').prop('disabled', true).val('');
-                                    } else if ($(this).val() !== 'no_major_roadblocks' && $(this).is(':checked')) {
-                                        $('input[name="unhelpful_paths"][value="no_major_roadblocks"]').prop('checked', false);
-                                    }
-                                });
-                            });
-                            </script>
                         </div>
                     </div>
 
@@ -286,17 +216,6 @@
                                 </div>
                             {% endfor %}
                             <label><input type="text" name="strategy_shift_other" style="margin-left: 10px; font-size: normal; width: 100%;" disabled placeholder="Please specify..." /></label>
-                            <script>
-                            $(function() {
-                                $('input[name="strategy_shift"]').change(function() {
-                                    if ($(this).val() === 'other' && $(this).is(':checked')) {
-                                        $('input[name="strategy_shift_other"]').prop('disabled', false);
-                                    } else {
-                                        $('input[name="strategy_shift_other"]').prop('disabled', true).val('');
-                                    }
-                                });
-                            });
-                            </script>
                         </div>
                     </div>
 
@@ -315,72 +234,143 @@
                 </div>
             </div>
         </div>
-        <script>
-            function validateForm() {
-                let checks = $('input[type="checkbox"]:checked').map(function () {
-                    return $(this).val();
-                }).get();
-            }
-        </script>
-        <script type="application/x-javascript">
-            $(function () {
-                let is_submitted = false;
-                $('#query-btn').click(
-                    function () {
-                        let difficulty_actual = $('input[name="difficulty_actual"]:checked');
-                        let aha_moment_type = $('input[name="aha_moment_type"]:checked');
-                        let aha_moment_other = $('input[name="aha_moment_other"]');
-                        let strategy_shift = $('input[name="strategy_shift"]:checked');
-                        let roadblocks = $('input[name="unhelpful_paths"]:checked');
-                        
-                        if(difficulty_actual.val() == null)
-                        {
-                            alert('Please select the actual difficulty of the task!');
-                            $('input[name="difficulty_actual"]').focus();
-                            return;
-                        }
-
-                        if(aha_moment_type.val() == null)
-                        {
-                            alert('Please select the type of "Aha!" moment!');
-                            $('input[name="aha_moment_type"]').focus();
-                            return;
-                        } else {
-                            if (aha_moment_type.val() === 'other') {
-                                if (aha_moment_other.val() === '') {
-                                    alert('Please specify the type of "Aha!" moment!');
-                                    aha_moment_other.focus();
-                                    return;
-                                }
-                            } else {
-                                aha_moment_other.val('');
-                            }
-                        }
-                        if(strategy_shift.val() == null)
-                        {
-                            alert('Please select the strategic shift! (You can select "No change" if applicable.)');
-                            $('input[name="strategy_shift"]').focus();
-                            return;
-                        }
-                        if (roadblocks.length === 0) {
-                            alert('Please select at least one roadblock you encountered! (You can select "No major roadblocks" if applicable.)');
-                            $('input[name="roadblocks"]').focus();
-                            return;
-                        }
-
-                        if (confirm("Are you sure to submit all the annotations?")) {
-                            is_submitted = true;
-                            $('#query-form').submit();
-                        }
-                    }
-                );
-                window.addEventListener('beforeunload', function (e) {
-                    if (!is_submitted) {
-                        navigator.sendBeacon('/task/stop_annotation/', new Blob());
-                    }
-                });
-            });
-        </script>
     </div>
 
+{% endblock %}
+{% block scripts %}
+<script>
+    function validateForm() {
+        let checks = $('input[type="checkbox"]:checked').map(function () {
+            return $(this).val();
+        }).get();
+    }
+</script>
+<script type="application/x-javascript">
+    $(function () {
+        var answerList = $('#answer-list');
+        var listItems = answerList.find('li');
+        var showAllButton = $('#show-all-answers');
+        var showFewerButton = $('#show-fewer-answers');
+        var initialItemCount = 2;
+
+        if (listItems.length > initialItemCount) {
+            listItems.slice(initialItemCount).hide();
+            showAllButton.show();
+        }
+
+        showAllButton.on('click', function(e) {
+            e.preventDefault();
+            answerList.find('li:hidden').show();
+            $(this).hide();
+            showFewerButton.show();
+            answerList.css({
+                'column-count': 2,
+                '-webkit-column-count': 2,
+                '-moz-column-count': 2
+            });
+        });
+
+        showFewerButton.on('click', function(e) {
+            e.preventDefault();
+            listItems.slice(initialItemCount).hide();
+            $(this).hide();
+            showAllButton.show();
+            answerList.css({
+                'column-count': 1,
+                '-webkit-column-count': 1,
+                '-moz-column-count': 1
+            });
+        });
+
+        $('input[name="aha_moment_type"]').change(function() {
+            if ($(this).val() === 'other' && $(this).is(':checked')) {
+                $('input[name="aha_moment_other"]').prop('disabled', false);
+            } else {
+                $('input[name="aha_moment_other"]').prop('disabled', true).val('');
+            }
+        });
+
+        $('input[name="unhelpful_paths"]').change(function() {
+            var otherChecked = $('input[name="unhelpful_paths"][value="other"]:checked').length > 0;
+            if (otherChecked) {
+                $('input[name="unhelpful_paths_other"]').prop('disabled', false);
+            } else {
+                $('input[name="unhelpful_paths_other"]').prop('disabled', true).val('');
+            }
+        });
+        
+        $('input[name="unhelpful_paths"]').change(function() {
+            if ($(this).val() === 'no_major_roadblocks' && $(this).is(':checked')) {
+                $('input[name="unhelpful_paths"]').not(this).prop('checked', false);
+                $('input[name="unhelpful_paths_other"]').prop('disabled', true).val('');
+            } else if ($(this).val() !== 'no_major_roadblocks' && $(this).is(':checked')) {
+                $('input[name="unhelpful_paths"][value="no_major_roadblocks"]').prop('checked', false);
+            }
+        });
+
+        $('input[name="strategy_shift"]').change(function() {
+            if ($(this).val() === 'other' && $(this).is(':checked')) {
+                $('input[name="strategy_shift_other"]').prop('disabled', false);
+            } else {
+                $('input[name="strategy_shift_other"]').prop('disabled', true).val('');
+            }
+        });
+
+        let is_submitted = false;
+        $('#query-btn').click(
+            function () {
+                let difficulty_actual = $('input[name="difficulty_actual"]:checked');
+                let aha_moment_type = $('input[name="aha_moment_type"]:checked');
+                let aha_moment_other = $('input[name="aha_moment_other"]');
+                let strategy_shift = $('input[name="strategy_shift"]:checked');
+                let roadblocks = $('input[name="unhelpful_paths"]:checked');
+                
+                if(difficulty_actual.val() == null)
+                {
+                    alert('Please select the actual difficulty of the task!');
+                    $('input[name="difficulty_actual"]').focus();
+                    return;
+                }
+
+                if(aha_moment_type.val() == null)
+                {
+                    alert('Please select the type of "Aha!" moment!');
+                    $('input[name="aha_moment_type"]').focus();
+                    return;
+                } else {
+                    if (aha_moment_type.val() === 'other') {
+                        if (aha_moment_other.val() === '') {
+                            alert('Please specify the type of "Aha!" moment!');
+                            aha_moment_other.focus();
+                            return;
+                        }
+                    } else {
+                        aha_moment_other.val('');
+                    }
+                }
+                if(strategy_shift.val() == null)
+                {
+                    alert('Please select the strategic shift! (You can select "No change" if applicable.)');
+                    $('input[name="strategy_shift"]').focus();
+                    return;
+                }
+                if (roadblocks.length === 0) {
+                    alert('Please select at least one roadblock you encountered! (You can select "No major roadblocks" if applicable.)');
+                    $('input[name="roadblocks"]').focus();
+                    return;
+                }
+
+                if (confirm("Are you sure to submit all the annotations?")) {
+                    is_submitted = true;
+                    $('#query-form').submit();
+                }
+            }
+        );
+        window.addEventListener('beforeunload', function (e) {
+            if (!is_submitted) {
+                navigator.sendBeacon('/task/stop_annotation/', new Blob());
+            }
+        });
+    });
+</script>
 {% endblock %}

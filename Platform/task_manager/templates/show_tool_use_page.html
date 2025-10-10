@@ -34,6 +34,8 @@
             </div>
         </div>
     </div>
+{% endblock %}
+{% block scripts %}
     <script>
         function submitForm(toolValue) {
             $('#tool-hidden').val(toolValue);
@@ -50,5 +52,4 @@
             );
         });
     </script>
-
 {% endblock %}

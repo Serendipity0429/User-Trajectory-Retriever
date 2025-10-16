@@ -27,7 +27,11 @@ if DEBUG:
     # os.system(f"python \"{work_dir}/manage.py\" load_nq_dataset ./task_manager/dataset/hard_questions.jsonl nq_hard_questions")
     # os.system(f"python \"{work_dir}/manage.py\" load_nq_dataset task_manager/dataset/NQ-open.train.jsonl nq_train")
     # Create a user for testing
-    os.system(f"python \"{work_dir}/manage.py\" create_test_user test qwaszx")
+    os.system(f"python \"{work_dir}/manage.py\" create_test_user test thuirthuir")
+    os.system(f"python \"{work_dir}/manage.py\" create_test_user test1 thuirthuir")
+    os.system(f"python \"{work_dir}/manage.py\" create_test_user test2 thuirthuir")
+    # Create a superuser for testing
+    os.system(f"python \"{work_dir}/manage.py\" create_test_superuser admin thuirthuir --primary")
     
 # Start Server
 os.system(f"python \"{work_dir}/manage.py\" runserver")

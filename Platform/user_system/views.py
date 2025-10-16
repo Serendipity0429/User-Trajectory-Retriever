@@ -12,8 +12,22 @@ from django.urls import reverse
 import logging
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth import login as auth_login, logout as auth_logout
-from django.contrib.auth.decorators import login_required
-from django.contrib.auth.forms import AuthenticationForm
+from django.contrib.auth.decorators import login_required, user_passes_test
+
+def is_superuser(user):
+    return user.is_superuser
+
+@login_required
+@user_passes_test(is_superuser)
+def admin_page(request):
+    users = User.objects.all()
+    return render(
+        request,
+        'admin_page.html',
+        {
+            'users': users,
+        }
+    )
 
 
 @csrf_exempt
@@ -52,8 +66,44 @@ def token_login(request):
         }, status=401)
 
 
+@login_required
+@user_passes_test(is_superuser)
+def delete_user(request, user_id):
+    if request.method == 'POST':
+        user_to_delete = get_object_or_404(User, id=user_id)
+        if request.user.id == user_to_delete.id:
+            # Optionally, add a message to inform the admin they cannot delete themselves
+            return HttpResponseRedirect(reverse('user_system:admin_page'))
+        user_to_delete.delete()
+        return HttpResponseRedirect(reverse('user_system:admin_page'))
+    # Redirect if not a POST request
+    return HttpResponseRedirect(reverse('user_system:admin_page'))
+
+
+@login_required
+@user_passes_test(is_superuser)
+def toggle_superuser(request, user_id):
+    if request.method == 'POST' and request.user.is_primary_superuser:
+        user_to_toggle = get_object_or_404(User, id=user_id)
+        if request.user.id != user_to_toggle.id:
+            user_to_toggle.is_superuser = not user_to_toggle.is_superuser
+            user_to_toggle.save()
+    return HttpResponseRedirect(reverse('user_system:admin_page'))
+
+
+@login_required
+@user_passes_test(is_superuser)
+def login_as_user(request, user_id):
+    if request.method == 'POST':
+        user_to_login = get_object_or_404(User, id=user_id)
+        if not user_to_login.is_primary_superuser and request.user.id != user_to_login.id:
+            auth_login(request, user_to_login)
+            return HttpResponseRedirect(reverse('task_manager:home'))
+    return HttpResponseRedirect(reverse('user_system:admin_page'))
+
+
 def login(request):
-    form = AuthenticationForm(request, data=request.POST or None)
+    form = CustomAuthenticationForm(request, data=request.POST or None)
     error_message = None
 
     if request.method == 'POST' and form.is_valid():
@@ -74,14 +124,31 @@ def login(request):
 
 
 def signup(request):
-    form = UserCreationForm(request.POST or None)
     error_message = None
-
-    if request.method == 'POST' and form.is_valid():
-        form.save()
-        return HttpResponseRedirect(reverse('user_system:login'))
-    elif request.method == 'POST':
-        error_message = form.errors
+    if request.method == 'POST':
+        form = SignupForm(request.POST)
+        if form.is_valid():
+            user = User.objects.create_user(
+                username=form.cleaned_data['username'],
+                password=form.cleaned_data['password'],
+                email=form.cleaned_data['email']
+            )
+            user.name = form.cleaned_data['name']
+            user.gender = form.cleaned_data['gender']
+            user.age = form.cleaned_data['age']
+            user.phone = form.cleaned_data['phone']
+            user.occupation = form.cleaned_data['occupation']
+            user.education = form.cleaned_data['education']
+            user.field_of_expertise = form.cleaned_data['field_of_expertise']
+            user.llm_frequency = form.cleaned_data['llm_frequency']
+            user.llm_history = form.cleaned_data['llm_history']
+            user.save()
+            return HttpResponseRedirect(reverse('user_system:login'))
+        else:
+            error_fields = ', '.join(form.errors.keys())
+            error_message = f"Required field(s) unfilled: {error_fields}"
+    else:
+        form = SignupForm()
 
     return render(
         request,
@@ -106,6 +173,19 @@ def info(request):
             'cur_user': request.user,
         }
         )
+
+
+@login_required
+@user_passes_test(is_superuser)
+def view_user_info(request, user_id):
+    user_info = get_object_or_404(User, id=user_id)
+    return render(
+        request,
+        'view_user_info.html',
+        {
+            'user_info': user_info,
+        }
+    )
 
 
 @login_required
@@ -165,7 +245,7 @@ def forget_password(request):
             reset_request = ResetPasswordRequest.objects.create(user=user)
             # Assuming send_reset_password_email is a utility function you have defined
             # from .utils import send_reset_password_email
-            send_reset_password_email(request, reset_request)
+            send_reset_password_email(request.get_host(), reset_request)
             return HttpResponseRedirect(reverse('user_system:login'))
         except User.DoesNotExist:
             error_message = 'Email address not found.'
@@ -213,5 +293,6 @@ def reset_password(request, token_str):
         {
             'form': form,
             'error_message': error_message,
+            'user': token.user,
         }
         )

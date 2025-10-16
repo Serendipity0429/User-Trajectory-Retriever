@@ -1,52 +1,53 @@
 {% extends "base.html" %}
-{% block title %} Task Homepage {% endblock %}
-{% block content_title %} Task Homepage {% endblock %}
+{% load task_manager_extras %}
+{% block title %}Task Dashboard{% endblock %}
+
 {% block content %}
-    <div class="row text-center">
-        <h3>
-            Task Homepage
-        </h3>
-    </div>
-    <div class="row">
-        <div class="col-xs-offset-3 col-xs-6 user-info">
-            <div class="user-info_row row">
-                <div class="info_label col-xs-offset-0 col-xs-12">
-                    Hello, {{ cur_user.username }}, here is your current annotation:
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-lg-10 col-xl-8">
+            <div class="card shadow-lg border-0 rounded-lg mt-5">
+                <div class="card-header bg-primary text-white text-center py-4">
+                    <h2 class="card-title mb-0"><i class="bi bi-speedometer2 me-2"></i>Welcome, {{ cur_user.username }}!</h2>
                 </div>
-            </div>
-            <div class="user-info_row row">
-                <div class="info_label col-xs-offset-0 col-xs-6">
-                    Number of annotated tasks:
-                </div>
-                <div class="info_value col-xs-offest-6 col-xs-6">
-                    {{ completed_num }}
-                </div>
-            </div>
-            <div class="user-info_row row">
-                <div class="info_label col-xs-offset-0 col-xs-6">
-                    Number of ongoing tasks:
-                </div>
-                <div class="info_value col-xs-offest-6 col-xs-6">
-                    {{ pending_num }}
+                <div class="card-body p-5">
+                    <p class="text-center text-muted mb-4">Here is a summary of your annotation progress.</p>
+
+                    <div class="row gx-4 gy-4 mb-5">
+                        <div class="col-md-6">
+                            <div class="card text-center h-100 shadow-sm">
+                                <div class="card-body">
+                                    <div class="display-4 text-success mb-2"><i class="bi bi-check-circle-fill"></i></div>
+                                    <h5 class="card-title">Annotated Tasks</h5>
+                                    <p class="card-text fs-1 fw-bold">{{ completed_num }}</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card text-center h-100 shadow-sm">
+                                <div class="card-body">
+                                    <div class="display-4 text-warning mb-2"><i class="bi bi-hourglass-split"></i></div>
+                                    <h5 class="card-title">Ongoing Tasks</h5>
+                                    <p class="card-text fs-1 fw-bold">{{ pending_num }}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {% with total_tasks=completed_num|add:pending_num %}
+                    {% if total_tasks > 0 %}
+                    
+                    {% endif %}
+                    {% endwith %}
+
+                    <div class="text-center d-grid">
+                        <a href="/task/annotation" class="btn btn-primary btn-lg btn-view-task">
+                            <i class="bi bi-arrow-right-circle-fill me-2"></i> View Details
+                        </a>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
-    <br/>
-    <div class="col-xs-offset-3 col-xs-6">
-        <div id="go-annotation-btn" class="col-xs-12 submit-btn btn btn-block btn-lg btn-primary">
-            Click here to view existing tasks
-        </div>
-    </div>
-{% endblock %}
-{% block scripts %}
-    <script>
-        $(function() {
-            $('#go-annotation-btn').click(
-                function () {
-                    window.location.href = '/task/annotation';
-                }
-            );
-        });
-    </script>
+</div>
 {% endblock %}

@@ -25,7 +25,7 @@ def authenticate(username, password):
     '''
     try:
         user = User.objects.get(username=username)
-        if user.password == password:
+        if user.check_password(password):
             return 0, user
         else:
             return 2, None
@@ -107,28 +107,141 @@ def get_user_groups_string(user_groups):
     return u' | '.join([val for key, val in user_group_list if key in user_groups])
 
 
-def send_reset_password_email(request, reset_req):
-    subject = u'THUIR Annotation Platform Forget Password'
-
+def send_reset_password_email(domain, reset_req):
+    """
+    Sends a password reset email to the user with a professional and informative message.
+    """
+    subject = 'Password Reset Request for THUIR Annotation Platform'
     user = reset_req.user
+    host = 'http://' + domain
+    reset_url = host + '/user/reset_password/%s/' % reset_req.token
 
-    message = u'If you are user %s' % user.username + ','
+    # Plain text message
+    text_content = f"""
+Hello {user.username},
 
-    message += u'Please click or copy the link below to your browser address bar to reset your password:'
-    host = u'http://' + request.get_host()
-    url = unicode(host + '/user/reset_password/%s/' % reset_req.token)
-    html_content = message + u'<a href="%s">%s</a>.' % (url, url)
-    message += url
+You are receiving this email because you requested a password reset for your account on the THU-IR Annotation Platform.
 
-    source = 'thuir_annotation@163.com'
-    target = reset_req.user.email
-    msg = EmailMultiAlternatives(subject, message, source, [target])
-    msg.attach_alternative(html_content, 'text/html')
+Account details:
+Username: {user.username}
+Email: {user.email}
+
+Please click the link below to reset your password:
+{reset_url}
+
+If you did not request a password reset, please ignore this email. This link will expire in 24 hours.
+
+Thank you,
+The THU-IR Annotation Platform Team
+"""
+
+    # HTML message
+    html_content = f"""
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Password Reset</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap');
+        body {{
+            font-family: 'Roboto', Arial, sans-serif;
+            background-color: #f4f4f4;
+            color: #333;
+            margin: 0;
+            padding: 0;
+            font-size: 16px; /* Base font size */
+        }}
+        .email-container {{
+            max-width: 600px;
+            margin: 40px auto;
+            background-color: #ffffff;
+            border: 1px solid #dddddd;
+            border-radius: 8px;
+            overflow: hidden;
+        }}
+        .email-header {{
+            background-color: #007bff;
+            color: #ffffff;
+            padding: 20px;
+            text-align: center;
+        }}
+        .email-header h1 {{
+            font-size: 28px;
+        }}
+        .email-body {{
+            padding: 30px;
+            line-height: 1.6;
+            font-size: 18px; /* Larger body text */
+        }}
+        .email-body h3 {{
+            font-size: 22px;
+        }}
+        .account-details {{
+            background-color: #f9f9f9;
+            border-left: 4px solid #007bff;
+            padding: 15px;
+            margin: 20px 0;
+        }}
+        .email-footer {{
+            background-color: #f4f4f4;
+            color: #777777;
+            padding: 20px;
+            text-align: center;
+            font-size: 1em; /* Larger footer text */
+        }}
+        .button {{
+            display: inline-block;
+            background-color: #007bff;
+            color: #ffffff;
+            padding: 15px 25px;
+            text-align: center;
+            text-decoration: none;
+            border-radius: 5px;
+            font-weight: bold;
+            margin: 20px 0;
+            font-size: 18px;
+        }}
+        .button:hover {{
+            background-color: #0056b3;
+        }}
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <div class="email-header">
+            <h1>Password Reset Request</h1>
+        </div>
+        <div class="email-body">
+            <h3>Hello {user.username},</h3>
+            <p>We received a request to reset the password for the following account on the <strong>THUIR Annotation Platform</strong>:</p>
+            <div class="account-details">
+                <strong>Username:</strong> {user.username}<br>
+                <strong>Email:</strong> {user.email}
+            </div>
+            <p>To proceed, please click the button below. This link will be valid for the next 24 hours.</p>
+            <a href="{reset_url}" class="button">Reset Your Password</a>
+            <p>If you are unable to click the button, please copy and paste the following URL into your web browser:</p>
+            <p><a href="{reset_url}">{reset_url}</a></p>
+            <p>If you did not request a password reset, please ignore this email. Your account remains secure.</p>
+        </div>
+        <div class="email-footer">
+            <p>&copy; 2025 THUIR Annotation Platform. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>
+"""
+
+    target_email = reset_req.user.email
+    msg = EmailMultiAlternatives(subject, text_content, to=[target_email])
+    msg.attach_alternative(html_content, "text/html")
+
     try:
         msg.send()
     except smtplib.SMTPException as e:
-        print (type(e))
-        print (e)
+        print(f"Failed to send email: {e}")
 
 
 

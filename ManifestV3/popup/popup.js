@@ -9,14 +9,18 @@ let active_task_id = -1;
 
 // --- UI LOGIC ---
 
-function showAlert(message) {
+function showAlert(message, title = "Alert") {
     const modal_container = document.getElementById('modal-container');
     modal_container.innerHTML = `
         <div class="modal-overlay">
             <div class="modal-content">
+                <div class="modal-header">
+                    <i class="fas fa-exclamation-circle" style="color: #f39c12;"></i>
+                    <h3>${title}</h3>
+                </div>
                 <p>${message}</p>
                 <div class="modal-buttons">
-                    <button class="ok-btn">OK</button>
+                    <button class="ok-btn btn">OK</button>
                 </div>
             </div>
         </div>
@@ -26,16 +30,20 @@ function showAlert(message) {
     });
 }
 
-function showConfirm(message) {
+function showConfirm(message, title = "Confirm") {
     return new Promise(resolve => {
         const modal_container = document.getElementById('modal-container');
         modal_container.innerHTML = `
             <div class="modal-overlay">
                 <div class="modal-content">
+                    <div class="modal-header">
+                        <i class="fas fa-question-circle"></i>
+                        <h3>${title}</h3>
+                    </div>
                     <p>${message}</p>
                     <div class="modal-buttons">
-                        <button class="confirm-btn">Yes</button>
-                        <button class="cancel-btn" style="margin-top: 10px;">No</button>
+                        <button class="confirm-btn btn">Yes</button>
+                        <button class="cancel-btn btn btn-secondary">No</button>
                     </div>
                 </div>
             </div>
@@ -61,7 +69,7 @@ function showFailMessage(message_type) {
     if (message_type >= 1 && message_type <= 3) {
         const failMsg = document.getElementById(`failMsg${message_type}`);
         if (failMsg) {
-            failMsg.style.display = 'block';
+            failMsg.style.display = 'flex';
         }
     }
 }
@@ -214,6 +222,14 @@ async function handleFeedback() {
     }
 }
 
+async function handleFeedbackUnlogged() {
+    const confirmed = await showConfirm("You are about to go to the task homepage. Continue?");
+    if (confirmed) {
+        window.open(feedback_url);
+    }
+}
+
+
 async function handleLogout() {
     const tabs = await new Promise(resolve => chrome.tabs.query({ active: true, currentWindow: true }, resolve));
     if (tabs[0]) {
@@ -288,7 +304,7 @@ async function handleViewTask() {
 (async function initialize() {
     document.getElementById('bt1').addEventListener('click', handleRegister);
     document.getElementById('bt2').addEventListener('click', handleLoginAttempt);
-    document.getElementById('bt4').addEventListener('click', handleFeedback);
+    document.getElementById('bt4').addEventListener('click', handleFeedbackUnlogged);
     document.getElementById('bt8').addEventListener('click', handleFeedback);
     document.getElementById('bt6').addEventListener('click', handleLogout);
     document.getElementById('bt_start_task').addEventListener('click', handleStartTask);

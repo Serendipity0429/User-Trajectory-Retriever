@@ -1,96 +1,84 @@
 {% extends "base.html" %}
-{% block title %} User Info  {% endblock %}
+{% block title %}User Profile{% endblock %}
 
 {% block content %}
-    <div class="row text-center">
-        <h3>
-            User Info
-        </h3>
-    </div>
-    <div class="row">
-    <div class="col-xs-offset-3 col-xs-6 user-info">
-        <div class="user-info_row row">
-            <div class="info_label col-xs-offset-0 col-xs-6">
-                Username:
-            </div>
-            <div class="info_value col-xs-offest-6 col-xs-6">
-                {{ cur_user.username }}
-            </div>
-        </div>
-        <div class="user-info_row row">
-            <div class="info_label col-xs-offset-0 col-xs-6">
-                Name:
-            </div>
-            <div class="info_value col-xs-offest-6 col-xs-6">
-                {{ cur_user.name }}
-            </div>
-        </div>
-        <div class="user-info_row row">
-            <div class="info_label col-xs-offset-0 col-xs-6">
-                Gender:
-            </div>
-            <div class="info_value col-xs-offest-6 col-xs-6">
-                {{ cur_user.sex }}
-            </div>
-        </div>
-        <div class="user-info_row row">
-            <div class="info_label col-xs-offset-0 col-xs-6">
-                Age:
-            </div>
-            <div class="info_value col-xs-offest-6 col-xs-6">
-                {{ cur_user.age }}
-            </div>
-        </div>
-        <div class="user-info_row row">
-            <div class="info_label col-xs-offset-0 col-xs-6">
-                Phone Number:
-            </div>
-            <div class="info_value col-xs-offest-6 col-xs-6">
-                {{ cur_user.phone }}
-            </div>
-        </div>
-        <div class="user-info_row row">
-            <div class="info_label col-xs-offset-0 col-xs-6">
-                E-mail Address:
-            </div>
-            <div class="info_value col-xs-offest-6 col-xs-6">
-                {{ cur_user.email }}
-            </div>
-        </div>
-        <div class="user-info_row row">
-            <div class="info_label col-xs-offset-0 col-xs-6">
-                Occupation:
-            </div>
-            <div class="info_value col-xs-offest-6 col-xs-6">
-                {{ cur_user.occupation }}
-            </div>
-        </div>
-        <div class="user-info_row row">
-            <div class="info_label col-xs-offset-0 col-xs-6">
-                How often do you use large language models (LLMs):
-            </div>
-            <div class="info_value col-xs-offest-6 col-xs-6">
-                {{ cur_user.get_llm_frequency_display }}
-            </div>
-        </div>
-        <div class="user-info_row row">
-            <div class="info_label col-xs-offset-0 col-xs-6">
-                How long have you been using large language models(LLMs):
-            </div>
-            <div class="info_value col-xs-offest-6 col-xs-6">
-                {{ cur_user.get_llm_history_display }}
-            </div>
-        </div>
-        <div class="row">
-            <div class="col-xs-6">
-                <a href="{% url 'user_system:edit_info' %}" class="btn btn-block btn-lg btn-primary">Edit Personal Info</a>
-            </div>
-            <div class="col-xs-6">
-                <a href="{% url 'user_system:edit_password' %}" class="btn btn-block btn-lg btn-primary">Edit Password</a>
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-lg-9">
+            <div class="card shadow-lg border-0 rounded-lg mt-5">
+                <div class="card-header bg-primary text-white text-center py-4">
+                    <h2 class="card-title mb-0"><i class="bi bi-person-circle me-2"></i>User Profile</h2>
+                </div>
+                <div class="card-body p-5">
+                    <div class="row align-items-center mb-5">
+                        <div class="col-md-4 text-center">
+                            <img src="https://cdn.jsdelivr.net/npm/bootstrap-icons/icons/person-circle.svg" alt="User Avatar" class="img-fluid rounded-circle mb-3" style="width: 150px; height: 150px; object-fit: cover;">
+                            <h4>{{ cur_user.name|default:"Not Provided" }}</h4>
+                            <p class="text-muted">{{ cur_user.occupation|capfirst|default:"Not Provided" }}</p>
+                        </div>
+                        <div class="col-md-8">
+                            <ul class="list-group list-group-flush">
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <strong><i class="bi bi-person-fill me-2"></i>Username</strong>
+                                    <span>{{ cur_user.username }}</span>
+                                </li>
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <strong><i class="bi bi-gender-ambiguous me-2"></i>Gender</strong>
+                                    <span>{{ cur_user.get_gender_display|default:"Not Provided" }}</span>
+                                </li>
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <strong><i class="bi bi-calendar-event-fill me-2"></i>Age</strong>
+                                    <span>{{ cur_user.age|default:"Not Provided" }}</span>
+                                </li>
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <strong><i class="bi bi-telephone-fill me-2"></i>Phone</strong>
+                                    <span>{{ cur_user.phone|default:"Not Provided" }}</span>
+                                </li>
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <strong><i class="bi bi-envelope-fill me-2"></i>Email</strong>
+                                    <span>{{ cur_user.email|default:"Not Provided" }}</span>
+                                </li>
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <strong><i class="bi bi-book-fill me-2"></i>Education Level</strong>
+                                    <span>{{ cur_user.get_education_display|default:"Not Provided" }}</span>
+                                </li>
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <strong><i class="bi bi-lightbulb-fill me-2"></i>Field of Expertise</strong>
+                                    <span>{{ cur_user.field_of_expertise|default:"Not Provided" }}</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <hr>
+
+                    <h5 class="card-title mt-4 mb-3 text-center">Large Language Model Usage</h5>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="card bg-light border-0 text-center h-100">
+                                <div class="card-body">
+                                    <h6 class="card-subtitle mb-2 text-muted">Frequency</h6>
+                                    <p class="card-text fs-5">{{ cur_user.get_llm_frequency_display|capfirst|default:"Not Provided" }}</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card bg-light border-0 text-center h-100">
+                                <div class="card-body">
+                                    <h6 class="card-subtitle mb-2 text-muted">History</h6>
+                                    <p class="card-text fs-5">{{ cur_user.get_llm_history_display|capfirst|default:"Not Provided" }}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-5">
+                        <a href="{% url 'user_system:edit_info' %}" class="btn btn-primary"><i class="bi bi-pencil-square me-2"></i>Edit Profile</a>
+                        <a href="{% url 'user_system:edit_password' %}" class="btn btn-outline-secondary"><i class="bi bi-key-fill me-2"></i>Change Password</a>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
-    </div>
+</div>
 {% endblock %}
-
-

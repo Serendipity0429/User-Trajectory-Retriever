@@ -1,34 +1,35 @@
-import json
 from django.core.management.base import BaseCommand
-from django.utils.timezone import now
 from user_system.models import User
 
 class Command(BaseCommand):
-    help = 'Create a test user with specified username and password'
+    help = 'Create a test user with a complete profile and specified username and password'
 
     def add_arguments(self, parser):
-        parser.add_argument('username', type=str)
-        parser.add_argument('password', type=str)
+        parser.add_argument('username', type=str, help='The username for the test user')
+        parser.add_argument('password', type=str, help='The password for the test user')
+
     def handle(self, *args, **kwargs):
-        from user_system.models import User
         username = kwargs['username']
         password = kwargs['password']
         if User.objects.filter(username=username).exists():
             self.stdout.write(f"User {username} already exists, skipping creation.")
             return
+        
         user = User()
         user.username = username
-        user.password = password
+        user.set_password(password)
         user.name = "Test User"
-        user.sex = "Test"
-        user.age = 0
-        user.phone = "0000000000"
-        user.email = "test@test.com"
-        user.occupation = "Tester"
-        user.llm_frequency = ''
-        user.llm_history = ''
-        user.signup_time = now()
-        user.last_login = now()
-        user.login_num = 0
+        user.gender = "O"
+        user.email = "test@nowhere.com"
+        user.age = 25
+        user.phone = "1234567890"
+        user.occupation = "engineer"
+        user.education = "master"
+        user.field_of_expertise = "Computer Science"
+        user.llm_frequency = "frequently"
+        user.llm_history = "long"
+        user.is_staff = False
+        user.is_superuser = False
         user.save()
-        self.stdout.write(self.style.SUCCESS(f"User {username} created successfully."))
+        self.stdout.write(self.style.SUCCESS(f"User {username} created successfully with password '{password}'."))
+

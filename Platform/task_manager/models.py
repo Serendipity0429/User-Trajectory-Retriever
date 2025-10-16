@@ -59,7 +59,7 @@ class PreTaskAnnotation(models.Model):
 
     familiarity = models.IntegerField(null=True)  # 0->4, unfamiliar -> familiar
     difficulty = models.IntegerField(null=True)  # 0->4, easy -> hard
-    effort = models.IntegerField(null=True)  # time effort to complete the task, 3 to 60
+    effort = models.IntegerField(default=5)  # time effort to complete the task, 3 to 30
     
     initial_strategy = models.TextField(null=True)  # initial strategy to solve the task
 

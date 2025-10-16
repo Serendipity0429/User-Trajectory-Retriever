@@ -1,290 +1,257 @@
 {% extends "base.html" %}
-{% block title %} Answer Submission {% endblock %}
-{% block content_title %} Answer Submission {% endblock %}
+{% load task_manager_extras %}
+{% block title %}Answer Submission{% endblock %}
+
 {% block content %}
-    <div class="row text-center">
-        <h2>
-            This is your Trial <div class="static-task-info" style="display: inline;">{{ num_trial }}</div>
-        </h2>
-        <h4>
-            Please submit the answer to the questions below
-        </h4>
-    </div>
-    <div class="row">
-        <div class="col-xs-offset-1 col-xs-10">
-            <details>
-                <summary class="col-xs-12 list-header">
-                    <b>Trajectories of this task...</b> (Click to expand)
-                </summary>
-                <div class="col-xs-offset-1 col-xs-10" id="trajectories">
-                    {% for webpage in webpages %}
-                        <div class="text-center col-xs-12 list-row webpage-wrapper">
-                            {#                style="padding: 3% 0 3% 0;border-bottom: 1px solid #cccccc;">#}
-                            <p style="font-size: 20px">Webpage {{ forloop.counter }}:&ensp;<a href="{{ webpage.url }}"
-                                                                                              target="_blank">{{ webpage.title }}</a>
-                            </p>
-                            <!-- create a div to store the rrweb player -->
-                            <div class="rrweb-player-wrapper" id="rrweb-player-{{ webpage.id }}"></div>
-                            <script>
-                                let rrweb_record_{{ webpage.id }} = {{ webpage.rrweb_record | safe }};
-                                // create a rrweb player
-                                const player_{{ webpage.id }} = new rrwebPlayer({
-                                    target: document.getElementById(`rrweb-player-{{ webpage.id }}`),
-                                    props: {
-                                        events: rrweb_record_{{ webpage.id }},
-                                        autoPlay: false,
-                                        width: 800,
-                                        height: 377,
-                                    },
-                                });
-                            </script>
-                        </div>
-                    {% endfor %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-lg-10">
+            <div class="card shadow-lg border-0 rounded-lg mt-5">
+                <div class="card-header bg-primary text-white text-center py-4">
+                    <h2 class="card-title mb-0">Trial {{ num_trial }} Submission</h2>
                 </div>
-            </details>
-        </div>
-        <div class="col-xs-offset-1 col-xs-10">
-            <div class="col-xs-12 list-header">
-                <b>Your answer</b>
-            </div>
-            <form  id="query-form" action="" method="post" onsubmit="validateForm()"
-                  enctype='multipart/form-data'>
-                {% csrf_token %}
-                <div class="col-xs-12 sheet">
-                    <div class="question-wrapper col-xs-12">
-                        <span class="col-xs-12 list-row question-text"><b>Question</b>:</span>
-                        <div class="static-task-info">{{ question }}</div>
-                    </div>
-                    <div class="question-wrapper col-xs-12">
-                        <label for="answer" class="col-xs-12 list-row question-text"> <b>1. Your Answer</b>:</label>
-                        <i class="col-xs-12 list-row">Notice: You don't need to reformulate the question into a complete sentence, just provide the answer directly.</i>
-                        <div><textarea class="col-xs-12 list-row" id="answer" name="answer" rows="1" required></textarea>
-                        </div>
-                        <div class="col-xs-12 list-row">
-                            <b>Example:</b>
-                            <div style="margin-left: 20px;">
-                                <em>Question:</em> What is the capital of France?<br>
-                                <em>Expected Answer:</em> Paris<br>
-                                <em>Wrong Answer 1:</em> The capital of France is Paris. (Redundant information)<br>
-                                <em>Wrong Answer 2:</em> Beijing (Incorrect answer)
-                            </div>
-                        </div>
-                    </div>
-                
+                <div class="card-body p-5" id="card-body">
+                    <div class="accordion mb-4" id="trajectoriesAccordion">
+                        <div class="accordion-item">
+                            <h2 class="accordion-header" id="headingOne">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseTrajectories" aria-expanded="false" aria-controls="collapseTrajectories">
+                                    <i class="bi bi-signpost-split-fill me-2"></i> <strong>View Trajectories</strong>&nbsp;(Click to expand)
+                                </button>
+                            </h2>
+                            <div id="collapseTrajectories" class="accordion-collapse collapse" aria-labelledby="headingOne" data-bs-parent="#trajectoriesAccordion">
+                                <div class="accordion-body">
+                                    {% for webpage in webpages %}
+                                    <div class="d-flex flex-column align-items-center mb-5 p-4 border rounded shadow-sm bg-light">
+                                        <p class="h5"><a href="{{ webpage.url }}" target="_blank">{{ webpage.title }}</a></p>
+                                        <div class="rrweb-player-wrapper" id="rrweb-player-{{ webpage.id }}" style="margin-top: 20px;"></div>
+                                        <script>
+                                            (function() {
+                                                var target = document.getElementById('rrweb-player-{{ webpage.id }}');
+                                                var events = {{ webpage.rrweb_record|safe }};
+                                                
+                                                if (!Array.isArray(events) || events.length === 0) {
+                                                    return;
+                                                }
 
-                <div class="question-wrapper col-xs-12">
-                    <label class="col-xs-12 list-row question-text">
-                        <b>2. Confidence</b>: How confident are you in this answer?
-                    </label>
-                    <div class="ratio col-xs-12 list-row ">
-                        <label><input type="radio" name="confidence" value="1" required/> Just a guess</label><br>
-                        <label><input type="radio" name="confidence" value="2"/> Not very confident</label><br>
-                        <label><input type="radio" name="confidence" value="3"/> Fairly confident</label><br>
-                        <label><input type="radio" name="confidence" value="4"/> Very confident</label><br>
-                        <label><input type="radio" name="confidence" value="5"/> Certain</label><br>
-                    </div>
-                </div>
+                                                // Get screen width and height ratio
+                                                var screenRatio = window.innerHeight / window.innerWidth;
 
-                <div class="question-wrapper col-xs-12">
-                    <label class="col-xs-12 list-row question-text">
-                        <b>3. Justification</b>: Please provide the primary source URL and source text that you used to answer the question.
-                    </label>
+                                                var accordionWidth = document.querySelector('#card-body').clientWidth;
+                                                var containerWidth = 0.8 * accordionWidth;
+                                                var calculatedHeight = containerWidth * screenRatio;
 
-                    <div id="source-container">
-                        <div class="source-entry" data-index="0">
-                            <div class="question-wrapper col-xs-12">
-                                <label for="source_url_0" class="col-xs-12 list-row" style="padding-left: 0;"><b>Source URL:</b></label>
-                                <input type="url" class="col-xs-12 list-row source-url" id="source_url_0" name="source_url_0" required>
-                            </div>
-
-                            <div class="question-wrapper col-xs-12">
-                                <label for="source_text_0" class="col-xs-12 list-row" style="padding-left: 0;"><b>Source Text:</b></label>
-                                <textarea class="col-xs-12 list-row source-text" id="source_text_0" name="source_text_0" rows="3" required></textarea>
-                            </div>
-
-                            <div class="question-wrapper col-xs-12">
-                                <button type="button" class="btn btn-danger remove-source btn-primary" style="display: none;">Remove Source</button>
+                                                new rrwebPlayer({
+                                                    target: target,
+                                                    props: {
+                                                        events: events,
+                                                        autoPlay: false,
+                                                        width: containerWidth,
+                                                        height: calculatedHeight,
+                                                        UNSAFE_replayCanvas: true,
+                                                    },
+                                                });
+                                            })();
+                                        </script>
+                                    </div>
+                                    {% endfor %}
+                                </div>
                             </div>
                         </div>
                     </div>
 
-                    <div class="question-wrapper col-xs-12">
-                        <button type="button" id="add-source" class="btn btn-success btn-primary add-source">Add Another Source</button>
+                    <form id="query-form" action="" method="post">
+                        {% csrf_token %}
+                        <div class="mb-4 p-3 border rounded bg-light">
+                            <h5><i class="bi bi-question-circle-fill me-2"></i>Question</h5>
+                            <p class="lead">{{ question }}</p>
+                        </div>
+
+                        <div class="mb-4 p-3 border rounded">
+                            <label for="answer" class="form-label"><strong>1. Your Answer</strong></label>
+                            <textarea class="form-control" id="answer" name="answer" rows="3" required></textarea>
+                        </div>
+
+                        <div class="mb-4 p-3 border rounded">
+                            <label class="form-label"><strong>2. Confidence</strong></label>
+                            <p class="form-text text-muted">How confident are you in your answer?</p>
+                            <div class="btn-group" role="group" aria-label="Confidence">
+                                {% for value, text in confidence_choices %}
+                                <input type="radio" class="btn-check" name="confidence_radio" id="c{{ forloop.counter }}" value="{{ value }}" autocomplete="off" required>
+                                <label class="btn btn-outline-primary" for="c{{ forloop.counter }}">
+                                    <strong>{{ value }}</strong><br>{{ text|split:" - "|slice:"1:"|join:" - " }}
+                                </label>
+                                {% endfor %}
+                            </div>
+                            <input type="hidden" name="confidence" id="confidence_hidden" required>
+                        </div>
+
+                        <div id="source-container" class="mb-4 p-3 border rounded">
+                            <label class="form-label"><strong>3. Justification</strong></label>
+                            <p class="form-text text-muted">Please provide at least one source URL and the relevant text from that source.</p>
+                            <div class="source-entry card p-3 mb-2">
+                                <div class="form-floating mb-2">
+                                    <input type="url" class="form-control" name="source_url_0" required placeholder="Source URL">
+                                    <label>Source URL</label>
+                                </div>
+                                <div class="form-floating">
+                                    <textarea class="form-control" name="source_text_0" rows="3" required placeholder="Source Text"></textarea>
+                                    <label>Source Text</label>
+                                </div>
+                                <button type="button" class="btn btn-danger btn-sm remove-source mt-2 align-self-end" style="display: none;">Remove</button>
+                            </div>
+                        </div>
+                        <button type="button" id="add-source" class="btn btn-outline-success btn-sm mb-3"><i class="bi bi-plus-circle-fill me-2"></i>Add Another Source</button>
+
+                        <div class="mb-4 p-3 border rounded">
+                            <label class="form-label"><strong>4. Reasoning Method</strong></label>
+                            <div class="w-100" role="group" aria-label="Reasoning Method">
+                                {% for value, text in reasoning_choices %}
+                                <div class="d-flex mb-2">
+                                    <input type="radio" class="btn-check" name="reasoning_method" id="rm{{ forloop.counter }}" value="{{ value }}" autocomplete="off" required>
+                                    <label class="btn btn-outline-primary {% if value != 'other' %}w-100{% endif %} text-start" for="rm{{ forloop.counter }}">{{ text }}</label>
+                                    {% if value == 'other' %}
+                                    <input type="text" class="form-control form-control-sm ms-2" name="reasoning_method_other" placeholder="Please specify..." disabled>
+                                    {% endif %}
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <div class="mb-4 p-3 border rounded">
+                            <label for="additional_explanation" class="form-label"><strong>5. (Optional) Additional Explanation</strong></label>
+                            <textarea class="form-control" id="additional_explanation" name="additional_explanation" rows="3"></textarea>
+                        </div>
+                    </form>
+
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
+                        <button type="button" id="cancel-btn" class="btn btn-secondary btn-lg">Cancel</button>
+                        <button type="button" id="query-btn" class="btn btn-primary btn-lg btn-submit">Submit Answer</button>
                     </div>
                 </div>
-
-                <div class="question-wrapper col-xs-12">
-                    <label class="col-xs-12 list-row question-text">
-                        <b>4. Reasoning Method</b>: How did you derive the answer from the source?
-                    </label>
-                    <div class="ratio col-xs-12 list-row">
-                        <label><input type="radio" name="reasoning_method" value="direct_fact" required/> Direct fact/number on page</label><br>
-                        <label><input type="radio" name="reasoning_method" value="synthesis_single_page"/> Synthesized from single page</label><br>
-                        <label><input type="radio" name="reasoning_method" value="synthesis_multi_page"/> Synthesized from multiple pages</label><br>
-                        <label><input type="radio" name="reasoning_method" value="calculation"/> Calculation from data</label><br>
-                        <label><input type="radio" name="reasoning_method" value="inference"/> Inference/deduction</label><br>
-                        <label><input type="radio" name="reasoning_method" value="other" id="reasoning_other"> Other (please specify)</label>
-                        <label><input type="text" name="reasoning_method_other" id="reasoning_other_text" style="width: 300%; margin-left: 0; padding: 0 !important;" disabled /></label>
-                    </div>
-                </div>
-
-                <div class="question-wrapper col-xs-12">
-                    <label class="col-xs-12 list-row question-text">
-                        <b>5. (Optional) Additional Explanation</b>: Please provide any additional explanation or context for your answer here.
-                    </label>
-
-                    <div class="question-wrapper col-xs-12">
-                        <textarea class="col-xs-12 list-row" id="additional_explanation" name="additional_explanation" rows="3"></textarea>
-                </div>
-            
-            </form>
-        </div>
-        <div class="col-xs-12">
-            <div id="query-btn" class="col-xs-6 submit-btn btn btn-block btn-lg btn-primary">
-                Submit Answer
-            </div>
-        </div>
-        <div class="col-xs-12">
-            <div id="cancel-btn" class="col-xs-6 submit-btn btn btn-block btn-lg btn-primary cancel-button">
-                Cancel
             </div>
         </div>
     </div>
-
+</div>
 {% endblock %}
+
 {% block scripts %}
 <script>
-    function validateForm() {
-        let answer = document.getElementById("answer").value;
-        if (answer === '') {
-            alert('Please fill in the answer!');
-            return false;
-        }
-        return true;
-    }
-</script>
-<script>
-    $(document).ready(function() {
-        $('#add-source').click(function() {
-            const currentCount = $('.source-entry').length;
-            const newSource = `
-                <div class="source-entry" data-index="${currentCount}">
-                    <div class="question-wrapper col-xs-12">
-                        <label for="source_url_${currentCount}" class="col-xs-12 list-row" style="padding-left: 0;"><b>Source URL:</b></label>
-                        <input type="url" class="col-xs-12 list-row source-url" id="source_url_${currentCount}" name="source_url_${currentCount}" required>
-                    </div>
-
-                    <div class="question-wrapper col-xs-12">
-                        <label for="source_text_${currentCount}" class="col-xs-12 list-row" style="padding-left: 0;"><b>Source Text:</b></label>
-                        <textarea class="col-xs-12 list-row source-text" id="source_text_${currentCount}" name="source_text_${currentCount}" rows="3" required></textarea>
-                    </div>
-
-                    <div class="question-wrapper col-xs-12">
-                        <button type="button" class="btn btn-danger remove-source btn-primary">Remove Source</button>
-                    </div>
-                </div>
-            `;
-            $('#source-container').append(newSource);
-            updateRemoveButtons();
+document.addEventListener('DOMContentLoaded', function() {
+    // Confidence Radio Buttons
+    document.querySelectorAll('input[name="confidence_radio"]').forEach(radio => {
+        radio.addEventListener('change', function() {
+            document.getElementById('confidence_hidden').value = this.value;
         });
+    });
 
-        $(document).on('click', '.remove-source', function() {
-            $(this).closest('.source-entry').remove();
+    // Add/Remove Sources
+    document.getElementById('add-source').addEventListener('click', function() {
+        const container = document.getElementById('source-container');
+        const count = container.getElementsByClassName('source-entry').length;
+        const newSource = document.createElement('div');
+        newSource.className = 'source-entry card p-3 mb-2';
+        newSource.innerHTML = `
+            <div class="form-floating mb-2">
+                <input type="url" class="form-control" name="source_url_${count}" required placeholder="Source URL">
+                <label>Source URL</label>
+            </div>
+            <div class="form-floating">
+                <textarea class="form-control" name="source_text_${count}" rows="3" required placeholder="Source Text"></textarea>
+                <label>Source Text</label>
+            </div>
+            <button type="button" class="btn btn-danger btn-sm remove-source mt-2 align-self-end">Remove</button>`;
+        container.appendChild(newSource);
+        updateRemoveButtons();
+    });
+
+    document.getElementById('source-container').addEventListener('click', function(e) {
+        if (e.target && e.target.classList.contains('remove-source')) {
+            e.target.closest('.source-entry').remove();
             reindexSources();
             updateRemoveButtons();
+        }
+    });
+
+    function reindexSources() {
+        const entries = document.getElementsByClassName('source-entry');
+        Array.from(entries).forEach((entry, i) => {
+            entry.querySelector('input[type="url"]').name = `source_url_${i}`;
+            entry.querySelector('textarea').name = `source_text_${i}`;
         });
+    }
 
-        function reindexSources() {
-            $('.source-entry').each(function(index) {
-                $(this).attr('data-index', index);
-                $(this).find('label[for^="source_url_"]').attr('for', `source_url_${index}`);
-                $(this).find('input[name^="source_url_"]').attr('id', `source_url_${index}`).attr('name', `source_url_${index}`);
-                $(this).find('label[for^="source_text_"]').attr('for', `source_text_${index}`);
-                $(this).find('textarea[name^="source_text_"]').attr('id', `source_text_${index}`).attr('name', `source_text_${index}`);
-            });
-        }
+    function updateRemoveButtons() {
+        const buttons = document.getElementsByClassName('remove-source');
+        const display = buttons.length > 1 ? 'block' : 'none';
+        Array.from(buttons).forEach(btn => btn.style.display = display);
+    }
 
-        function updateRemoveButtons() {
-            const sourceEntries = $('.source-entry');
-            if (sourceEntries.length > 1) {
-                $('.remove-source').show();
-            } else {
-                $('.remove-source').hide();
-            }
-        }
-
-        $('input[name="reasoning_method"]').change(function() {
-            if ($('#reasoning_other').is(':checked')) {
-                $('#reasoning_other_text').prop('disabled', false);
-            } else {
-                $('#reasoning_other_text').prop('disabled', true).val('');
+    // Reasoning Method Other
+    document.querySelectorAll('input[name="reasoning_method"]').forEach(radio => {
+        radio.addEventListener('change', function() {
+            const otherInput = document.querySelector('input[name="reasoning_method_other"]');
+            if (otherInput) {
+                otherInput.disabled = this.value !== 'other';
             }
         });
     });
-</script>
-<script type="application/x-javascript">
-    $(function () {
-        let is_submitted = false;
-        $('#query-btn').click(
-            function () {
-                let answer = $("[name='answer']");
-                let confidence = $("[name='confidence']:checked");
-                let source_url = $("[name='source_url_0']");
-                let source_text = $("[name='source_text_0']");
-                let reasoning_method = $("[name='reasoning_method']:checked");
-                if (reasoning_method.val() === 'other') {
-                    let reasoning_other_text = $("[name='reasoning_method_other']");
-                    if (reasoning_other_text.val() === '') {
-                        alert('Please fill in the specific reasoning method!');
-                        reasoning_other_text.focus();
-                        return
-                    }
-                }
-                if (answer.val() === '') {
-                    alert('Please fill in the answer!');
-                    answer.focus();
-                    return
-                }
-                if (confidence.val() === undefined) {
-                    alert('Please select your confidence level!');
-                    confidence.focus();
-                    return
-                }
-                if (source_url.val() === '') {
-                    alert('Please fill in the source URL!');
-                    source_url.focus();
-                    return
-                }
-                if (source_text.val() === '') {
-                    alert('Please fill in the source text!');
-                    source_text.focus();
-                    return
-                }
-                if (reasoning_method.val() === undefined) {
-                    alert('Please select your reasoning method!');
-                    reasoning_method.focus();
-                    return
-                }
 
-                if (confirm("Are you sure to submit all annotations?")) {
-                    is_submitted = true;
-                    $('#query-form').submit();
-                }
+    // Form Submission
+    let is_submitted = false;
+    document.getElementById('query-btn').addEventListener('click', function() {
+        // Validation
+        if (document.getElementById('answer').value.trim() === '') {
+            alert('Please provide your answer.');
+            document.getElementById('answer').focus();
+            return;
+        }
+        if (document.getElementById('confidence_hidden').value === '') {
+            alert('Please select your confidence level.');
+            return;
+        }
+        const sourceUrl = document.querySelector('input[name="source_url_0"]').value.trim();
+        const sourceText = document.querySelector('textarea[name="source_text_0"]').value.trim();
+        if (sourceUrl === '' || sourceText === '') {
+            alert('Please provide at least one justification source (URL and text).');
+            return;
+        }
+        const reasoningMethod = document.querySelector('input[name="reasoning_method"]:checked');
+        if (!reasoningMethod) {
+            alert('Please select a reasoning method.');
+            return;
+        }
+        if (reasoningMethod.value === 'other' && document.querySelector('input[name="reasoning_method_other"]').value.trim() === '') {
+            alert('Please specify your "Other" reasoning method.');
+            document.querySelector('input[name="reasoning_method_other"]').focus();
+            return;
+        }
 
-            }
-        );
-        $('#cancel-btn').click(
-            function () {
-                if (confirm("Are you sure to abort the task submission?")) {
-                    window.close();
-                }
-            }
-        );
-        window.addEventListener('beforeunload', function (e) {
-            if (!is_submitted) {
-                navigator.sendBeacon('/task/stop_annotation/', new Blob());
-            }
-        });
+        if (confirm("Are you sure you want to submit your answer?")) {
+            is_submitted = true;
+            document.getElementById('query-form').submit();
+        }
     });
+
+    document.getElementById('cancel-btn').addEventListener('click', function() {
+        if (confirm("Are you sure you want to cancel? This will close the window.")) {
+            window.close();
+        }
+    });
+
+    window.addEventListener('beforeunload', function() {
+        if (!is_submitted) {
+            navigator.sendBeacon('/task/stop_annotation/', new Blob());
+        }
+    });
+
+    updateRemoveButtons();
+
+    var trajectoriesCollapse = document.getElementById('collapseTrajectories');
+    if (trajectoriesCollapse) {
+        trajectoriesCollapse.addEventListener('shown.bs.collapse', function () {
+            window.dispatchEvent(new Event('resize'));
+        });
+    }
+});
 </script>
 {% endblock %}

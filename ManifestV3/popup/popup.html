@@ -3,56 +3,58 @@
     <head>
         <meta charset="UTF-8">
         <title>User Interface</title>
-        <!-- jQuery is kept for DOM manipulation -->
-        <script src="jquery-3.3.1.min.js"></script>
-        <!-- Link to the external CSS file -->
         <link type="text/css" rel="stylesheet" href="popup.css">
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     </head>
-    <body style="min-width: 150px;">
-        <div id="login">
-            <div class="popup-title" > <em>THUIR</em> </div>
-            <div class="popup-title"> User Trajectory Retriever Toolkit </div>
-            <label for="username">Username</label>
-            <input type="text" id="username" name="username" style="margin-bottom:5px">
-            <br/>
-            <label for="password">Password</label>
-            <input id="password" name="password" type="password" style="margin-bottom:5px">
-            <br/>
-            <div style="margin-bottom:10px">
-                <input type="checkbox" id="remember" name="remember" style="margin-right: 10px;vertical-align: middle;">
-                <label for="remember">Remember</label>
+    <body>
+        <div class="container">
+            <div class="header">
+                <img src="THUIR.png" alt="Logo" class="logo">
+                <h1>THUIR</h1>
+                <p>User Trajectory Retriever Toolkit</p>
             </div>
-            <button id="bt2">Login</button>
-            <br/>
-            <br/>
-            <button id="bt1">Signup</button>
-            <br/>
-            <br/>
-            <button id="bt4">Go to Platform</button>
-            <p id="failMsg1" hidden style="color:red">Username does not exist!</p>
-            <p id="failMsg2" hidden style="color:red">Password error!</p>
-            <p id="failMsg3" hidden style="color:red">Request failed. Please check the server and try again.</p>
-        </div>
-        <div id="logged" hidden>
-            <div id="username_text_logged"></div>
-            <div id="active_task">No active task</div>
-            <button id="bt_start_task">Start Task</button>
-            <button id="bt_end_task">Submit Answer</button>
-            <br/>
-            <button id="bt_view_task_info">View Task Info</button>
-            <br/>
-            <br/>
-            <button id="bt_cancel_task">Cancel Task</button>
-            <br/>
-            <br/>
-            <button id="bt8">Go to Platform</button>
-            <br/>
-            <br/>
-            <button id="bt6">Logout</button>
-        </div>
-        <!-- This container is for dynamically generated modals -->
-        <div id="modal-container"></div>
 
+            <div id="login" class="content">
+                <div class="form-group">
+                    <label for="username"><i class="fas fa-user"></i></label>
+                    <input type="text" id="username" name="username" placeholder="Username">
+                </div>
+                <div class="form-group">
+                    <label for="password"><i class="fas fa-lock"></i></label>
+                    <input id="password" name="password" type="password" placeholder="Password">
+                </div>
+                <div class="form-group remember-me">
+                    <input type="checkbox" id="remember" name="remember">
+                    <label for="remember">Remember Me</label>
+                </div>
+                <button id="bt2" class="btn"><i class="fas fa-sign-in-alt"></i> Login</button>
+                <div class="button-row">
+                    <button id="bt1" class="btn"><i class="fas fa-user-plus"></i> Signup</button>
+                    <button id="bt4" class="btn"><i class="fas fa-globe"></i> Home</button>
+                </div>
+                <div class="messages">
+                    <p id="failMsg1" class="error-msg"><i class="fas fa-times-circle"></i> Username does not exist!</p>
+                    <p id="failMsg2" class="error-msg"><i class="fas fa-times-circle"></i> Password error!</p>
+                    <p id="failMsg3" class="error-msg"><i class="fas fa-times-circle"></i> Request failed. Please check the server and try again.</p>
+                </div>
+            </div>
+
+            <div id="logged" hidden class="content">
+                <div id="user-info">
+                    <p id="username_text_logged"></p>
+                    <p id="active_task">No active task</p>
+                </div>
+                <div class="button-group">
+                    <button id="bt_start_task" class="btn"><i class="fas fa-play"></i> Start Task</button>
+                    <button id="bt_end_task" class="btn"><i class="fas fa-check"></i> Submit Answer</button>
+                    <button id="bt_view_task_info" class="btn"><i class="fas fa-info-circle"></i> View Task Info</button>
+                    <button id="bt_cancel_task" class="btn btn-danger"><i class="fas fa-times"></i> Cancel Task</button>
+                    <button id="bt8" class="btn"><i class="fas fa-globe"></i> Home</button>
+                    <button id="bt6" class="btn btn-danger"><i class="fas fa-sign-out-alt"></i> Logout</button>
+                </div>
+            </div>
+        </div>
+        <div id="modal-container"></div>
         <script src="../utils.js"></script> 
         <script src="popup.js"></script>
     </body>

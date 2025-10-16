@@ -1,488 +1,215 @@
-{% extends 'base.html' %}
+{% extends "base.html" %}
+{% load task_manager_extras %}
 
 {% block title %}Cancel Task{% endblock %}
-{% block content_title %}Cancel Task{% endblock %}
 
 {% block content %}
-{% load task_manager_extras %}
-    <style>
-        .choice-container {
-            display: flex;
-            align-items: center;
-            margin-right: 20px; /* Add space between options */
-        }
-        .tooltip-container {
-            position: relative;
-            display: inline-block;
-            cursor: pointer;
-        }
-        .tooltip-button {
-            background-color: #f0f0f0;
-            border: 1px solid #ccc;
-            border-radius: 50%;
-            width: 20px;
-            height: 20px;
-            font-size: 12px;
-            margin-left: 5px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .tooltip-text {
-            visibility: hidden;
-            min-width: 220px;
-            max-width: 300px;
-            background-color: #555;
-            color: #fff;
-            text-align: center;
-            border-radius: 6px;
-            padding: 8px 12px;
-            position: absolute;
-            z-index: 1;
-            bottom: 125%;
-            left: 50%;
-            transform: translateX(-50%);
-            opacity: 0;
-            transition: opacity 0.3s;
-        }
-        .tooltip-text::after {
-            content: "";
-            position: absolute;
-            top: 100%;
-            left: 50%;
-            margin-left: -5px;
-            border-width: 5px;
-            border-style: solid;
-            border-color: #555 transparent transparent transparent;
-        }
-        .tooltip-container:hover .tooltip-text {
-            visibility: visible;
-            opacity: 1;
-        }
-    </style>
-    <div class="row text-center">
-        <h2>
-            Ongoing Task Cancelled 
-        </h2>
-        <h4>
-            Please provide reasons why you want to cancel this task
-        </h4>
-    </div>
-    <div class="row">
-        <div class="col-xs-offset-1 col-xs-10">
-            <div class="col-xs-12 list-header">
-                Feedback & Reflection
-            </div>
-            <form id="query-form" action="" method="post" enctype='multipart/form-data'>
-                {% csrf_token %}
-                <div class="col-xs-12 sheet">
-                    <div class="question-wrapper col-xs-12">
-                        <span class="col-xs-12 list-row question-text">
-                            <b>1. Task Description</b>: You need to answer the following question:
-                            </span>
-                        <br/>
-                        <div class="static-task-info">{{ question }}</div>
-                    </div>
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card shadow-lg border-0 rounded-lg mt-5">
+                <div class="card-header bg-danger text-white text-center py-4">
+                    <h2 class="card-title mb-0"><i class="bi bi-x-circle-fill me-2"></i>Cancel Task</h2>
+                </div>
+                <div class="card-body p-5">
+                    <p class="lead text-center mb-4">Please provide the reasons for cancelling this task.</p>
 
-                    <div class="question-wrapper col-xs-12">
-                        <span class="col-xs-12 list-row question-text">
-                            <b>2. Task Completion Criteria</b>: The criteria for task completion.</span>
-                        <br/>
-                        <div class="static-task-info">Exact Match (EM)</div>
-                    </div>
-
-                    <div class="question-wrapper col-xs-12">
-                        <span class="col-xs-12 list-row question-text">
-                            <b>3. Task Solution</b>: The authentic answers for this task.</span>
-                        <br/>
-                        <!-- Modified section for expandable/collapsible answers -->
-                        <div class="static-task-info" style="font-size: 16px;">
-                            <ul id="answer-list" style="padding-left: 20px; margin-top: 5px; list-style-position: inside; column-count: 1; -webkit-column-count: 1; -moz-column-count: 1; margin-bottom: 5px;">
+                    <div class="card shadow-sm mb-4">
+                        <div class="card-header">
+                            <h5 class="mb-0"><i class="bi bi-info-circle-fill me-2"></i>Task Review</h5>
+                        </div>
+                        <div class="card-body">
+                            <p><strong>Question:</strong></p>
+                            <div class="p-3 bg-light rounded mb-3">{{ question }}</div>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <p class="mb-0"><strong>Correct Answer(s):</strong></p>
+                                <div class="mt-2">
+                                    <a href="#" id="show-all-answers" class="btn btn-outline-secondary btn-sm" style="display: none;">Show all...</a>
+                                    <a href="#" id="show-fewer-answers" class="btn btn-outline-secondary btn-sm" style="display: none;">Show fewer...</a>
+                                </div>
+                            </div>
+                            <ul id="answer-list" class="list-group mt-2">
                                 {% for item in answer %}
-                                    <li>{{ item }}</li>
+                                <li class="list-group-item">{{ item }}</li>
                                 {% endfor %}
                             </ul>
-                            <a href="#" id="show-all-answers" style="display: none; margin-top: 10px; cursor: pointer;">Click here to see all possible correct answers</a>
-                            <a href="#" id="show-fewer-answers" style="display: none; margin-top: 10px; cursor: pointer;">Show fewer answers</a>
                         </div>
                     </div>
                     
-                    <div class="question-wrapper col-xs-12">
-                        <label class="col-xs-12 list-row question-text">
-                            <b>4. Primary Reason for Cancellation</b>: Please select the primary reason you are cancelling this task.
-                        </label>
-                        <div class="ratio col-xs-12 list-row">
-                            <div class="choice-container">
-                                <label><input type="radio" name="cancel_category" value="info_unavailable" required/> Information unavailable online
-                                </label>
-                                <div class="tooltip-container">
-                                    <span class="tooltip-button">?</span>
-                                    <span class="tooltip-text">{{ CANCEL_CATEGORY_EXPLANATION_MAP|get_item:"info_unavailable" }}</span>
-                                </div>
-                            </div>
-                            <div class="choice-container">
-                                <label><input type="radio" name="cancel_category" value="too_difficult"/> Task too complex/difficult
-                                </label>
-                                <div class="tooltip-container">
-                                    <span class="tooltip-button">?</span>
-                                    <span class="tooltip-text">{{ CANCEL_CATEGORY_EXPLANATION_MAP|get_item:"too_difficult" }}</span>
-                                </div>
-                            </div>
-                            <div class="choice-container">
-                                <label><input type="radio" name="cancel_category" value="no_idea"/> Stuck, no clear path
-                                </label>
-                                <div class="tooltip-container">
-                                    <span class="tooltip-button">?</span>
-                                    <span class="tooltip-text">{{ CANCEL_CATEGORY_EXPLANATION_MAP|get_item:"no_idea" }}</span>
-                                </div>
-                            </div>
-                            <div class="choice-container">
-                                <label><input type="radio" name="cancel_category" value="too_long"/> Task taking too long
-                                </label>
-                                <div class="tooltip-container">
-                                    <span class="tooltip-button">?</span>
-                                    <span class="tooltip-text">{{ CANCEL_CATEGORY_EXPLANATION_MAP|get_item:"too_long" }}</span>
-                                </div>
-                            </div>
-                            <div class="choice-container">
-                                <label><input type="radio" name="cancel_category" value="technical_issue"/> Technical barrier (paywall, etc.)
-                                </label>
-                                <div class="tooltip-container">
-                                    <span class="tooltip-button">?</span>
-                                    <span class="tooltip-text">{{ CANCEL_CATEGORY_EXPLANATION_MAP|get_item:"technical_issue" }}</span>
-                                </div>
-                            </div>
-                            <div class="choice-container">
-                                <label><input type="radio" name="cancel_category" value="other"/> Other (please specify)
-                                </label>
-                                <div class="tooltip-container">
-                                    <span class="tooltip-button">?</span>
-                                    <span class="tooltip-text">{{ CANCEL_CATEGORY_EXPLANATION_MAP|get_item:"other" }}</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                    <form id="query-form" action="" method="post" enctype='multipart/form-data'>
+                        {% csrf_token %}
 
-                    <div class="question-wrapper col-xs-12">
-                        <label for="cancel_reason" class="col-xs-12 list-row question-text">
-                            <b>5. Detailed Explanation</b>: Please explain what specific obstacle prevented you from completing the task. What was your final attempt before deciding to cancel?
-                        </label>
-                        <div><textarea class="col-xs-12 list-row" id="cancel_reason" name="cancel_reason" rows="3" required></textarea>
-                        </div>
-                    </div>
-
-                    <div class="question-wrapper col-xs-12">
-                        <label class="col-xs-12 list-row question-text">
-                            <b>6. Missing Resources</b>: What do you believe was needed to make this task solvable? (Check all that apply and drag to reorder by priority)
-                        </label>
-                        <div class="col-xs-12 list-row">
-                            <div id="selected-resources-list" class="sortable-list"></div>
-                            <hr id="selection-separator" style="display: none; border-top: 1px dashed #ccc; margin: 10px 0;">
-                            <div id="unselected-resources-list">
-                                <div class="drag-option" data-value="expert_knowledge">
-                                    <input type="checkbox" name="cancel_missing_resources" value="expert_knowledge"/>
-                                    <span class="drag-handle">≡</span>
-                                    <label>Specialized domain knowledge</label>
-                                    <div class="tooltip-container">
-                                        <span class="tooltip-button">?</span>
-                                        <span class="tooltip-text">{{ MISSING_RESOURCES_EXPLANATION_MAP|get_item:"expert_knowledge" }}</span>
-                                    </div>
+                        <div class="mb-4 p-3 border rounded">
+                            <label class="form-label"><strong>1. Primary Reason for Cancellation</strong></label>
+                            <p class="form-text text-muted">Select the main reason you are cancelling this task.</p>
+                            <div class="w-100" role="group" aria-label="Cancellation Reason">
+                                {% for key, value in CANCEL_CATEGORY_MAP.items %}
+                                <div class="d-flex mb-2">
+                                    <input class="btn-check" type="radio" name="cancel_category" id="cancel_{{ key }}" value="{{ key }}" required autocomplete="off">
+                                    <label class="btn btn-outline-primary {% if key != 'other' %}w-100{% endif %} text-start" for="cancel_{{ key }}">{{ value }}</label>
+                                    {% if key == 'other' %}
+                                    <input type="text" name="cancel_reason" class="form-control ms-2" placeholder="Please specify...">
+                                    {% endif %}
                                 </div>
-                                <div class="drag-option" data-value="paid_access">
-                                    <input type="checkbox" name="cancel_missing_resources" value="paid_access"/>
-                                    <span class="drag-handle">≡</span>
-                                    <label>Paid subscription/service</label>
-                                    <div class="tooltip-container">
-                                        <span class="tooltip-button">?</span>
-                                        <span class="tooltip-text">{{ MISSING_RESOURCES_EXPLANATION_MAP|get_item:"paid_access" }}</span>
-                                    </div>
-                                </div>
-                                <div class="drag-option" data-value="better_tools">
-                                    <input type="checkbox" name="cancel_missing_resources" value="better_tools"/>
-                                    <span class="drag-handle">≡</span>
-                                    <label>Better search tool</label>
-                                    <div class="tooltip-container">
-                                        <span class="tooltip-button">?</span>
-                                        <span class="tooltip-text">{{ MISSING_RESOURCES_EXPLANATION_MAP|get_item:"better_tools" }}</span>
-                                    </div>
-                                </div>
-                                <div class="drag-option" data-value="different_question">
-                                    <input type="checkbox" name="cancel_missing_resources" value="different_question"/>
-                                    <span class="drag-handle">≡</span>
-                                    <label>Ambiguous/unanswerable question</label>
-                                    <div class="tooltip-container">
-                                        <span class="tooltip-button">?</span>
-                                        <span class="tooltip-text">{{ MISSING_RESOURCES_EXPLANATION_MAP|get_item:"different_question" }}</span>
-                                    </div>
-                                </div>
-                                <div class="drag-option" data-value="info_not_online">
-                                    <input type="checkbox" name="cancel_missing_resources" value="info_not_online"/>
-                                    <span class="drag-handle">≡</span>
-                                    <label>Information not publicly online</label>
-                                    <div class="tooltip-container">
-                                        <span class="tooltip-button">?</span>
-                                        <span class="tooltip-text">{{ MISSING_RESOURCES_EXPLANATION_MAP|get_item:"info_not_online" }}</span>
-                                    </div>
-                                </div>
-                                <div class="drag-option" data-value="time_limit">
-                                    <input type="checkbox" name="cancel_missing_resources" value="time_limit"/>
-                                    <span class="drag-handle">≡</span>
-                                    <label>More research time</label>
-                                    <div class="tooltip-container">
-                                        <span class="tooltip-button">?</span>
-                                        <span class="tooltip-text">{{ MISSING_RESOURCES_EXPLANATION_MAP|get_item:"time_limit" }}</span>
-                                    </div>
-                                </div>
-                                <div class="drag-option" data-value="team_help">
-                                    <input type="checkbox" name="cancel_missing_resources" value="team_help"/>
-                                    <span class="drag-handle">≡</span>
-                                    <label>Help from others</label>
-                                    <div class="tooltip-container">
-                                        <span class="tooltip-button">?</span>
-                                        <span class="tooltip-text">{{ MISSING_RESOURCES_EXPLANATION_MAP|get_item:"team_help" }}</span>
-                                    </div>
-                                </div>
-                                 <div class="drag-option" data-value="guidance">
-                                    <input type="checkbox" name="cancel_missing_resources" value="guidance"/>
-                                    <span class="drag-handle">≡</span>
-                                    <label>Expert guidance</label>
-                                    <div class="tooltip-container">
-                                        <span class="tooltip-button">?</span>
-                                        <span class="tooltip-text">{{ MISSING_RESOURCES_EXPLANATION_MAP|get_item:"guidance" }}</span>
-                                    </div>
-                                </div>
-                                <div class="drag-option" data-value="better_question">
-                                    <input type="checkbox" name="cancel_missing_resources" value="better_question"/>
-                                    <span class="drag-handle">≡</span>
-                                    <label>Clearer question/instructions</label>
-                                </div>
-                                <div class="drag-option" data-value="other">
-                                    <input type="checkbox" name="cancel_missing_resources" value="other"/>
-                                    <span class="drag-handle">≡</span>
-                                    <label>Other (please specify):</label>
-                                    <input type="text" name="cancel_missing_resources_other" style="width: 70%; white-space: no-wrap; margin-left: 5px;" disabled/>
-                                </div>
+                                {% endfor %}
                             </div>
                         </div>
-                        <input type="hidden" name="cancel_missing_resources_list" id="cancel_missing_resources_list" />
-                    </div>
-                    <div class="question-wrapper col-xs-12">
-                        <label for="cancel_additional_reflection" class="col-xs-12 list-row question-text">
-                            <b>7. (Optional) Additional Reflection</b>: Do you have any additional thoughts or reflections on this task?
-                        <textarea class="col-xs-12 list-row" id="reflection" name="cancel_additional_reflection" rows="3" required></textarea>
-                    </div>
-                </div>
-            </form>
-            <div class="col-xs-12">
-                <div id="query-btn" class="col-xs-6 submit-btn btn btn-block btn-lg btn-primary">
-                    Submit
+
+                        <div class="mb-4 p-3 border rounded">
+                            <label for="cancel_reason" class="form-label"><strong>2. Detailed Explanation</strong></label>
+                            <p class="form-text text-muted">What specific obstacle prevented you from completing the task? What was your final attempt?</p>
+                            <textarea class="form-control" id="cancel_reason" name="cancel_reason" rows="3" required></textarea>
+                        </div>
+
+                        <div class="mb-4 p-3 border rounded">
+                            <label class="form-label"><strong>3. Missing Resources</strong></label>
+                            <p class="form-text text-muted"><strong>What was needed to make this task solvable? Check all that apply and drag to reorder.</strong></p>
+                            <div id="selected-resources-list" class="sortable-list list-group mb-2"></div>
+                            <hr id="selection-separator" style="display: none;">
+                            <div id="unselected-resources-list" class="list-group">
+                                {% for key, value in MISSING_RESOURCES_MAP.items %}
+                                <div class="list-group-item drag-option d-flex align-items-center mb-2" data-value="{{ key }}">
+                                    <input class="form-check-input me-2" type="checkbox" name="cancel_missing_resources" value="{{ key }}">
+                                    <span class="drag-handle me-2"><i class="bi bi-grip-vertical"></i></span>
+                                    <span class="priority-number me-2"></span>
+                                    {% if key == 'other' %}
+                                    <span>{{ value }}</span>
+                                    <div class="d-flex align-items-center flex-grow-1">
+                                        <input type="text" name="cancel_missing_resources_other" class="form-control form-control-sm ms-2" style="display:none;" placeholder="Please specify...">
+                                    </div>
+                                    {% else %}
+                                    <span class="flex-grow-1">{{ value }}</span>
+                                    {% endif %}
+                                </div>
+                                {% endfor %}
+                            </div>
+                            <input type="hidden" name="cancel_missing_resources_list" id="cancel_missing_resources_list" />
+                        </div>
+
+                        <div class="mb-4 p-3 border rounded">
+                            <label for="cancel_additional_reflection" class="form-label"><strong>4. (Optional) Additional Reflection</strong></label>
+                            <p class="form-text text-muted">Any other thoughts on this task?</p>
+                            <textarea class="form-control" id="cancel_additional_reflection" name="cancel_additional_reflection" rows="3"></textarea>
+                        </div>
+
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-5">
+                            <a href="/task" class="btn btn-outline-secondary btn-lg">Go Back</a>
+                            <button type="button" id="query-btn" class="btn btn-danger btn-lg btn-submi">Submit Cancellation</button>
+                        </div>
+                    </form>
                 </div>
             </div>
         </div>
     </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
+
 {% block scripts %}
-<script type="application/x-javascript">
-    $(function () {
-        // --- Updated logic for expanding and collapsing the answer list ---
-        var answerList = $('#answer-list');
-        var listItems = answerList.find('li');
-        var showAllButton = $('#show-all-answers');
-        var showFewerButton = $('#show-fewer-answers');
-        var initialItemCount = 2; // Show 2 items initially
+<script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
+<script>
+$(function () {
+    // Answer list expansion
+    const answerList = $('#answer-list');
+    const listItems = answerList.find('li');
+    const showAllButton = $('#show-all-answers');
+    const showFewerButton = $('#show-fewer-answers');
+    const initialItemCount = 2;
 
-        // Check if there are more answers than the initial count
-        if (listItems.length > initialItemCount) {
-            // Hide items after the initial count
-            listItems.slice(initialItemCount).hide();
-            // Show the "show all" button
-            showAllButton.show();
-        }
+    if (listItems.length > initialItemCount) {
+        listItems.slice(initialItemCount).hide();
+        showAllButton.show();
+    }
 
-        // Add click event to the "show all" button
-        showAllButton.on('click', function(e) {
-            e.preventDefault(); // Prevent default link behavior
-            // Show all hidden list items
-            answerList.find('li:hidden').show();
-            // Hide this button and show the "show fewer" button
-            $(this).hide();
-            showFewerButton.show();
-            // Set to two columns when all are shown
-            answerList.css({
-                'column-count': 2,
-                '-webkit-column-count': 2,
-                '-moz-column-count': 2
-            });
-        });
+    showAllButton.on('click', function(e) {
+        e.preventDefault();
+        listItems.show();
+        $(this).hide();
+        showFewerButton.show();
+    });
 
-        // Add click event to the "show fewer" button
-        showFewerButton.on('click', function(e) {
-            e.preventDefault(); // Prevent default link behavior
-            // Hide items after the initial count
-            listItems.slice(initialItemCount).hide();
-            // Hide this button and show the "show all" button
-            $(this).hide();
-            showAllButton.show();
-            // Restore to single column when fewer are shown
-            answerList.css({
-                'column-count': 1,
-                '-webkit-column-count': 1,
-                '-moz-column-count': 1
-            });
-        });
-        // --- END UPDATED SCRIPT ---
+    showFewerButton.on('click', function(e) {
+        e.preventDefault();
+        listItems.slice(initialItemCount).hide();
+        $(this).hide();
+        showAllButton.show();
+    });
 
-        // Initialize jQuery UI Sortable on the list of selected items
-        $("#selected-resources-list").sortable({
-            cursor: "grabbing",
-            opacity: 0.8,
-            placeholder: "sortable-placeholder",
-            tolerance: "pointer",
-            helper: "clone",
-            appendTo: "body",
-            start: function(event, ui) {
-                ui.item.css('visibility', 'hidden');
-                ui.helper.width(ui.item.outerWidth());
-                ui.helper.height(ui.item.outerHeight());
-                var itemOffset = ui.item.offset();
-                var cursorTop = event.pageY - itemOffset.top;
-                var cursorLeft = event.pageX - itemOffset.left;
-                $(this).sortable('option', 'cursorAt', { top: cursorTop, left: cursorLeft });
-            },
-            stop: function(event, ui) {
-                ui.item.css('visibility', 'visible');
-                $(this).sortable('option', 'cursorAt', false);
-            },
-            update: function(event, ui) {
-                updateMissingResourcesOrder();
-                updateMissingResourcesPriorityNumbers();
+    // Sortable list for missing resources
+    function initializeSortable(selectedListId, unselectedListId, inputName, hiddenInputId, separatorId) {
+        const selectedList = $("#" + selectedListId);
+        const unselectedList = $("#" + unselectedListId);
+
+        selectedList.sortable({
+            handle: ".drag-handle",
+            placeholder: "sortable-placeholder list-group-item",
+            update: function() {
+                updateOrderAndPriority(selectedList, hiddenInputId);
             }
-        });
+        }).disableSelection();
 
-        // Handle checkbox changes to move items between lists
-        $('input[name="cancel_missing_resources"]').change(function() {
-            var option = $(this).closest('.drag-option');
-            var otherTextInput = $('[name="cancel_missing_resources_other"]');
-            var selectedList = $('#selected-resources-list');
-            var unselectedList = $('#unselected-resources-list');
-            var separator = $('#selection-separator');
-
-            if ($(this).is(':checked')) {
-                option.addClass('selected');
-                option.appendTo(selectedList); // Move to selected list
-                if ($(this).val() === 'other') {
-                    otherTextInput.prop('disabled', false);
-                }
+        $('input[name="' + inputName + '"]').change(function() {
+            const option = $(this).closest('.drag-option');
+            if (this.checked) {
+                option.appendTo(selectedList);
             } else {
-                option.removeClass('selected');
-                option.appendTo(unselectedList); // Move to unselected list
-                $(this).attr('data-priority', '');
-                if ($(this).val() === 'other') {
-                    otherTextInput.prop('disabled', true).val('');
-                }
-            }
-
-            // Show separator if both lists have items
-            if (selectedList.children().length > 0 && unselectedList.children().length > 0) {
-                separator.show();
-            } else {
-                separator.hide();
-            }
-
-            // Update order and priority numbers
-            updateMissingResourcesOrder();
-            updateMissingResourcesPriorityNumbers();
-        });
-
-        // Handle clicking on drag-option to toggle checkbox
-        $('.drag-option').click(function(e) {
-            // Don't trigger if clicking on checkbox or text input directly
-            if ($(e.target).is('input[type="checkbox"], input[type="text"]')) {
-                return;
+                option.appendTo(unselectedList);
+                option.find('.priority-number').text(''); // Clear the priority number
             }
             
-            var checkbox = $(this).find('input[type="checkbox"]');
-            checkbox.prop('checked', !checkbox.prop('checked')).trigger('change');
-        });
+            if (inputName === 'cancel_missing_resources' && option.data('value') === 'other') {
+                option.find('input[type="text"]').toggle(this.checked);
+            }
 
-        // Function to update the hidden input with the sorted order of selected items
-        function updateMissingResourcesOrder() {
-            var order = [];
-            // Only items in the selected list are included and in order
-            $('#selected-resources-list .drag-option').each(function() {
-                order.push($(this).data('value'));
-            });
-            $('#cancel_missing_resources_list').val(JSON.stringify(order));
+            updateOrderAndPriority(selectedList, hiddenInputId);
+            $('#' + separatorId).toggle(selectedList.children().length > 0 && unselectedList.children().length > 0);
+        });
+    }
+
+    function updateOrderAndPriority(selectedList, hiddenInputId) {
+        const order = [];
+        selectedList.children('.drag-option').each(function(index) {
+            order.push($(this).data('value'));
+            $(this).find('.priority-number').text(index + 1);
+        });
+        $('#' + hiddenInputId).val(JSON.stringify(order));
+    }
+
+    initializeSortable("selected-resources-list", "unselected-resources-list", "cancel_missing_resources", "cancel_missing_resources_list", "selection-separator");
+
+    let is_submitted = false;
+    $('#query-btn').click(function () {
+        if ($('input[name="cancel_category"]:checked').length === 0) {
+            alert('Please select a primary reason for cancellation.');
+            return;
+        }
+        if ($('#cancel_reason').val().trim() === '') {
+            alert('Please provide a detailed explanation.');
+            $('#cancel_reason').focus();
+            return;
+        }
+        if ($('input[name="cancel_missing_resources"]:checked').length === 0) {
+            alert('Please select at least one missing resource.');
+            return;
+        }
+        if ($('input[name="cancel_missing_resources"][value="other"]').is(':checked') && $('input[name="cancel_missing_resources_other"]').val().trim() === '') {
+            alert('Please specify your "Other" missing resource.');
+            $('input[name="cancel_missing_resources_other"]').focus();
+            return;
         }
 
-        // Function to update the visual priority numbers on the checkboxes
-        function updateMissingResourcesPriorityNumbers() {
-            // Add priority numbers to selected items
-            $('#selected-resources-list .drag-option').each(function(index) {
-                $(this).find('input[type="checkbox"]').attr('data-priority', index + 1);
-            });
-            // Remove priority numbers from unselected items
-             $('#unselected-resources-list .drag-option').each(function(index) {
-                $(this).find('input[type="checkbox"]').removeAttr('data-priority');
-            });
+        if (confirm("Are you sure you want to cancel this task?")) {
+            is_submitted = true;
+            $('#query-form').submit();
         }
-        
-        let is_submitted = false;
-
-        // Handle form submission
-        $('#query-btn').click(
-            function () {
-                let cancel_reason = $("[name='cancel_reason']");
-                let cancel_category = $("[name='cancel_category']:checked");
-                let selectedResources = $("#selected-resources-list .drag-option"); // Updated selector
-                
-                if (cancel_reason.val() === '') {
-                    alert('Please fill in the reason for cancellation!');
-                    cancel_reason.focus();
-                    return
-                }
-                if (cancel_category.length === 0) {
-                    alert('Please select a primary reason for cancellation!');
-                    return
-                }
-                if (selectedResources.length === 0) {
-                    alert('Please select at least one missing resource!');
-                    return;
-                }
-                
-                // If "Other" is checked, ensure the text field is filled
-                let otherCheckbox = selectedResources.find('input[value="other"]');
-                if (otherCheckbox.length > 0) {
-                    let otherText = $("[name='cancel_missing_resources_other']");
-                    if (otherText.val().trim() === '') {
-                        alert('Please specify the other missing resource!');
-                        otherText.focus();
-                        return;
-                    }
-                }
-
-                if (confirm("Are you sure to cancel the ongoing task?")) {
-                    // Before submitting, ensure the hidden field is up-to-date
-                    updateMissingResourcesOrder();
-                    is_submitted = true;
-                    $('#query-form').submit();
-                }
-            }
-        );
-
-        window.addEventListener('beforeunload', function (e) {
-            if (!is_submitted) {
-                navigator.sendBeacon('/task/stop_annotation/', new Blob());
-            }
-        });
-
-        // Before unloading the page, send a beacon to stop annotation
-        window.addEventListener('unload', function() {
-            if (!is_submitted) {
-                navigator.sendBeacon('/task/stop_annotation/', new Blob());
-            }
-        });
-
     });
+
+    window.addEventListener('beforeunload', function (e) {
+        if (!is_submitted) {
+            navigator.sendBeacon('/task/stop_annotation/', new Blob());
+        }
+    });
+});
 </script>
 {% endblock %}

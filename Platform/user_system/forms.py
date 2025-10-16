@@ -4,9 +4,27 @@
 from django import forms
 from .models import User
 
-llm_frequency_choices = User.LLM_FREQUENCY_CHOICES
-llm_history_choices = User.LLM_HISTORY_CHOICES
 
+from django.contrib.auth.forms import AuthenticationForm
+
+class CustomAuthenticationForm(AuthenticationForm):
+    username = forms.CharField(
+        widget=forms.TextInput(
+            attrs={
+                'class': 'form-control',
+                'placeholder': 'Username',
+                'autofocus': True
+            }
+        )
+    )
+    password = forms.CharField(
+        widget=forms.PasswordInput(
+            attrs={
+                'class': 'form-control',
+                'placeholder': 'Password'
+            }
+        )
+    )
 
 class LoginForm(forms.Form):
     username = forms.CharField(
@@ -35,13 +53,15 @@ class UserCreationForm(AuthUserCreationForm):
         fields = ('username',)
 
     name = forms.CharField(max_length=50)
-    sex = forms.CharField(max_length=50)
+    gender = forms.ChoiceField(choices=User.GENDER_CHOICES)
     age = forms.IntegerField()
     phone = forms.CharField(max_length=50)
     email = forms.EmailField()
-    occupation = forms.CharField(max_length=50)
-    llm_frequency = forms.ChoiceField(choices=llm_frequency_choices)
-    llm_history = forms.ChoiceField(choices=llm_history_choices)
+    occupation = forms.ChoiceField(choices=User.OCCUPATION_CHOICES)
+    education = forms.ChoiceField(choices=User.EDUCATION_CHOICES)
+    field_of_expertise = forms.CharField(max_length=100)
+    llm_frequency = forms.ChoiceField(choices=User.LLM_FREQUENCY_CHOICES)
+    llm_history = forms.ChoiceField(choices=User.LLM_HISTORY_CHOICES)
 
 
 class SignupForm(forms.Form):
@@ -88,13 +108,13 @@ class SignupForm(forms.Form):
             }
         )
     )
-    sex = forms.CharField(
+    gender = forms.ChoiceField(
         required=True,
+        choices=User.GENDER_CHOICES,
         label=u'Gender',
-        widget=forms.TextInput(
+        widget=forms.Select(
             attrs={
-                'class': 'form-control login-field',
-                'placeholder': u'Gender',
+                'class': 'form-select',
             }
         )
     )
@@ -128,48 +148,63 @@ class SignupForm(forms.Form):
             }
         )
     )
-    occupation = forms.CharField(
+    occupation = forms.ChoiceField(
         required=True,
+        choices=User.OCCUPATION_CHOICES,
         label=u'Occupation',
+        widget=forms.Select(
+            attrs={
+                'class': 'form-select',
+            }
+        )
+    )
+    education = forms.ChoiceField(
+        required=True,
+        choices=User.EDUCATION_CHOICES,
+        label=u'Education Level',
+        widget=forms.Select(
+            attrs={
+                'class': 'form-select',
+            }
+        )
+    )
+    field_of_expertise = forms.CharField(
+        required=True,
+        label=u'Field of Expertise',
         widget=forms.TextInput(
             attrs={
                 'class': 'form-control login-field',
-                'placeholder': u'Occupation',
+                'placeholder': u'e.g., Computer Science, History, etc.',
             }
         )
     )
     llm_frequency = forms.ChoiceField(
         required=True,
-        choices=llm_frequency_choices,
+        choices=User.LLM_FREQUENCY_CHOICES,
         label=u'How often do you use large language models (LLMs)?',
         help_text=u'This helps us understand your experience with LLMs.',
         widget=forms.Select(
             attrs={
-                'class': 'select2-container form-control select select-primary',
+                'class': 'form-select',
             }
         )
     )
     llm_history = forms.ChoiceField(
         required=True,
-        choices=llm_history_choices,
+        choices=User.LLM_HISTORY_CHOICES,
         label=u'How long have you been using large language models(LLMs)?',
         help_text=u'This helps us understand your experience with LLMs.',
         widget=forms.Select(
             attrs={
-                'class': 'select2-container form-control select select-primary' ,
+                'class': 'form-select',
             }
         )
     )
 
     def clean(self):
         cleaned_data = super(SignupForm, self).clean()
-        password = cleaned_data.get('password')
-        password_retype = cleaned_data.get('password_retype')
-
-        if password != password_retype:
-            raise forms.ValidationError(
-                u'The two passwords are inconsistent!'
-            )
+        if password and password_retype and password != password_retype:
+            self.add_error('password_retype', "The two passwords do not match.")
 
         return cleaned_data
 
@@ -177,7 +212,7 @@ class SignupForm(forms.Form):
 class EditInfoForm(forms.ModelForm):
     class Meta:
         model = User
-        fields = ['name', 'sex', 'age', 'phone', 'email', 'occupation', 'llm_frequency', 'llm_history']
+        fields = ['name', 'gender', 'age', 'phone', 'email', 'occupation', 'education', 'field_of_expertise', 'llm_frequency', 'llm_history']
 
 
 class EditPasswordForm(forms.Form):
@@ -217,14 +252,8 @@ class EditPasswordForm(forms.Form):
     )
 
     def clean(self):
-        cleaned_data = super(EditPasswordForm, self).clean()
-        password = cleaned_data.get('new_password')
-        password_retype = cleaned_data.get('new_password_retype')
-
-        if password != password_retype:
-            raise forms.ValidationError(
-                u'The two passwords are inconsistent!'
-            )
+        if password and password_retype and password != password_retype:
+            self.add_error('new_password_retype', "The two passwords do not match.")
 
         return cleaned_data
 
@@ -272,9 +301,7 @@ class ResetPasswordForm(forms.Form):
         password = cleaned_data.get('new_password')
         password_retype = cleaned_data.get('new_password_retype')
 
-        if password != password_retype:
-            raise forms.ValidationError(
-                u'The two passwords are inconsistent!'
-            )
+        if password and password_retype and password != password_retype:
+            self.add_error('new_password_retype', "The two passwords do not match.")
 
         return cleaned_data

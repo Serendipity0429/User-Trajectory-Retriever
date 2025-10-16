@@ -1,80 +1,275 @@
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap');
+
+:root {
+    --primary-color: #671372; /* Tsinghua Purple */
+    --secondary-color: #f4f4f4;
+    --danger-color: #e74c3c;
+    --light-gray: #f8f9fa; /* Lighter gray background */
+    --dark-gray: #34495e;
+    --white: #ffffff;
+    --font-family: 'Roboto', sans-serif;
+}
+
 * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: var(--font-family);
+    background-color: var(--light-gray);
+    color: var(--dark-gray);
+    min-width: 280px; /* Adjusted width */
     text-align: center;
 }
 
-label {
-    font: 12px Arial;
+.container {
+    padding: 15px; /* Reduced padding for a more compact look */
 }
 
-input[type=text], input[type=password] {
-    font: 12px Arial;
-    width: 90%;
+.header {
+    margin-bottom: 25px;
 }
 
-.popup-title {
-    color: rgb(151, 67, 219);
-    padding-top: 3px;
-    padding-bottom: 6px;
-    font: 14px Arial;
+.header p {
+    font-size: 17px;
+    color: #6c757d;
+}
+
+.logo {
+    width: 60px;
+    height: 60px;
+    margin-bottom: 15px;
+}
+
+h1 {
+    color: var(--primary-color);
+    font-size: 26px;
+    font-weight: 700;
+    margin-bottom: 8px;
+}
+
+.content {
+    display: flex;
+    flex-direction: column;
+}
+
+.form-group {
+    display: flex;
+    align-items: center;
+    background-color: var(--white);
+    border-radius: 8px;
+    padding: 12px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    margin-bottom: 15px;
+}
+
+.form-group i {
+    color: var(--primary-color);
+    margin-right: 12px;
+}
+
+.form-group input[type="text"],
+.form-group input[type="password"] {
+    border: none;
+    outline: none;
     width: 100%;
-    text-align: center;
-    font-weight: bold;
+    font-size: 16px;
 }
 
-button {
-    display: inline-block;
-    padding: 3px 6px;
-    font-size: 12px;
+.remember-me {
+    background-color: transparent;
+    box-shadow: none;
+    padding: 0;
+    margin-top: -8px; /* Pull it closer to the password field */
+    margin-bottom: 20px; /* Reduce space before the login button */
+    display: flex;
+    align-items: center;
+    justify-content: center; /* Centered the "Remember me" section */
+}
+
+.remember-me label {
+    font-size: 16px;
+}
+
+.remember-me input[type="checkbox"] {
+    margin-right: 10px;
+    width: 16px;
+    height: 16px;
+    accent-color: var(--primary-color); /* Make checkbox purple */
+}
+
+.btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 10px;
+    font-size: 16px;
+    font-weight: 500;
     cursor: pointer;
-    text-align: center;
     text-decoration: none;
     outline: none;
-    color: #fff;
-    background-color: rgb(151, 67, 219);
+    color: var(--white);
+    background-color: var(--primary-color);
     border: none;
-    border-radius: 4px;
-    box-shadow: 0 3px #999;
+    border-radius: 8px;
+    transition: all 0.3s ease;
     width: 100%;
 }
 
-button:hover {
-    background-color: #a75ad8;
+#login > .btn {
+    margin-bottom: 15px;
 }
 
-button:active {
-    background-color: #5b0b8d;
-    box-shadow: 0 1px #666;
-    transform: translateY(1px);
+#bt1, #bt4 {
+    background-color: grey;
 }
 
-button:disabled {
+.button-row {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 10px;
+}
+
+.btn:hover {
+    background-color: #560e5c; /* Darker purple on hover */
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.btn:active {
+    transform: translateY(0);
+    box-shadow: none;
+}
+
+.btn:disabled {
     background-color: #cccccc;
-    color: #666666;
+    color: var(--dark-gray); /* Use dark gray for better contrast */
     cursor: not-allowed;
-}
-
-button:disabled:active {
-    box-shadow: 0 3px #999;
     transform: none;
+    box-shadow: none;
 }
 
 
+.btn-danger {
+    background-color: var(--danger-color);
+}
+
+.btn-danger:not(:disabled):hover {
+    background-color: #c0392b;
+}
+
+.error-msg, .warning-msg {
+    padding: 10px;
+    border-radius: 5px;
+    margin: 10px 0;
+    display: none; /* Hidden by default */
+    text-align: left;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.error-msg {
+    background-color: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+.warning-msg {
+    background-color: #fff3cd;
+    color: #856404;
+    border: 1px solid #ffeeba;
+}
+
+.error-msg i, .warning-msg i {
+    font-size: 16px;
+}
+
+#user-info {
+    margin-bottom: 15px;
+}
 
 #username_text_logged {
-    color: rgb(151, 67, 219);
-    padding-top: 3px;
-    padding-bottom: 6px;
-    font: 14px Arial;
-    width: 100%;
-    text-align: center;
-    font-weight: bold;
+    font-size: 20px;
+    font-weight: 500;
+    color: var(--primary-color);
+    margin-bottom: 5px;
 }
 
 #active_task {
-    color: #000000;
-    padding-top: 3px;
-    padding-bottom: 6px;
-    font: 14px Arial;
+    font-size: 16px;
+}
+
+.button-group {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+/* Modal Styles */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
     width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.6);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background-color: var(--white);
+    padding: 20px;
+    border-radius: 10px;
     text-align: center;
+    box-shadow: 0 5px 20px rgba(0,0,0,0.2);
+    width: 90%;
+    max-width: 260px;
+}
+
+.modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+.modal-header h3 {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--dark-gray);
+    margin: 0;
+}
+
+.modal-header i {
+    font-size: 22px;
+    color: var(--primary-color);
+}
+
+.modal-content p {
+    font-size: 15px;
+    line-height: 1.5;
+    color: #6c757d;
+}
+
+.modal-buttons {
+    margin-top: 20px;
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+}
+
+.modal-buttons .btn {
+    width: auto;
+    padding: 8px 20px;
+    font-size: 14px;
+    margin: 0;
 }

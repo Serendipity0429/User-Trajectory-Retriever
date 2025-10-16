@@ -1,42 +1,55 @@
 {% extends "base.html" %}
 {% load static %}
-{% block title %} Login  {% endblock %}
+{% block title %}Login{% endblock %}
 
 {% block content %}
-<div class="row">
-<div class="col-xs-6 text-center">
-    <p>
-        <img src="{% static 'img/IR4.png' %}"/>
-    </p>
-    <p>
-        <a href="http://www.thuir.org/">Tsinghua University, Department of Computer Science and Technology, Institute for Artificial Intelligence </br>Information Retrieval Group (THUIR)</a>
-    </p>
-</div>
-<div class="col-xs-6 pull-right">
-<div class="login-form">
-    <form id="login_form" name="login_form" action="" method="POST">
-        {% csrf_token %}
-        <div class="form-group">
-            {{ form.username }}
-          <label class="login-field-icon fui-user" for="login-name"></label>
-        </div>
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-lg-5">
+            <div class="card shadow-lg border-0 rounded-lg mt-5">
+                <div class="card-header text-center py-4 bg-primary text-white">
+                    <img src="{% static 'img/IR4.png' %}" alt="THUIR Logo" class="mb-3" style="width: 80px;"/>
+                    <h3 class="my-2"><strong>THUIR Annotation Platform</strong></h3>
+                </div>
+                <div class="card-body p-5">
+                    <div class="text-center text-muted mb-4">
+                        <p>Please login to continue</p>
+                    </div>
+                    <form id="login_form" name="login_form" action="" method="POST">
+                        {% csrf_token %}
+                        <div class="form-floating mb-3">
+                            {{ form.username }}
+                            <label for="id_username"><i class="bi bi-person-fill me-2"></i>Username</label>
+                        </div>
 
-        <div class="form-group">
-            {{ form.password }}
-          <label class="login-field-icon fui-lock" for="login-pass"></label>
-        </div>
+                        <div class="form-floating mb-3">
+                            {{ form.password }}
+                            <label for="id_password"><i class="bi bi-key-fill me-2"></i>Password</label>
+                        </div>
 
-        {% if error_message %}
-        <div class="login-error-message">
-            {{ error_message }}
-        </div>
-        {% endif %}
+                        {% if error_message %}
+                        <div class="alert alert-danger d-flex align-items-center" role="alert">
+                            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                            <div>
+                                {{ error_message }}
+                            </div>
+                        </div>
+                        {% endif %}
 
-        <button type="submit" class="btn btn-primary btn-lg btn-block">Login</button>
-        <a class="login-link" href="{% url 'user_system:forget_password' %}">Forget password?</a>
-        <a class="login-link" href="{% url 'user_system:signup' %}">Create a new account</a>
-    </form>
-</div>
-</div>
+                        <div class="d-grid mt-4 mb-3">
+                            <button type="submit" class="btn btn-primary btn-lg"><i class="bi bi-box-arrow-in-right me-2"></i>Login</button>
+                        </div>
+                        
+                        <div class="text-center">
+                            <a href="{% url 'user_system:forget_password' %}" class="btn btn-link">Forgot Password?</a>
+                        </div>
+                    </form>
+                </div>
+                <div class="card-footer text-center py-3">
+                    <a href="{% url 'user_system:signup' %}" class="btn btn-secondary">Need an account? Sign up!</a>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 {% endblock %}

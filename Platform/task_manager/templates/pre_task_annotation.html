@@ -1,219 +1,143 @@
 {% extends "base.html" %}
 {% load task_manager_extras %}
 {% block title %} Pre-Task Annotation {% endblock %}
-{% block content_title %} Pre-Task Annotation {% endblock %}
-{% block content %}
-    <style>
-        .choice-container {
-            display: flex;
-            align-items: center;
-            margin-right: 20px; /* Add space between options */
-        }
-        .tooltip-container {
-            position: relative;
-            display: inline-block;
-            cursor: pointer;
-        }
-        .tooltip-button {
-            background-color: #f0f0f0;
-            border: 1px solid #ccc;
-            border-radius: 50%;
-            width: 20px;
-            height: 20px;
-            font-size: 12px;
-            margin-left: 5px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .tooltip-text {
-            visibility: hidden;
-            min-width: 220px;
-            max-width: 300px;
-            background-color: #555;
-            color: #fff;
-            text-align: center;
-            border-radius: 6px;
-            padding: 8px 12px;
-            position: absolute;
-            z-index: 1;
-            bottom: 125%;
-            left: 50%;
-            transform: translateX(-50%);
-            opacity: 0;
-            transition: opacity 0.3s;
-        }
-        .tooltip-text::after {
-            content: "";
-            position: absolute;
-            top: 100%;
-            left: 50%;
-            margin-left: -5px;
-            border-width: 5px;
-            border-style: solid;
-            border-color: #555 transparent transparent transparent;
-        }
-        .tooltip-container:hover .tooltip-text {
-            visibility: visible;
-            opacity: 1;
-        }
-    </style>
-    <div class="row text-center">
-        <h3>
-            Please annotate the following questions before task
-        </h3>
-    </div>
-    <div class="row">
-        <div class="col-xs-offset-1 col-xs-10">
-            <form  id="query-form" action="" method="post" onsubmit="validateForm()"
-                  enctype="multipart/form-data">
-                {% csrf_token %}
-                <div class="col-xs-12 sheet">
-                    <input type="hidden" name="entry_id" id="entry-id" value="{{entry_id}}">
-                    <div class="question-wrapper col-xs-12">
-                        <span class="col-xs-12 list-row question-text">
-                            <b>1. Task Description</b>: You need to answer the following question:
-                            </span>
-                        <br/>
-                        <div class="static-task-info">{{ question }}</div>
-                    </div>
 
-                    <div class="question-wrapper col-xs-12">
-                        <span class="col-xs-12 list-row question-text">
-                            <b>2. Task Completion Criteria</b>: The criteria for task completion.</span>
-                        <br/>
-                        <div class="static-task-info">Exact Match (EM)</div>
-                        <div class="col-xs-12 list-row notice"> Notice: You don't need to reformulate the question into a complete sentence, just provide the answer directly.</div>
-                        <div class="col-xs-12 list-row">
-                            <b>Example:</b>
-                            <div style="margin-left: 20px;">
-                                <em>Question:</em> What is the capital of France?<br>
-                                <em>Expected Answer:</em> Paris<br>
-                                <em>Wrong Answer 1:</em> The capital of France is Paris. (Redundant information)<br>
-                                <em>Wrong Answer 2:</em> Beijing (Incorrect answer)<br>
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card shadow-sm">
+                <div class="card-header">
+                    <h3 class="mb-0"><i class="bi bi-pencil-square me-2"></i>Pre-Task Annotation</h3>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted">Please answer the following questions before you begin the task.</p>
+                    <hr>
+                    <form id="query-form" action="" method="post" enctype="multipart/form-data">
+                        {% csrf_token %}
+                        <input type="hidden" name="entry_id" id="entry-id" value="{{entry_id}}">
+
+                        <!-- Task Description -->
+                        <div class="mb-4 p-3 border rounded">
+                            <h5>1. Task Description</h5>
+                            <p>You need to answer the following question:</p>
+                            <div class="p-3 bg-light rounded">{{ question }}</div>
+                        </div>
+
+                        <!-- Task Completion Criteria -->
+                        <div class="mb-4 p-3 border rounded">
+                            <h5>2. Task Completion Criteria</h5>
+                            <p>The criteria for task completion is <strong>Exact Match (EM)</strong>. This means your answer must be <strong>precise</strong> and contain <strong>only the requested information</strong>. It is crucial that you provide just the answer itself, without any additional explanatory text or sentences.</p>
+                            <h6>Example:</h6>
+                            <ul class="list-group">
+                                <li class="list-group-item"><em>Question:</em> What is the capital of France?</li>
+                                <li class="list-group-item list-group-item-success"><em>Expected Answer:</em> Paris</li>
+                                <li class="list-group-item list-group-item-danger"><em>Wrong Answer 1:</em> The capital of France is Paris. (Redundant information)</li>
+                                <li class="list-group-item list-group-item-danger"><em>Wrong Answer 2:</em> Beijing (Incorrect answer)</li>
+                            </ul>
+                        </div>
+
+                        <!-- Domain Familiarity -->
+                        <div class="mb-4">
+                            <h5>3. Domain Familiarity</h5>
+                            <p>How familiar are you with the topic of this question?</p>
+                            <div class="btn-group" role="group" aria-label="Familiarity">
+                                {% for key, value in FAMILIARITY_MAP.items %}
+                                <input type="radio" class="btn-check" name="familiarity" id="familiarity{{ key }}" value="{{ key }}" autocomplete="off" required>
+                                <label class="btn btn-outline-primary" for="familiarity{{ key }}" data-bs-toggle="tooltip" data-bs-placement="top" title="{{ FAMILIARITY_EXPLANATION_MAP|get_item:key }}">
+                                    <strong>{{ key }}</strong><br>{{ value|split:" - "|slice:"1:"|join:" - " }}
+                                </label>
+                                {% endfor %}
                             </div>
                         </div>
-                    </div>
 
-                    <div class="question-wrapper col-xs-12">
-                        <div class="ratio col-xs-12 list-row question-text"><b>3. Domain Familiarity</b>: How familiar are you with the topic of this question?</div>
-                        <div class="ratio col-xs-12 list-row ">
-                            {% for key, value in FAMILIARITY_MAP.items %}
-                                <div class="choice-container">
-                                    <label>
-                                        <input type="radio" name="familiarity" value="{{ key }}"/> {{ value }}
-                                    </label>
-                                    <div class="tooltip-container">
-                                        <span class="tooltip-button">?</span>
-                                        <span class="tooltip-text">{{ FAMILIARITY_EXPLANATION_MAP|get_item:key }}</span>
-                                    </div>
-                                </div>
-                            {% endfor %}
-                        </div>
-                    </div>
-
-                    <div class="question-wrapper col-xs-12">
-                        <div class="ratio col-xs-12 list-row question-text"><b>4. Difficulty</b>: How do
-                            you evaluate the difficulty of the task？</div>
-                        <div class="ratio col-xs-12 list-row ">
-                            {% for key, value in DIFFICULTY_MAP.items %}
-                                <div class="choice-container">
-                                    <label>
-                                        <input type="radio" name="difficulty" value="{{ key }}"/> {{ value }}
-                                    </label>
-                                    <div class="tooltip-container">
-                                        <span class="tooltip-button">?</span>
-                                        <span class="tooltip-text">{{ DIFFICULTY_EXPLANATION_MAP|get_item:key }}</span>
-                                    </div>
-                                </div>
-                            {% endfor %}
-                        </div>
-                    </div>
-
-                    <div class="question-wrapper col-xs-12">
-                        <label for="effort" class="ratio col-xs-12 list-row question-text"><b>5. Effort</b>: How much time do you expect to spend on this task?&ensp;<span class="notice">(Current choice:&ensp;<b><span id="effort_val">10</span></b>)</span></label>
-                        <div class="ratio col-xs-12 list-row">
-                        <span style="display:flex;">
-                            Three minutes or slower&emsp;
-                            <input type="range" style="width: 40%;" name="effort" id="effort" min="3" max="60" value="10" step="1" list="effort_marks" oninput="setEffort()" onchange="setEffort()"/>
-                            &emsp; Sixty minutes or longer</span>
-                            <datalist id="effort_marks">
-                                {% for i in "3456789" %}
-                                    <option>{{ i }}</option>
+                        <!-- Difficulty -->
+                        <div class="mb-4">
+                            <h5>4. Difficulty</h5>
+                            <p>How do you evaluate the difficulty of the task?</p>
+                            <div class="btn-group" role="group" aria-label="Difficulty">
+                                {% for key, value in DIFFICULTY_MAP.items %}
+                                <input type="radio" class="btn-check" name="difficulty" id="difficulty{{ key }}" value="{{ key }}" autocomplete="off" required>
+                                <label class="btn btn-outline-primary" for="difficulty{{ key }}" data-bs-toggle="tooltip" data-bs-placement="top" title="{{ DIFFICULTY_EXPLANATION_MAP|get_item:key }}">
+                                    <strong>{{ key }}</strong><br>{{ value|split:" - "|slice:"1:"|join:" - " }}
+                                </label>
                                 {% endfor %}
-                                {% for i in "123456" %}
-                                    {% for j in "0123456789" %}
-                                        <option>{{ i }}{{ j }}</option>
-                                    {% endfor %}
-                                {% endfor %}
-                            </datalist>
+                            </div>
                         </div>
-                    </div>
 
-                    <div class="question-wrapper col-xs-12">
-                        <label for="initial_strategy" class="col-xs-12 list-row question-text">
-                            6. <b>Initial Strategy</b>: Briefly describe your initial plan. For example, what search queries or keywords will you start with? (e.g. "search for A and B, then look for C")</label>
-                        </label>
-                        <div>
-                            <textarea class="col-xs-12 list-row" id="initial_strategy" name="initial_strategy" rows="5" required></textarea>
+                        <!-- Effort -->
+                        <div class="mb-4">
+                            <label for="effort" class="form-label"><h5>5. Effort</h5></label>
+                            <p>How much time do you expect to spend on this task? <span class="badge bg-secondary" id="effort_val">5</span></p>
+                            <input type="range" class="form-range" name="effort" id="effort" min="3" max="30" value="5" step="1" oninput="setEffort()">
                         </div>
-                    </div>
 
-                </div>
+                        <!-- Initial Strategy -->
+                        <div class="mb-4">
+                            <label for="initial_strategy" class="form-label"><h5>6. Initial Strategy</h5></label>
+                            <p>Briefly describe your initial plan. For example, what search queries or keywords will you start with?</p>
+                            <textarea class="form-control" id="initial_strategy" name="initial_strategy" rows="5" required></textarea>
+                        </div>
 
-            </form>
-            <div class="col-xs-12">
-                <div id="query-btn" class="col-xs-6 submit-btn btn btn-block btn-lg btn-primary">
-                    Submit
+                        <div class="d-grid">
+                            <button type="button" id="query-btn" class="btn btn-primary btn-lg btn-submit">Submit</button>
+                        </div>
+                    </form>
                 </div>
             </div>
         </div>
     </div>
-
+</div>
 {% endblock %}
+
 {% block scripts %}
 <script>
     function setEffort() {
-        let effort = document.getElementById("effort_val");
-        effort.innerText = document.getElementsByName("effort")[0].value;
+        let effortInput = document.getElementsByName("effort")[0];
+        let effortVal = document.getElementById("effort_val");
+        let value = parseInt(effortInput.value);
+        let min = parseInt(effortInput.min);
+        let max = parseInt(effortInput.max);
+
+        if (value === min) {
+            effortVal.innerText = value + " minutes and shorter";
+        } else if (value === max) {
+            effortVal.innerText = value + " minutes and longer";
+        } else {
+            effortVal.innerText = value + " minutes";
+        }
     }
 
-    function validateForm() {
-        let checks = $('input[type="checkbox"]:checked').map(function () {
-            return $(this).val();
-        }).get();
-    }
-</script>
-<script type="application/x-javascript">
+    // Initialize tooltips
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl)
+    })
+
     $(function () {
+        setEffort();
         let is_submitted = false;
-        $('#query-btn').click(
-            function () {
-                let difficulty = $("[name='difficulty']:checked");
-                if (difficulty.val() == null) {
-                    alert('Please check a difficulty button!');
-                    $("[name='difficulty']").focus();
-                    return
-                }
-                let familiarity = $("[name='familiarity']:checked");
-                if (familiarity.val() == null) {
-                    alert('Please check a familiarity button!');
-                    $("[name='familiarity']").focus();
-                    return
-                }
-                let initial_strategy = $('#initial_strategy').val();
-                if (initial_strategy.trim() === '') {
-                    alert('Please fill in the initial strategy!');
-                    $('#initial_strategy').focus();
-                    return
-                }
-
-                if (confirm("Are you sure to submit all the annotations?")) {
-                    is_submitted = true;
-                    $('#query-form').submit();
-                }
+        $('#query-btn').click(function () {
+            if (!$("input[name='familiarity']:checked").val()) {
+                alert('Please select your domain familiarity!');
+                return;
             }
-        );
+            if (!$("input[name='difficulty']:checked").val()) {
+                alert('Please select the task difficulty!');
+                return;
+            }
+            if ($('#initial_strategy').val().trim() === '') {
+                alert('Please describe your initial strategy!');
+                $('#initial_strategy').focus();
+                return;
+            }
+
+            if (confirm("Are you sure you want to submit?")) {
+                is_submitted = true;
+                $('#query-form').submit();
+            }
+        });
+
         window.addEventListener('beforeunload', function (e) {
             if (!is_submitted) {
                 navigator.sendBeacon('/task/stop_annotation/', new Blob());

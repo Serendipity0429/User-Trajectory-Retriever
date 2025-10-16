@@ -1,0 +1,82 @@
+
+{% extends "base.html" %}
+
+{% block title %}Admin Page - User Management{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <h1 class="mt-4">Administrator Dashboard</h1>
+    <p>Welcome to the admin dashboard. Here you can manage users and other site settings.</p>
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-header">
+            <i class="bi bi-people-fill me-2"></i>
+            User Management
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped table-hover">
+                    <thead class="table-dark">
+                        <tr>
+                            <th scope="col">#</th>
+                            <th scope="col">Username</th>
+                            <th scope="col">Email</th>
+                            <th scope="col">Name</th>
+                            <th scope="col">Is Superuser</th>
+                            <th scope="col">Last Login</th>
+                            <th scope="col">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for user in users %}
+                        <tr>
+                            <th scope="row">{{ forloop.counter }}</th>
+                            <td>{{ user.username }}</td>
+                            <td>{{ user.email }}</td>
+                            <td>{{ user.name }}</td>
+                            <td>
+                                {% if user.is_primary_superuser %}
+                                    <span class="badge bg-primary">Primary</span>
+                                {% elif user.is_superuser %}
+                                    <span class="badge bg-success">Yes</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">No</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ user.last_login|date:"Y-m-d H:i:s" }}</td>
+                            <td>
+                                <form action="{% url 'user_system:delete_user' user.id %}" method="post" onsubmit="return confirm('Are you sure you want to delete this user?');" style="display: inline;">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+                                </form>
+                                {% if request.user.is_primary_superuser %}
+                                <form action="{% url 'user_system:toggle_superuser' user.id %}" method="post" style="display: inline;">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-primary btn-sm" style="color: white;" {% if user.id == request.user.id %}disabled{% endif %}>
+                                        {% if user.is_superuser %}
+                                            Demote
+                                        {% else %}
+                                            Promote
+                                        {% endif %}
+                                    </button>
+                                </form>
+                                {% endif %}
+                                <form action="{% url 'user_system:login_as_user' user.id %}" method="post" style="display: inline;">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-secondary btn-sm" {% if user.id == request.user.id or user.is_primary_superuser %}disabled{% endif %}>Login As</button>
+                                </form>
+                                <a href="{% url 'user_system:view_user_info' user.id %}" class="btn btn-dark btn-sm">View</a>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="7" class="text-center">No users found.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

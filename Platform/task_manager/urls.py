@@ -17,7 +17,11 @@ urlpatterns = [
     path('auth_redirect/', views.auth_redirect, name='auth_redirect'), # Auth redirect  
     
     path('pre_task_annotation/<int:timestamp>/', views.pre_task_annotation, name='pre_task_annotation'), # Preliminary task annotation
-    path('reflection_annotation/<int:task_id>/<int:end_timestamp>/', views.reflection_annotation, name='reflection_annotation'), # Reflection annotation
+    path(
+        "reflection_annotation/<int:task_trial_id>/",
+        views.reflection_annotation,
+        name="reflection_annotation",
+    ),
     path('post_task_annotation/<int:task_id>/', views.post_task_annotation, name='post_task_annotation'), # Post task annotation
     path('show_task/<int:task_id>/', views.show_task, name='show_task'), # Show task
     path('view_task_info/<int:task_id>/', views.view_task_info, name='view_task_info'), # View task info

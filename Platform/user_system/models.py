@@ -28,18 +28,42 @@ class User(AbstractUser):
         ('short', u'one to three years'),
         ('very short', u'less than one year'),
     )
+    GENDER_CHOICES = (
+        ('', u''),
+        ('M', 'Male'),
+        ('F', 'Female'),
+        ('O', 'Other'),
+    )
+    OCCUPATION_CHOICES = (
+        ('', u''),
+        ('student', 'Student'),
+        ('engineer', 'Engineer'),
+        ('teacher', 'Teacher'),
+        ('other', 'Other'),
+    )
+    EDUCATION_CHOICES = (
+        ('', u''),
+        ('high_school', 'High School'),
+        ('bachelor', 'Bachelor\'s Degree'),
+        ('master', 'Master\'s Degree'),
+        ('phd', 'PhD'),
+        ('other', 'Other'),
+    )
 
     # Inherits username, password, email, first_name, last_name, is_staff, is_active, date_joined, last_login from AbstractUser.
     # We are adding the following fields to the default User model.
 
     name = models.CharField(max_length=50, blank=True)
-    sex = models.CharField(max_length=50, blank=True)
+    gender = models.CharField(max_length=50, choices=GENDER_CHOICES, blank=True)
     age = models.IntegerField(default=0)
     phone = models.CharField(max_length=50, blank=True)
-    occupation = models.CharField(max_length=50, blank=True)
+    occupation = models.CharField(max_length=50, choices=OCCUPATION_CHOICES, blank=True)
+    education = models.CharField(max_length=50, choices=EDUCATION_CHOICES, blank=True)
+    field_of_expertise = models.CharField(max_length=100, blank=True)
     llm_frequency = models.CharField(max_length=50, choices=LLM_FREQUENCY_CHOICES, blank=True)
     llm_history = models.CharField(max_length=50, choices=LLM_HISTORY_CHOICES, blank=True)
     login_num = models.IntegerField(default=0)
+    is_primary_superuser = models.BooleanField(default=False)
 
     # No need for custom manager, USERNAME_FIELD, or REQUIRED_FIELDS as AbstractUser provides sensible defaults.
     # 'username' is the default USERNAME_FIELD.

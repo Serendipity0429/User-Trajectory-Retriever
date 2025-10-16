@@ -17,11 +17,11 @@
 
 .list-header {
     background: #edeff1;
-    border-bottom: 2px solid #007087;
+    border-bottom: 2px solid #343a40;
 }
 
 .list-header b {
-    color: #045363;
+    color: #021e4d;
 }
 
 .list-row {
@@ -35,14 +35,14 @@
 
 .control-panel {
     background: #edeff1;
-    border-top: 2px solid #007087;
+    border-top: 2px solid #021e4d;
     border-radius: 0 0 4px 4px;
     margin-bottom: 10px;
 }
 
 
 .btn-primary {
-    background-color: #007087;
+    background-color: #021e4d;
     margin-top: 10px;
     margin-bottom: 10px;
     font-size: large;
@@ -50,20 +50,20 @@
 }
 
 .btn-primary:hover {
-    background-color: #5a8ea7;
+    background-color: #032b6b;
 }
 
 .btn-primary:active {
-    background-color: #4a7b8c;
+    background-color: #011536;
 }
 
 .btn-primary:focus {
-    background-color: #4a7b8c;
+    background-color: #011536;
     outline: none;
 }
 
 h1, h2, h3, h4, h5, h6, b {
-    color: #007087;
+    color: #021e4d;
 }
 
 div.question-wrapper {
@@ -89,10 +89,7 @@ div.question-wrapper > :not(.question-text, input, textarea) {
 }
 
 .rrweb-player-wrapper {
-    width: 800px;
-    height: 450px;
     background: #7f7f88;
-    display: inline-block;
 }
 
 .webpage-wrapper {
@@ -154,11 +151,11 @@ details:hover {
 }
 
 input {
-    accent-color: #007087;
+    accent-color: #021e4d;
 }
 
 input {
-    accent-color: #007087;
+    accent-color: #021e4d;
 }
 
 label {
@@ -171,7 +168,7 @@ label {
 }
 a {
 
-    color: #007087;
+    color: #021e4d;
     text-decoration: none;
 }
 
@@ -300,8 +297,8 @@ a.btn {
     padding: 5px 10px;
     /* Using list-header style from your CSS */
     background: #edeff1;
-    border-bottom: 2px solid #007087;
-    color: #045363;
+    border-bottom: 2px solid #021e4d;
+    color: #021e4d;
     list-style: none; /* Remove default arrow/marker */
     display: block;
 }
@@ -336,3 +333,7 @@ a.btn {
 .status-right { color: #4CAF50; }
 .status-wrong { color: #F44336; }
 .status-cancelled { color: #f0ad4e; }
+
+
+
+

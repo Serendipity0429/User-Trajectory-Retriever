@@ -1,606 +1,289 @@
 {% extends "base.html" %}
-{% block title %} Reflection Annotation {% endblock %}
-{% block content_title %} Reflection Annotation {% endblock %}
-{% block content %}
 {% load task_manager_extras %}
-    <style>
-        .tooltip-container {
-            position: relative;
-            display: inline-block;
-            cursor: pointer;
-        }
-        .tooltip-button {
-            background-color: #f0f0f0;
-            border: 1px solid #ccc;
-            border-radius: 50%;
-            width: 20px;
-            height: 20px;
-            font-size: 12px;
-            margin-left: 5px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .tooltip-text {
-            visibility: hidden;
-            min-width: 220px;
-            max-width: 300px;
-            background-color: #555;
-            color: #fff;
-            text-align: center;
-            border-radius: 6px;
-            padding: 8px 12px;
-            position: absolute;
-            z-index: 1;
-            bottom: 125%;
-            left: 50%;
-            transform: translateX(-50%);
-            opacity: 0;
-            transition: opacity 0.3s;
-        }
-        .tooltip-text::after {
-            content: "";
-            position: absolute;
-            top: 100%;
-            left: 50%;
-            margin-left: -5px;
-            border-width: 5px;
-            border-style: solid;
-            border-color: #555 transparent transparent transparent;
-        }
-        .tooltip-container:hover .tooltip-text {
-            visibility: visible;
-            opacity: 1;
-        }
-    </style>
-    <div class="row text-center">
-        <h3>
-            Your answer is <span style="color:red">WRONG!</span>
-        </h3>
-        <h3>
-            Please provide your feedback & reflection on this trial
-        </h3>
-    </div>
-    <div class="row">
-        <div class="col-xs-offset-1 col-xs-10">
-            <details>
-                <summary class="col-xs-12 list-header">
-                    <b>Trajectories of this task...</b> (Click to expand)
-                </summary>
-                <div class="col-xs-offset-1 col-xs-10" id="trajectories">
-                    {% for webpage in webpages %}
-                        <div class="text-center col-xs-12 list-row webpage-wrapper">
-                            {#                style="padding: 3% 0 3% 0;border-bottom: 1px solid #cccccc;">#}
-                            <p style="font-size: 20px">Webpage {{ forloop.counter }}:&ensp;<a href="{{ webpage.url }}" target="_blank">{{ webpage.title }}</a></p>
-                            <!-- create a div to store the rrweb player -->
-                            <div class="rrweb-player-wrapper" id="rrweb-player-{{ webpage.id }}"></div>
-                            <script>
-                                var rrweb_record_{{ webpage.id }} = {{ webpage.rrweb_record | safe }};
-                                // create a rrweb player
-                                const player_{{ webpage.id }} = new rrwebPlayer({
-                                    target: document.getElementById(`rrweb-player-{{ webpage.id }}`),
-                                    props: {
-                                        events: rrweb_record_{{ webpage.id }},
-                                        autoPlay: false,
-                                        width: 800,
-                                        height: 377,
-                                    },
-                                });
-                            </script>
-                        </div>
-                    {% endfor %}
+
+{% block title %}Reflection Annotation{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-lg-10">
+            <div class="card shadow-sm">
+                <div class="card-header bg-danger text-white">
+                    <h4 class="mb-0"><i class="bi bi-exclamation-triangle-fill me-2"></i>Reflection Required</h4>
                 </div>
-            </details>
-            <div class="col-xs-12 list-header">
-                <b>Feedback & Reflection</b>
-            </div>
-            <form id="query-form" action="" method="post" onsubmit="validateForm()"
-                  enctype='multipart/form-data'>
-                {% csrf_token %}
-                <div class="col-xs-12 sheet">
-                    <div class="question-wrapper col-xs-12">
-                        <span class="col-xs-12 list-row question-text">
-                            <b>1. Task Description</b>: You need to answer the following question:
-                            </span>
-                        <br/>
-                        <div class="static-task-info">{{ question }}</div>
-                    </div>
-
-                    <div class="question-wrapper col-xs-12">
-                        <span class="col-xs-12 list-row question-text">
-                            <b>2. Task Completion Criteria</b>: The criteria for task completion.</span>
-                        <br/>
-                        <div class="static-task-info">Exact Match (EM)</div>
-                        <div class="col-xs-12 list-row">
-                            <b>Example:</b>
-                            <div style="margin-left: 20px;">
-                                <em>Question:</em> What is the capital of France?<br>
-                                <em>Expected Answer:</em> Paris<br>
-                                <em>Wrong Answer 1:</em> The capital of France is Paris. (Redundant information)<br>
-                                <em>Wrong Answer 2:</em> Beijing (Incorrect answer)
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="question-wrapper col-xs-12">
-                        <span class="col-xs-12 list-row question-text">
-                            <b>3. Your Answer</b>: Your answer to the question is:
-                            </span>
-                        <br/>
-                        <div class="static-task-info">{{ user_answer }}</div>
-                    </div>
-
-                    <div class="question-wrapper col-xs-12">
-                        <label class="col-xs-12 list-row question-text">
-                        <b>3. Primary Reasons for Failure</b>: What do you think that might be the <b class="notice">main</b> reasons your answer was wrong? (Select at least one and drag to reorder by priority)
-                        </label>
-                        <div class="ratio col-xs-12 list-row">
-                            <div id="selected-failure-categories" class="sortable-list"></div>
-                            <hr id="failure-separator" style="display: none; border-top: 1px dashed #ccc; margin: 10px 0;">
-                            <div id="unselected-failure-categories">
-                                <div class="drag-option" data-value="bad_query">
-                                    <input type="checkbox" name="failure_category" value="bad_query" required/>
-                                    <span class="drag-handle">≡</span>
-                                    <span class="priority-number" style="display:none; margin-right: 8px; font-weight: bold; color: #0056b3;">1</span>
-                                    <label>Ineffective search query</label>
-                                    <div class="tooltip-container">
-                                        <span class="tooltip-button">?</span>
-                                        <span class="tooltip-text">{{ FAILURE_CATEGORY_EXPLANATION_MAP|get_item:"bad_query" }}</span>
+                <div class="card-body">
+                                    <p class="lead text-center"><span class="text-danger">Your answer was incorrect.</span> Please provide feedback and reflection on this trial.</p>
+                
+                                    <div class="accordion mb-4" id="trajectoriesAccordion">
+                                        <div class="accordion-item">
+                                            <h2 class="accordion-header" id="headingOne">
+                                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseTrajectories" aria-expanded="false" aria-controls="collapseTrajectories">
+                                                    <i class="bi bi-signpost-split-fill me-2"></i> <strong>Task Trajectories</strong>&nbsp;(Click to expand)
+                                                </button>
+                                            </h2>
+                                            <div id="collapseTrajectories" class="accordion-collapse collapse" aria-labelledby="headingOne" data-bs-parent="#trajectoriesAccordion">
+                                                <div class="accordion-body">
+                                                    {% for webpage in webpages %}
+                                                    <div class="d-flex flex-column align-items-center mb-4 p-3 border rounded">
+                                                        <p class="h5">Webpage {{ forloop.counter }}: <a href="{{ webpage.url }}" target="_blank">{{ webpage.title }}</a></p>
+                                                        <div class="rrweb-player-wrapper" id="rrweb-player-{{ webpage.id }}" data-events='{{ webpage.rrweb_record|safe }}'></div>
+                                                    </div>
+                                                    {% endfor %}
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
-                                </div>
-                                <div class="drag-option" data-value="misinterpreted_info">
-                                    <input type="checkbox" name="failure_category" value="misinterpreted_info"/>
-                                    <span class="drag-handle">≡</span>
-                                    <span class="priority-number" style="display:none; margin-right: 8px; font-weight: bold; color: #0056b3;">2</span>
-                                    <label>Misinterpreted information</label>
-                                    <div class="tooltip-container">
-                                        <span class="tooltip-button">?</span>
-                                        <span class="tooltip-text">{{ FAILURE_CATEGORY_EXPLANATION_MAP|get_item:"misinterpreted_info" }}</span>
+                
+                                    <form id="query-form" action="" method="post" enctype='multipart/form-data'>
+                                        {% csrf_token %}
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <div class="mb-3 p-3 border rounded bg-light">
+                                                    <label class="form-label"><strong>1. Task Description</strong></label>
+                                                    <div class="question-text">{{ question }}</div>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <div class="mb-3 p-3 border rounded bg-light">
+                                                    <label class="form-label"><strong>2. Your Answer</strong></label>
+                                                    <div class="question-text">{{ user_answer }}</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                        <div class="mb-4 p-3 border rounded">
+                            <label class="form-label"><strong>3. Primary Reasons for Failure</strong></label>
+                            <p class="form-text text-muted"><strong>Select at least one reason and drag to reorder by priority.</strong></p>
+                            <div id="selected-failure-categories" class="sortable-list list-group mb-2"></div>
+                            <hr id="failure-separator" style="display: none;">
+                            <div id="unselected-failure-categories" class="list-group">
+                                {% for key, value in FAILURE_CATEGORY_MAP.items %}
+                                <div class="list-group-item drag-option d-flex align-items-center mb-2" data-value="{{ key }}">
+                                    <input class="form-check-input me-2" type="checkbox" name="failure_category" value="{{ key }}">
+                                    <span class="drag-handle me-2"><i class="bi bi-grip-vertical"></i></span>
+                                    <span class="priority-number me-2"></span>
+                                    {% if key == 'other' %}
+                                    <span>{{ value }}</span>
+                                    <div class="d-flex align-items-center flex-grow-1">
+                                        <input type="text" name="failure_category_other" class="form-control form-control-sm ms-2" style="display:none;" placeholder="Please specify...">
                                     </div>
+                                    {% else %}
+                                    <span class="flex-grow-1">{{ value }}</span>
+                                    {% endif %}
                                 </div>
-                                <div class="drag-option" data-value="info_not_found">
-                                    <input type="checkbox" name="failure_category" value="info_not_found"/>
-                                    <span class="drag-handle">≡</span>
-                                    <span class="priority-number" style="display:none; margin-right: 8px; font-weight: bold; color: #0056b3;">3</span>
-                                    <label>Information not found</label>
-                                    <div class="tooltip-container">
-                                        <span class="tooltip-button">?</span>
-                                        <span class="tooltip-text">{{ FAILURE_CATEGORY_EXPLANATION_MAP|get_item:"info_not_found" }}</span>
-                                    </div>
-                                </div>
-                                <div class="drag-option" data-value="logic_error">
-                                    <input type="checkbox" name="failure_category" value="logic_error"/>
-                                    <span class="drag-handle">≡</span>
-                                    <span class="priority-number" style="display:none; margin-right: 8px; font-weight: bold; color: #0056b3;">4</span>
-                                    <label>Logical/calculation error</label>
-                                    <div class="tooltip-container">
-                                        <span class="tooltip-button">?</span>
-                                        <span class="tooltip-text">{{ FAILURE_CATEGORY_EXPLANATION_MAP|get_item:"logic_error" }}</span>
-                                    </div>
-                                </div>
-                                <div class="drag-option" data-value="ambiguous_info">
-                                    <input type="checkbox" name="failure_category" value="ambiguous_info"/>
-                                    <span class="drag-handle">≡</span>
-                                    <span class="priority-number" style="display:none; margin-right: 8px; font-weight: bold; color: #0056b3;">5</span>
-                                    <label>Ambiguous information</label>
-                                    <div class="tooltip-container">
-                                        <span class="tooltip-button">?</span>
-                                        <span class="tooltip-text">{{ FAILURE_CATEGORY_EXPLANATION_MAP|get_item:"ambiguous_info" }}</span>
-                                    </div>
-                                </div>
-                                <div class="drag-option" data-value="outdated_info">
-                                    <input type="checkbox" name="failure_category" value="outdated_info"/>
-                                    <span class="drag-handle">≡</span>
-                                    <span class="priority-number" style="display:none; margin-right: 8px; font-weight: bold; color: #0056b3;">6</span>
-                                    <label>Outdated information</label>
-                                    <div class="tooltip-container">
-                                        <span class="tooltip-button">?</span>
-                                        <span class="tooltip-text">{{ FAILURE_CATEGORY_EXPLANATION_MAP|get_item:"outdated_info" }}</span>
-                                    </div>
-                                </div>
-                                <div class="drag-option" data-value="trusting_source">
-                                    <input type="checkbox" name="failure_category" value="trusting_source"/>
-                                    <span class="drag-handle">≡</span>
-                                    <span class="priority-number" style="display:none; margin-right: 8px; font-weight: bold; color: #0056b3;">7</span>
-                                    <label>Unreliable source</label>
-                                    <div class="tooltip-container">
-                                        <span class="tooltip-button">?</span>
-                                        <span class="tooltip-text">{{ FAILURE_CATEGORY_EXPLANATION_MAP|get_item:"trusting_source" }}</span>
-                                    </div>
-                                </div>
-                                <div class="drag-option" data-value="time_pressure">
-                                    <input type="checkbox" name="failure_category" value="time_pressure"/>
-                                    <span class="drag-handle">≡</span>
-                                    <span class="priority-number" style="display:none; margin-right: 8px; font-weight: bold; color: #0056b3;">8</span>
-                                    <label>Time pressure</label>
-                                    <div class="tooltip-container">
-                                        <span class="tooltip-button">?</span>
-                                        <span class="tooltip-text">{{ FAILURE_CATEGORY_EXPLANATION_MAP|get_item:"time_pressure" }}</span>
-                                    </div>
-                                </div>
-                                <div class="drag-option" data-value="lack_expertise">
-                                    <input type="checkbox" name="failure_category" value="lack_expertise"/>
-                                    <span class="drag-handle">≡</span>
-                                    <span class="priority-number" style="display:none; margin-right: 8px; font-weight: bold; color: #0056b3;">9</span>
-                                    <label>Lacked expertise</label>
-                                    <div class="tooltip-container">
-                                        <span class="tooltip-button">?</span>
-                                        <span class="tooltip-text">{{ FAILURE_CATEGORY_EXPLANATION_MAP|get_item:"lack_expertise" }}</span>
-                                    </div>
-                                </div>
-                                <div class="drag-option" data-value="format_error">
-                                    <input type="checkbox" name="failure_category" value="format_error"/>
-                                    <span class="drag-handle">≡</span>
-                                    <span class="priority-number" style="display:none; margin-right: 8px; font-weight: bold; color: #0056b3;">10</span>
-                                    <label>Answer formatting error</label>
-                                    <div class="tooltip-container">
-                                        <span class="tooltip-button">?</span>
-                                        <span class="tooltip-text">{{ FAILURE_CATEGORY_EXPLANATION_MAP|get_item:"format_error" }}</span>
-                                    </div>
-                                </div>
-                                <div class="drag-option" data-value="other">
-                                    <input type="checkbox" name="failure_category" value="other"/>
-                                    <span class="drag-handle">≡</span>
-                                    <span class="priority-number" style="display:none; margin-right: 8px; font-weight: bold; color: #0056b3;">11</span>
-                                    <label>Other (please specify)</label>
-                                    <div class="tooltip-container">
-                                        <span class="tooltip-button">?</span>
-                                        <span class="tooltip-text">{{ FAILURE_CATEGORY_EXPLANATION_MAP|get_item:"other" }}</span>
-                                    </div>
-                                </div>
+                                {% endfor %}
                             </div>
                             <input type="hidden" name="failure_category_list" id="failure_category_list" />
                         </div>
-                    </div>
-                        
 
-                    <div class="question-wrapper col-xs-12">
-                        <label for="failure_reason" class="col-xs-12 list-row question-text">
-                            <b>4. Failure Analysis</b>: Please elaborate on what do you think might have gone wrong. (e.g., "I trusted an outdated blog post," "I misread the column header in the table.", "I made a calculation error in my reasoning.")
-                        </label>
-                        <div><textarea class="col-xs-12 list-row" id="failure_reason" name="failure_reason" rows="3" required></textarea></div>
-                    </div>
-                
+                        <div class="mb-4 p-3 border rounded">
+                            <label for="failure_reason" class="form-label"><strong>4. Failure Analysis</strong></label>
+                            <p class="form-text text-muted">Please elaborate on what went wrong (e.g., "I trusted an outdated blog post," "I misread the column header.").</p>
+                            <textarea class="form-control" id="failure_reason" name="failure_reason" rows="3" required></textarea>
+                        </div>
 
-                    <div class="question-wrapper col-xs-12">
-                        <label class="col-xs-12 list-row question-text">
-                            <b>5. Corrective Plan</b>: What will you do in your next attempt? (Select at least one and drag to reorder by priority)
-                        </label>
-                        <div class="ratio col-xs-12 list-row">
-                            <div id="selected-corrective-actions" class="sortable-list"></div>
-                            <hr id="corrective-separator" style="display: none; border-top: 1px dashed #ccc; margin: 10px 0;">
-                            <div id="unselected-corrective-actions">
-                                <div class="drag-option" data-value="refine_query">
-                                    <input type="checkbox" name="future_plan_actions" value="refine_query" required/>
-                                    <span class="drag-handle">≡</span>
-                                    <span class="priority-number" style="display:none; margin-right: 8px; font-weight: bold; color: #0056b3;">1</span>
-                                    <label>Refine search query</label>
-                                    <div class="tooltip-container">
-                                        <span class="tooltip-button">?</span>
-                                        <span class="tooltip-text">{{ CORRECTIVE_ACTION_EXPLANATION_MAP|get_item:"refine_query" }}</span>
+                        <div class="mb-4 p-3 border rounded">
+                            <label class="form-label"><strong>5. Corrective Plan</strong></label>
+                            <p class="form-text text-muted"><strong>What will you do in your next attempt? Select at least one and drag to reorder.</strong></p>
+                            <div id="selected-corrective-actions" class="sortable-list list-group mb-2"></div>
+                            <hr id="corrective-separator" style="display: none;">
+                            <div id="unselected-corrective-actions" class="list-group">
+                                {% for key, value in CORRECTIVE_PLAN_MAP.items %}
+                                <div class="list-group-item drag-option d-flex align-items-center mb-2" data-value="{{ key }}">
+                                    <input class="form-check-input me-2" type="checkbox" name="future_plan_actions" value="{{ key }}">
+                                    <span class="drag-handle me-2"><i class="bi bi-grip-vertical"></i></span>
+                                    <span class="priority-number me-2"></span>
+                                    {% if key == 'other' %}
+                                    <span>{{ value }}</span>
+                                    <div class="d-flex align-items-center flex-grow-1">
+                                        <input type="text" name="future_plan_other" class="form-control form-control-sm ms-2" style="display:none;" placeholder="Please specify...">
                                     </div>
+                                    {% else %}
+                                    <span class="flex-grow-1">{{ value }}</span>
+                                    {% endif %}
                                 </div>
-                                <div class="drag-option" data-value="broaden_query">
-                                    <input type="checkbox" name="future_plan_actions" value="broaden_query"/>
-                                    <span class="drag-handle">≡</span>
-                                    <span class="priority-number" style="display:none; margin-right: 8px; font-weight: bold; color: #0056b3;">2</span>
-                                    <label>Broaden search query</label>
-                                    <div class="tooltip-container">
-                                        <span class="tooltip-button">?</span>
-                                        <span class="tooltip-text">{{ CORRECTIVE_ACTION_EXPLANATION_MAP|get_item:"broaden_query" }}</span>
-                                    </div>
-                                </div>
-                                <div class="drag-option" data-value="find_new_source_type">
-                                    <input type="checkbox" name="future_plan_actions" value="find_new_source_type"/>
-                                    <span class="drag-handle">≡</span>
-                                    <span class="priority-number" style="display:none; margin-right: 8px; font-weight: bold; color: #0056b3;">3</span>
-                                    <label>Find different source types</label>
-                                    <div class="tooltip-container">
-                                        <span class="tooltip-button">?</span>
-                                        <span class="tooltip-text">{{ CORRECTIVE_ACTION_EXPLANATION_MAP|get_item:"find_new_source_type" }}</span>
-                                    </div>
-                                </div>
-                                <div class="drag-option" data-value="re-evaluate_info">
-                                    <input type="checkbox" name="future_plan_actions" value="re-evaluate_info"/>
-                                    <span class="drag-handle">≡</span>
-                                    <span class="priority-number" style="display:none; margin-right: 8px; font-weight: bold; color: #0056b3;">4</span>
-                                    <label>Re-evaluate existing information</label>
-                                    <div class="tooltip-container">
-                                        <span class="tooltip-button">?</span>
-                                        <span class="tooltip-text">{{ CORRECTIVE_ACTION_EXPLANATION_MAP|get_item:"re-evaluate_info" }}</span>
-                                    </div>
-                                </div>
-                                <div class="drag-option" data-value="check_recency">
-                                    <input type="checkbox" name="future_plan_actions" value="check_recency"/>
-                                    <span class="drag-handle">≡</span>
-                                    <span class="priority-number" style="display:none; margin-right: 8px; font-weight: bold; color: #0056b3;">5</span>
-                                    <label>Find more recent information</label>
-                                    <div class="tooltip-container">
-                                        <span class="tooltip-button">?</span>
-                                        <span class="tooltip-text">{{ CORRECTIVE_ACTION_EXPLANATION_MAP|get_item:"check_recency" }}</span>
-                                    </div>
-                                </div>
-                                <div class="drag-option" data-value="check_reliability">
-                                    <input type="checkbox" name="future_plan_actions" value="check_reliability"/>
-                                    <span class="drag-handle">≡</span>
-                                    <span class="priority-number" style="display:none; margin-right: 8px; font-weight: bold; color: #0056b3;">6</span>
-                                    <label>Verify source reliability</label>
-                                    <div class="tooltip-container">
-                                        <span class="tooltip-button">?</span>
-                                        <span class="tooltip-text">{{ CORRECTIVE_ACTION_EXPLANATION_MAP|get_item:"check_reliability" }}</span>
-                                    </div>
-                                </div>
-                                <div class="drag-option" data-value="improve_logic">
-                                    <input type="checkbox" name="future_plan_actions" value="improve_logic"/>
-                                    <span class="drag-handle">≡</span>
-                                    <span class="priority-number" style="display:none; margin-right: 8px; font-weight: bold; color: #0056b3;">7</span>
-                                    <label>Improve reasoning/calculation</label>
-                                    <div class="tooltip-container">
-                                        <span class="tooltip-button">?</span>
-                                        <span class="tooltip-text">{{ CORRECTIVE_ACTION_EXPLANATION_MAP|get_item:"improve_logic" }}</span>
-                                    </div>
-                                </div>
-                                <div class="drag-option" data-value="validate_source">
-                                    <input type="checkbox" name="future_plan_actions" value="validate_source"/>
-                                    <span class="drag-handle">≡</span>
-                                    <span class="priority-number" style="display:none; margin-right: 8px; font-weight: bold; color: #0056b3;">8</span>
-                                    <label>Cross-validate with other sources</label>
-                                    <div class="tooltip-container">
-                                        <span class="tooltip-button">?</span>
-                                        <span class="tooltip-text">{{ CORRECTIVE_ACTION_EXPLANATION_MAP|get_item:"validate_source" }}</span>
-                                    </div>
-                                </div>
-                                <div class="drag-option" data-value="reformulate_answer">
-                                    <input type="checkbox" name="future_plan_actions" value="reformulate_answer"/>
-                                    <span class="drag-handle">≡</span>
-                                    <span class="priority-number" style="display:none; margin-right: 8px; font-weight: bold; color: #0056b3;">9</span>
-                                    <label>Correct answer formatting</label>
-                                    <div class="tooltip-container">
-                                        <span class="tooltip-button">?</span>
-                                        <span class="tooltip-text">{{ CORRECTIVE_ACTION_EXPLANATION_MAP|get_item:"reformulate_answer" }}</span>
-                                    </div>
-                                </div>
-                                <div class="drag-option" data-value="other">
-                                    <input type="checkbox" name="future_plan_actions" value="other"/>
-                                    <span class="drag-handle">≡</span>
-                                    <span class="priority-number" style="display:none; margin-right: 8px; font-weight: bold; color: #0056b3;">10</span>
-                                    <label>Other (please specify)</label>
-                                    <div class="tooltip-container">
-                                        <span class="tooltip-button">?</span>
-                                        <span class="tooltip-text">{{ CORRECTIVE_ACTION_EXPLANATION_MAP|get_item:"other" }}</span>
-                                    </div>
-                                    <input type="text" name="future_plan_other" id="future_plan_other_text" style="margin-left: 10px; font-size: normal; width: 100%;" disabled placeholder="Please specify..." />
-                                </div>
+                                {% endfor %}
                             </div>
                             <input type="hidden" name="future_plan_actions_list" id="future_plan_actions_list" />
                         </div>
-                    </div>
 
-                    <div class="question-wrapper col-xs-12">
-                        <label for="remaining_effort" class="ratio col-xs-12 list-row question-text question-text"><b>6. Remaining Effort</b>: How much time <b class="notice">remaining</b> do you expect to spend on this task?&ensp;<span class="notice">(Current choice:&ensp;<b><span id="effort_val">10</span></b>)</span></label>
-                        <div class="ratio col-xs-12 list-row">
-                        <span style="display:flex;">
-                            Three minutes or slower&emsp;
-                            <input type="range" style="width: 40%" name="remaining_effort" id="remaining_effort" min="3" max="60" value="10" step="1" list="effort_marks" oninput="setEffort()" onchange="setEffort()"/>
-                            &emsp; Sixty minutes or longer</span>
-                            <datalist id="effort_marks">
-                                {% for i in "3456789" %}
-                                    <option>{{ i }}</option>
+                        <div class="mb-4 p-3 border rounded">
+                            <label for="remaining_effort" class="form-label"><strong>6. Remaining Effort</strong></label>
+                            <p class="form-text text-muted">How do you evaluate the difficulty of the task?</p>
+                            <div class="btn-group" role="group" aria-label="Difficulty">
+                                {% for key, value in DIFFICULTY_MAP.items %}
+                                <input type="radio" class="btn-check" name="remaining_effort" id="remaining_effort{{ key }}" value="{{ key }}" autocomplete="off" required>
+                                <label class="btn btn-outline-primary" for="remaining_effort{{ key }}" data-bs-toggle="tooltip" data-bs-placement="top" title="{{ DIFFICULTY_EXPLANATION_MAP|get_item:key }}">
+                                    <strong>{{ key }}</strong><br>{{ value|split:" - "|slice:"1:"|join:" - " }}
+                                </label>
                                 {% endfor %}
-                                {% for i in "123456" %}
-                                    {% for j in "0123456789" %}
-                                        <option>{{ i }}{{ j }}</option>
-                                    {% endfor %}
-                                {% endfor %}
-                            </datalist>
+                            </div>
                         </div>
-                    </div>
-                    <div class="question-wrapper col-xs-12">
-                        <label for="cancel_additional_reflection" class="col-xs-12 list-row question-text">
-                            <b>7. (Optional) Additional Reflection</b>: Do you have any additional thoughts or reflections on this failure?
-                        <textarea class="col-xs-12 list-row" id="reflection" name="additional_reflection" rows="3" required></textarea>
-                    </div>
+
+                        <div class="mb-4 p-3 border rounded">
+                            <label for="additional_reflection" class="form-label"><strong>7. (Optional) Additional Reflection</strong></label>
+                            <p class="form-text text-muted">Any other thoughts on this attempt?</p>
+                            <textarea class="form-control" id="additional_reflection" name="additional_reflection" rows="3"></textarea>
+                        </div>
+
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <button type="button" id="query-btn" class="btn btn-primary btn-lg btn-submit">Submit Reflection</button>
+                        </div>
+                    </form>
                 </div>
-                <div class="col-xs-12">
-                <div id="query-btn" class="col-xs-6 submit-btn btn btn-block btn-lg btn-primary">
-                    Submit
-                </div>
-                </div>
-                <div class="col-xs-12">
-                    <div id="cancel-btn" class="col-xs-6 submit-btn btn btn-block btn-lg btn-primary cancel-button">
-                        Cancel
-                    </div>
-                </div>
-            </form>
+            </div>
         </div>
     </div>
-
+</div>
 {% endblock %}
+
 {% block scripts %}
+<script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
 <script>
-    document.querySelectorAll('.explanation-button').forEach(button => {
-        button.addEventListener('click', (e) => {
-            const targetId = button.getAttribute('data-target');
-            const target = document.getElementById(targetId);
-            if (target) {
-                target.style.display = target.style.display === 'none' ? 'block' : 'none';
+$(function () {
+    function initializeSortable(selectedListId, unselectedListId, inputName, hiddenInputId, separatorId) {
+        const selectedList = $("#" + selectedListId);
+        const unselectedList = $("#" + unselectedListId);
+
+        selectedList.sortable({
+            handle: ".drag-handle",
+            placeholder: "sortable-placeholder list-group-item",
+            update: function(event, ui) {
+                updateOrderAndPriority(selectedList, hiddenInputId);
             }
-            e.stopPropagation();
-        });
-    });
-</script>
-<script>
-    function setEffort() {
-        let effort = document.getElementById("effort_val");
-        effort.innerText = document.getElementsByName("remaining_effort")[0].value;
-    }
+        }).disableSelection();
 
-    function validateForm() {
-        let checks = $('input[type="checkbox"]:checked').map(function () {
-            return $(this).val();
-        }).get();
-    }
-</script>
-<script type="application/x-javascript">
-    $(function () {
-        function initializeSortable(selectedListId, unselectedListId, inputName, hiddenInputId, separatorId) {
-            // Initialize jQuery UI Sortable on the list of selected items
-            $("#" + selectedListId).sortable({
-                cursor: "grabbing",
-                opacity: 0.8,
-                placeholder: "sortable-placeholder",
-                tolerance: "pointer",
-                helper: "clone",
-                appendTo: "body",
-                start: function(event, ui) {
-                    ui.item.css('visibility', 'hidden');
-                    ui.helper.width(ui.item.outerWidth());
-                    ui.helper.height(ui.item.outerHeight());
-                    var itemOffset = ui.item.offset();
-                    var cursorTop = event.pageY - itemOffset.top;
-                    var cursorLeft = event.pageX - itemOffset.left;
-                    $(this).sortable('option', 'cursorAt', { top: cursorTop, left: cursorLeft });
-                },
-                stop: function(event, ui) {
-                    ui.item.css('visibility', 'visible');
-                    $(this).sortable('option', 'cursorAt', false);
-                },
-                update: function(event, ui) {
-                    updateOrder(selectedListId, hiddenInputId);
-                    updatePriorityNumbers(selectedListId, unselectedListId);
-                }
-            });
-
-            // Handle checkbox changes to move items between lists
-            $('input[name="' + inputName + '"]').change(function() {
-                var option = $(this).closest('.drag-option');
-                var selectedList = $('#' + selectedListId);
-                var unselectedList = $('#' + unselectedListId);
-                var separator = $('#' + separatorId);
-
-                if ($(this).is(':checked')) {
-                    option.addClass('selected');
-                    option.appendTo(selectedList); // Move to selected list
-                } else {
-                    option.removeClass('selected');
-                    option.appendTo(unselectedList); // Move to unselected list
-                }
-
-                // Show separator if both lists have items
-                if (selectedList.children().length > 0 && unselectedList.children().length > 0) {
-                    separator.show();
-                } else {
-                    separator.hide();
-                }
-
-                updateOrder(selectedListId, hiddenInputId);
-                updatePriorityNumbers(selectedListId, unselectedListId);
-            });
-        }
-
-        function updateOrder(selectedListId, hiddenInputId) {
-            var order = [];
-            $('#' + selectedListId + ' .drag-option').each(function() {
-                order.push($(this).data('value'));
-            });
-            $('#' + hiddenInputId).val(JSON.stringify(order));
-        }
-
-        function updatePriorityNumbers(selectedListId, unselectedListId) {
-            $('#' + selectedListId + ' .drag-option').each(function(index) {
-                $(this).find('.priority-number').text(index + 1).show();
-            });
-            $('#' + unselectedListId + ' .drag-option').each(function() {
-                $(this).find('.priority-number').hide();
-            });
-        }
-
-        // Initialize for both sections
-        initializeSortable("selected-failure-categories", "unselected-failure-categories", "failure_category", "failure_category_list", "failure-separator");
-        initializeSortable("selected-corrective-actions", "unselected-corrective-actions", "future_plan_actions", "future_plan_actions_list", "corrective-separator");
-
-        // Handle the 'other' text input for corrective actions
-        $('input[name="future_plan_actions"][value="other"]').change(function() {
-            if ($(this).is(':checked')) {
-                $('#future_plan_other_text').prop('disabled', false);
+        $('input[name="' + inputName + '"]').change(function() {
+            const option = $(this).closest('.drag-option');
+            if (this.checked) {
+                option.appendTo(selectedList);
             } else {
-                $('#future_plan_other_text').prop('disabled', true).val('');
-            }
-        });
-
-        // Handle clicking on drag-option to toggle checkbox
-        $('.drag-option').click(function(e) {
-            // Don't trigger if clicking on checkbox or text input directly
-            if ($(e.target).is('input[type="checkbox"], input[type="text"]')) {
-                return;
+                option.appendTo(unselectedList);
+                option.find('.priority-number').text(''); // Clear the priority number
             }
             
-            var checkbox = $(this).find('input[type="checkbox"]');
-            checkbox.prop('checked', !checkbox.prop('checked')).trigger('change');
+            // Handle 'other' text input visibility
+            if (inputName === 'future_plan_actions' && option.data('value') === 'other') {
+                option.find('input[type="text"]').toggle(this.checked);
+            }
+            if (inputName === 'failure_category' && option.data('value') === 'other') {
+                option.find('input[type="text"]').toggle(this.checked);
+            }
+
+            updateOrderAndPriority(selectedList, hiddenInputId);
+            $('#' + separatorId).toggle(selectedList.children().length > 0 && unselectedList.children().length > 0);
         });
+    }
 
-        let is_submitted = false;
-        $('#query-btn').click(
-            function () {
-                var failure_reason = $("[name='failure_reason']");
-                var future_plan_actions = $("[name='future_plan_actions']:checked");
-                var failure_category = $("[name='failure_category']:checked");
-                if (failure_reason.val() === '') {
-                    alert('Please fill in the failure analysis!');
-                    failure_reason.focus();
-                    return
-                }
-                if (future_plan_actions.length === 0) {
-                    alert('Please select at least one corrective action for future attempts!');
-                    $("[name='future_plan_actions']").focus();
-                    return
-                }
-                // If select "Other" in failure_category, check if the input is filled
-                else
-                {
-                    if (failure_category.val() === 'other') {
-                    var future_plan_other = $("[name='future_plan_other']");
-                    if (future_plan_other.val() === '') {
-                        alert('Please specify the corrective action for future attempts!');
-                        future_plan_other.focus();
-                        return
-                    }
-                }else
-                {
-                    var future_plan_other = $("[name='future_plan_other']");
-                    future_plan_other.val('');
-                }
-            }
-                if (failure_category.val() == null) {
-                    alert('Please select a primary reason for failure!');
-                    $("[name='failure_category']").focus();
-                    return
-                }
-
-                if (confirm("Are you sure to submit your reflections?")) {
-                    is_submitted = true;
-                    $('#query-form').submit();
-                }
-
-            }
-        );
-        window.addEventListener('beforeunload', function (e) {
-            if (!is_submitted) {
-                navigator.sendBeacon('/task/stop_annotation/', new Blob());
-            }
+    function updateOrderAndPriority(selectedList, hiddenInputId) {
+        const order = [];
+        selectedList.children('.drag-option').each(function(index) {
+            const value = $(this).data('value');
+            order.push(value);
+            $(this).find('.priority-number').text(index + 1);
         });
+        $('#' + hiddenInputId).val(JSON.stringify(order));
+    }
 
-        // Handle clicking on drag-option to toggle checkbox
-        $('.drag-option').click(function(e) {
-            // Don't trigger if clicking on checkbox or text input directly
-            if ($(e.target).is('input[type="checkbox"], input[type="text"]')) {
-                return;
-            }
-            
-            var checkbox = $(this).find('input[type="checkbox"]');
-            checkbox.prop('checked', !checkbox.prop('checked')).trigger('change');
-        });
+    initializeSortable("selected-failure-categories", "unselected-failure-categories", "failure_category", "failure_category_list", "failure-separator");
+    initializeSortable("selected-corrective-actions", "unselected-corrective-actions", "future_plan_actions", "future_plan_actions_list", "corrective-separator");
+
+    $('#remaining_effort').on('input', function() {
+        $('#effort_val').text($(this).val());
     });
-    
+
+    let is_submitted = false;
+    $('#query-btn').click(function () {
+        if ($('input[name="failure_category"]:checked').length === 0) {
+            alert('Please select at least one primary reason for failure.');
+            return;
+        }
+        if ($('input[name="failure_category"][value="other"]').is(':checked') && $('input[name="failure_category_other"]').val().trim() === '') {
+            alert('Please specify your "Other" failure reason.');
+            $('input[name="failure_category_other"]').focus();
+            return;
+        }
+        if ($('#failure_reason').val().trim() === '') {
+            alert('Please provide a failure analysis.');
+            $('#failure_reason').focus();
+            return;
+        }
+        if ($('input[name="future_plan_actions"]:checked').length === 0) {
+            alert('Please select at least one corrective action.');
+            return;
+        }
+        if ($('input[name="future_plan_actions"][value="other"]').is(':checked') && $('input[name="future_plan_other"]').val().trim() === '') {
+            alert('Please specify your "Other" corrective action.');
+            $('input[name="future_plan_other"]').focus();
+            return;
+        }
+        if (!$('input[name="remaining_effort"]:checked').val()) {
+            alert('Please select the remaining effort.');
+            return;
+        }
+
+        if (confirm("Are you sure you want to submit your reflection?")) {
+            is_submitted = true;
+            $('#query-form').submit();
+        }
+    });
+
+    window.addEventListener('beforeunload', function (e) {
+        if (!is_submitted) {
+            navigator.sendBeacon('/task/stop_annotation/', new Blob());
+        }
+    });
+});
+
+function initRrwebPlayer(playerWrapper) {
+    if (playerWrapper.dataset.initialized === 'true' || !playerWrapper.dataset.events) {
+        return;
+    }
+
+    var events;
+    try {
+        events = JSON.parse(playerWrapper.dataset.events);
+    } catch (e) {
+        console.error('Could not parse rrweb events for player', playerWrapper.id, e);
+        return;
+    }
+
+    if (!Array.isArray(events) || events.length === 0) {
+        return;
+    }
+
+    var containerWidth = playerWrapper.offsetWidth;
+    if (containerWidth === 0) {
+        return; // Not visible, will be initialized when accordion opens.
+    }
+
+    // Clear existing content
+    while (playerWrapper.firstChild) {
+        playerWrapper.removeChild(playerWrapper.firstChild);
+    }
+
+    var calculatedHeight = containerWidth * (9 / 16);
+
+    new rrwebPlayer({
+        target: playerWrapper,
+        props: {
+            events: events,
+            autoPlay: false,
+            width: '100%',
+            height: calculatedHeight,
+            UNSAFE_replayCanvas: true,
+        },
+    });
+    playerWrapper.dataset.initialized = 'true';
+}
+
+var trajectoriesCollapse = document.getElementById('collapseTrajectories');
+if (trajectoriesCollapse) {
+    trajectoriesCollapse.addEventListener('shown.bs.collapse', function () {
+        trajectoriesCollapse.querySelectorAll('.rrweb-player-wrapper').forEach(initRrwebPlayer);
+    });
+}
+
+// Init any players that are already visible on load
+document.querySelectorAll('.rrweb-player-wrapper').forEach(initRrwebPlayer);
 </script>
 {% endblock %}

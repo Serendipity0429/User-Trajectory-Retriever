@@ -1,48 +1,41 @@
 {% extends "base.html" %}
-{% block title %} User Info  {% endblock %}
+{% block title %}Authorization Failed{% endblock %}
 
 {% block content %}
-    <div class="row text-center">
-        <h3>
-            Unauthorized
-        </h3>
-    </div>
-    <div class="row">
-    <div class="col-xs-offset-3 col-xs-6 user-info">
-        <div class="user-info_row row">
-            <div class="info_label col-xs-offset-0 col-xs-6">
-                Username:
-            </div>
-            <div class="info_value col-xs-offest-6 col-xs-6">
-                {{ cur_user.username }}
-            </div>
-        </div>
-
-        <div class="user-info_row row">
-            <div class="info_label col-xs-offset-0 col-xs-6">
-                Need Permission:
-            </div>
-            <div class="info_value col-xs-offest-6 col-xs-6">
-                {{ missing_group_string }}
-            </div>
-        </div>
-
-        <div class="user-info_row row">
-            <div class="info_label col-xs-offset-0 col-xs-6">
-                Current Permission:
-            </div>
-            <div class="info_value col-xs-offest-6 col-xs-6">
-                {{ user_group_string }}
-            </div>
-        </div>
-        <div class="row">
-            <div class="col-xs-offset-3 col-xs-6">
-                <a href="/user/login/" class="btn btn-block btn-lg btn-primary">Switch the user</a>
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-lg-6">
+            <div class="card shadow-lg border-0 rounded-lg mt-5 text-center">
+                <div class="card-header bg-danger text-white py-4">
+                    <h2 class="card-title mb-0"><i class="bi bi-exclamation-octagon-fill me-2"></i>Unauthorized Access</h2>
+                </div>
+                <div class="card-body p-5">
+                    <p class="lead">You do not have the necessary permissions to view this page.</p>
+                    <div class="card bg-light my-4">
+                        <div class="card-body">
+                            <ul class="list-group list-group-flush text-start">
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <strong>Username:</strong>
+                                    <span>{{ cur_user.username }}</span>
+                                </li>
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <strong>Required Permission:</strong>
+                                    <span class="badge bg-warning text-dark">{{ missing_group_string }}</span>
+                                </li>
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <strong>Your Permissions:</strong>
+                                    <span class="badge bg-secondary">{{ user_group_string }}</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                    <p>Please contact an administrator if you believe this is an error.</p>
+                    <div class="d-grid mt-4">
+                        <a href="{% url 'user_system:login' %}" class="btn btn-primary btn-lg"><i class="bi bi-arrow-left-right me-2"></i>Switch User</a>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
-    </div>
-    </div>
+</div>
 {% endblock %}
-
-

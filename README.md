@@ -1,11 +1,93 @@
 # User-Trajectory-Retriever
-To record user trajectories when performing different tasks in the web browswers.
 
 [![THUIR](https://img.shields.io/badge/THUIR-ver%201.0-blueviolet)](http://www.thuir.cn)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 [![made-with-python](https://img.shields.io/badge/Made%20with-Python-red.svg)](#python)
 [![made-with-js](https://img.shields.io/badge/Made%20with-JS-yellow.svg)](#javascript)
 ![Static Badge](https://img.shields.io/badge/made_by-Zhang_Xinkai-blue)
+
+A comprehensive platform for recording, replaying, and annotating user trajectories for web interaction research. This system consists of a web-based annotation platform and a browser extension for data collection.
+
+## Overview
+
+User-Trajectory-Retriever is a powerful tool designed for researchers studying user behavior on the web. It allows for the detailed recording of user interactions—such as mouse movements, clicks, and scrolls—during specific tasks. The collected data can then be visualized, replayed, and annotated through a dedicated web platform, providing valuable insights into user engagement and decision-making processes.
+
+The system is composed of two main parts:
+1.  **A Chrome Browser Extension (`ManifestV3`):** Records user interaction data in real-time using the `rrweb` library.
+2.  **A Django Web Platform (`Platform`):** Manages users, tasks, and collected data, and provides an interface for replaying and annotating the recorded user sessions.
+
+## Features
+
+- **Session Recording:** A lightweight browser extension captures detailed user interactions on any webpage.
+- **Session Replay:** The web platform provides a high-fidelity replay of user sessions, accurately reproducing mouse movements, clicks, and DOM changes.
+- **Task Management:** Researchers can create and manage tasks for users to complete.
+- **User Management:** A complete user system for authentication and profile management.
+- **Data Annotation:** An interface for researchers to annotate key events or behaviors within a user's session.
+
+## System Architecture
+
+- **Frontend (Browser Extension):** Built as a Chrome Extension using Manifest V3 and vanilla JavaScript. It utilizes the `rrweb` library to capture DOM snapshots and interaction events.
+- **Backend (Web Platform):** A monolithic application built with Python and the Django Web Framework. It serves the user interface, manages the database, and handles data processing.
+
+## Installation
+
+To get the system up and running, you need to set up both the backend platform and the browser extension.
+
+### 1. Backend (Django Platform)
+
+The backend server is located in the `Platform/` directory.
+
+1.  **Clone the repository:**
+    ```bash
+    git clone https://github.com/your-username/User-Trajectory-Retriever.git
+    cd User-Trajectory-Retriever/Platform
+    ```
+
+2.  **Create a virtual environment and install dependencies:**
+    ```bash
+    python -m venv venv
+    source venv/bin/activate  # On Windows, use `venv\Scripts\activate`
+    pip install -r ../requirements.txt
+    ```
+
+3.  **Apply database migrations:**
+    ```bash
+    python manage.py migrate
+    ```
+
+4.  **Start the development server:**
+    ```bash
+    python manage.py runserver
+    ```
+    The platform should now be running at `http://127.0.0.1:8000/`.
+
+### 2. Frontend (Chrome Extension)
+
+The extension is located in the `ManifestV3/` directory.
+
+1.  Open Google Chrome and navigate to `chrome://extensions`.
+2.  Enable **Developer mode** using the toggle in the top-right corner.
+3.  Click the **Load unpacked** button.
+4.  Select the `ManifestV3` folder from the cloned repository.
+5.  The extension should now be installed and active in your browser.
+
+## Usage
+
+1.  Ensure the Django backend server is running.
+2.  Make sure the Chrome extension is installed and enabled.
+3.  Navigate to the web platform (e.g., `http://127.0.0.1:8000/`) to sign up and log in.
+4.  The extension will automatically start recording user trajectories on specified websites once a task is initiated from the platform.
+5.  After completing a task, the recorded data can be viewed and replayed from the user's dashboard on the web platform.
+
+## Directory Structure
+
+```
+.
+├── ManifestV3/       # Source code for the Chrome browser extension
+├── Platform/         # Source code for the Django web platform
+├── requirements.txt  # Python dependencies for the platform
+└── README.md         # This file
+```
 
 ## Contact
 If you have any questions, please feel free to contact me via [stevenzhangx@163.com]() or open an issue.

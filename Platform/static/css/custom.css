@@ -273,3 +273,11 @@ h2.text-success {
     border-color: #0a58ca !important;
 }
 
+
+.card-header[data-bs-toggle='collapse'] {
+    cursor: pointer;
+}
+
+.card-header[data-bs-toggle='collapse']:hover {
+    background-color: #f8f9fa;
+}

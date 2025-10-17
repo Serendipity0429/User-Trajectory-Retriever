@@ -13,19 +13,96 @@ import logging
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth import login as auth_login, logout as auth_logout
 from django.contrib.auth.decorators import login_required, user_passes_test
+from django.db.models import Q
+from django.core.paginator import Paginator
+from django.utils import timezone
+from datetime import timedelta
 
 def is_superuser(user):
     return user.is_superuser
 
+from django.utils import timezone
+from datetime import timedelta
+
+from task_manager.models import Task
+
 @login_required
 @user_passes_test(is_superuser)
 def admin_page(request):
-    users = User.objects.all()
+    # User search and sort
+    user_search_query = request.GET.get('user_search', '')
+    user_sort_by = request.GET.get('user_sort_by', 'id')
+    user_sort_dir = request.GET.get('user_sort_dir', 'asc')
+    if user_sort_dir not in ['asc', 'desc']:
+        user_sort_dir = 'asc'
+    user_order = f"{'-' if user_sort_dir == 'desc' else ''}{user_sort_by}"
+
+    if user_search_query:
+        users_list = User.objects.filter(
+            Q(username__icontains=user_search_query) |
+            Q(email__icontains=user_search_query) |
+            Q(name__icontains=user_search_query)
+        ).order_by(user_order)
+    else:
+        users_list = User.objects.all().order_by(user_order)
+
+    user_paginator = Paginator(users_list, 10)
+    user_page_number = request.GET.get('user_page')
+    users = user_paginator.get_page(user_page_number)
+
+    # Task filter and sort
+    task_user_filter = request.GET.get('task_user', '')
+    task_date_filter = request.GET.get('task_date', '')
+    task_sort_by = request.GET.get('task_sort_by', 'id')
+    task_sort_dir = request.GET.get('task_sort_dir', 'asc')
+    if task_sort_dir not in ['asc', 'desc']:
+        task_sort_dir = 'asc'
+    task_order = f"{'-' if task_sort_dir == 'desc' else ''}{task_sort_by}"
+
+    tasks_list = Task.objects.all()
+    if task_user_filter:
+        tasks_list = tasks_list.filter(user__id=task_user_filter)
+    if task_date_filter:
+        tasks_list = tasks_list.filter(start_timestamp__date=task_date_filter)
+    tasks_list = tasks_list.order_by(task_order)
+
+    task_paginator = Paginator(tasks_list, 10)
+    task_page_number = request.GET.get('task_page')
+    tasks = task_paginator.get_page(task_page_number)
+
+    # Dashboard metrics
+    total_users = User.objects.count()
+    superusers = User.objects.filter(is_superuser=True).count()
+    thirty_days_ago = timezone.now() - timedelta(days=30)
+    active_users = User.objects.filter(last_login__gte=thirty_days_ago).count()
+    total_tasks = Task.objects.count()
+    completed_tasks = Task.objects.filter(cancelled=False, active=False).count()
+    cancelled_tasks = Task.objects.filter(cancelled=True).count()
+    active_tasks = Task.objects.filter(active=True).count()
+
+    all_users = User.objects.all()
+
     return render(
         request,
         'admin_page.html',
         {
             'users': users,
+            'user_search_query': user_search_query,
+            'user_sort_by': user_sort_by,
+            'user_sort_dir': user_sort_dir,
+            'tasks': tasks,
+            'all_users': all_users,
+            'task_user_filter': task_user_filter,
+            'task_date_filter': task_date_filter,
+            'task_sort_by': task_sort_by,
+            'task_sort_dir': task_sort_dir,
+            'total_users': total_users,
+            'superusers': superusers,
+            'active_users': active_users,
+            'total_tasks': total_tasks,
+            'completed_tasks': completed_tasks,
+            'cancelled_tasks': cancelled_tasks,
+            'active_tasks': active_tasks,
         }
     )
 
@@ -88,7 +165,8 @@ def toggle_superuser(request, user_id):
         if request.user.id != user_to_toggle.id:
             user_to_toggle.is_superuser = not user_to_toggle.is_superuser
             user_to_toggle.save()
-    return HttpResponseRedirect(reverse('user_system:admin_page'))
+            return JsonResponse({'status': 'success', 'is_superuser': user_to_toggle.is_superuser})
+    return JsonResponse({'status': 'error'}, status=400)
 
 
 @login_required

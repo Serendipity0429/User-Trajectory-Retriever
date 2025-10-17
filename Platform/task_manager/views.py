@@ -296,6 +296,9 @@ def initialize(request):
     return HttpResponse(-1)
 
 
+from django.contrib.auth.decorators import login_required
+
+@login_required
 @permission_classes([IsAuthenticated])
 def task_home(request):
     print_debug("function task_home")
@@ -435,7 +438,7 @@ FAILURE_CATEGORY_MAP = {
     "time_pressure": "I was under time pressure and could not verify the information thoroughly.",
     "lack_expertise": "I lacked the necessary expertise to understand or evaluate the information.",
     "format_error": "I made a formatting error in my answer (e.g., missing units, incorrect decimal places).",
-    "other": "Other (please specify below).",
+    "other": "Other:",
 }
 
 CORRECTIVE_PLAN_MAP = {
@@ -457,7 +460,7 @@ AHA_MOMENT_MAP = {
     "official_document": "Finding an official document or report (e.g., PDF, government site).",
     "key_definition": "Understanding a key definition or concept.",
     "synthesis": "Connecting two pieces of information that finally made sense together.",
-    "other": "Other (please specify):",
+    "other": "Other:",
 }
 
 UNHELPFUL_PATHS_MAP = {
@@ -467,7 +470,7 @@ UNHELPFUL_PATHS_MAP = {
     "low_quality": "Visited low-quality, spam, or untrustworthy sites.",
     "paywall": "Hit a paywall or login requirement.",
     "contradictory_info": "Found contradictory information on different sites.",
-    "other": "Other (please specify):",
+    "other": "Other:",
 }
 
 STRATEGY_SHIFT_MAP = {
@@ -476,7 +479,7 @@ STRATEGY_SHIFT_MAP = {
     "broadened_search": "I had to broaden my search to find related concepts first.",
     "changed_source_type": "I realized I was looking at the wrong type of sources and switched.",
     "re-evaluated_assumption": "I realized my initial assumption was wrong and changed my approach.",
-    "other": "Other (please specify):",
+    "other": "Other:",
 }
 
 AHA_MOMENT_EXPLANATION_MAP = {
@@ -563,7 +566,7 @@ CANCEL_CATEGORY_MAP = {
     "no_idea": "I am completely stuck and have no idea how to proceed.",
     "too_long": "The task is taking too much time to complete.",
     "technical_issue": "I encountered a technical barrier (e.g., paywall, login, broken site).",
-    "other": "Other (please specify below).",
+    "other": "Other:",
 }
 
 MISSING_RESOURCES_MAP = {
@@ -576,7 +579,7 @@ MISSING_RESOURCES_MAP = {
     "team_help": "Help from a team or community.",
     "guidance": "Guidance or mentorship from an expert.",
     "better_question": "A better-formulated question or clearer instructions.",
-    "other": "Other (please specify):",
+    "other": "Other:",
 }
 
 
@@ -599,12 +602,17 @@ def show_task(request, task_id):
     Fetches all data related to a specific task and renders it in a detail view.
     This function gathers the pre-task survey, all trials with their respective
     webpages, submitted answers, reflections, and the post-task or cancellation survey.
+    Allows access to the task owner or any superuser.
     """
     print_debug(f"function show_task for task_id: {task_id}")
     user = request.user
-    task = Task.objects.filter(id=task_id, user=user).first()
-    if task is None:
-        return HttpResponse(f"No task found with task_id={task_id}")
+    
+    # Fetch the task by ID.
+    task = Task.objects.filter(id=task_id).first()
+
+    # Check if the task exists and if the user has permission to view it.
+    if task is None or (task.user != user and not user.is_superuser):
+        return HttpResponse(f"No task found with task_id={task_id} or permission denied.")
 
     # 1. Fetch general task information
     task_question = task.content.question
@@ -630,6 +638,19 @@ def show_task(request, task_id):
 
     # 4. Fetch Post-Task or Cancellation Annotation
     final_annotation = PostTaskAnnotation.objects.filter(belong_task=task).first()
+    post_task_annotation = None
+    cancel_annotation = None
+    if final_annotation:
+        if task.cancelled:
+            cancel_annotation = final_annotation
+        else:
+            post_task_annotation = final_annotation
+
+    cancel_missing_resources = []
+    if cancel_annotation:
+        cancel_missing_resources = map_json_list(
+            cancel_annotation.cancel_missing_resources, MISSING_RESOURCES_MAP
+        )
 
     # 5. Assemble the final context and render the template
     context = {
@@ -639,8 +660,9 @@ def show_task(request, task_id):
         "task_answer": task_answer,
         "pre_task_annotation": pre_task_annotation,
         "trials": task_trials,
-        "post_task_annotation": final_annotation if (final_annotation and not task.cancelled) else None,
-        "cancel_annotation": final_annotation if (final_annotation and task.cancelled) else None,
+        "post_task_annotation": post_task_annotation,
+        "cancel_annotation": cancel_annotation,
+        "cancel_missing_resources": cancel_missing_resources,
         "task": task,
         "FAMILIARITY_MAP": FAMILIARITY_MAP,
         "DIFFICULTY_MAP": DIFFICULTY_MAP,
@@ -738,6 +760,8 @@ def cancel_task(request, task_id, end_timestamp):
                 "task_id": task_id,
                 "question": question,
                 "answer": answer,
+                "CANCEL_CATEGORY_MAP": CANCEL_CATEGORY_MAP,
+                "MISSING_RESOURCES_MAP": MISSING_RESOURCES_MAP,
                 "CANCEL_CATEGORY_EXPLANATION_MAP": CANCEL_CATEGORY_EXPLANATION_MAP,
                 "MISSING_RESOURCES_EXPLANATION_MAP": MISSING_RESOURCES_EXPLANATION_MAP,
             },
@@ -805,6 +829,10 @@ def reflection_annotation(request, task_id, end_timestamp):
                 "question": question,
                 "webpages": webpages,
                 "user_answer": user_answer,
+                "FAILURE_CATEGORY_MAP": FAILURE_CATEGORY_MAP,
+                "CORRECTIVE_PLAN_MAP": CORRECTIVE_PLAN_MAP,
+                "DIFFICULTY_MAP": DIFFICULTY_MAP,
+                "DIFFICULTY_EXPLANATION_MAP": DIFFICULTY_EXPLANATION_MAP,
                 "FAILURE_CATEGORY_EXPLANATION_MAP": FAILURE_CATEGORY_EXPLANATION_MAP,
                 "CORRECTIVE_ACTION_EXPLANATION_MAP": CORRECTIVE_ACTION_EXPLANATION_MAP,
             },
@@ -903,6 +931,8 @@ def submit_answer(request, task_id, timestamp):
                 "question": question,
                 "webpages": webpages,
                 "num_trial": num_trial + 1,
+                "confidence_choices": CONFIDENCE_MAP.items(),
+                "reasoning_choices": REASONING_METHOD_MAP.items(),
             },
         )
 

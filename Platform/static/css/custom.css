@@ -291,3 +291,16 @@ h2.text-success {
     color: black !important;
     font-weight: bold !important;
 }
+
+.form-floating > .form-control {
+    padding-right: 2.5rem; /* Make space for the icon */
+}
+
+.form-floating > .bi {
+    position: absolute;
+    top: 50%;
+    right: 1rem;
+    transform: translateY(-50%);
+    cursor: pointer;
+    z-index: 2;
+}

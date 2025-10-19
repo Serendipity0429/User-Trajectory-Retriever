@@ -183,10 +183,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 if (logged_in) {
                     const task_id = await getCurrentTask();
                     if (task_id != -1) {
-                        chrome.action.setBadgeText({ text: 'off' });
+                        chrome.action.setBadgeText({ text: 'on' });
                         chrome.action.setBadgeBackgroundColor({ color: [202, 181, 225, 255] });
                     } else {
-                        chrome.action.setBadgeText({ text: 'on' });
+                        chrome.action.setBadgeText({ text: 'off' });
                         chrome.action.setBadgeBackgroundColor({ color: [202, 181, 225, 255] });
                     }
                     response = { log_status: true };

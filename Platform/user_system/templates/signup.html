@@ -28,15 +28,17 @@
                                 </div>
                             </div>
                             <div class="col-md-6 mb-3">
-                                <div class="form-floating">
+                                <div class="form-floating position-relative">
                                     <input type="password" name="password" class="form-control" id="id_password" placeholder="Password">
                                     <label for="id_password"><i class="bi bi-key-fill me-2"></i>Password</label>
+                                    <i class="bi bi-eye-slash position-absolute top-50 end-0 translate-middle-y me-3" id="togglePassword" style="cursor: pointer;"></i>
                                 </div>
                             </div>
                             <div class="col-md-6 mb-3">
-                                <div class="form-floating">
+                                <div class="form-floating position-relative">
                                     <input type="password" name="password_retype" class="form-control" id="id_password_retype" placeholder="Retype Password">
                                     <label for="id_password_retype"><i class="bi bi-key me-2"></i>Retype Password</label>
+                                    <i class="bi bi-eye-slash position-absolute top-50 end-0 translate-middle-y me-3" id="togglePasswordRetype" style="cursor: pointer;"></i>
                                 </div>
                             </div>
                         </div>
@@ -212,6 +214,30 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
+
+    const togglePassword = document.querySelector('#togglePassword');
+    const password = document.querySelector('#id_password');
+
+    togglePassword.addEventListener('click', function (e) {
+        // toggle the type attribute
+        const type = password.getAttribute('type') === 'password' ? 'text' : 'password';
+        password.setAttribute('type', type);
+        // toggle the eye / eye slash icon
+        this.classList.toggle('bi-eye');
+        this.classList.toggle('bi-eye-slash');
+    });
+
+    const togglePasswordRetype = document.querySelector('#togglePasswordRetype');
+    const passwordRetype = document.querySelector('#id_password_retype');
+
+    togglePasswordRetype.addEventListener('click', function (e) {
+        // toggle the type attribute
+        const type = passwordRetype.getAttribute('type') === 'password' ? 'text' : 'password';
+        passwordRetype.setAttribute('type', type);
+        // toggle the eye / eye slash icon
+        this.classList.toggle('bi-eye');
+        this.classList.toggle('bi-eye-slash');
+    });
 });
 </script>
 {% endblock %}

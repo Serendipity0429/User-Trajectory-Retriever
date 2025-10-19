@@ -17,14 +17,15 @@
                     </div>
                     <form id="login_form" name="login_form" action="" method="POST">
                         {% csrf_token %}
-                        <div class="form-floating mb-3">
+                        <div class="form-floating mb-3 position-relative">
                             {{ form.username }}
                             <label for="id_username"><i class="bi bi-person-fill me-2"></i>Username</label>
                         </div>
 
-                        <div class="form-floating mb-3">
-                            {{ form.password }}
+                        <div class="form-floating mb-3 position-relative">
+                            <input type="password" name="password" class="form-control" id="id_password" placeholder="Password">
                             <label for="id_password"><i class="bi bi-key-fill me-2"></i>Password</label>
+                            <i class="bi bi-eye-slash position-absolute top-50 end-0 translate-middle-y me-3" id="togglePassword" style="cursor: pointer;"></i>
                         </div>
 
                         {% if error_message %}
@@ -52,4 +53,20 @@
         </div>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const togglePassword = document.querySelector('#togglePassword');
+    const password = document.querySelector('#id_password');
+
+    togglePassword.addEventListener('click', function (e) {
+        // toggle the type attribute
+        const type = password.getAttribute('type') === 'password' ? 'text' : 'password';
+        password.setAttribute('type', type);
+        // toggle the eye / eye slash icon
+        this.classList.toggle('bi-eye');
+        this.classList.toggle('bi-eye-slash');
+    });
+});
+</script>
 {% endblock %}

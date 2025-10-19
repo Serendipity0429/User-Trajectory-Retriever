@@ -26,7 +26,7 @@ urlpatterns = [
     path('show_task/<int:task_id>/', views.show_task, name='show_task'), # Show task
     path('view_task_info/<int:task_id>/', views.view_task_info, name='view_task_info'), # View task info
     path('submit_answer/<int:task_id>/<int:timestamp>/', views.submit_answer, name='submit_answer'), # Submit answer
-    path('cancel_task/<int:task_id>/<int:end_timestamp>/', views.cancel_task, name='cancel_task'), # Cancel task
+    path('cancel_annotation/<int:task_id>/<int:end_timestamp>/', views.cancel_annotation, name='cancel_annotation'), # Cancel annotation
     path('remove_task/<int:task_id>/', views.remove_task, name='remove_task'), # Remove task
 
 ]

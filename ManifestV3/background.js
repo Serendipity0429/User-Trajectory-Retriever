@@ -75,12 +75,16 @@ async function checkActiveTaskID() {
         return new_task_id;
     } catch (error) {
         console.error("Error checking active task ID:", error);
-        // Check if the error is due to token refresh failure
-        if (error.message.includes("Token refresh failed")) {
-            // Force logout if token cannot be refreshed
+        if (error.message === "Authentication failed.") {
+            // Force logout if authentication fails
             await _remove_local(['access_token', 'refresh_token', 'username', 'logged_in']);
             chrome.runtime.sendMessage({ command: "alter_logging_status", log_status: false });
             chrome.action.setBadgeText({ text: '' });
+        } else if (error.message.startsWith("Server error:")) {
+            // Indicate server error on the badge
+            chrome.action.setBadgeText({ text: 'err' });
+            chrome.action.setBadgeTextColor({ color: [255, 255, 255, 255] });
+            chrome.action.setBadgeBackgroundColor({ color: [255, 0, 0, 255] });
         }
         return -2; // Indicate server failure
     }
@@ -177,8 +181,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             case MSG_CHECK_LOGGING_STATUS:
                 const { logged_in } = await _get_local(['logged_in']);
                 if (logged_in) {
-                    chrome.action.setBadgeText({ text: 'on' });
-                    chrome.action.setBadgeBackgroundColor({ color: [202, 181, 225, 255] });
+                    const task_id = await getCurrentTask();
+                    if (task_id != -1) {
+                        chrome.action.setBadgeText({ text: 'off' });
+                        chrome.action.setBadgeBackgroundColor({ color: [202, 181, 225, 255] });
+                    } else {
+                        chrome.action.setBadgeText({ text: 'on' });
+                        chrome.action.setBadgeBackgroundColor({ color: [202, 181, 225, 255] });
+                    }
                     response = { log_status: true };
                 } else {
                     chrome.action.setBadgeText({ text: '' });

@@ -54,6 +54,11 @@
                                 </script>
                             </div>
                             {% endfor %}
+                            <div class="text-center mt-3">
+                                <button class="btn btn-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#collapseTrajectories" aria-expanded="false" aria-controls="collapseTrajectories">
+                                    Fold
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -68,10 +73,10 @@
                     <form id="query-form" action="" method="post" enctype='multipart/form-data'>
                         {% csrf_token %}
                         <!-- Task Info -->
-                        <div class="mb-4">
-                            <h5>1. Task Review</h5>
+                        <div class="mb-4 p-3 border rounded">
+                            <h5><strong>1. Task Review</strong></h5>
                             <p><strong>Question:</strong></p>
-                            <div class="p-3 bg-light rounded mb-3">{{ question }}</div>
+                            <div class="p-3 bg-light rounded mb-3 question-text">{{ question }}</div>
                             <div class="d-flex justify-content-between align-items-center">
                                 <p class="mb-0"><strong>Correct Answer(s):</strong></p>
                                 <div class="mt-2">
@@ -91,11 +96,10 @@
                                 {% endfor %}
                             </ul>
                         </div>
-                        <hr>
 
                         <!-- Overall Difficulty -->
-                        <div class="mb-4">
-                            <h5>2. Overall Difficulty</h5>
+                        <div class="mb-4 p-3 border rounded">
+                            <h5><strong>2. Overall Difficulty</strong></h5>
                             <p>How would you rate the actual difficulty of the search process you completed?</p>
                             <div class="btn-group" role="group" aria-label="Difficulty">
                                 {% for key, value in DIFFICULTY_MAP.items %}
@@ -106,11 +110,10 @@
                                 {% endfor %}
                             </div>
                         </div>
-                        <hr>
 
                         <!-- "Aha!" Moment -->
-                        <div class="mb-4">
-                            <h5>3. The "Aha!" Moment</h5>
+                        <div class="mb-4 p-3 border rounded">
+                            <h5><strong>3. The "Aha!" Moment</strong></h5>
                             <p>What type of information was most critical to solving this task?</p>
                             <div class="w-100" role="group" aria-label="Aha! Moment">
                                 {% for key, value in AHA_MOMENT_MAP.items %}
@@ -126,11 +129,10 @@
                             <label for="aha_moment_source" class="form-label mt-2">(Optional) Paste the source URL or search query for this "Aha!" moment.</label>
                             <input type="text" class="form-control" id="aha_moment_source" name="aha_moment_source">
                         </div>
-                        <hr>
 
                         <!-- Unhelpful Paths -->
-                        <div class="mb-4">
-                            <h5>4. Unhelpful Paths</h5>
+                        <div class="mb-4 p-3 border rounded">
+                            <h5><strong>4. Unhelpful Paths</strong></h5>
                             <p>Which of these roadblocks did you encounter? <small class="text-muted fw-bold">(Check all that apply)</small></p>
                             <div class="w-100" role="group" aria-label="Unhelpful Paths">
                                 {% for key, value in UNHELPFUL_PATHS_MAP.items %}
@@ -144,11 +146,10 @@
                                 {% endfor %}
                             </div>
                         </div>
-                        <hr>
 
                         <!-- Strategic Shift -->
-                        <div class="mb-4">
-                            <h5>5. Strategic Shift</h5>
+                        <div class="mb-4 p-3 border rounded">
+                            <h5><strong>5. Strategic Shift</strong></h5>
                             <p>How did your successful strategy evolve from your initial plan?</p>
                             <div class="w-100" role="group" aria-label="Strategic Shift">
                                 {% for key, value in STRATEGY_SHIFT_MAP.items %}
@@ -162,11 +163,10 @@
                                 {% endfor %}
                             </div>
                         </div>
-                        <hr>
 
                         <!-- Additional Reflection -->
-                        <div class="mb-4">
-                            <label for="additional_reflection" class="form-label"><h5>6. (Optional) Additional Reflection</h5></label>
+                        <div class="mb-4 p-3 border rounded">
+                            <label for="additional_reflection" class="form-label"><h5><strong>6. (Optional) Additional Reflection</strong></h5></label>
                             <p>Do you have any additional thoughts or reflections on this task?</p>
                             <textarea class="form-control" id="additional_reflection" name="additional_reflection" rows="3"></textarea>
                         </div>

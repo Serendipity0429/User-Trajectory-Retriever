@@ -281,3 +281,13 @@ h2.text-success {
 .card-header[data-bs-toggle='collapse']:hover {
     background-color: #f8f9fa;
 }
+
+.question-text {
+    color: black !important;
+    font-weight: bold !important;
+}
+
+.question-text {
+    color: black !important;
+    font-weight: bold !important;
+}

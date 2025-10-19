@@ -43,7 +43,7 @@ try:
     import simplejson as json
 except ImportError:
     import json
-from django.http import HttpResponse, HttpResponseRedirect
+from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
 from django.contrib.auth import login
 
 
@@ -111,7 +111,7 @@ def data(request):
     message = decompress_json_data(message)
     user = request.user
     store_data(message, user)
-    return HttpResponse("data storage succeeded")
+    return JsonResponse({"status": "success"})
 
 
 # Pre-Task Annotation Fetcher
@@ -715,8 +715,8 @@ def tool_use(request):
 
 
 @permission_classes([IsAuthenticated])
-def cancel_task(request, task_id, end_timestamp):
-    print_debug("function cancel_task")
+def cancel_annotation(request, task_id, end_timestamp):
+    print_debug("function cancel_annotation")
     user = request.user
     task = Task.objects.filter(id=task_id, user=user).first()
     if task is None:
@@ -751,10 +751,10 @@ def cancel_task(request, task_id, end_timestamp):
         question = entry.question
         answer = json.loads(entry.answer)
 
-        start_annotating("cancel_task")
+        start_annotating("cancel_annotation")
         return render(
             request,
-            "cancel_task.html",
+            "cancel_annotation.html",
             {
                 "cur_user": user,
                 "task_id": task_id,
@@ -769,35 +769,31 @@ def cancel_task(request, task_id, end_timestamp):
 
 
 @permission_classes([IsAuthenticated])
-def reflection_annotation(request, task_id, end_timestamp):
+def reflection_annotation(request, task_trial_id):
     print_debug("function reflection_annotation")
     user = request.user
-    task = Task.objects.filter(id=task_id, user=user).first()
-    if task is None:
-        return HttpResponse(f"No task found with task_id={task_id}")
+    task_trial = TaskTrial.objects.filter(id=task_trial_id).first()
+    if task_trial is None:
+        return HttpResponse(f"No trial found with id={task_trial_id}")
+
+    task = task_trial.belong_task
+    if task.user != user and not user.is_superuser:
+        return HttpResponse("Permission denied.")
+
     entry = task.content
     question = entry.question
-    task_trial = TaskTrial.objects.filter(
-        belong_task=task, end_timestamp=timezone.make_aware(datetime.fromtimestamp(end_timestamp / 1000))
-    ).first()
-    if task_trial is None:
-        return HttpResponse(
-            f"No trial found with task_id={task_id} and end_timestamp={end_timestamp}"
-        )
 
     if request.method == "POST":
-        ref_annotation = ReflectionAnnotation()
-        ref_annotation.failure_category = request.POST.get("failure_category_list")
-        ref_annotation.failure_reason = request.POST.get("failure_reason")
-        ref_annotation.future_plan_actions = request.POST.get(
-            "future_plan_actions_list"
+        ref_annotation = ReflectionAnnotation(
+            belong_task_trial=task_trial,
+            failure_category=request.POST.get("failure_category_list"),
+            failure_reason=request.POST.get("failure_reason"),
+            future_plan_actions=request.POST.get("future_plan_actions_list"),
+            future_plan_other=request.POST.get("future_plan_other"),
+            remaining_effort=request.POST.get("remaining_effort"),
+            additional_reflection=request.POST.get("additional_reflection"),
         )
-        ref_annotation.future_plan_other = request.POST.get("future_plan_other")
-        ref_annotation.remaining_effort = request.POST.get("remaining_effort")
-        ref_annotation.additional_reflection = request.POST.get("additional_reflection")
         ref_annotation.save()
-        task_trial.reflection_annotation = ref_annotation
-        task_trial.save()
 
         stop_annotating()
 
@@ -805,11 +801,9 @@ def reflection_annotation(request, task_id, end_timestamp):
 
     else:
         # Filter the webpage whose timestamp is within the range of start_timestamp and timestamp
-        end_datetime = timezone.make_aware(datetime.fromtimestamp(end_timestamp / 1000))
+        end_datetime = task_trial.end_timestamp
         webpages = Webpage.objects.filter(
-            belong_task=task,
-            start_timestamp__gte=task_trial.start_timestamp,
-            start_timestamp__lt=end_datetime,
+            belong_task_trial=task_trial,
             is_redirected=False,
             during_annotation=False,
         )
@@ -825,7 +819,7 @@ def reflection_annotation(request, task_id, end_timestamp):
             "reflection_annotation.html",
             {
                 "cur_user": user,
-                "task_id": task_id,
+                "task_id": task.id,
                 "question": question,
                 "webpages": webpages,
                 "user_answer": user_answer,
@@ -901,16 +895,22 @@ def submit_answer(request, task_id, timestamp):
         source_url_and_text = json.dumps(source_url_and_text)
         task_trial.source_url_and_text = source_url_and_text
 
-        redirect_url = reverse('task_manager:post_task_annotation', args=[task_id])
-        if check_answer(task.content, answer):
-            task_trial.is_correct = True
-            task.end_timestamp = timezone.make_aware(datetime.fromtimestamp(timestamp / 1000))
-        else:
-            task_trial.is_correct = False
-            redirect_url = reverse('task_manager:reflection_annotation', args=[task_id, timestamp])
+        is_correct = check_answer(task.content, answer)
+        task_trial.is_correct = is_correct
+        if is_correct:
+            task.end_timestamp = timezone.make_aware(
+                datetime.fromtimestamp(timestamp / 1000)
+            )
 
         task_trial.save()
         task.save()
+
+        if is_correct:
+            redirect_url = reverse("task_manager:post_task_annotation", args=[task_id])
+        else:
+            redirect_url = reverse(
+                "task_manager:reflection_annotation", args=[task_trial.id]
+            )
 
         for webpage in all_webpages:
             webpage.belong_task_trial = task_trial

@@ -60,13 +60,13 @@ function showConfirm(message, title = "Confirm") {
 }
 
 function showFailMessage(message_type) {
-    for (let i = 1; i <= 3; i++) {
+    for (let i = 1; i <= 4; i++) {
         const failMsg = document.getElementById(`failMsg${i}`);
         if (failMsg) {
             failMsg.style.display = 'none';
         }
     }
-    if (message_type >= 1 && message_type <= 3) {
+    if (message_type >= 1 && message_type <= 4) {
         const failMsg = document.getElementById(`failMsg${message_type}`);
         if (failMsg) {
             failMsg.style.display = 'flex';
@@ -193,12 +193,13 @@ async function handleLoginAttempt() {
 
     const credentials = { username, password, ext: true };
     try {
-        const login_response = await _post(token_login_url, credentials, true);
+        const login_response = await _post(token_login_url, credentials, true, false, true);
         if (login_response?.access && login_response?.refresh) {
             await _set_local({
                 'username': username,
                 'access_token': login_response.access,
-                'refresh_token': login_response.refresh
+                'refresh_token': login_response.refresh,
+                'logged_in': true
             });
             await sendMessageFromPopup({ command: "alter_logging_status", log_status: true });
             await showUserTab();
@@ -211,7 +212,11 @@ async function handleLoginAttempt() {
             showFailMessage(message_map[error_code] || message_map.default);
         }
     } catch (error) {
-        showFailMessage(3);
+        if (error.message === "Authentication failed.") {
+            showFailMessage(4);
+        } else {
+            showFailMessage(3);
+        }
     }
 }
 
@@ -288,7 +293,11 @@ async function handleCancelTask() {
         const is_confirmed = await showConfirm("Do you want to cancel the task?");
         if (is_confirmed) {
             const timestamp = Date.now();
-            openTaskWindow(`/task/cancel_task/${current_task_id}/${timestamp}/`, false);
+const cancelAnnotationBtn = document.getElementById('bt_cancel_annotation');
+// ... (other code)
+openTaskWindow(`/task/cancel_annotation/${current_task_id}/${timestamp}/`, false);
+// ... (other code)
+document.getElementById('bt_cancel_annotation').addEventListener('click', handleCancelAnnotation);
         }
     }
 }
@@ -309,7 +318,7 @@ async function handleViewTask() {
     document.getElementById('bt6').addEventListener('click', handleLogout);
     document.getElementById('bt_start_task').addEventListener('click', handleStartTask);
     document.getElementById('bt_end_task').addEventListener('click', handleEndTask);
-    document.getElementById('bt_cancel_task').addEventListener('click', handleCancelTask);
+    document.getElementById('bt_cancel_annotation').addEventListener('click', handleCancelTask);
     document.getElementById('bt_view_task_info').addEventListener('click', handleViewTask);
 
     const { access_token } = await _get_local(['access_token']);

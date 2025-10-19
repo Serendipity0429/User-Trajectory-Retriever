@@ -18,17 +18,50 @@
                                         <div class="accordion-item">
                                             <h2 class="accordion-header" id="headingOne">
                                                 <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseTrajectories" aria-expanded="false" aria-controls="collapseTrajectories">
-                                                    <i class="bi bi-signpost-split-fill me-2"></i> <strong>Task Trajectories</strong>&nbsp;(Click to expand)
+                                                    <i class="bi bi-signpost-split-fill me-2"></i> <strong>View Trajectories</strong>&nbsp;(Click to expand)
                                                 </button>
                                             </h2>
                                             <div id="collapseTrajectories" class="accordion-collapse collapse" aria-labelledby="headingOne" data-bs-parent="#trajectoriesAccordion">
                                                 <div class="accordion-body">
                                                     {% for webpage in webpages %}
-                                                    <div class="d-flex flex-column align-items-center mb-4 p-3 border rounded">
-                                                        <p class="h5">Webpage {{ forloop.counter }}: <a href="{{ webpage.url }}" target="_blank">{{ webpage.title }}</a></p>
-                                                        <div class="rrweb-player-wrapper" id="rrweb-player-{{ webpage.id }}" data-events='{{ webpage.rrweb_record|safe }}'></div>
+                                                    <div class="d-flex flex-column align-items-center mb-5 p-4 border rounded shadow-sm bg-light">
+                                                        <p class="h5"><a href="{{ webpage.url }}" target="_blank">{{ webpage.title }}</a></p>
+                                                        <div class="rrweb-player-wrapper" id="rrweb-player-{{ webpage.id }}" style="margin-top: 20px;"></div>
+                                                        <script>
+                                                            (function() {
+                                                                var target = document.getElementById('rrweb-player-{{ webpage.id }}');
+                                                                var events = {{ webpage.rrweb_record|safe }};
+                                                                
+                                                                if (!Array.isArray(events) || events.length === 0) {
+                                                                    return;
+                                                                }
+
+                                                                // Get screen width and height ratio
+                                                                var screenRatio = window.innerHeight / window.innerWidth;
+
+                                                                var accordionWidth = document.querySelector('.card-body').clientWidth;
+                                                                var containerWidth = 0.8 * accordionWidth;
+                                                                var calculatedHeight = containerWidth * screenRatio;
+
+                                                                new rrwebPlayer({
+                                                                    target: target,
+                                                                    props: {
+                                                                        events: events,
+                                                                        autoPlay: false,
+                                                                        width: containerWidth,
+                                                                        height: calculatedHeight,
+                                                                        UNSAFE_replayCanvas: true,
+                                                                    },
+                                                                });
+                                                            })();
+                                                        </script>
                                                     </div>
                                                     {% endfor %}
+                                                    <div class="text-center mt-3">
+                                                        <button class="btn btn-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#collapseTrajectories" aria-expanded="false" aria-controls="collapseTrajectories">
+                                                            Fold
+                                                        </button>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
@@ -39,20 +72,20 @@
                                         <div class="row">
                                             <div class="col-md-6">
                                                 <div class="mb-3 p-3 border rounded bg-light">
-                                                    <label class="form-label"><strong>1. Task Description</strong></label>
+                                                    <h5><strong>1. Task Description</strong></h5>
                                                     <div class="question-text">{{ question }}</div>
                                                 </div>
                                             </div>
                                             <div class="col-md-6">
                                                 <div class="mb-3 p-3 border rounded bg-light">
-                                                    <label class="form-label"><strong>2. Your Answer</strong></label>
+                                                    <h5><strong>2. Your Answer</strong></h5>
                                                     <div class="question-text">{{ user_answer }}</div>
                                                 </div>
                                             </div>
                                         </div>
                         <div class="mb-4 p-3 border rounded">
-                            <label class="form-label"><strong>3. Primary Reasons for Failure</strong></label>
-                            <p class="form-text text-muted"><strong>Select at least one reason and drag to reorder by priority.</strong></p>
+                            <h5><strong>3. Primary Reasons for Failure</strong></h5>
+                            <p><strong>Select at least one reason and drag to reorder by priority.</strong></p>
                             <div id="selected-failure-categories" class="sortable-list list-group mb-2"></div>
                             <hr id="failure-separator" style="display: none;">
                             <div id="unselected-failure-categories" class="list-group">
@@ -76,14 +109,14 @@
                         </div>
 
                         <div class="mb-4 p-3 border rounded">
-                            <label for="failure_reason" class="form-label"><strong>4. Failure Analysis</strong></label>
-                            <p class="form-text text-muted">Please elaborate on what went wrong (e.g., "I trusted an outdated blog post," "I misread the column header.").</p>
+                            <h5><strong>4. Failure Analysis</strong></h5>
+                            <p>Please elaborate on what went wrong (e.g., "I trusted an outdated blog post," "I misread the column header.").</p>
                             <textarea class="form-control" id="failure_reason" name="failure_reason" rows="3" required></textarea>
                         </div>
 
                         <div class="mb-4 p-3 border rounded">
-                            <label class="form-label"><strong>5. Corrective Plan</strong></label>
-                            <p class="form-text text-muted"><strong>What will you do in your next attempt? Select at least one and drag to reorder.</strong></p>
+                            <h5><strong>5. Corrective Plan</strong></h5>
+                            <p><strong>What will you do in your next attempt? Select at least one and drag to reorder.</strong></p>
                             <div id="selected-corrective-actions" class="sortable-list list-group mb-2"></div>
                             <hr id="corrective-separator" style="display: none;">
                             <div id="unselected-corrective-actions" class="list-group">
@@ -107,8 +140,8 @@
                         </div>
 
                         <div class="mb-4 p-3 border rounded">
-                            <label for="remaining_effort" class="form-label"><strong>6. Remaining Effort</strong></label>
-                            <p class="form-text text-muted">How do you evaluate the difficulty of the task?</p>
+                            <h5><strong>6. Remaining Effort</strong></h5>
+                            <p>How do you evaluate the difficulty of the task?</p>
                             <div class="btn-group" role="group" aria-label="Difficulty">
                                 {% for key, value in DIFFICULTY_MAP.items %}
                                 <input type="radio" class="btn-check" name="remaining_effort" id="remaining_effort{{ key }}" value="{{ key }}" autocomplete="off" required>
@@ -120,8 +153,8 @@
                         </div>
 
                         <div class="mb-4 p-3 border rounded">
-                            <label for="additional_reflection" class="form-label"><strong>7. (Optional) Additional Reflection</strong></label>
-                            <p class="form-text text-muted">Any other thoughts on this attempt?</p>
+                            <h5><strong>7. (Optional) Additional Reflection</strong></h5>
+                            <p>Any other thoughts on this attempt?</p>
                             <textarea class="form-control" id="additional_reflection" name="additional_reflection" rows="3"></textarea>
                         </div>
 
@@ -233,57 +266,5 @@ $(function () {
         }
     });
 });
-
-function initRrwebPlayer(playerWrapper) {
-    if (playerWrapper.dataset.initialized === 'true' || !playerWrapper.dataset.events) {
-        return;
-    }
-
-    var events;
-    try {
-        events = JSON.parse(playerWrapper.dataset.events);
-    } catch (e) {
-        console.error('Could not parse rrweb events for player', playerWrapper.id, e);
-        return;
-    }
-
-    if (!Array.isArray(events) || events.length === 0) {
-        return;
-    }
-
-    var containerWidth = playerWrapper.offsetWidth;
-    if (containerWidth === 0) {
-        return; // Not visible, will be initialized when accordion opens.
-    }
-
-    // Clear existing content
-    while (playerWrapper.firstChild) {
-        playerWrapper.removeChild(playerWrapper.firstChild);
-    }
-
-    var calculatedHeight = containerWidth * (9 / 16);
-
-    new rrwebPlayer({
-        target: playerWrapper,
-        props: {
-            events: events,
-            autoPlay: false,
-            width: '100%',
-            height: calculatedHeight,
-            UNSAFE_replayCanvas: true,
-        },
-    });
-    playerWrapper.dataset.initialized = 'true';
-}
-
-var trajectoriesCollapse = document.getElementById('collapseTrajectories');
-if (trajectoriesCollapse) {
-    trajectoriesCollapse.addEventListener('shown.bs.collapse', function () {
-        trajectoriesCollapse.querySelectorAll('.rrweb-player-wrapper').forEach(initRrwebPlayer);
-    });
-}
-
-// Init any players that are already visible on load
-document.querySelectorAll('.rrweb-player-wrapper').forEach(initRrwebPlayer);
 </script>
 {% endblock %}

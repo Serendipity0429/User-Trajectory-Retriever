@@ -19,14 +19,14 @@
 
                         <!-- Task Description -->
                         <div class="mb-4 p-3 border rounded">
-                            <h5>1. Task Description</h5>
+                            <h5><strong>1. Task Description</strong></h5>
                             <p>You need to answer the following question:</p>
-                            <div class="p-3 bg-light rounded">{{ question }}</div>
+                            <div class="p-3 bg-light rounded question-text">{{ question }}</div>
                         </div>
 
                         <!-- Task Completion Criteria -->
                         <div class="mb-4 p-3 border rounded">
-                            <h5>2. Task Completion Criteria</h5>
+                            <h5><strong>2. Task Completion Criteria</strong></h5>
                             <p>The criteria for task completion is <strong>Exact Match (EM)</strong>. This means your answer must be <strong>precise</strong> and contain <strong>only the requested information</strong>. It is crucial that you provide just the answer itself, without any additional explanatory text or sentences.</p>
                             <h6>Example:</h6>
                             <ul class="list-group">
@@ -38,8 +38,8 @@
                         </div>
 
                         <!-- Domain Familiarity -->
-                        <div class="mb-4">
-                            <h5>3. Domain Familiarity</h5>
+                        <div class="mb-4 p-3 border rounded">
+                            <h5><strong>3. Domain Familiarity</strong></h5>
                             <p>How familiar are you with the topic of this question?</p>
                             <div class="btn-group" role="group" aria-label="Familiarity">
                                 {% for key, value in FAMILIARITY_MAP.items %}
@@ -52,8 +52,8 @@
                         </div>
 
                         <!-- Difficulty -->
-                        <div class="mb-4">
-                            <h5>4. Difficulty</h5>
+                        <div class="mb-4 p-3 border rounded">
+                            <h5><strong>4. Difficulty</strong></h5>
                             <p>How do you evaluate the difficulty of the task?</p>
                             <div class="btn-group" role="group" aria-label="Difficulty">
                                 {% for key, value in DIFFICULTY_MAP.items %}
@@ -66,15 +66,15 @@
                         </div>
 
                         <!-- Effort -->
-                        <div class="mb-4">
-                            <label for="effort" class="form-label"><h5>5. Effort</h5></label>
+                        <div class="mb-4 p-3 border rounded">
+                            <label for="effort" class="form-label"><h5><strong>5. Effort</strong></h5></label>
                             <p>How much time do you expect to spend on this task? <span class="badge bg-secondary" id="effort_val">5</span></p>
                             <input type="range" class="form-range" name="effort" id="effort" min="3" max="30" value="5" step="1" oninput="setEffort()">
                         </div>
 
                         <!-- Initial Strategy -->
-                        <div class="mb-4">
-                            <label for="initial_strategy" class="form-label"><h5>6. Initial Strategy</h5></label>
+                        <div class="mb-4 p-3 border rounded">
+                            <label for="initial_strategy" class="form-label"><h5><strong>6. Initial Strategy</strong></h5></label>
                             <p>Briefly describe your initial plan. For example, what search queries or keywords will you start with?</p>
                             <textarea class="form-control" id="initial_strategy" name="initial_strategy" rows="5" required></textarea>
                         </div>

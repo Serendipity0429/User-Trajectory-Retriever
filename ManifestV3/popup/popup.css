@@ -168,9 +168,12 @@ h1 {
     display: none; /* Hidden by default */
     text-align: left;
     font-size: 14px;
-    display: flex;
     align-items: center;
     gap: 10px;
+}
+
+#logged {
+    display: none;
 }
 
 .error-msg {
@@ -267,9 +270,6 @@ h1 {
     gap: 10px;
 }
 
-.modal-buttons .btn {
-    width: auto;
-    padding: 8px 20px;
-    font-size: 14px;
-    margin: 0;
+.content[hidden] {
+    display: none;
 }

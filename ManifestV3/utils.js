@@ -12,7 +12,7 @@ const URLS = {
     token_login: `${URL_BASE}/user/token_login/`,
     token_refresh: `${URL_BASE}/user/token/refresh/`,
     data: `${URL_BASE}/task/data/`,
-    cancel: `${URL_BASE}/task/cancel_task/`,
+    cancel: `${URL_BASE}/task/cancel_annotation/`,
     active_task: `${URL_BASE}/task/active_task/`,
     register: `${URL_BASE}/user/signup/`,
     home: `${URL_BASE}/task/home/`,
@@ -105,14 +105,17 @@ async function refreshToken() {
     }
 }
 
-async function _post(url, data = {}, json_response = true, raw_data = false) {
+async function _post(url, data = {}, json_response = true, raw_data = false, send_as_json = false) {
     try {
         const { access_token } = await _get_local('access_token');
 
         let headers = {};
         let body;
 
-        if (!raw_data) {
+        if (send_as_json) {
+            headers["Content-Type"] = "application/json";
+            body = JSON.stringify(data);
+        } else if (!raw_data) {
             headers["Content-Type"] = "application/x-www-form-urlencoded";
             body = new URLSearchParams(data);
         } else {
@@ -140,12 +143,12 @@ async function _post(url, data = {}, json_response = true, raw_data = false) {
                     body,
                 });
             } else {
-                throw new Error("Token refresh failed.");
+                throw new Error("Authentication failed.");
             }
         }
 
         if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+            throw new Error(`Server error: ${response.status}`);
         }
 
         if (json_response) {
@@ -261,7 +264,22 @@ function displayLoadedBox(message) {
 // --- Helpers ---
 
 function uint8ArrayToBase64(bytes) {
-    return btoa(String.fromCharCode.apply(null, bytes));
+  // Using a smaller chunk size is generally safer and performs well.
+  // 32768 is a common choice.
+  const CHUNK_SIZE = 0x8000;
+  let binary = '';
+  const len = bytes.length;
+
+  for (let i = 0; i < len; i += CHUNK_SIZE) {
+    // Get a chunk of the Uint8Array
+    const chunk = bytes.subarray(i, i + CHUNK_SIZE);
+
+    // This is the most efficient way to convert a small chunk to a binary string
+    binary += String.fromCharCode.apply(null, chunk);
+  }
+
+  // The final binary string is then encoded to Base64
+  return btoa(binary);
 }
 
 function isJSONString(str) {

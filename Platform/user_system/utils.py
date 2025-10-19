@@ -6,6 +6,11 @@ from django.http import HttpResponseRedirect
 from django.http import HttpRequest
 from django.core.mail import EmailMultiAlternatives
 import smtplib
+from django.conf import settings
+
+def print_debug(msg):
+    if settings.DEBUG:
+        print(msg)
 
 
 def get_user_from_request(req):

@@ -26,6 +26,8 @@ from datetime import timedelta
 
 from task_manager.models import Task
 
+from django.template.loader import render_to_string
+
 @login_required
 @user_passes_test(is_superuser)
 def admin_page(request):
@@ -52,7 +54,8 @@ def admin_page(request):
 
     # Task filter and sort
     task_user_filter = request.GET.get('task_user', '')
-    task_date_filter = request.GET.get('task_date', '')
+    task_date_start_filter = request.GET.get('task_date_start', '')
+    task_date_end_filter = request.GET.get('task_date_end', '')
     task_sort_by = request.GET.get('task_sort_by', 'id')
     task_sort_dir = request.GET.get('task_sort_dir', 'asc')
     if task_sort_dir not in ['asc', 'desc']:
@@ -62,13 +65,34 @@ def admin_page(request):
     tasks_list = Task.objects.all()
     if task_user_filter:
         tasks_list = tasks_list.filter(user__id=task_user_filter)
-    if task_date_filter:
-        tasks_list = tasks_list.filter(start_timestamp__date=task_date_filter)
+    if task_date_start_filter:
+        tasks_list = tasks_list.filter(start_timestamp__date__gte=task_date_start_filter)
+    if task_date_end_filter:
+        tasks_list = tasks_list.filter(start_timestamp__date__lte=task_date_end_filter)
     tasks_list = tasks_list.order_by(task_order)
 
     task_paginator = Paginator(tasks_list, 10)
     task_page_number = request.GET.get('task_page')
     tasks = task_paginator.get_page(task_page_number)
+
+    if request.GET.get('ajax'):
+        tasks_data = []
+        for task in tasks:
+            status_badge = ''
+            if task.cancelled:
+                status_badge = '<span class="badge bg-danger">Cancelled</span>'
+            elif not task.active:
+                status_badge = '<span class="badge bg-success">Completed</span>'
+            else:
+                status_badge = '<span class="badge bg-warning">Active</span>'
+            
+            tasks_data.append({
+                'id': task.id,
+                'user': task.user.username,
+                'start_timestamp': task.start_timestamp.strftime("%Y-%m-%d %H:%M:%S"),
+                'status_badge': status_badge,
+            })
+        return JsonResponse({'tasks': tasks_data})
 
     # Dashboard metrics
     total_users = User.objects.count()
@@ -93,7 +117,8 @@ def admin_page(request):
             'tasks': tasks,
             'all_users': all_users,
             'task_user_filter': task_user_filter,
-            'task_date_filter': task_date_filter,
+            'task_date_start_filter': task_date_start_filter,
+            'task_date_end_filter': task_date_end_filter,
             'task_sort_by': task_sort_by,
             'task_sort_dir': task_sort_dir,
             'total_users': total_users,
@@ -112,6 +137,7 @@ def token_login(request):
     if request.method != 'POST':
         return JsonResponse({'error': 'Only POST method is allowed'}, status=405)
 
+    print_debug(request.POST)
     username = request.POST.get('username')
     password = request.POST.get('password')
 
@@ -149,11 +175,18 @@ def delete_user(request, user_id):
     if request.method == 'POST':
         user_to_delete = get_object_or_404(User, id=user_id)
         if request.user.id == user_to_delete.id:
-            # Optionally, add a message to inform the admin they cannot delete themselves
-            return HttpResponseRedirect(reverse('user_system:admin_page'))
+            if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+                return JsonResponse({'status': 'error', 'message': 'You cannot delete yourself.'}, status=400)
+            else:
+                return HttpResponseRedirect(reverse('user_system:admin_page'))
+        
         user_to_delete.delete()
-        return HttpResponseRedirect(reverse('user_system:admin_page'))
-    # Redirect if not a POST request
+        
+        if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+            return JsonResponse({'status': 'success', 'message': 'User deleted successfully.'})
+        else:
+            return HttpResponseRedirect(reverse('user_system:admin_page'))
+    
     return HttpResponseRedirect(reverse('user_system:admin_page'))
 
 

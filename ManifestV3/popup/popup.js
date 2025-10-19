@@ -60,23 +60,30 @@ function showConfirm(message, title = "Confirm") {
 }
 
 function showFailMessage(message_type) {
-    for (let i = 1; i <= 4; i++) {
-        const failMsg = document.getElementById(`failMsg${i}`);
-        if (failMsg) {
-            failMsg.style.display = 'none';
-        }
-    }
-    if (message_type >= 1 && message_type <= 4) {
-        const failMsg = document.getElementById(`failMsg${message_type}`);
-        if (failMsg) {
-            failMsg.style.display = 'flex';
-        }
+    const errorMessages = {
+        1: 'usernameError',
+        2: 'passwordError',
+        3: 'requestError',
+        4: 'authError'
+    };
+
+    Object.values(errorMessages).forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = 'none';
+    });
+
+    const errorId = errorMessages[message_type];
+    if (errorId) {
+        const el = document.getElementById(errorId);
+        if (el) el.style.display = 'flex';
     }
 }
 
 function switchUiState(show_login) {
-    const loggedDiv = document.getElementById('logged');
-    const loginDiv = document.getElementById('login');
+    let loggedDiv = document.getElementById('logged');
+    let loginDiv = document.getElementById('login');
+    printDebug("popup", "loggedDiv:", loggedDiv, "loginDiv:", loginDiv);
+    printDebug("popup", "show_login:", show_login);
     if (show_login) {
         loggedDiv.style.display = 'none';
         loginDiv.style.display = 'block';
@@ -91,7 +98,7 @@ async function displayActiveTask() {
     active_task_id = await getActiveTask();
     printDebug("popup", "Active task ID:", active_task_id);
     const activeTaskEl = document.getElementById('active_task');
-    const startTaskBtn = document.getElementById('bt_start_task');
+    const startTaskBtn = document.getElementById('startTaskBtn');
 
     if (active_task_id === -1) {
         switchTaskButtonStatus('off');
@@ -112,7 +119,8 @@ async function displayActiveTask() {
 async function showUserTab() {
     const { username } = await _get_local(['username']);
     document.getElementById('username_text_logged').textContent = "User: " + username;
-    document.getElementById('bt_end_task').style.display = 'none';
+    document.getElementById('submitAnswerBtn').style.display = 'none';
+    printDebug("popup", "Switched to user tab for user:", username);    
     await displayActiveTask();
     switchUiState(false);
 }
@@ -123,10 +131,10 @@ function showLoginTab() {
 
 function switchTaskButtonStatus(task_status) {
     const is_active = task_status === 'on';
-    const startTaskBtn = document.getElementById('bt_start_task');
-    const endTaskBtn = document.getElementById('bt_end_task');
-    const cancelTaskBtn = document.getElementById('bt_cancel_task');
-    const viewTaskInfoBtn = document.getElementById('bt_view_task_info');
+    const startTaskBtn = document.getElementById('startTaskBtn');
+    const endTaskBtn = document.getElementById('submitAnswerBtn');
+    const cancelTaskBtn = document.getElementById('cancelAnnotationBtn');
+    const viewTaskInfoBtn = document.getElementById('viewTaskInfoBtn');
 
     startTaskBtn.style.display = is_active ? 'none' : 'block';
     endTaskBtn.style.display = is_active ? 'block' : 'none';
@@ -193,7 +201,7 @@ async function handleLoginAttempt() {
 
     const credentials = { username, password, ext: true };
     try {
-        const login_response = await _post(token_login_url, credentials, true, false, true);
+        const login_response = await _post(token_login_url, credentials, true, false, false);
         if (login_response?.access && login_response?.refresh) {
             await _set_local({
                 'username': username,
@@ -203,8 +211,8 @@ async function handleLoginAttempt() {
             });
             await sendMessageFromPopup({ command: "alter_logging_status", log_status: true });
             await showUserTab();
-            chrome.action.setBadgeText({ text: 'on' });
-            chrome.action.setBadgeBackgroundColor({ color: [202, 181, 225, 255] });
+            // chrome.action.setBadgeText({ text: 'on' });
+            // chrome.action.setBadgeBackgroundColor({ color: [202, 181, 225, 255] });
         } else {
             chrome.action.setBadgeText({ text: '' });
             const error_code = login_response?.error_code ?? -1;
@@ -247,7 +255,7 @@ async function handleLogout() {
 }
 
 async function handleStartTask() {
-    document.getElementById('bt_start_task').disabled = true;
+    document.getElementById('startTaskBtn').disabled = true;
     const current_task_id = await getActiveTask();
 
     if (current_task_id === -2) {
@@ -261,11 +269,11 @@ async function handleStartTask() {
             openTaskWindow(`/task/pre_task_annotation/${timestamp}/`);
         }
     }
-    document.getElementById('bt_start_task').disabled = false;
+    document.getElementById('startTaskBtn').disabled = false;
 }
 
 async function handleEndTask() {
-    document.getElementById('bt_end_task').disabled = true;
+    document.getElementById('submitAnswerBtn').disabled = true;
     const current_task_id = await getActiveTask();
 
     if (current_task_id === -2) {
@@ -284,7 +292,7 @@ async function handleEndTask() {
             }
         }
     }
-    document.getElementById('bt_end_task').disabled = false;
+    document.getElementById('submitAnswerBtn').disabled = false;
 }
 
 async function handleCancelTask() {
@@ -293,11 +301,7 @@ async function handleCancelTask() {
         const is_confirmed = await showConfirm("Do you want to cancel the task?");
         if (is_confirmed) {
             const timestamp = Date.now();
-const cancelAnnotationBtn = document.getElementById('bt_cancel_annotation');
-// ... (other code)
-openTaskWindow(`/task/cancel_annotation/${current_task_id}/${timestamp}/`, false);
-// ... (other code)
-document.getElementById('bt_cancel_annotation').addEventListener('click', handleCancelAnnotation);
+            openTaskWindow(`/task/cancel_annotation/${current_task_id}/${timestamp}/`, false);
         }
     }
 }
@@ -311,21 +315,21 @@ async function handleViewTask() {
 
 // --- INITIALIZATION ---
 (async function initialize() {
-    document.getElementById('bt1').addEventListener('click', handleRegister);
-    document.getElementById('bt2').addEventListener('click', handleLoginAttempt);
-    document.getElementById('bt4').addEventListener('click', handleFeedbackUnlogged);
-    document.getElementById('bt8').addEventListener('click', handleFeedback);
-    document.getElementById('bt6').addEventListener('click', handleLogout);
-    document.getElementById('bt_start_task').addEventListener('click', handleStartTask);
-    document.getElementById('bt_end_task').addEventListener('click', handleEndTask);
-    document.getElementById('bt_cancel_annotation').addEventListener('click', handleCancelTask);
-    document.getElementById('bt_view_task_info').addEventListener('click', handleViewTask);
+    document.getElementById('signupBtn').addEventListener('click', handleRegister);
+    document.getElementById('loginBtn').addEventListener('click', handleLoginAttempt);
+    document.getElementById('homeBtnLoggedOut').addEventListener('click', handleFeedbackUnlogged);
+    document.getElementById('homeBtnLoggedIn').addEventListener('click', handleFeedback);
+    document.getElementById('logoutBtn').addEventListener('click', handleLogout);
+    document.getElementById('startTaskBtn').addEventListener('click', handleStartTask);
+    document.getElementById('submitAnswerBtn').addEventListener('click', handleEndTask);
+    document.getElementById('cancelAnnotationBtn').addEventListener('click', handleCancelTask);
+    document.getElementById('viewTaskInfoBtn').addEventListener('click', handleViewTask);
 
     const { access_token } = await _get_local(['access_token']);
     if (access_token) {
         await showUserTab();
-        chrome.action.setBadgeText({ text: 'on' });
-        chrome.action.setBadgeBackgroundColor({ color: [202, 181, 225, 255] });
+        // chrome.action.setBadgeText({ text: 'on' });
+        // chrome.action.setBadgeBackgroundColor({ color: [202, 181, 225, 255] });
     } else {
         showLoginTab();
         chrome.action.setBadgeText({ text: '' });

@@ -213,6 +213,18 @@ class EditInfoForm(forms.ModelForm):
     class Meta:
         model = User
         fields = ['name', 'gender', 'age', 'phone', 'email', 'occupation', 'education', 'field_of_expertise', 'llm_frequency', 'llm_history']
+        widgets = {
+            'name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Name'}),
+            'gender': forms.Select(attrs={'class': 'form-select'}),
+            'age': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'Age'}),
+            'phone': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Phone'}),
+            'email': forms.EmailInput(attrs={'class': 'form-control', 'placeholder': 'Email'}),
+            'occupation': forms.Select(attrs={'class': 'form-select'}),
+            'education': forms.Select(attrs={'class': 'form-select'}),
+            'field_of_expertise': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Field of Expertise'}),
+            'llm_frequency': forms.Select(attrs={'class': 'form-select'}),
+            'llm_history': forms.Select(attrs={'class': 'form-select'}),
+        }
 
 
 class EditPasswordForm(forms.Form):

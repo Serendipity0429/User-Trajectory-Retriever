@@ -70,6 +70,7 @@ def start_annotating(name):
 def stop_annotating():
     annotation_state.stop_annotating()
     
+    
 def store_data(message, user):
     annotation_state.is_storing_data = True
     
@@ -85,7 +86,8 @@ def store_data(message, user):
         return
     
     webpage = Webpage()
-    if message['mouse_moves'] == '[]' or message['rrweb_record'] == '[]':
+    # A page is considered a redirect if the dwell time is very short (< 200ms) or if there's no user interaction.
+    if check_is_redirected_page(message):
         print_debug("Redirect detected, setting is_redirected to True")
         webpage.is_redirected = True
     
@@ -115,6 +117,10 @@ def store_data(message, user):
     webpage.save()
     annotation_state.is_storing_data = False
     
+def check_is_redirected_page(message):
+    # A page is considered a redirect if the dwell time is very short (< 200ms) or if there's no user interaction.
+    return message['dwell_time'] < 200 or (message['mouse_moves'] == '[]' or message['rrweb_record'] == '[]' or message['event_list'] == '[]') or message['title'] == '' or 'redirect' in message['title'].lower()
+
 def wait_until_data_stored(func):
     def wrapper(*args, **kwargs):
         while annotation_state.is_storing_data:
@@ -122,7 +128,7 @@ def wait_until_data_stored(func):
             time.sleep(0.1)
         return func(*args, **kwargs)
     return wrapper
-
+    
 
 def check_answer(entry, user_answer):
     try:
@@ -158,4 +164,3 @@ def get_active_task_dataset():
     except Exception as e:
         print(f"Error getting active dataset {active_dataset}, error: {e}")
     return active_dataset
-

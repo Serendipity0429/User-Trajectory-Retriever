@@ -19,28 +19,28 @@
 
                         <!-- Task Description -->
                         <div class="mb-4 p-3 border rounded">
-                            <h5><strong>1. Task Description</strong></h5>
-                            <p>You need to answer the following question:</p>
-                            <div class="p-3 bg-light rounded question-text">{{ question }}</div>
-                        </div>
+                            <h5><strong>1. Understand the Task</strong></h5>
+                            <p>Your goal is to answer the following question accurately.</p>
+                            <div class="p-3 bg-light rounded loaded-box">
+                                <div class="question-text">
+                                    {{ question }}
+                                </div>
+                            </div>                        </div>
 
                         <!-- Task Completion Criteria -->
                         <div class="mb-4 p-3 border rounded">
-                            <h5><strong>2. Task Completion Criteria</strong></h5>
-                            <p>The criteria for task completion is <strong>Exact Match (EM)</strong>. This means your answer must be <strong>precise</strong> and contain <strong>only the requested information</strong>. It is crucial that you provide just the answer itself, without any additional explanatory text or sentences.</p>
-                            <h6>Example:</h6>
-                            <ul class="list-group">
-                                <li class="list-group-item"><em>Question:</em> What is the capital of France?</li>
-                                <li class="list-group-item list-group-item-success"><em>Expected Answer:</em> Paris</li>
-                                <li class="list-group-item list-group-item-danger"><em>Wrong Answer 1:</em> The capital of France is Paris. (Redundant information)</li>
-                                <li class="list-group-item list-group-item-danger"><em>Wrong Answer 2:</em> Beijing (Incorrect answer)</li>
-                            </ul>
+                            <h5><strong>2. How to Format Your Answer</strong></h5>
+                            <p class="text-muted mb-0">
+                                Your answer must be an <strong>exact match</strong>. Do not include extra words or sentences.
+                                <br>
+                                <em>For example, if the question is "What is the capital of France?", the correct answer is "Paris".</em>
+                            </p>
                         </div>
 
                         <!-- Domain Familiarity -->
                         <div class="mb-4 p-3 border rounded">
-                            <h5><strong>3. Domain Familiarity</strong></h5>
-                            <p>How familiar are you with the topic of this question?</p>
+                            <h5><strong>3. Your Familiarity with the Topic</strong></h5>
+                            <p>How familiar are you with the subject of this question?</p>
                             <div class="btn-group" role="group" aria-label="Familiarity">
                                 {% for key, value in FAMILIARITY_MAP.items %}
                                 <input type="radio" class="btn-check" name="familiarity" id="familiarity{{ key }}" value="{{ key }}" autocomplete="off" required>
@@ -49,12 +49,13 @@
                                 </label>
                                 {% endfor %}
                             </div>
+                            <div class="invalid-feedback">Please select your familiarity with the topic.</div>
                         </div>
 
                         <!-- Difficulty -->
                         <div class="mb-4 p-3 border rounded">
-                            <h5><strong>4. Difficulty</strong></h5>
-                            <p>How do you evaluate the difficulty of the task?</p>
+                            <h5><strong>4. Perceived Task Difficulty</strong></h5>
+                            <p>How difficult do you think this task will be?</p>
                             <div class="btn-group" role="group" aria-label="Difficulty">
                                 {% for key, value in DIFFICULTY_MAP.items %}
                                 <input type="radio" class="btn-check" name="difficulty" id="difficulty{{ key }}" value="{{ key }}" autocomplete="off" required>
@@ -63,24 +64,63 @@
                                 </label>
                                 {% endfor %}
                             </div>
+                            <div class="invalid-feedback">Please select the perceived task difficulty.</div>
                         </div>
 
                         <!-- Effort -->
                         <div class="mb-4 p-3 border rounded">
-                            <label for="effort" class="form-label"><h5><strong>5. Effort</strong></h5></label>
-                            <p>How much time do you expect to spend on this task? <span class="badge bg-secondary" id="effort_val">5</span></p>
-                            <input type="range" class="form-range" name="effort" id="effort" min="3" max="30" value="5" step="1" oninput="setEffort()">
+                            <h5><strong>5. Estimated Time Commitment</strong></h5>
+                            <p>Estimate the time you'll need for this task. This helps us understand the complexity of the task.</p>
+                            <div class="btn-group" role="group" aria-label="Effort">
+                                {% for key, value in EFFORT_MAP.items %}
+                                <input type="radio" class="btn-check" name="effort" id="effort{{ key }}" value="{{ key }}" autocomplete="off" required>
+                                <label class="btn btn-outline-primary" for="effort{{ key }}" data-bs-toggle="tooltip" data-bs-placement="top" title="{{ EFFORT_EXPLANATION_MAP|get_item:key }}">
+                                    {{ value }}
+                                </label>
+                                {% endfor %}
+                            </div>
+                            <div class="invalid-feedback">Please select the estimated time commitment.</div>
                         </div>
 
                         <!-- Initial Strategy -->
                         <div class="mb-4 p-3 border rounded">
-                            <label for="initial_strategy" class="form-label"><h5><strong>6. Initial Strategy</strong></h5></label>
-                            <p>Briefly describe your initial plan. For example, what search queries or keywords will you start with?</p>
-                            <textarea class="form-control" id="initial_strategy" name="initial_strategy" rows="5" required></textarea>
+                            <label for="first_search_query" class="form-label"><h5><strong>6. Your First Search Query</strong></h5></label>
+                            <p>Please enter the first search query you will use to start this task.</p>
+                            <input type="text" class="form-control" id="first_search_query" name="first_search_query" required placeholder="e.g., 'capital of France'">
+                            <div class="invalid-feedback">Please enter your first search query.</div>
+                        </div>
+
+                        <!-- Initial Guess -->
+                        <div class="mb-4 p-3 border rounded">
+                            <label for="initial_guess" class="form-label"><h5><strong>7. Initial Guess</strong></h5></label>
+                            <p>If you have an initial idea of the answer, or a possible range for it, please specify it below.</p>
+                            <input type="text" class="form-control" id="initial_guess" name="initial_guess" placeholder="Your initial guess or range">
+                            <div class="form-check mt-2">
+                                <input class="form-check-input" type="checkbox" name="initial_guess_unknown" id="initial_guess_unknown">
+                                <label class="form-check-label" for="initial_guess_unknown">
+                                    I don't know
+                                </label>
+                            </div>
+                            <div class="invalid-feedback">Please provide an initial guess or check "I don't know".</div>
+                        </div>
+
+                        <!-- Expected Source of Answer -->
+                        <div class="mb-4 p-3 border rounded">
+                            <h5><strong>8. Expected Source of Answer</strong></h5>
+                            <p>Where do you think you will find the answer? (You can select multiple options)</p>
+                            <div class="btn-group flex-wrap" role="group" aria-label="Expected Source">
+                                {% for key, value in EXPECTED_SOURCES_MAP.items %}
+                                <input type="checkbox" class="btn-check" name="expected_source" id="source_{{ key }}" value="{{ key }}" autocomplete="off">
+                                <label class="btn btn-outline-primary mb-2 me-2" for="source_{{ key }}">{{ value }}</label>
+                                {% endfor %}
+                            </div>
+                            <input type="text" class="form-control mt-2" id="expected_source_other" name="expected_source_other" placeholder="If other, please specify" style="display: none;">
+                            <div class="invalid-feedback">Please select at least one expected source.</div>
+                            <div class="invalid-feedback" id="expected_source_other_feedback">Please specify the other expected source.</div>
                         </div>
 
                         <div class="d-grid">
-                            <button type="button" id="query-btn" class="btn btn-primary btn-lg btn-submit">Submit</button>
+                            <button type="button" id="query-btn" class="btn btn-primary btn-lg btn-submit">Start Task</button>
                         </div>
                     </form>
                 </div>
@@ -92,22 +132,6 @@
 
 {% block scripts %}
 <script>
-    function setEffort() {
-        let effortInput = document.getElementsByName("effort")[0];
-        let effortVal = document.getElementById("effort_val");
-        let value = parseInt(effortInput.value);
-        let min = parseInt(effortInput.min);
-        let max = parseInt(effortInput.max);
-
-        if (value === min) {
-            effortVal.innerText = value + " minutes and shorter";
-        } else if (value === max) {
-            effortVal.innerText = value + " minutes and longer";
-        } else {
-            effortVal.innerText = value + " minutes";
-        }
-    }
-
     // Initialize tooltips
     var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
     var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
@@ -115,20 +139,79 @@
     })
 
     $(function () {
-        setEffort();
         let is_submitted = false;
+
+        // Initial Guess Logic
+        $('#initial_guess_unknown').change(function() {
+            if ($(this).is(':checked')) {
+                $('#initial_guess').val('').prop('disabled', true);
+            } else {
+                $('#initial_guess').prop('disabled', false);
+            }
+        });
+
+        // Show/hide 'other' source text input
+        $('#source_other').change(function() {
+            if ($(this).is(':checked')) {
+                $('#expected_source_other').show();
+            } else {
+                $('#expected_source_other').hide();
+            }
+        });
+
         $('#query-btn').click(function () {
+            // Reset validation states
+            $('.is-invalid').removeClass('is-invalid');
+            let isValid = true;
+
+            // Validation for familiarity
             if (!$("input[name='familiarity']:checked").val()) {
-                alert('Please select your domain familiarity!');
-                return;
+                $("input[name='familiarity']").closest('.btn-group').addClass('is-invalid');
+                isValid = false;
             }
+
+            // Validation for difficulty
             if (!$("input[name='difficulty']:checked").val()) {
-                alert('Please select the task difficulty!');
-                return;
+                $("input[name='difficulty']").closest('.btn-group').addClass('is-invalid');
+                isValid = false;
             }
-            if ($('#initial_strategy').val().trim() === '') {
-                alert('Please describe your initial strategy!');
-                $('#initial_strategy').focus();
+
+            // Validation for effort
+            if (!$("input[name='effort']:checked").val()) {
+                $("input[name='effort']").closest('.btn-group').addClass('is-invalid');
+                isValid = false;
+            }
+
+            // Validation for first search query
+            const firstSearchQuery = $('#first_search_query');
+            if (firstSearchQuery.val().trim() === '') {
+                firstSearchQuery.addClass('is-invalid');
+                isValid = false;
+            }
+
+            // Validation for initial guess
+            const initialGuess = $('#initial_guess');
+            const initialGuessUnknown = $('#initial_guess_unknown');
+            if (!initialGuessUnknown.is(':checked') && initialGuess.val().trim() === '') {
+                initialGuess.addClass('is-invalid');
+                isValid = false;
+            }
+
+            // Validation for expected source
+            const expectedSourceCheckboxes = $("input[name='expected_source']:checked");
+            const expectedSourceOther = $('#expected_source_other');
+            const otherIsChecked = $('#source_other').is(':checked');
+
+            if (expectedSourceCheckboxes.length === 0) {
+                $("input[name='expected_source']").closest('.btn-group').addClass('is-invalid');
+                isValid = false;
+            } else if (otherIsChecked && expectedSourceOther.val().trim() === '') {
+                expectedSourceOther.addClass('is-invalid');
+                $('#expected_source_other_feedback').show();
+                isValid = false;
+            }
+
+            if (!isValid) {
                 return;
             }
 
@@ -136,6 +219,22 @@
                 is_submitted = true;
                 $('#query-form').submit();
             }
+        });
+
+        // Clear validation on input
+        $("input[name='familiarity']").change(() => $("input[name='familiarity']").closest('.btn-group').removeClass('is-invalid'));
+        $("input[name='difficulty']").change(() => $("input[name='difficulty']").closest('.btn-group').removeClass('is-invalid'));
+        $("input[name='effort']").change(() => $("input[name='effort']").closest('.btn-group').removeClass('is-invalid'));
+        $('#first_search_query').on('input', () => $('#first_search_query').removeClass('is-invalid'));
+        $('#initial_guess, #initial_guess_unknown').on('input change', () => $('#initial_guess').removeClass('is-invalid'));
+        $("input[name='expected_source']").change(() => {
+            $("input[name='expected_source']").closest('.btn-group').removeClass('is-invalid');
+            $('#expected_source_other').removeClass('is-invalid');
+            $('#expected_source_other_feedback').hide();
+        });
+        $('#expected_source_other').on('input', () => {
+            $('#expected_source_other').removeClass('is-invalid');
+            $('#expected_source_other_feedback').hide();
         });
 
         window.addEventListener('beforeunload', function (e) {

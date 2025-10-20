@@ -76,14 +76,13 @@
             <form id="query-form" action="" method="post" enctype='multipart/form-data'>
                 {% csrf_token %}
                 <div class="col-xs-12 sheet">
-                    <div class="question-wrapper col-xs-12">
+                    <div class="question-wrapper col-xs-12 loaded-box">
                         <span class="col-xs-12 list-row question-text">
                             <b>1. Task Description</b>: You need to answer the following question:
                             </span>
                         <br/>
-                        <div class="static-task-info">{{ question }}</div>
+                        <div class="question-text">{{ question }}</div>
                     </div>
-
                     <div class="question-wrapper col-xs-12">
                         <span class="col-xs-12 list-row question-text">
                             <b>2. Task Completion Criteria</b>: The criteria for task completion.</span>
@@ -161,6 +160,7 @@
                                 </div>
                             </div>
                         </div>
+                        <div class="invalid-feedback">Please select a primary reason for cancellation.</div>
                     </div>
 
                     <div class="question-wrapper col-xs-12">
@@ -169,104 +169,106 @@
                         </label>
                         <div><textarea class="col-xs-12 list-row" id="cancel_reason" name="cancel_reason" rows="3" required></textarea>
                         </div>
+                        <div class="invalid-feedback">Please provide a detailed explanation.</div>
                     </div>
 
-                    <div class="question-wrapper col-xs-12">
-                        <label class="col-xs-12 list-row question-text">
-                            <b>6. Missing Resources</b>: What do you believe was needed to make this task solvable? (Check all that apply and drag to reorder by priority)
-                        </label>
-                        <div class="col-xs-12 list-row">
-                            <div id="selected-resources-list" class="sortable-list"></div>
-                            <hr id="selection-separator" style="display: none; border-top: 1px dashed #ccc; margin: 10px 0;">
-                            <div id="unselected-resources-list">
-                                <div class="drag-option" data-value="expert_knowledge">
-                                    <input type="checkbox" name="cancel_missing_resources" value="expert_knowledge"/>
-                                    <span class="drag-handle">≡</span>
-                                    <label>Specialized domain knowledge</label>
-                                    <div class="tooltip-container">
-                                        <span class="tooltip-button">?</span>
-                                        <span class="tooltip-text">{{ MISSING_RESOURCES_EXPLANATION_MAP|get_item:"expert_knowledge" }}</span>
-                                    </div>
-                                </div>
-                                <div class="drag-option" data-value="paid_access">
-                                    <input type="checkbox" name="cancel_missing_resources" value="paid_access"/>
-                                    <span class="drag-handle">≡</span>
-                                    <label>Paid subscription/service</label>
-                                    <div class="tooltip-container">
-                                        <span class="tooltip-button">?</span>
-                                        <span class="tooltip-text">{{ MISSING_RESOURCES_EXPLANATION_MAP|get_item:"paid_access" }}</span>
-                                    </div>
-                                </div>
-                                <div class="drag-option" data-value="better_tools">
-                                    <input type="checkbox" name="cancel_missing_resources" value="better_tools"/>
-                                    <span class="drag-handle">≡</span>
-                                    <label>Better search tool</label>
-                                    <div class="tooltip-container">
-                                        <span class="tooltip-button">?</span>
-                                        <span class="tooltip-text">{{ MISSING_RESOURCES_EXPLANATION_MAP|get_item:"better_tools" }}</span>
-                                    </div>
-                                </div>
-                                <div class="drag-option" data-value="different_question">
-                                    <input type="checkbox" name="cancel_missing_resources" value="different_question"/>
-                                    <span class="drag-handle">≡</span>
-                                    <label>Ambiguous/unanswerable question</label>
-                                    <div class="tooltip-container">
-                                        <span class="tooltip-button">?</span>
-                                        <span class="tooltip-text">{{ MISSING_RESOURCES_EXPLANATION_MAP|get_item:"different_question" }}</span>
-                                    </div>
-                                </div>
-                                <div class="drag-option" data-value="info_not_online">
-                                    <input type="checkbox" name="cancel_missing_resources" value="info_not_online"/>
-                                    <span class="drag-handle">≡</span>
-                                    <label>Information not publicly online</label>
-                                    <div class="tooltip-container">
-                                        <span class="tooltip-button">?</span>
-                                        <span class="tooltip-text">{{ MISSING_RESOURCES_EXPLANATION_MAP|get_item:"info_not_online" }}</span>
-                                    </div>
-                                </div>
-                                <div class="drag-option" data-value="time_limit">
-                                    <input type="checkbox" name="cancel_missing_resources" value="time_limit"/>
-                                    <span class="drag-handle">≡</span>
-                                    <label>More research time</label>
-                                    <div class="tooltip-container">
-                                        <span class="tooltip-button">?</span>
-                                        <span class="tooltip-text">{{ MISSING_RESOURCES_EXPLANATION_MAP|get_item:"time_limit" }}</span>
-                                    </div>
-                                </div>
-                                <div class="drag-option" data-value="team_help">
-                                    <input type="checkbox" name="cancel_missing_resources" value="team_help"/>
-                                    <span class="drag-handle">≡</span>
-                                    <label>Help from others</label>
-                                    <div class="tooltip-container">
-                                        <span class="tooltip-button">?</span>
-                                        <span class="tooltip-text">{{ MISSING_RESOURCES_EXPLANATION_MAP|get_item:"team_help" }}</span>
-                                    </div>
-                                </div>
-                                 <div class="drag-option" data-value="guidance">
-                                    <input type="checkbox" name="cancel_missing_resources" value="guidance"/>
-                                    <span class="drag-handle">≡</span>
-                                    <label>Expert guidance</label>
-                                    <div class="tooltip-container">
-                                        <span class="tooltip-button">?</span>
-                                        <span class="tooltip-text">{{ MISSING_RESOURCES_EXPLANATION_MAP|get_item:"guidance" }}</span>
-                                    </div>
-                                </div>
-                                <div class="drag-option" data-value="better_question">
-                                    <input type="checkbox" name="cancel_missing_resources" value="better_question"/>
-                                    <span class="drag-handle">≡</span>
-                                    <label>Clearer question/instructions</label>
-                                </div>
-                                <div class="drag-option" data-value="other">
-                                    <input type="checkbox" name="cancel_missing_resources" value="other"/>
-                                    <span class="drag-handle">≡</span>
-                                    <label>Other (please specify):</label>
-                                    <input type="text" name="cancel_missing_resources_other" style="width: 70%; white-space: no-wrap; margin-left: 5px;" disabled/>
-                                </div>
-                            </div>
-                        </div>
-                        <input type="hidden" name="cancel_missing_resources_list" id="cancel_missing_resources_list" />
-                    </div>
-                    <div class="question-wrapper col-xs-12">
+                                            <div class="question-wrapper col-xs-12">
+                                            <label class="col-xs-12 list-row question-text">
+                                                <b>6. Missing Resources</b>: What do you believe was needed to make this task solvable? (Check all that apply and drag to reorder by priority)
+                                            </label>
+                                            <div class="col-xs-12 list-row">
+                                                <div id="selected-resources-list" class="sortable-list"></div>
+                                                <hr id="selection-separator" style="display: none; border-top: 1px dashed #ccc; margin: 10px 0;">
+                                                <div id="unselected-resources-list">
+                                                    <div class="drag-option" data-value="expert_knowledge">
+                                                        <input type="checkbox" name="cancel_missing_resources" value="expert_knowledge"/>
+                                                        <span class="drag-handle">≡</span>
+                                                        <label>Specialized domain knowledge</label>
+                                                        <div class="tooltip-container">
+                                                            <span class="tooltip-button">?</span>
+                                                            <span class="tooltip-text">{{ MISSING_RESOURCES_EXPLANATION_MAP|get_item:"expert_knowledge" }}</span>
+                                                        </div>
+                                                    </div>
+                                                    <div class="drag-option" data-value="paid_access">
+                                                        <input type="checkbox" name="cancel_missing_resources" value="paid_access"/>
+                                                        <span class="drag-handle">≡</span>
+                                                        <label>Paid subscription/service</label>
+                                                        <div class="tooltip-container">
+                                                            <span class="tooltip-button">?</span>
+                                                            <span class="tooltip-text">{{ MISSING_RESOURCES_EXPLANATION_MAP|get_item:"paid_access" }}</span>
+                                                        </div>
+                                                    </div>
+                                                    <div class="drag-option" data-value="better_tools">
+                                                        <input type="checkbox" name="cancel_missing_resources" value="better_tools"/>
+                                                        <span class="drag-handle">≡</span>
+                                                        <label>Better search tool</label>
+                                                        <div class="tooltip-container">
+                                                            <span class="tooltip-button">?</span>
+                                                            <span class="tooltip-text">{{ MISSING_RESOURCES_EXPLANATION_MAP|get_item:"better_tools" }}</span>
+                                                        </div>
+                                                    </div>
+                                                    <div class="drag-option" data-value="different_question">
+                                                        <input type="checkbox" name="cancel_missing_resources" value="different_question"/>
+                                                        <span class="drag-handle">≡</span>
+                                                        <label>Ambiguous/unanswerable question</label>
+                                                        <div class="tooltip-container">
+                                                            <span class="tooltip-button">?</span>
+                                                            <span class="tooltip-text">{{ MISSING_RESOURCES_EXPLANATION_MAP|get_item:"different_question" }}</span>
+                                                        </div>
+                                                    </div>
+                                                    <div class="drag-option" data-value="info_not_online">
+                                                        <input type="checkbox" name="cancel_missing_resources" value="info_not_online"/>
+                                                        <span class="drag-handle">≡</span>
+                                                        <label>Information not publicly online</label>
+                                                        <div class="tooltip-container">
+                                                            <span class="tooltip-button">?</span>
+                                                            <span class="tooltip-text">{{ MISSING_RESOURCES_EXPLANATION_MAP|get_item:"info_not_online" }}</span>
+                                                        </div>
+                                                    </div>
+                                                    <div class="drag-option" data-value="time_limit">
+                                                        <input type="checkbox" name="cancel_missing_resources" value="time_limit"/>
+                                                        <span class="drag-handle">≡</span>
+                                                        <label>More research time</label>
+                                                        <div class="tooltip-container">
+                                                            <span class="tooltip-button">?</span>
+                                                            <span class="tooltip-text">{{ MISSING_RESOURCES_EXPLANATION_MAP|get_item:"time_limit" }}</span>
+                                                        </div>
+                                                    </div>
+                                                    <div class="drag-option" data-value="team_help">
+                                                        <input type="checkbox" name="cancel_missing_resources" value="team_help"/>
+                                                        <span class="drag-handle">≡</span>
+                                                        <label>Help from others</label>
+                                                        <div class="tooltip-container">
+                                                            <span class="tooltip-button">?</span>
+                                                            <span class="tooltip-text">{{ MISSING_RESOURCES_EXPLANATION_MAP|get_item:"team_help" }}</span>
+                                                        </div>
+                                                    </div>
+                                                     <div class="drag-option" data-value="guidance">
+                                                        <input type="checkbox" name="cancel_missing_resources" value="guidance"/>
+                                                        <span class="drag-handle">≡</span>
+                                                        <label>Expert guidance</label>
+                                                        <div class="tooltip-container">
+                                                            <span class="tooltip-button">?</span>
+                                                            <span class="tooltip-text">{{ MISSING_RESOURCES_EXPLANATION_MAP|get_item:"guidance" }}</span>
+                                                        </div>
+                                                    </div>
+                                                    <div class="drag-option" data-value="better_question">
+                                                        <input type="checkbox" name="cancel_missing_resources" value="better_question"/>
+                                                        <span class="drag-handle">≡</span>
+                                                        <label>Clearer question/instructions</label>
+                                                    </div>
+                                                    <div class="drag-option" data-value="other">
+                                                        <input type="checkbox" name="cancel_missing_resources" value="other"/>
+                                                        <span class="drag-handle">≡</span>
+                                                        <label>Other (please specify):</label>
+                                                        <input type="text" name="cancel_missing_resources_other" style="width: 70%; white-space: no-wrap; margin-left: 5px;" disabled/>
+                                                        <div class="invalid-feedback">Please specify the other missing resource.</div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="invalid-feedback">Please select at least one missing resource.</div>
+                                            <input type="hidden" name="cancel_missing_resources_list" id="cancel_missing_resources_list" />
+                                        </div>                    <div class="question-wrapper col-xs-12">
                         <label for="cancel_additional_reflection" class="col-xs-12 list-row question-text">
                             <b>7. (Optional) Additional Reflection</b>: Do you have any additional thoughts or reflections on this task?
                         <textarea class="col-xs-12 list-row" id="reflection" name="cancel_additional_reflection" rows="3" required></textarea>
@@ -432,33 +434,43 @@
         // Handle form submission
         $('#query-btn').click(
             function () {
+                // Reset validation states
+                $('.is-invalid').removeClass('is-invalid');
+                let isValid = true;
+
+                // Validation for cancel reason
                 let cancel_reason = $("[name='cancel_reason']");
+                if (cancel_reason.val().trim() === '') {
+                    cancel_reason.addClass('is-invalid');
+                    isValid = false;
+                }
+
+                // Validation for cancel category
                 let cancel_category = $("[name='cancel_category']:checked");
-                let selectedResources = $("#selected-resources-list .drag-option"); // Updated selector
-                
-                if (cancel_reason.val() === '') {
-                    alert('Please fill in the reason for cancellation!');
-                    cancel_reason.focus();
-                    return
-                }
                 if (cancel_category.length === 0) {
-                    alert('Please select a primary reason for cancellation!');
-                    return
+                    $("[name='cancel_category']").closest('.ratio').addClass('is-invalid');
+                    isValid = false;
                 }
+
+                // Validation for missing resources
+                let selectedResources = $("#selected-resources-list .drag-option");
                 if (selectedResources.length === 0) {
-                    alert('Please select at least one missing resource!');
-                    return;
-                }
-                
-                // If "Other" is checked, ensure the text field is filled
-                let otherCheckbox = selectedResources.find('input[value="other"]');
-                if (otherCheckbox.length > 0) {
-                    let otherText = $("[name='cancel_missing_resources_other']");
-                    if (otherText.val().trim() === '') {
-                        alert('Please specify the other missing resource!');
-                        otherText.focus();
-                        return;
+                    $('#unselected-resources-list').addClass('is-invalid');
+                    isValid = false;
+                } else {
+                    // If "Other" is checked, ensure the text field is filled
+                    let otherCheckbox = selectedResources.find('input[value="other"]');
+                    if (otherCheckbox.length > 0) {
+                        let otherText = $("[name='cancel_missing_resources_other']");
+                        if (otherText.val().trim() === '') {
+                            otherText.addClass('is-invalid');
+                            isValid = false;
+                        }
                     }
+                }
+
+                if (!isValid) {
+                    return;
                 }
 
                 if (confirm("Are you sure to cancel the ongoing task?")) {
@@ -469,6 +481,15 @@
                 }
             }
         );
+
+        // Clear validation on input
+        $("[name='cancel_reason']").on('input', () => $("[name='cancel_reason']").removeClass('is-invalid'));
+        $("[name='cancel_category']").change(() => $("[name='cancel_category']").closest('.ratio').removeClass('is-invalid'));
+        $('input[name="cancel_missing_resources"]').change(() => {
+            $('#unselected-resources-list').removeClass('is-invalid');
+            $("[name='cancel_missing_resources_other']").removeClass('is-invalid');
+        });
+        $("[name='cancel_missing_resources_other']").on('input', () => $("[name='cancel_missing_resources_other']").removeClass('is-invalid'));
 
         window.addEventListener('beforeunload', function (e) {
             if (!is_submitted) {

@@ -69,17 +69,24 @@
                 
                                     <form id="query-form" action="" method="post" enctype='multipart/form-data'>
                                         {% csrf_token %}
-                                        <div class="row">
-                                            <div class="col-md-6">
-                                                <div class="mb-3 p-3 border rounded bg-light">
-                                                    <h5><strong>1. Task Description</strong></h5>
-                                                    <div class="question-text">{{ question }}</div>
+                                        <!-- Task Description -->
+                                        <div class="mb-4 p-3 border rounded">
+                                            <h5><strong>1. Understand the Task</strong></h5>
+                                            <p>Your goal is to answer the following question accurately.</p>
+                                            <div class="p-3 bg-light rounded loaded-box">
+                                                <div class="question-text">
+                                                    {{ question }}
                                                 </div>
                                             </div>
-                                            <div class="col-md-6">
-                                                <div class="mb-3 p-3 border rounded bg-light">
-                                                    <h5><strong>2. Your Answer</strong></h5>
-                                                    <div class="question-text">{{ user_answer }}</div>
+                                        </div>
+                
+                                        <!-- User's Answer -->
+                                        <div class="mb-4 p-3 border rounded">
+                                            <h5><strong>2. Your Answer</strong></h5>
+                                            <p>This is the answer you submitted in the previous trial.</p>
+                                            <div class="p-3 bg-light rounded loaded-box">
+                                                <div class="question-text">
+                                                    {{ user_answer }}
                                                 </div>
                                             </div>
                                         </div>
@@ -98,6 +105,7 @@
                                     <span>{{ value }}</span>
                                     <div class="d-flex align-items-center flex-grow-1">
                                         <input type="text" name="failure_category_other" class="form-control form-control-sm ms-2" style="display:none;" placeholder="Please specify...">
+                                        <div class="invalid-feedback">Please specify your "Other" failure reason.</div>
                                     </div>
                                     {% else %}
                                     <span class="flex-grow-1">{{ value }}</span>
@@ -105,6 +113,7 @@
                                 </div>
                                 {% endfor %}
                             </div>
+                            <div class="invalid-feedback">Please select at least one primary reason for failure.</div>
                             <input type="hidden" name="failure_category_list" id="failure_category_list" />
                         </div>
 
@@ -112,6 +121,7 @@
                             <h5><strong>4. Failure Analysis</strong></h5>
                             <p>Please elaborate on what went wrong (e.g., "I trusted an outdated blog post," "I misread the column header.").</p>
                             <textarea class="form-control" id="failure_reason" name="failure_reason" rows="3" required></textarea>
+                            <div class="invalid-feedback">Please provide a failure analysis.</div>
                         </div>
 
                         <div class="mb-4 p-3 border rounded">
@@ -129,6 +139,7 @@
                                     <span>{{ value }}</span>
                                     <div class="d-flex align-items-center flex-grow-1">
                                         <input type="text" name="future_plan_other" class="form-control form-control-sm ms-2" style="display:none;" placeholder="Please specify...">
+                                        <div class="invalid-feedback">Please specify your "Other" corrective action.</div>
                                     </div>
                                     {% else %}
                                     <span class="flex-grow-1">{{ value }}</span>
@@ -136,24 +147,40 @@
                                 </div>
                                 {% endfor %}
                             </div>
+                            <div class="invalid-feedback">Please select at least one corrective action.</div>
                             <input type="hidden" name="future_plan_actions_list" id="future_plan_actions_list" />
                         </div>
 
                         <div class="mb-4 p-3 border rounded">
-                            <h5><strong>6. Remaining Effort</strong></h5>
-                            <p>How do you evaluate the difficulty of the task?</p>
-                            <div class="btn-group" role="group" aria-label="Difficulty">
+                            <h5><strong>6. Estimated Time Left</strong></h5>
+                            <p>Please estimate how much more time you think you'll need to complete this task.</p>
+                            <div class="btn-group" role="group" aria-label="Effort">
+                                {% for key, value in EFFORT_MAP.items %}
+                                <input type="radio" class="btn-check" name="estimated_time" id="effort{{ key }}" value="{{ key }}" autocomplete="off" required>
+                                <label class="btn btn-outline-primary" for="effort{{ key }}" data-bs-toggle="tooltip" data-bs-placement="top" title="{{ EFFORT_EXPLANATION_MAP|get_item:key }}">
+                                    {{ value }}
+                                </label>
+                                {% endfor %}
+                            </div>
+                            <div class="invalid-feedback">Please estimate the time left.</div>
+                        </div>
+
+                        <div class="mb-4 p-3 border rounded">
+                            <h5><strong>7. Adjusted Difficulty</strong></h5>
+                            <p>After this attempt, how would you rate the difficulty of the task?</p>
+                            <div class="btn-group" role="group" aria-label="Adjusted Difficulty">
                                 {% for key, value in DIFFICULTY_MAP.items %}
-                                <input type="radio" class="btn-check" name="remaining_effort" id="remaining_effort{{ key }}" value="{{ key }}" autocomplete="off" required>
-                                <label class="btn btn-outline-primary" for="remaining_effort{{ key }}" data-bs-toggle="tooltip" data-bs-placement="top" title="{{ DIFFICULTY_EXPLANATION_MAP|get_item:key }}">
+                                <input type="radio" class="btn-check" name="adjusted_difficulty" id="adjusted_difficulty{{ key }}" value="{{ key }}" autocomplete="off" required>
+                                <label class="btn btn-outline-primary" for="adjusted_difficulty{{ key }}" data-bs-toggle="tooltip" data-bs-placement="top" title="{{ DIFFICULTY_EXPLANATION_MAP|get_item:key }}">
                                     <strong>{{ key }}</strong><br>{{ value|split:" - "|slice:"1:"|join:" - " }}
                                 </label>
                                 {% endfor %}
                             </div>
+                            <div class="invalid-feedback">Please select the adjusted difficulty.</div>
                         </div>
 
                         <div class="mb-4 p-3 border rounded">
-                            <h5><strong>7. (Optional) Additional Reflection</strong></h5>
+                            <h5><strong>8. (Optional) Additional Reflection</strong></h5>
                             <p>Any other thoughts on this attempt?</p>
                             <textarea class="form-control" id="additional_reflection" name="additional_reflection" rows="3"></textarea>
                         </div>
@@ -220,37 +247,54 @@ $(function () {
     initializeSortable("selected-failure-categories", "unselected-failure-categories", "failure_category", "failure_category_list", "failure-separator");
     initializeSortable("selected-corrective-actions", "unselected-corrective-actions", "future_plan_actions", "future_plan_actions_list", "corrective-separator");
 
-    $('#remaining_effort').on('input', function() {
-        $('#effort_val').text($(this).val());
-    });
-
     let is_submitted = false;
     $('#query-btn').click(function () {
-        if ($('input[name="failure_category"]:checked').length === 0) {
-            alert('Please select at least one primary reason for failure.');
-            return;
+        // Reset validation states
+        $('.is-invalid').removeClass('is-invalid');
+        let isValid = true;
+
+        // Validation for failure categories
+        const failureCategories = $('input[name="failure_category"]:checked');
+        const failureCategoryOther = $('input[name="failure_category_other"]');
+        if (failureCategories.length === 0) {
+            $('#unselected-failure-categories').addClass('is-invalid');
+            isValid = false;
+        } else if ($('input[name="failure_category"][value="other"]').is(':checked') && failureCategoryOther.val().trim() === '') {
+            failureCategoryOther.addClass('is-invalid');
+            isValid = false;
         }
-        if ($('input[name="failure_category"][value="other"]').is(':checked') && $('input[name="failure_category_other"]').val().trim() === '') {
-            alert('Please specify your "Other" failure reason.');
-            $('input[name="failure_category_other"]').focus();
-            return;
+
+        // Validation for failure reason
+        const failureReason = $('#failure_reason');
+        if (failureReason.val().trim() === '') {
+            failureReason.addClass('is-invalid');
+            isValid = false;
         }
-        if ($('#failure_reason').val().trim() === '') {
-            alert('Please provide a failure analysis.');
-            $('#failure_reason').focus();
-            return;
+
+        // Validation for corrective plan
+        const correctiveActions = $('input[name="future_plan_actions"]:checked');
+        const correctiveActionOther = $('input[name="future_plan_other"]');
+        if (correctiveActions.length === 0) {
+            $('#unselected-corrective-actions').addClass('is-invalid');
+            isValid = false;
+        } else if ($('input[name="future_plan_actions"][value="other"]').is(':checked') && correctiveActionOther.val().trim() === '') {
+            correctiveActionOther.addClass('is-invalid');
+            isValid = false;
         }
-        if ($('input[name="future_plan_actions"]:checked').length === 0) {
-            alert('Please select at least one corrective action.');
-            return;
+
+        // Validation for estimated time left
+        if (!$('input[name="estimated_time"]:checked').val()) {
+            $('input[name="estimated_time"]').closest('.btn-group').addClass('is-invalid');
+            isValid = false;
         }
-        if ($('input[name="future_plan_actions"][value="other"]').is(':checked') && $('input[name="future_plan_other"]').val().trim() === '') {
-            alert('Please specify your "Other" corrective action.');
-            $('input[name="future_plan_other"]').focus();
-            return;
+
+        // Validation for adjusted difficulty
+        if (!$('input[name="adjusted_difficulty"]:checked').val()) {
+            $('input[name="adjusted_difficulty"]').closest('.btn-group').addClass('is-invalid');
+            isValid = false;
         }
-        if (!$('input[name="remaining_effort"]:checked').val()) {
-            alert('Please select the remaining effort.');
+
+        if (!isValid) {
             return;
         }
 
@@ -259,6 +303,21 @@ $(function () {
             $('#query-form').submit();
         }
     });
+
+    // Clear validation on input
+    $('input[name="failure_category"]').change(() => {
+        $('#unselected-failure-categories').removeClass('is-invalid');
+        $('input[name="failure_category_other"]').removeClass('is-invalid');
+    });
+    $('input[name="failure_category_other"]').on('input', () => $('input[name="failure_category_other"]').removeClass('is-invalid'));
+    $('#failure_reason').on('input', () => $('#failure_reason').removeClass('is-invalid'));
+    $('input[name="future_plan_actions"]').change(() => {
+        $('#unselected-corrective-actions').removeClass('is-invalid');
+        $('input[name="future_plan_other"]').removeClass('is-invalid');
+    });
+    $('input[name="future_plan_other"]').on('input', () => $('input[name="future_plan_other"]').removeClass('is-invalid'));
+    $('input[name="estimated_time"]').change(() => $('input[name="estimated_time"]').closest('.btn-group').removeClass('is-invalid'));
+    $('input[name="adjusted_difficulty"]').change(() => $('input[name="adjusted_difficulty"]').closest('.btn-group').removeClass('is-invalid'));
 
     window.addEventListener('beforeunload', function (e) {
         if (!is_submitted) {

@@ -11,6 +11,51 @@ let _content_vars = {
     is_task_active: false,
 };
 
+function displayQuestionBox(question) {
+    if (!question) return;
+
+    const box = document.createElement('div');
+    box.id = 'task-question-box';
+    box.className = 'rr-ignore rr-block';
+    box.style.cssText = `
+        position: fixed;
+        top: 10px;
+        right: 10px;
+        background-color: #f8f9fa;
+        color: #212529;
+        padding: 1rem;
+        border-radius: .25rem;
+        z-index: 2147483647;
+        max-width: 300px;
+        font-size: 1.2rem;
+        line-height: 1.5;
+        box-shadow: 0 .5rem 1rem rgba(0,0,0,.15);
+        border-left: 5px solid #021e4d;
+        opacity: 0.8;
+        transition: opacity 0.3s ease-in-out;
+        font-family: 'Noto Sans SC', sans-serif;
+        pointer-events: none;
+    `;
+    box.innerHTML = `<h5 style="margin-bottom: 0.5rem;margin-top: 0;"><strong>Task Question</strong></h5><p style="margin-bottom: 0;">${question}</p>`;
+
+    document.body.appendChild(box);
+}
+
+async function getTaskInfo() {
+    return new Promise((resolve, reject) => {
+        chrome.runtime.sendMessage({ type: MSG_TYPE_POPUP, command: "get_task_info" }, function (response) {
+            if (chrome.runtime.lastError) {
+                console.error("Error getting task info:", chrome.runtime.lastError.message);
+                return reject(chrome.runtime.lastError);
+            }
+            if (response && response.question) {
+                displayQuestionBox(response.question);
+            }
+            resolve();
+        });
+    });
+}
+
 function updateTaskStatus() {
     printDebug("content", "Checking if task is active...");
     return new Promise((resolve, reject) => {
@@ -31,6 +76,23 @@ function updateTaskStatus() {
 
 function getTaskStatus() {
     return _content_vars.is_task_active;
+}
+
+function removeExistingBoxes() {
+    const questionBox = document.getElementById('task-question-box');
+    if (questionBox) {
+        questionBox.remove();
+    }
+    const loadedBoxes = document.querySelectorAll('.loaded-box');
+    loadedBoxes.forEach(box => box.remove());
+}
+
+async function setupTaskUI() {
+    removeExistingBoxes();
+    await getTaskInfo();
+    if (!_is_server_page(_content_vars.url_now)) {
+        displayLoadedBox("You can start your task now!");
+    }
 }
 
 async function initialize() {
@@ -56,6 +118,8 @@ async function initialize() {
             return;
         }
 
+        await setupTaskUI();
+
         // Monkey-patch history API for SPA navigation tracking
         (function (history) {
             const { pushState, replaceState } = history;
@@ -67,7 +131,8 @@ async function initialize() {
                         _content_vars.referrer_now = _content_vars.url_now;
                         _content_vars.url_now = window.location.href;
                         viewState.flush();
-                        printDebug("content", "URL changed (pushState), re-initializing.");
+                        setupTaskUI();
+                        printDebug("content", "URL changed (pushState), re-initializing UI.");
                     }
                 }, 0);
             };
@@ -79,7 +144,8 @@ async function initialize() {
                         _content_vars.referrer_now = _content_vars.url_now;
                         _content_vars.url_now = window.location.href;
                         viewState.flush();
-                        printDebug("content", "URL changed (replaceState), re-initializing.");
+                        setupTaskUI();
+                        printDebug("content", "URL changed (replaceState), re-initializing UI.");
                     }
                 }, 0);
             };
@@ -95,7 +161,6 @@ async function initialize() {
                 },
             });
             printDebug("content", "rrweb recording started.");
-            displayLoadedBox("Start Recording");
         }
 
     } catch (error) {
@@ -112,7 +177,8 @@ window.addEventListener('popstate', () => {
         _content_vars.referrer_now = _content_vars.url_now;
         _content_vars.url_now = window.location.href;
         viewState.flush();
-        printDebug("content", "URL changed (popstate), re-initializing.");
+        setupTaskUI();
+        printDebug("content", "URL changed (popstate), re-initializing UI.");
     }
 });
 

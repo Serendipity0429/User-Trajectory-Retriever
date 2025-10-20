@@ -141,7 +141,11 @@ def pre_task_annotation(request, timestamp):
         pre_annotation.familiarity = request.POST.get("familiarity")
         pre_annotation.difficulty = request.POST.get("difficulty")
         pre_annotation.effort = request.POST.get("effort")
-        pre_annotation.initial_strategy = request.POST.get("initial_strategy")
+        pre_annotation.first_search_query = request.POST.get("first_search_query")
+        pre_annotation.initial_guess = request.POST.get("initial_guess")
+        pre_annotation.initial_guess_unknown = request.POST.get("initial_guess_unknown") == "on"
+        pre_annotation.expected_source = request.POST.getlist("expected_source")
+        pre_annotation.expected_source_other = request.POST.get("expected_source_other")
         pre_annotation.save()
 
         stop_annotating()
@@ -174,8 +178,11 @@ def pre_task_annotation(request, timestamp):
                 "entry_id": entry.id,
                 "FAMILIARITY_MAP": FAMILIARITY_MAP,
                 "DIFFICULTY_MAP": DIFFICULTY_MAP,
+                "EFFORT_MAP": EFFORT_MAP,
                 "FAMILIARITY_EXPLANATION_MAP": FAMILIARITY_EXPLANATION_MAP,
                 "DIFFICULTY_EXPLANATION_MAP": DIFFICULTY_EXPLANATION_MAP,
+                "EFFORT_EXPLANATION_MAP": EFFORT_EXPLANATION_MAP,
+                "EXPECTED_SOURCES_MAP": EXPECTED_SOURCES_MAP,
             },
         )
 
@@ -183,6 +190,7 @@ def pre_task_annotation(request, timestamp):
 # Post-Task Annotation Fetcher
 @api_view(["GET", "POST"])
 @permission_classes([IsAuthenticated])
+@wait_until_data_stored
 def post_task_annotation(request, task_id):
     print_debug("function post_task_annotation")
     user = request.user
@@ -300,6 +308,7 @@ from django.contrib.auth.decorators import login_required
 
 @login_required
 @permission_classes([IsAuthenticated])
+@wait_until_data_stored
 def task_home(request):
     print_debug("function task_home")
     user = request.user
@@ -377,6 +386,34 @@ def annotation_home(request):
         },
     )
 
+
+EXPECTED_SOURCES_MAP = {
+    "personal": "Personal Knowledge / Experience",
+    "wikipedia": "Wikipedia / Encyclopedia",
+    "news": "News / Media Outlet",
+    "forum": "Forum / Social Media / Q&A Site",
+    "academic": "Academic Paper / Book",
+    "video": "Video / Documentary",
+    "other": "Other",
+}
+
+EFFORT_MAP = {
+    0: "0-3 minutes",
+    1: "3-5 minutes",
+    2: "5-10 minutes",
+    3: "10-15 minutes",
+    4: "15-30 minutes",
+    5: "30+ minutes",
+}
+
+EFFORT_EXPLANATION_MAP = {
+    0: "The task is very simple and I expect to find the answer almost immediately.",
+    1: "The task is simple and I expect to find the answer with a simple search.",
+    2: "The task is of average difficulty and may require browsing a few pages.",
+    3: "The task is difficult and may require some in-depth research.",
+    4: "The task is very difficult and may require significant effort and synthesis.",
+    5: "The task is extremely difficult and I expect it to take a long time.",
+}
 
 FAMILIARITY_MAP = {
     0: "0 - Not familiar at all",
@@ -592,11 +629,27 @@ def map_json_list(json_string, mapping):
         return []
 
 
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def get_task_info(request):
+    print_debug("function get_task_info")
+    user = request.user
+    task_id = request.query_params.get("task_id")
+    task = Task.objects.filter(id=task_id, user=user, active=True).first()
+    if task is None:
+        return HttpResponse(f"No task found with task_id={task_id}", status=404)
+
+    question = task.content.question
+    trial_num = task.num_trial
+    return JsonResponse({"question": question, "trial_num": trial_num})
+
+
 # =============================================
 # =        Updated show_task Function         =
 # =============================================
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
+@wait_until_data_stored
 def show_task(request, task_id):
     """
     Fetches all data related to a specific task and renders it in a detail view.
@@ -666,6 +719,7 @@ def show_task(request, task_id):
         "task": task,
         "FAMILIARITY_MAP": FAMILIARITY_MAP,
         "DIFFICULTY_MAP": DIFFICULTY_MAP,
+        "EFFORT_MAP": EFFORT_MAP,
         "CONFIDENCE_MAP": CONFIDENCE_MAP,
         "REASONING_METHOD_MAP": REASONING_METHOD_MAP,
         "FAILURE_CATEGORY_MAP": FAILURE_CATEGORY_MAP,
@@ -675,6 +729,7 @@ def show_task(request, task_id):
         "STRATEGY_SHIFT_MAP": STRATEGY_SHIFT_MAP,
         "CANCEL_CATEGORY_MAP": CANCEL_CATEGORY_MAP,
         "MISSING_RESOURCES_MAP": MISSING_RESOURCES_MAP,
+        "EXPECTED_SOURCES_MAP": EXPECTED_SOURCES_MAP,
     }
     return render(request, "show_task.html", context)
 
@@ -715,6 +770,7 @@ def tool_use(request):
 
 
 @permission_classes([IsAuthenticated])
+@wait_until_data_stored
 def cancel_annotation(request, task_id, end_timestamp):
     print_debug("function cancel_annotation")
     user = request.user
@@ -769,6 +825,7 @@ def cancel_annotation(request, task_id, end_timestamp):
 
 
 @permission_classes([IsAuthenticated])
+@wait_until_data_stored
 def reflection_annotation(request, task_trial_id):
     print_debug("function reflection_annotation")
     user = request.user
@@ -790,7 +847,8 @@ def reflection_annotation(request, task_trial_id):
             failure_reason=request.POST.get("failure_reason"),
             future_plan_actions=request.POST.get("future_plan_actions_list"),
             future_plan_other=request.POST.get("future_plan_other"),
-            remaining_effort=request.POST.get("remaining_effort"),
+            estimated_time=request.POST.get("estimated_time"),
+            adjusted_difficulty=request.POST.get("adjusted_difficulty"),
             additional_reflection=request.POST.get("additional_reflection"),
         )
         ref_annotation.save()
@@ -826,6 +884,8 @@ def reflection_annotation(request, task_trial_id):
                 "FAILURE_CATEGORY_MAP": FAILURE_CATEGORY_MAP,
                 "CORRECTIVE_PLAN_MAP": CORRECTIVE_PLAN_MAP,
                 "DIFFICULTY_MAP": DIFFICULTY_MAP,
+                "EFFORT_MAP": EFFORT_MAP,
+                "EFFORT_EXPLANATION_MAP": EFFORT_EXPLANATION_MAP,
                 "DIFFICULTY_EXPLANATION_MAP": DIFFICULTY_EXPLANATION_MAP,
                 "FAILURE_CATEGORY_EXPLANATION_MAP": FAILURE_CATEGORY_EXPLANATION_MAP,
                 "CORRECTIVE_ACTION_EXPLANATION_MAP": CORRECTIVE_ACTION_EXPLANATION_MAP,

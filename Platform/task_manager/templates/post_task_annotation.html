@@ -76,7 +76,9 @@
                         <div class="mb-4 p-3 border rounded">
                             <h5><strong>1. Task Review</strong></h5>
                             <p><strong>Question:</strong></p>
-                            <div class="p-3 bg-light rounded mb-3 question-text">{{ question }}</div>
+                            <div class="p-3 bg-light rounded mb-3 loaded-box">
+    <div class="question-text">{{ question }}</div>
+</div>
                             <div class="d-flex justify-content-between align-items-center">
                                 <p class="mb-0"><strong>Correct Answer(s):</strong></p>
                                 <div class="mt-2">
@@ -109,6 +111,7 @@
                                 </label>
                                 {% endfor %}
                             </div>
+                            <div class="invalid-feedback">Please rate the overall difficulty.</div>
                         </div>
 
                         <!-- "Aha!" Moment -->
@@ -122,10 +125,12 @@
                                     <label class="btn btn-outline-primary {% if key != 'other' %}w-100{% endif %} text-start" for="aha{{ key }}" data-bs-toggle="tooltip" data-bs-placement="top" title="{{ AHA_MOMENT_EXPLANATION_MAP|get_item:key }}">{{ value }}</label>
                                     {% if key == 'other' %}
                                     <input type="text" name="aha_moment_other" class="form-control ms-2" disabled placeholder="Please specify...">
+                                    <div class="invalid-feedback">Please specify your "Other" Aha! moment.</div>
                                     {% endif %}
                                 </div>
                                 {% endfor %}
                             </div>
+                            <div class="invalid-feedback">Please select your "Aha!" moment.</div>
                             <label for="aha_moment_source" class="form-label mt-2">(Optional) Paste the source URL or search query for this "Aha!" moment.</label>
                             <input type="text" class="form-control" id="aha_moment_source" name="aha_moment_source">
                         </div>
@@ -158,10 +163,12 @@
                                     <label class="btn btn-outline-primary {% if key != 'other' %}w-100{% endif %} text-start" for="strategy{{ key }}" data-bs-toggle="tooltip" data-bs-placement="top" title="{{ STRATEGY_SHIFT_EXPLANATION_MAP|get_item:key }}">{{ value }}</label>
                                     {% if key == 'other' %}
                                     <input type="text" name="strategy_shift_other" class="form-control ms-2" disabled placeholder="Please specify...">
+                                    <div class="invalid-feedback">Please specify your "Other" strategic shift.</div>
                                     {% endif %}
                                 </div>
                                 {% endfor %}
                             </div>
+                            <div class="invalid-feedback">Please select a strategic shift.</div>
                         </div>
 
                         <!-- Additional Reflection -->
@@ -231,29 +238,39 @@
         // Form submission
         let is_submitted = false;
         $('#query-btn').click(function () {
-            // Validation logic
+            // Reset validation states
+            $('.is-invalid').removeClass('is-invalid');
+            let isValid = true;
+
+            // Validation for overall difficulty
             if (!$('input[name="difficulty_actual"]:checked').val()) {
-                alert('Please rate the overall difficulty.');
-                return;
+                $('input[name="difficulty_actual"]').closest('.btn-group').addClass('is-invalid');
+                isValid = false;
             }
+
+            // Validation for "Aha!" moment
             const ahaMoment = $('input[name="aha_moment_type"]:checked');
+            const ahaMomentOther = $('input[name="aha_moment_other"]');
             if (!ahaMoment.val()) {
-                alert('Please select your "Aha!" moment.');
-                return;
+                $('input[name="aha_moment_type"]').closest('.w-100').addClass('is-invalid');
+                isValid = false;
+            } else if (ahaMoment.val() === 'other' && ahaMomentOther.val().trim() === '') {
+                ahaMomentOther.addClass('is-invalid');
+                isValid = false;
             }
-            if (ahaMoment.val() === 'other' && $('input[name="aha_moment_other"]').val().trim() === '') {
-                alert('Please specify your "Other" Aha! moment.');
-                $('input[name="aha_moment_other"]').focus();
-                return;
-            }
+
+            // Validation for strategic shift
             const strategyShift = $('input[name="strategy_shift"]:checked');
+            const strategyShiftOther = $('input[name="strategy_shift_other"]');
             if (!strategyShift.val()) {
-                alert('Please select a strategic shift.');
-                return;
+                $('input[name="strategy_shift"]').closest('.w-100').addClass('is-invalid');
+                isValid = false;
+            } else if (strategyShift.val() === 'other' && strategyShiftOther.val().trim() === '') {
+                strategyShiftOther.addClass('is-invalid');
+                isValid = false;
             }
-            if (strategyShift.val() === 'other' && $('input[name="strategy_shift_other"]').val().trim() === '') {
-                alert('Please specify your "Other" strategic shift.');
-                $('input[name="strategy_shift_other"]').focus();
+
+            if (!isValid) {
                 return;
             }
 
@@ -262,6 +279,19 @@
                 $('#query-form').submit();
             }
         });
+
+        // Clear validation on input
+        $('input[name="difficulty_actual"]').change(() => $('input[name="difficulty_actual"]').closest('.btn-group').removeClass('is-invalid'));
+        $('input[name="aha_moment_type"]').change(() => {
+            $('input[name="aha_moment_type"]').closest('.w-100').removeClass('is-invalid');
+            $('input[name="aha_moment_other"]').removeClass('is-invalid');
+        });
+        $('input[name="aha_moment_other"]').on('input', () => $('input[name="aha_moment_other"]').removeClass('is-invalid'));
+        $('input[name="strategy_shift"]').change(() => {
+            $('input[name="strategy_shift"]').closest('.w-100').removeClass('is-invalid');
+            $('input[name="strategy_shift_other"]').removeClass('is-invalid');
+        });
+        $('input[name="strategy_shift_other"]').on('input', () => $('input[name="strategy_shift_other"]').removeClass('is-invalid'));
 
         window.addEventListener('beforeunload', function (e) {
             if (!is_submitted) {

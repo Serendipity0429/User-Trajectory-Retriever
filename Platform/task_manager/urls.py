@@ -10,6 +10,7 @@ urlpatterns = [
     path('data/', views.data, name='data'),
     path('annotation/', views.annotation_home, name='annotation_home'),
     path('active_task/', views.active_task, name='active_task'),
+    path('get_task_info/', views.get_task_info, name='get_task_info'),
     path('initialize/', views.initialize, name='initialize'),
     path('show_tool_use_page/', views.show_tool_use_page, name='show_tool_use_page'), # Show tool use page
     path('tool_use/', views.tool_use, name='tool_use'), # Tool use

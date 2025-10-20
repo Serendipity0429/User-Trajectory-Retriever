@@ -60,7 +60,7 @@ h1 {
     align-items: center;
     background-color: var(--white);
     border-radius: 8px;
-    padding: 12px;
+    padding: 10px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.05);
     margin-bottom: 15px;
     position: relative;
@@ -77,12 +77,13 @@ h1 {
     outline: none;
     width: 100%;
     font-size: 16px;
+    padding-right: 35px; /* Space for the icon */
     flex: 1;
 }
 
 #togglePassword {
     position: absolute;
-    right: 12px;
+    right: 10px;
     top: 50%;
     transform: translateY(-50%);
     cursor: pointer;
@@ -133,6 +134,14 @@ h1 {
 
 #login > .btn {
     margin-bottom: 15px;
+}
+
+#signupBtn, #homeBtnLoggedOut, #homeBtnLoggedIn {
+    background-color: #808080; /* Grey */
+}
+
+#signupBtn:hover, #homeBtnLoggedOut:hover, #homeBtnLoggedIn:hover {
+    background-color: #696969; /* Darker Grey */
 }
 
 #bt1, #bt4 {
@@ -215,8 +224,27 @@ h1 {
     margin-bottom: 5px;
 }
 
-#active_task {
+.info-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px;
+    background-color: var(--white);
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    margin-bottom: 10px;
+}
+
+.info-label {
     font-size: 16px;
+    font-weight: 500;
+    color: var(--dark-gray);
+}
+
+.info-value {
+    font-size: 16px;
+    font-weight: 400;
+    color: var(--primary-color);
 }
 
 .button-group {
@@ -286,6 +314,3 @@ h1 {
     display: none;
 }
 
-.password-with-icon {
-    padding-right: 2.5rem; /* Adjust as needed */
-}

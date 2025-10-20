@@ -4,6 +4,7 @@
 const IS_DEV = !('update_url' in chrome.runtime.getManifest());
 const URL_BASE = IS_DEV ? "http://127.0.0.1:8000" : "http://101.6.41.59:32904";
 const IS_PASSIVE_MODE = true;
+const CANCEL_TRIAL_THRESHOLD = 10; // number of trials before the user is allowed to cancel annotation
 
 const URLS = {
     base: URL_BASE,
@@ -14,6 +15,7 @@ const URLS = {
     data: `${URL_BASE}/task/data/`,
     cancel: `${URL_BASE}/task/cancel_annotation/`,
     active_task: `${URL_BASE}/task/active_task/`,
+    get_task_info: `${URL_BASE}/task/get_task_info/`,
     register: `${URL_BASE}/user/signup/`,
     home: `${URL_BASE}/task/home/`,
     stop_annotation: `${URL_BASE}/task/stop_annotation/`,
@@ -25,6 +27,7 @@ const config = {
     is_passive_mode: IS_PASSIVE_MODE,
     urls: URLS,
     version: chrome.runtime.getManifest().version,
+    cancel_trial_threshold: CANCEL_TRIAL_THRESHOLD,
 };
 
 
@@ -61,7 +64,7 @@ async function refreshToken() {
 
     const { refresh_token } = await _get_local('refresh_token');
     if (!refresh_token) {
-        console.error("Refresh token not found. Forcing logout.");
+        printDebug("utils", "Refresh token not found. Forcing logout.");
         // Force logout if refresh token is missing
         await _remove_local(['access_token', 'refresh_token', 'username', 'logged_in']);
         chrome.runtime.sendMessage({ command: "alter_logging_status", log_status: false });
@@ -105,30 +108,32 @@ async function refreshToken() {
     }
 }
 
-async function _post(url, data = {}, json_response = true, raw_data = false, send_as_json = false) {
+async function _request(method, url, data = {}, json_response = true, raw_data = false, send_as_json = false) {
     try {
         const { access_token } = await _get_local('access_token');
-
         let headers = {};
         let body;
+        let request_url = url;
 
-        if (send_as_json) {
-            headers["Content-Type"] = "application/json";
-            body = JSON.stringify(data);
-        } else if (!raw_data) {
-            headers["Content-Type"] = "application/x-www-form-urlencoded";
-            body = new URLSearchParams(data);
-        } else {
-            headers["Content-Type"] = "text/plain";
-            body = typeof data === "string" ? data : String(data);
+        if (method.toUpperCase() === 'POST') {
+            if (send_as_json) {
+                headers["Content-Type"] = "application/json";
+                body = JSON.stringify(data);
+            } else if (!raw_data) {
+                headers["Content-Type"] = "application/x-www-form-urlencoded";
+                body = new URLSearchParams(data);
+            } else {
+                headers["Content-Type"] = "text/plain";
+                body = typeof data === "string" ? data : String(data);
+            }
         }
 
         if (access_token && url !== URLS.token_login) {
             headers["Authorization"] = `Bearer ${access_token}`;
         }
 
-        let response = await fetch(url, {
-            method: "POST",
+        let response = await fetch(request_url, {
+            method: method.toUpperCase(),
             headers,
             body,
         });
@@ -137,8 +142,8 @@ async function _post(url, data = {}, json_response = true, raw_data = false, sen
             const new_token = await refreshToken();
             if (new_token) {
                 headers["Authorization"] = `Bearer ${new_token}`;
-                response = await fetch(url, {
-                    method: "POST",
+                response = await fetch(request_url, {
+                    method: method.toUpperCase(),
                     headers,
                     body,
                 });
@@ -159,6 +164,14 @@ async function _post(url, data = {}, json_response = true, raw_data = false, sen
         printDebug("utils", `API request failed: ${url}`, error);
         throw error; // Re-throw the error to be handled by the caller
     }
+}
+
+async function _get(url, json_response = true) {
+    return _request('GET', url, {}, json_response);
+}
+
+async function _post(url, data = {}, json_response = true, raw_data = false, send_as_json = false) {
+    return _request('POST', url, data, json_response, raw_data, send_as_json);
 }
 
 // --- Storage --- 
@@ -231,21 +244,29 @@ function displayLoadedBox(message) {
     const box = document.createElement('div');
     box.className = 'rr-ignore loaded-box rr-block';
     box.style.cssText = `
-        opacity: 0.2;
-        transition: opacity 0.5s ease-in-out;
         position: fixed;
         right: 10px;
-        background-color: white;
-        color: black;
-        padding: 10px;
-        border: 2px solid rgb(151, 67, 219);
+        background-color: #f8f9fa;
+        color: #212529;
+        padding: 1rem;
+        border-radius: .25rem;
         z-index: 2147483647;
-        content-visibility: visible;
+        box-shadow: 0 .5rem 1rem rgba(0,0,0,.15);
+        border-left: 5px solid #021e4d;
+        opacity: 0;
+        transition: opacity 0.5s ease-in-out;
+        font-size: 1rem;
+        font-family: 'Noto Sans SC', sans-serif;
     `;
     box.innerText = message;
 
-    const existingBoxes = document.querySelectorAll('.loaded-box');
     let topPosition = 10;
+    const questionBox = document.getElementById('task-question-box');
+    if (questionBox) {
+        topPosition = questionBox.getBoundingClientRect().bottom + 10;
+    }
+
+    const existingBoxes = document.querySelectorAll('.loaded-box');
     existingBoxes.forEach(existingBox => {
         topPosition = Math.max(topPosition, existingBox.getBoundingClientRect().bottom + 10);
     });

@@ -44,12 +44,18 @@
             <div id="logged" hidden class="content">
                 <div id="user-info">
                     <p id="username_text_logged"></p>
-                    <p id="active_task">No active task</p>
+                    <div class="info-item">
+                        <span class="info-label">Active Task ID:</span>
+                        <span id="active_task" class="info-value">No active task</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Attempted Task Trial:</span>
+                        <span id="task_trial" class="info-value">0</span>
+                    </div>
                 </div>
                 <div class="button-group">
                     <button id="startTaskBtn" class="btn"><i class="fas fa-play"></i> Start Task</button>
                     <button id="submitAnswerBtn" class="btn"><i class="fas fa-check"></i> Submit Answer</button>
-                    <button id="viewTaskInfoBtn" class="btn"><i class="fas fa-info-circle"></i> View Task Info</button>
                     <button id="cancelAnnotationBtn" class="btn btn-danger"><i class="fas fa-times"></i> Cancel Annotation</button>
                     <button id="homeBtnLoggedIn" class="btn"><i class="fas fa-globe"></i> Home</button>
                     <button id="logoutBtn" class="btn btn-danger"><i class="fas fa-sign-out-alt"></i> Logout</button>

@@ -84,10 +84,10 @@ function switchUiState(show_login) {
     let loginDiv = document.getElementById('login');
     printDebug("popup", "loggedDiv:", loggedDiv, "loginDiv:", loginDiv);
     printDebug("popup", "show_login:", show_login);
-    if (show_login) {
+    if (show_login) { // Display login interface
         loggedDiv.style.display = 'none';
         loginDiv.style.display = 'block';
-    } else {
+    } else { // Display logged-in interface
         loginDiv.style.display = 'none';
         loggedDiv.style.display = 'block';
     }
@@ -99,20 +99,30 @@ async function displayActiveTask() {
     printDebug("popup", "Active task ID:", active_task_id);
     const activeTaskEl = document.getElementById('active_task');
     const startTaskBtn = document.getElementById('startTaskBtn');
+    const taskTrialEl = document.getElementById('task_trial');
 
     if (active_task_id === -1) {
         switchTaskButtonStatus('off');
         activeTaskEl.textContent = "No active task";
-        activeTaskEl.style.color = "#000";
+        activeTaskEl.style.color = "";
+        taskTrialEl.textContent = "0";
     } else if (active_task_id === -2) {
         switchTaskButtonStatus('off');
         startTaskBtn.setAttribute("disabled", "true");
         activeTaskEl.textContent = "Fail to connect to server";
         activeTaskEl.style.color = "#e13636";
+        taskTrialEl.textContent = "0";
     } else {
-        switchTaskButtonStatus('on');
-        activeTaskEl.textContent = "Active task ID: " + active_task_id;
-        activeTaskEl.style.color = "#000";
+        const task_info = await getTaskInfo(active_task_id);
+        if (task_info) {
+            taskTrialEl.textContent = task_info.trial_num;
+            switchTaskButtonStatus('on', task_info.trial_num);
+        } else {
+            taskTrialEl.textContent = "N/A";
+            switchTaskButtonStatus('on', 0);
+        }
+        activeTaskEl.textContent = active_task_id;
+        activeTaskEl.style.color = "";
     }
 }
 
@@ -129,20 +139,19 @@ function showLoginTab() {
     switchUiState(true);
 }
 
-function switchTaskButtonStatus(task_status) {
+function switchTaskButtonStatus(task_status, trial_num = 0) {
     const is_active = task_status === 'on';
     const startTaskBtn = document.getElementById('startTaskBtn');
     const endTaskBtn = document.getElementById('submitAnswerBtn');
     const cancelTaskBtn = document.getElementById('cancelAnnotationBtn');
-    const viewTaskInfoBtn = document.getElementById('viewTaskInfoBtn');
 
     startTaskBtn.style.display = is_active ? 'none' : 'block';
     endTaskBtn.style.display = is_active ? 'block' : 'none';
+    cancelTaskBtn.style.display = config.is_dev || trial_num > config.cancel_trial_threshold ? 'block' : 'none';
 
     startTaskBtn.disabled = is_active;
     endTaskBtn.disabled = !is_active;
     cancelTaskBtn.disabled = !is_active;
-    viewTaskInfoBtn.disabled = !is_active;
 }
 
 // --- API CALLS ---
@@ -169,6 +178,16 @@ async function getActiveTask() {
     } catch (error) {
         console.error("Failed to get active task from background script:", error);
         return -2;
+    }
+}
+
+async function getTaskInfo(task_id) {
+    try {
+        const response = await sendMessageFromPopup({ command: "get_task_info", task_id: task_id });
+        return response;
+    } catch (error) {
+        console.error("Failed to get task info from background script:", error);
+        return null;
     }
 }
 
@@ -211,8 +230,8 @@ async function handleLoginAttempt() {
             });
             await sendMessageFromPopup({ command: "alter_logging_status", log_status: true });
             await showUserTab();
-            // chrome.action.setBadgeText({ text: 'on' });
-            // chrome.action.setBadgeBackgroundColor({ color: [202, 181, 225, 255] });
+            chrome.action.setBadgeText({ text: 'off' });
+            chrome.action.setBadgeBackgroundColor({ color: [202, 181, 225, 255] });
         } else {
             chrome.action.setBadgeText({ text: '' });
             const error_code = login_response?.error_code ?? -1;
@@ -306,13 +325,6 @@ async function handleCancelTask() {
     }
 }
 
-async function handleViewTask() {
-    const current_task_id = await getActiveTask();
-    if (current_task_id !== -1) {
-        openTaskWindow(`/task/view_task_info/${current_task_id}/`, true);
-    }
-}
-
 // --- INITIALIZATION ---
 (async function initialize() {
     document.getElementById('signupBtn').addEventListener('click', handleRegister);
@@ -323,7 +335,6 @@ async function handleViewTask() {
     document.getElementById('startTaskBtn').addEventListener('click', handleStartTask);
     document.getElementById('submitAnswerBtn').addEventListener('click', handleEndTask);
     document.getElementById('cancelAnnotationBtn').addEventListener('click', handleCancelTask);
-    document.getElementById('viewTaskInfoBtn').addEventListener('click', handleViewTask);
 
     const { access_token } = await _get_local(['access_token']);
     if (access_token) {

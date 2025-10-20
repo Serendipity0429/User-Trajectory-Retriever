@@ -278,13 +278,10 @@ h2.text-success {
     cursor: pointer;
 }
 
-.card-header[data-bs-toggle='collapse']:hover {
-    background-color: #f8f9fa;
-}
-
 .question-text {
-    color: black !important;
+    color: #333 !important;
     font-weight: bold !important;
+    font-size: 1.2em !important;
 }
 
 .question-text {
@@ -296,11 +293,42 @@ h2.text-success {
     padding-right: 2.5rem; /* Make space for the icon */
 }
 
+
+
+
+
+
+
 .form-floating > .bi {
+
+
+
     position: absolute;
+
+
+
     top: 50%;
+
+
+
     right: 1rem;
+
+
+
     transform: translateY(-50%);
+
+
+
     cursor: pointer;
+
+
+
     z-index: 2;
+
+
+
 }
+
+
+
+

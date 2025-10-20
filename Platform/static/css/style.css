@@ -70,8 +70,10 @@ div.question-wrapper {
     margin-bottom: 10px;
 }
 
-div.question-wrapper .question-text {
-    font-size: large;
+div.question-wrapper .question-text, .loaded-box .question-text {
+    font-size: 1.2em;
+    color: #333;
+    font-weight: bold;
 }
 
 div.question-wrapper .notice {

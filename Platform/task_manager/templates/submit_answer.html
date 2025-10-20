@@ -66,19 +66,23 @@
 
                     <form id="query-form" action="" method="post">
                         {% csrf_token %}
-                        <div class="mb-4 p-3 border rounded bg-light">
-                            <h5><i class="bi bi-question-circle-fill me-2"></i>Question</h5>
-                            <p class="lead">{{ question }}</p>
-                        </div>
+                        <div class="mb-4 p-3 border rounded">
+                            <h5><i class="bi bi-question-circle-fill me-2"></i><strong>Question</strong></h5>
+                             <div class="p-3 bg-light rounded loaded-box">
+                                 <div class="question-text">
+                                     {{ question }}
+                                 </div>
+                             </div>                        </div>
 
                         <div class="mb-4 p-3 border rounded">
-                            <label for="answer" class="form-label"><strong>1. Your Answer</strong></label>
+                            <h5><strong>1. Your Answer</strong></h5>
                             <textarea class="form-control" id="answer" name="answer" rows="3" required></textarea>
+                            <div class="invalid-feedback">Please provide your answer.</div>
                         </div>
 
                         <div class="mb-4 p-3 border rounded">
-                            <label class="form-label"><strong>2. Confidence</strong></label>
-                            <p class="form-text text-muted">How confident are you in your answer?</p>
+                            <h5><strong>2. Confidence</strong></h5>
+                            <p>How confident are you in your answer?</p>
                             <div class="btn-group" role="group" aria-label="Confidence">
                                 {% for value, text in confidence_choices %}
                                 <input type="radio" class="btn-check" name="confidence_radio" id="c{{ forloop.counter }}" value="{{ value }}" autocomplete="off" required>
@@ -88,19 +92,22 @@
                                 {% endfor %}
                             </div>
                             <input type="hidden" name="confidence" id="confidence_hidden" required>
+                            <div class="invalid-feedback">Please select your confidence level.</div>
                         </div>
 
                         <div id="source-container" class="mb-4 p-3 border rounded">
-                            <label class="form-label"><strong>3. Justification</strong></label>
-                            <p class="form-text text-muted">Please provide at least one source URL and the relevant text from that source.</p>
+                            <h5><strong>3. Justification</strong></h5>
+                            <p>Please provide at least one source URL and the relevant text from that source.</p>
                             <div class="source-entry card p-3 mb-2">
                                 <div class="form-floating mb-2">
                                     <input type="url" class="form-control" name="source_url_0" required placeholder="Source URL">
                                     <label>Source URL</label>
+                                    <div class="invalid-feedback">Please provide a source URL.</div>
                                 </div>
                                 <div class="form-floating">
                                     <textarea class="form-control" name="source_text_0" rows="3" required placeholder="Source Text"></textarea>
                                     <label>Source Text</label>
+                                    <div class="invalid-feedback">Please provide the source text.</div>
                                 </div>
                                 <button type="button" class="btn btn-danger btn-sm remove-source mt-2 align-self-end" style="display: none;">Remove</button>
                             </div>
@@ -108,7 +115,8 @@
                         <button type="button" id="add-source" class="btn btn-outline-success btn-sm mb-3"><i class="bi bi-plus-circle-fill me-2"></i>Add Another Source</button>
 
                         <div class="mb-4 p-3 border rounded">
-                            <label class="form-label"><strong>4. Reasoning Method</strong></label>
+                            <h5><strong>4. Reasoning Method</strong></h5>
+                            <p> Which reasoning method did you primarily use to arrive at your answer?</p>
                             <div class="w-100" role="group" aria-label="Reasoning Method">
                                 {% for value, text in reasoning_choices %}
                                 <div class="d-flex mb-2">
@@ -116,14 +124,16 @@
                                     <label class="btn btn-outline-primary {% if value != 'other' %}w-100{% endif %} text-start" for="rm{{ forloop.counter }}">{{ text }}</label>
                                     {% if value == 'other' %}
                                     <input type="text" class="form-control form-control-sm ms-2" name="reasoning_method_other" placeholder="Please specify..." disabled>
+                                    <div class="invalid-feedback">Please specify your "Other" reasoning method.</div>
                                     {% endif %}
                                 </div>
                                 {% endfor %}
                             </div>
+                            <div class="invalid-feedback">Please select a reasoning method.</div>
                         </div>
 
                         <div class="mb-4 p-3 border rounded">
-                            <label for="additional_explanation" class="form-label"><strong>5. (Optional) Additional Explanation</strong></label>
+                            <h5><strong>5. (Optional) Additional Explanation</strong></h5>
                             <textarea class="form-control" id="additional_explanation" name="additional_explanation" rows="3"></textarea>
                         </div>
                     </form>
@@ -204,30 +214,51 @@ document.addEventListener('DOMContentLoaded', function() {
     // Form Submission
     let is_submitted = false;
     document.getElementById('query-btn').addEventListener('click', function() {
-        // Validation
-        if (document.getElementById('answer').value.trim() === '') {
-            alert('Please provide your answer.');
-            document.getElementById('answer').focus();
-            return;
+        // Reset validation states
+        document.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid'));
+
+        let isValid = true;
+
+        // Validation for answer
+        const answer = document.getElementById('answer');
+        if (answer.value.trim() === '') {
+            answer.classList.add('is-invalid');
+            answer.focus();
+            isValid = false;
         }
-        if (document.getElementById('confidence_hidden').value === '') {
-            alert('Please select your confidence level.');
-            return;
+
+        // Validation for confidence
+        const confidence = document.getElementById('confidence_hidden');
+        if (confidence.value === '') {
+            document.querySelector('.btn-group[aria-label="Confidence"]').classList.add('is-invalid');
+            isValid = false;
         }
-        const sourceUrl = document.querySelector('input[name="source_url_0"]').value.trim();
-        const sourceText = document.querySelector('textarea[name="source_text_0"]').value.trim();
-        if (sourceUrl === '' || sourceText === '') {
-            alert('Please provide at least one justification source (URL and text).');
-            return;
+
+        // Validation for justification
+        const sourceUrl = document.querySelector('input[name="source_url_0"]');
+        const sourceText = document.querySelector('textarea[name="source_text_0"]');
+        if (sourceUrl.value.trim() === '') {
+            sourceUrl.classList.add('is-invalid');
+            isValid = false;
         }
+        if (sourceText.value.trim() === '') {
+            sourceText.classList.add('is-invalid');
+            isValid = false;
+        }
+
+        // Validation for reasoning method
         const reasoningMethod = document.querySelector('input[name="reasoning_method"]:checked');
+        const reasoningMethodOther = document.querySelector('input[name="reasoning_method_other"]');
         if (!reasoningMethod) {
-            alert('Please select a reasoning method.');
-            return;
+            document.querySelector('.w-100[aria-label="Reasoning Method"]').classList.add('is-invalid');
+            isValid = false;
+        } else if (reasoningMethod.value === 'other' && reasoningMethodOther.value.trim() === '') {
+            reasoningMethodOther.classList.add('is-invalid');
+            reasoningMethodOther.focus();
+            isValid = false;
         }
-        if (reasoningMethod.value === 'other' && document.querySelector('input[name="reasoning_method_other"]').value.trim() === '') {
-            alert('Please specify your "Other" reasoning method.');
-            document.querySelector('input[name="reasoning_method_other"]').focus();
+
+        if (!isValid) {
             return;
         }
 
@@ -236,6 +267,37 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('query-form').submit();
         }
     });
+
+    // Clear validation on input
+    document.getElementById('answer').addEventListener('input', () => {
+        document.getElementById('answer').classList.remove('is-invalid');
+    });
+    document.querySelectorAll('input[name="confidence_radio"]').forEach(radio => {
+        radio.addEventListener('change', () => {
+            document.querySelector('.btn-group[aria-label="Confidence"]').classList.remove('is-invalid');
+        });
+    });
+    document.querySelector('input[name="source_url_0"]').addEventListener('input', () => {
+        document.querySelector('input[name="source_url_0"]').classList.remove('is-invalid');
+    });
+    document.querySelector('textarea[name="source_text_0"]').addEventListener('input', () => {
+        document.querySelector('textarea[name="source_text_0"]').classList.remove('is-invalid');
+    });
+    document.querySelectorAll('input[name="reasoning_method"]').forEach(radio => {
+        radio.addEventListener('change', () => {
+            document.querySelector('.w-100[aria-label="Reasoning Method"]').classList.remove('is-invalid');
+            const reasoningMethodOther = document.querySelector('input[name="reasoning_method_other"]');
+            if (reasoningMethodOther) {
+                reasoningMethodOther.classList.remove('is-invalid');
+            }
+        });
+    });
+    const reasoningMethodOtherInput = document.querySelector('input[name="reasoning_method_other"]');
+    if (reasoningMethodOtherInput) {
+        reasoningMethodOtherInput.addEventListener('input', () => {
+            reasoningMethodOtherInput.classList.remove('is-invalid');
+        });
+    }
 
     document.getElementById('cancel-btn').addEventListener('click', function() {
         if (confirm("Are you sure you want to cancel? This will close the window.")) {

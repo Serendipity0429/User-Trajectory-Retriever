@@ -59,9 +59,14 @@ class PreTaskAnnotation(models.Model):
 
     familiarity = models.IntegerField(null=True)  # 0->4, unfamiliar -> familiar
     difficulty = models.IntegerField(null=True)  # 0->4, easy -> hard
-    effort = models.IntegerField(default=5)  # time effort to complete the task, 3 to 30
+    effort = models.IntegerField(null=True)  # 0->5, time effort category
     
-    initial_strategy = models.TextField(null=True)  # initial strategy to solve the task
+    first_search_query = models.TextField(null=True)  # initial strategy to solve the task
+
+    initial_guess = models.TextField(null=True, blank=True)
+    initial_guess_unknown = models.BooleanField(default=False)
+    expected_source = models.JSONField(null=True, blank=True)
+    expected_source_other = models.TextField(null=True, blank=True)
 
 # Reflection annotation
 class ReflectionAnnotation(models.Model):
@@ -74,7 +79,8 @@ class ReflectionAnnotation(models.Model):
     failure_category = models.JSONField(null=True)  # category of failure, e.g. "lack of resources", "lack of knowledge", etc.
     future_plan_actions = models.JSONField(null=True)  # actions to take in the future
     future_plan_other = models.TextField(null=True)  # other future plan actions
-    remaining_effort = models.IntegerField()  # remaining effort to complete the task, 3 to 60
+    estimated_time = models.IntegerField()  # 0->5, time effort category
+    adjusted_difficulty = models.IntegerField(null=True) # user's adjusted difficulty of the task
 
     additional_reflection = models.TextField(null=True)  # additional reflection on the task
 

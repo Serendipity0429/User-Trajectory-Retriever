@@ -6,69 +6,83 @@
     <div class="row justify-content-center">
         <div class="col-lg-8">
             <div class="card shadow-lg border-0 rounded-lg mt-5">
-                <div class="card-header bg-primary text-white text-center py-4">
-                    <h2 class="card-title mb-0"><i class="bi bi-pencil-square me-2"></i>Edit User Profile</h2>
+                <div class="card-header text-center py-4 bg-primary text-white">
+                    <h3 class="fw-light my-2">Edit User Profile</h3>
                 </div>
                 <div class="card-body p-5">
                     <form id="edit_info_form" name="edit_info_form" action="" method="POST">
                         {% csrf_token %}
 
-                        <h5 class="mb-4">Personal Information</h5>
+                        <h5 class="mb-4"><i class="bi bi-file-person-fill me-2"></i>Personal Details</h5>
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <div class="form-floating">
                                     {{ form.name }}
-                                    <label for="id_name">Name</label>
-                                </div>
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <div class="form-floating">
-                                    {{ form.occupation }}
-                                    <label for="id_occupation">Occupation</label>
-                                </div>
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <div class="form-floating">
-                                    {{ form.gender }}
-                                    <label for="id_gender">Gender</label>
-                                </div>
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <div class="form-floating">
-                                    {{ form.age }}
-                                    <label for="id_age">Age</label>
-                                </div>
-                            </div>
-                        </div>
-
-                        <hr class="my-4">
-
-                        <h5 class="mb-4">Contact Information</h5>
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <div class="form-floating">
-                                    {{ form.phone }}
-                                    <label for="id_phone">Phone</label>
+                                    <label for="id_name"><i class="bi bi-person-circle me-2"></i>Name</label>
                                 </div>
                             </div>
                             <div class="col-md-6 mb-3">
                                 <div class="form-floating">
                                     {{ form.email }}
-                                    <label for="id_email">Email</label>
+                                    <label for="id_email"><i class="bi bi-envelope-fill me-2"></i>Email</label>
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <div class="form-floating">
+                                    {{ form.phone }}
+                                    <label for="id_phone"><i class="bi bi-telephone-fill me-2"></i>Phone</label>
+                                </div>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <div class="form-floating">
+                                    {{ form.gender }}
+                                    <label for="id_gender"><i class="bi bi-gender-ambiguous me-2"></i>Gender</label>
+                                </div>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <div class="form-floating">
+                                    {{ form.age }}
+                                    <label for="id_age"><i class="bi bi-calendar-event-fill me-2"></i>Age</label>
+                                </div>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <div class="form-floating">
+                                    {{ form.occupation }}
+                                    <label for="id_occupation"><i class="bi bi-briefcase-fill me-2"></i>Occupation</label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <div class="form-floating">
+                                    {{ form.education }}
+                                    <label for="id_education"><i class="bi bi-book-fill me-2"></i>Education Level</label>
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <div class="form-floating">
+                                    {{ form.field_of_expertise }}
+                                    <label for="id_field_of_expertise"><i class="bi bi-lightbulb-fill me-2"></i>Field of Expertise</label>
                                 </div>
                             </div>
                         </div>
 
                         <hr class="my-4">
 
-                        <h5 class="mb-4">Large Language Model Usage</h5>
-                        <div class="mb-3">
-                            <label class="form-label">How often do you use LLMs?</label>
-                            {{ form.llm_frequency }}
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">How long have you been using LLMs?</label>
-                            {{ form.llm_history }}
+                        <h5 class="mb-4"><i class="bi bi-robot me-2"></i>Large Language Model Usage</h5>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <div class="form-floating">
+                                    {{ form.llm_frequency }}
+                                    <label for="id_llm_frequency">How often do you use LLMs?</label>
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <div class="form-floating">
+                                    {{ form.llm_history }}
+                                    <label for="id_llm_history">How long have you been using LLMs?</label>
+                                </div>
+                            </div>
                         </div>
 
                         {% if error_message %}

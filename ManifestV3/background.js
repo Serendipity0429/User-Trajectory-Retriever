@@ -8,9 +8,11 @@ importScripts('./utils.js');
 const URL_CHECK = config.urls.check;
 const URL_DATA = config.urls.data;
 const URL_ACTIVE_TASK = config.urls.active_task;
+const URL_GET_TASK_INFO = config.urls.get_task_info;
 const URL_STOP_ANNOTATION = config.urls.stop_annotation;
 
 const TASK_STORAGE_KEY = 'current_task_id';
+const TASK_INFO_KEY = 'current_task_info';
 
 const ALARM_CLEAR_STORAGE = 'clear_local_storage';
 const ALARM_CHECK_TASK = 'check_active_task';
@@ -20,6 +22,7 @@ const MSG_ALTER_LOGGING_STATUS = 'alter_logging_status';
 const MSG_INJECT_SCRIPT = 'inject_script';
 const MSG_SEND_MESSAGE = 'send_message';
 const MSG_GET_ACTIVE_TASK = 'get_active_task';
+const MSG_GET_TASK_INFO = 'get_task_info';
 
 
 // --- State Management ---
@@ -30,6 +33,9 @@ async function getCurrentTask() {
 }
 
 async function setCurrentTask(task_id) {
+    if (task_id === -1) {
+        await _remove_local(TASK_INFO_KEY);
+    }
     return await _set_local({ [TASK_STORAGE_KEY]: task_id });
 }
 
@@ -43,6 +49,18 @@ async function getUserInfo() {
 
 
 // --- Core Logic ---
+
+async function getTaskInfo(task_id) {
+    if (task_id === -1) return;
+    try {
+        const response = await _get(`${URL_GET_TASK_INFO}?task_id=${task_id}`);
+        if (response && response.question) {
+            await _set_local({ [TASK_INFO_KEY]: response });
+        }
+    } catch (error) {
+        console.error("Error getting task info:", error);
+    }
+}
 
 async function checkActiveTaskID() {
     printDebug("background", "Checking active task ID...");
@@ -66,6 +84,10 @@ async function checkActiveTaskID() {
 
         const is_task_started = old_task_id === -1 && new_task_id > -1;
         const is_task_finished = old_task_id > -1 && new_task_id === -1;
+
+        if (is_task_started) {
+            getTaskInfo(new_task_id);
+        }
 
         if (is_task_started || is_task_finished) {
             printDebug("background", `Task state changed. Old: ${old_task_id}, New: ${new_task_id}`);
@@ -94,16 +116,20 @@ function closeAllIrrelevantTabs() {
     printDebug("background", "Closing all irrelevant tabs...");
     chrome.tabs.query({}, (tabs) => {
         printDebug("background", "All open tabs:", tabs);
+        // NOTICE: Currently, we only keep extension pages open.
         const irrelevant_tab_ids = tabs
-            .filter(tab => tab.url && !_is_server_page(tab.url) && !_is_extension_page(tab.url))
+            // .filter(tab => tab.url && !_is_server_page(tab.url) && !_is_extension_page(tab.url))
+            .filter(tab => tab.url && !_is_extension_page(tab.url))
             .map(tab => tab.id);
-        const home_tab_ids = tabs
-            .filter(tab => tab.url && _is_server_page(tab.url))
-            .map(tab => tab.id);
+        // const home_tab_ids = tabs
+        //     .filter(tab => tab.url && _is_server_page(tab.url))
+        //     .map(tab => tab.id);
 
-        if (home_tab_ids.length === 0) {
-            chrome.tabs.create({ url: config.urls.initial_page, active: false });
-        }
+        // if (home_tab_ids.length === 0) {
+        //     chrome.tabs.create({ url: config.urls.initial_page, active: false });
+        // }
+
+        chrome.tabs.create({ url: config.urls.initial_page, active: false });
 
         if (irrelevant_tab_ids.length > 0) {
             chrome.tabs.remove(irrelevant_tab_ids);
@@ -201,7 +227,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 if (message.log_status !== undefined) {
                     await _set_local({ logged_in: message.log_status });
                     sendResponse("Logging status updated");
-                } else {
+                }
+                else {
                     sendResponse({ error: "Invalid logging status" });
                 }
                 break;
@@ -245,6 +272,25 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 const is_task_active = task_id !== -1;
                 printDebug("background", `Active task ID: ${task_id}`);
                 sendResponse({ is_task_active: is_task_active, task_id: task_id });
+                break;
+            
+            case MSG_GET_TASK_INFO:
+                let { [TASK_INFO_KEY]: task_info } = await _get_local(TASK_INFO_KEY);
+                if (!task_info) {
+                    const task_id = await getCurrentTask();
+                    if (task_id !== -1) {
+                        try {
+                            const response = await _get(`${URL_GET_TASK_INFO}?task_id=${task_id}`);
+                            if (response) {
+                                await _set_local({ [TASK_INFO_KEY]: response });
+                                task_info = response;
+                            }
+                        } catch (error) {
+                            console.error("Error getting task info on demand:", error);
+                        }
+                    }
+                }
+                sendResponse(task_info);
                 break;
         }
     })();

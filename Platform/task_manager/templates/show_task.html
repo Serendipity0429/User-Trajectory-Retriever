@@ -192,19 +192,22 @@
                                     <p><span class="annotation-key">Confidence:</span> {{ CONFIDENCE_MAP|get_item:trial.confidence }}</p>
                                     <p><span class="annotation-key">Justification:</span></p>
                                     <ul class="list-unstyled">
-                                        {% for source in trial.submitted_sources %}
+                                        {% for justification in trial.justifications %}
                                         <li class="mb-2">
-                                            <p class="mb-1"><span class="annotation-key">URL:</span> <a href="{{ source.url }}" target="_blank">{{ source.url }}</a></p>
+                                            <p class="mb-1"><span class="annotation-key">URL:</span> <a href="{{ justification.url }}" target="_blank">{{ justification.url }}</a></p>
+                                            <p class="mb-1"><span class="annotation-key">Confidence:</span> 
+                                                {% if justification.confidence == 3 %} High
+                                                {% elif justification.confidence == 2 %} Medium
+                                                {% elif justification.confidence == 1 %} Low
+                                                {% endif %}
+                                            </p>
                                             <blockquote class="blockquote bg-light p-2 rounded" style="font-size: 0.9rem;">
-                                                {{ source.text }}
+                                                {{ justification.text }}
                                             </blockquote>
                                         </li>
                                         {% endfor %}
                                     </ul>
-                                    <p><span class="annotation-key">Reasoning Method:</span> {{ REASONING_METHOD_MAP|get_item:trial.reasoning_method }}</p>
-                                    {% if trial.additional_explanation %}
-                                    <p><span class="annotation-key">Additional Explanation:</span> {{ trial.additional_explanation }}</p>
-                                    {% endif %}
+                                    <p><span class="annotation-key">Answer Formulation Method:</span> {{ ANSWER_FORMULATION_MAP|get_item:trial.answer_formulation_method }}</p>
 
                                     {% if not trial.is_correct and trial.reflection_annotation %}
                                     <hr>

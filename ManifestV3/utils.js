@@ -19,6 +19,7 @@ const URLS = {
     register: `${URL_BASE}/user/signup/`,
     home: `${URL_BASE}/task/home/`,
     stop_annotation: `${URL_BASE}/task/stop_annotation/`,
+    add_justification: `${URL_BASE}/task/justification/add/`,
     initial_page: "https://www.bing.com/",
 };
 

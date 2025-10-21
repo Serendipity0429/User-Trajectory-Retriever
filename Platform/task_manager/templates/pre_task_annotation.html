@@ -31,10 +31,29 @@
                         <div class="mb-4 p-3 border rounded">
                             <h5><strong>2. How to Format Your Answer</strong></h5>
                             <p class="text-muted mb-0">
-                                Your answer must be an <strong>exact match</strong>. Do not include extra words or sentences.
-                                <br>
-                                <em>For example, if the question is "What is the capital of France?", the correct answer is "Paris".</em>
+                                Your answer must be an <strong>exact match</strong>. Do not include extra words or sentences. Capitalization will be ignored.
                             </p>
+                            <div class="mt-2" style="font-size: 0.8rem; line-height: 1.4;">
+                                <p class="mb-1">For example:</p>
+                                <div class="p-2 bg-light rounded">
+                                    <p class="mb-1"><strong>Question:</strong></p>
+                                    <div class="border rounded bg-white mb-2 py-1 px-2">
+                                        What is the capital of France?
+                                    </div>
+
+                                    <p class="mb-1"><strong>Correct Answer:</strong></p>
+                                    <div class="border rounded bg-white mb-2 py-1 px-2">
+                                        Paris
+                                    </div>
+
+                                    <p class="mb-1"><strong>Incorrect Answers:</strong></p>
+                                    <ul class="list-group">
+                                        <li class="list-group-item list-group-item py-1 px-2">"The capital of France is Paris." <span class="text-muted">(contains extra words)</span></li>
+                                        <li class="list-group-item py-1 px-2">"Paris is the capital of France." <span class="text-muted">(contains extra words)</span></li>
+                                        <li class="list-group-item py-1 px-2">"Paris." <span class="text-muted">(contains a period)</span></li>
+                                    </ul>
+                                </div>
+                            </div>
                         </div>
 
                         <!-- Domain Familiarity -->
@@ -163,22 +182,36 @@
             // Reset validation states
             $('.is-invalid').removeClass('is-invalid');
             let isValid = true;
+            let firstInvalidElement = null;
+
+            // Helper to set focus
+            const setFocus = (element) => {
+                if (!firstInvalidElement) {
+                    firstInvalidElement = element;
+                }
+            };
 
             // Validation for familiarity
             if (!$("input[name='familiarity']:checked").val()) {
-                $("input[name='familiarity']").closest('.btn-group').addClass('is-invalid');
+                const container = $("input[name='familiarity']").closest('.btn-group');
+                container.addClass('is-invalid');
+                setFocus(container.find('input').first());
                 isValid = false;
             }
 
             // Validation for difficulty
             if (!$("input[name='difficulty']:checked").val()) {
-                $("input[name='difficulty']").closest('.btn-group').addClass('is-invalid');
+                const container = $("input[name='difficulty']").closest('.btn-group');
+                container.addClass('is-invalid');
+                setFocus(container.find('input').first());
                 isValid = false;
             }
 
             // Validation for effort
             if (!$("input[name='effort']:checked").val()) {
-                $("input[name='effort']").closest('.btn-group').addClass('is-invalid');
+                const container = $("input[name='effort']").closest('.btn-group');
+                container.addClass('is-invalid');
+                setFocus(container.find('input').first());
                 isValid = false;
             }
 
@@ -186,6 +219,7 @@
             const firstSearchQuery = $('#first_search_query');
             if (firstSearchQuery.val().trim() === '') {
                 firstSearchQuery.addClass('is-invalid');
+                setFocus(firstSearchQuery);
                 isValid = false;
             }
 
@@ -194,6 +228,7 @@
             const initialGuessUnknown = $('#initial_guess_unknown');
             if (!initialGuessUnknown.is(':checked') && initialGuess.val().trim() === '') {
                 initialGuess.addClass('is-invalid');
+                setFocus(initialGuess);
                 isValid = false;
             }
 
@@ -203,15 +238,21 @@
             const otherIsChecked = $('#source_other').is(':checked');
 
             if (expectedSourceCheckboxes.length === 0) {
-                $("input[name='expected_source']").closest('.btn-group').addClass('is-invalid');
+                const container = $("input[name='expected_source']").closest('.btn-group');
+                container.addClass('is-invalid');
+                setFocus(container.find('input').first());
                 isValid = false;
             } else if (otherIsChecked && expectedSourceOther.val().trim() === '') {
                 expectedSourceOther.addClass('is-invalid');
                 $('#expected_source_other_feedback').show();
+                setFocus(expectedSourceOther);
                 isValid = false;
             }
 
             if (!isValid) {
+                if (firstInvalidElement) {
+                    firstInvalidElement.focus();
+                }
                 return;
             }
 

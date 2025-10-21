@@ -30,4 +30,8 @@ urlpatterns = [
     path('cancel_annotation/<int:task_id>/<int:end_timestamp>/', views.cancel_annotation, name='cancel_annotation'), # Cancel annotation
     path('remove_task/<int:task_id>/', views.remove_task, name='remove_task'), # Remove task
 
+    # Justification URLs
+    path('justification/add/', views.add_justification, name='add_justification'),
+    path('justification/update/<int:justification_id>/', views.update_justification_status, name='update_justification_status'),
+    path('justification/get/<int:task_id>/', views.get_justifications, name='get_justifications'),
 ]

@@ -116,14 +116,13 @@ function closeAllIrrelevantTabs() {
     printDebug("background", "Closing all irrelevant tabs...");
     chrome.tabs.query({}, (tabs) => {
         printDebug("background", "All open tabs:", tabs);
-        // NOTICE: Currently, we only keep extension pages open.
         const irrelevant_tab_ids = tabs
-            // .filter(tab => tab.url && !_is_server_page(tab.url) && !_is_extension_page(tab.url))
-            .filter(tab => tab.url && !_is_extension_page(tab.url))
+            .filter(tab => tab.url && !_is_server_page(tab.url) && !_is_extension_page(tab.url))
+            // .filter(tab => tab.url && !_is_extension_page(tab.url))
             .map(tab => tab.id);
-        // const home_tab_ids = tabs
-        //     .filter(tab => tab.url && _is_server_page(tab.url))
-        //     .map(tab => tab.id);
+        const home_tab_ids = tabs
+            .filter(tab => tab.url && _is_server_page(tab.url))
+            .map(tab => tab.id);
 
         // if (home_tab_ids.length === 0) {
         //     chrome.tabs.create({ url: config.urls.initial_page, active: false });
@@ -195,6 +194,150 @@ async function clearLocalStorage() {
         await _remove_local(keys_to_remove);
     }
 }
+
+
+// --- Context Menu ---
+
+function createContextMenu() {
+    chrome.contextMenus.create({
+        id: "add-as-evidence-text",
+        title: "Add as Evidence (Text)",
+        contexts: ["selection"]
+    });
+    chrome.contextMenus.create({
+        id: "add-as-evidence-element",
+        title: "Add as Evidence (Others)",
+        contexts: ["image", "video", "audio"]
+    });
+}
+
+chrome.runtime.onInstalled.addListener(() => {
+    createContextMenu();
+});
+
+function getSelectionDetails() {
+    const selection = window.getSelection();
+    if (selection.rangeCount > 0) {
+        const range = selection.getRangeAt(0);
+        const text = selection.toString();
+        let container = range.commonAncestorContainer;
+        if (container.nodeType !== Node.ELEMENT_NODE) {
+            container = container.parentElement;
+        }
+        
+        const getCssSelector = (el) => {
+            if (!(el instanceof Element)) return;
+            const path = [];
+            while (el.nodeType === Node.ELEMENT_NODE) {
+                let selector = el.nodeName.toLowerCase();
+                if (el.id) {
+                    selector += '#' + el.id;
+                    path.unshift(selector);
+                    break;
+                } else {
+                    let sib = el, nth = 1;
+                    while (sib = sib.previousElementSibling) {
+                        if (sib.nodeName.toLowerCase() == selector)
+                           nth++;
+                    }
+                    if (nth != 1)
+                        selector += ":nth-of-type("+nth+")";
+                }
+                path.unshift(selector);
+                el = el.parentNode;
+            }
+            return path.join(" > ");
+        }
+
+        const selector = getCssSelector(container);
+        return { text, selector };
+    }
+    return null;
+}
+
+chrome.contextMenus.onClicked.addListener(async (info, tab) => {
+    const task_id = await getCurrentTask();
+    if (task_id === -1) {
+        chrome.notifications.create({
+            type: 'basic',
+            iconUrl: 'popup/THUIR48.png',
+            title: 'Action Failed',
+            message: 'No active task found.'
+        });
+        return;
+    }
+
+    if (info.menuItemId === "add-as-evidence-text" && info.selectionText) {
+        chrome.scripting.executeScript({
+            target: { tabId: tab.id },
+            function: getSelectionDetails,
+        }, async (injectionResults) => {
+            if (chrome.runtime.lastError || !injectionResults || !injectionResults.length) {
+                console.error("Script injection failed:", chrome.runtime.lastError.message);
+                return;
+            }
+            
+            const [details] = injectionResults;
+            if (details.result) {
+                try {
+                    await _post(config.urls.add_justification, {
+                        task_id: task_id,
+                        url: tab.url,
+                        page_title: tab.title,
+                        text: details.result.text,
+                        dom_position: details.result.selector,
+                        evidence_type: 'text_selection'
+                    }, true, false, true); // send_as_json = true
+
+                    // Notify the content script to show a confirmation
+                    chrome.tabs.sendMessage(tab.id, { command: "evidence-added-successfully" });
+
+                    chrome.tabs.query({ url: `${config.urls.base}/task/submit_answer/*` }, (tabs) => {
+                        if (tabs.length > 0) {
+                            chrome.tabs.sendMessage(tabs[0].id, { command: "refresh_justifications" });
+                        }
+                    });
+                } catch (error) {
+                    console.error("Error adding justification:", error);
+                }
+            }
+        });
+    } else if (info.menuItemId === "add-as-evidence-element") {
+        chrome.tabs.sendMessage(tab.id, { command: 'get-element-details' }, { frameId: info.frameId }, async (details) => {
+            if (chrome.runtime.lastError) {
+                console.error("Error sending message:", chrome.runtime.lastError.message);
+                return;
+            }
+
+            if (details) {
+                try {
+                    await _post(config.urls.add_justification, {
+                        task_id: task_id,
+                        url: tab.url,
+                        page_title: tab.title,
+                        dom_position: details.selector,
+                        evidence_type: 'element',
+                        element_details: {
+                            tagName: details.tagName,
+                            attributes: details.attributes
+                        }
+                    }, true, false, true); // send_as_json = true
+
+                    // Notify the content script to show a confirmation
+                    chrome.tabs.sendMessage(tab.id, { command: "evidence-added-successfully" });
+
+                    chrome.tabs.query({ url: `${config.urls.base}/task/submit_answer/*` }, (tabs) => {
+                        if (tabs.length > 0) {
+                            chrome.tabs.sendMessage(tabs[0].id, { command: "refresh_justifications" });
+                        }
+                    });
+                } catch (error) {
+                    console.error("Error adding element evidence:", error);
+                }
+            }
+        });
+    }
+});
 
 
 // --- Event Listeners ---

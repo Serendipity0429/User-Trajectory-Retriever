@@ -251,6 +251,14 @@
     color: #adb5bd;
 }
 
+.dark-mode .bg-white {
+    background-color: #3a3a3c !important;
+}
+
+.dark-mode .question-text {
+    color: var(--bs-body-color) !important;
+}
+
 .dark-mode .form-floating > .form-control:not(:placeholder-shown) ~ label span,
 .dark-mode .form-floating > .form-control:focus ~ label span {
     color: #adb5bd;

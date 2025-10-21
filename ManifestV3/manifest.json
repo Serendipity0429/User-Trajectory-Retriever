@@ -22,9 +22,12 @@
     "notifications",
     "history",
     "scripting",
-    "alarms"
+    "alarms",
+    "contextMenus"
   ],
   "host_permissions": [
+    "http://*/*",
+    "https://*/*",
     "http://127.0.0.1:8000/*",
     "http://101.6.41.59:32904/*"
   ],
@@ -60,7 +63,8 @@
       "css": [
         "css/rrweb-player.css"
       ],
-      "run_at": "document_start"
+      "run_at": "document_start",
+      "all_frames": true
     }
   ]
 }

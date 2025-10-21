@@ -88,7 +88,7 @@
                             </div>
                             <ul id="answer-list" class="list-group mt-2">
                                 <li class="list-group-item list-group-item-success d-flex justify-content-between align-items-center">
-                                    {{ user_answer }}
+                                    <span>{{ user_answer }}</span>
                                     <span class="badge bg-success-light">Your Answer</span>
                                 </li>
                                 {% for item in answer %}
@@ -131,7 +131,7 @@
                                 {% endfor %}
                             </div>
                             <div class="invalid-feedback">Please select your "Aha!" moment.</div>
-                            <label for="aha_moment_source" class="form-label mt-2">(Optional) Paste the source URL or search query for this "Aha!" moment.</label>
+                            <label for="aha_moment_source" class="form-label mt-2">(Optional) What was the source of this breakthrough? (e.g., URL, search query)</label>
                             <input type="text" class="form-control" id="aha_moment_source" name="aha_moment_source">
                         </div>
 
@@ -141,13 +141,24 @@
                             <p>Which of these roadblocks did you encounter? <small class="text-muted fw-bold">(Check all that apply)</small></p>
                             <div class="w-100" role="group" aria-label="Unhelpful Paths">
                                 {% for key, value in UNHELPFUL_PATHS_MAP.items %}
+                                {% if key == 'no_major_roadblocks' %}
                                 <div class="d-flex mb-2">
                                     <input type="checkbox" class="btn-check" name="unhelpful_paths" id="unhelpful{{ key }}" value="{{ key }}" autocomplete="off">
-                                    <label class="btn btn-outline-primary {% if key != 'other' %}w-100{% endif %} text-start" for="unhelpful{{ key }}" data-bs-toggle="tooltip" data-bs-placement="top" title="{{ UNHELPFUL_PATHS_EXPLANATION_MAP|get_item:key }}">{{ value }}</label>
+                                    <label class="btn btn-outline-primary w-100 text-start" for="unhelpful{{ key }}" data-bs-toggle="tooltip" data-bs-placement="top" title="{{ UNHELPFUL_PATHS_EXPLANATION_MAP|get_item:key }}">{{ value|safe }}</label>
+                                </div>
+                                <hr>
+                                {% endif %}
+                                {% endfor %}
+                                {% for key, value in UNHELPFUL_PATHS_MAP.items %}
+                                {% if key != 'no_major_roadblocks' %}
+                                <div class="d-flex mb-2">
+                                    <input type="checkbox" class="btn-check" name="unhelpful_paths" id="unhelpful{{ key }}" value="{{ key }}" autocomplete="off">
+                                    <label class="btn btn-outline-primary {% if key != 'other' %}w-100{% endif %} text-start" for="unhelpful{{ key }}" data-bs-toggle="tooltip" data-bs-placement="top" title="{{ UNHELPFUL_PATHS_EXPLANATION_MAP|get_item:key }}">{{ value|safe }}</label>
                                     {% if key == 'other' %}
                                     <input type="text" name="unhelpful_paths_other" class="form-control ms-2" disabled placeholder="Please specify...">
                                     {% endif %}
                                 </div>
+                                {% endif %}
                                 {% endfor %}
                             </div>
                         </div>
@@ -158,24 +169,28 @@
                             <p>How did your successful strategy evolve from your initial plan?</p>
                             <div class="w-100" role="group" aria-label="Strategic Shift">
                                 {% for key, value in STRATEGY_SHIFT_MAP.items %}
+                                {% if key == 'no_change' %}
                                 <div class="d-flex mb-2">
                                     <input type="radio" class="btn-check" name="strategy_shift" id="strategy{{ key }}" value="{{ key }}" autocomplete="off" required>
-                                    <label class="btn btn-outline-primary {% if key != 'other' %}w-100{% endif %} text-start" for="strategy{{ key }}" data-bs-toggle="tooltip" data-bs-placement="top" title="{{ STRATEGY_SHIFT_EXPLANATION_MAP|get_item:key }}">{{ value }}</label>
+                                    <label class="btn btn-outline-primary w-100 text-start" for="strategy{{ key }}" data-bs-toggle="tooltip" data-bs-placement="top" title="{{ STRATEGY_SHIFT_EXPLANATION_MAP|get_item:key }}">{{ value|safe }}</label>
+                                </div>
+                                <hr>
+                                {% endif %}
+                                {% endfor %}
+                                {% for key, value in STRATEGY_SHIFT_MAP.items %}
+                                {% if key != 'no_change' %}
+                                <div class="d-flex mb-2">
+                                    <input type="radio" class="btn-check" name="strategy_shift" id="strategy{{ key }}" value="{{ key }}" autocomplete="off" required>
+                                    <label class="btn btn-outline-primary {% if key != 'other' %}w-100{% endif %} text-start" for="strategy{{ key }}" data-bs-toggle="tooltip" data-bs-placement="top" title="{{ STRATEGY_SHIFT_EXPLANATION_MAP|get_item:key }}">{{ value|safe }}</label>
                                     {% if key == 'other' %}
                                     <input type="text" name="strategy_shift_other" class="form-control ms-2" disabled placeholder="Please specify...">
                                     <div class="invalid-feedback">Please specify your "Other" strategic shift.</div>
                                     {% endif %}
                                 </div>
+                                {% endif %}
                                 {% endfor %}
                             </div>
                             <div class="invalid-feedback">Please select a strategic shift.</div>
-                        </div>
-
-                        <!-- Additional Reflection -->
-                        <div class="mb-4 p-3 border rounded">
-                            <label for="additional_reflection" class="form-label"><h5><strong>6. (Optional) Additional Reflection</strong></h5></label>
-                            <p>Do you have any additional thoughts or reflections on this task?</p>
-                            <textarea class="form-control" id="additional_reflection" name="additional_reflection" rows="3"></textarea>
                         </div>
 
                         <div class="d-grid">
@@ -235,16 +250,45 @@
             $('input[name="strategy_shift_other"]').prop('disabled', $(this).val() !== 'other');
         });
 
+        // Unhelpful paths mutual exclusivity
+        const noRoadblocks = $('#unhelpfulno_major_roadblocks');
+        const otherRoadblocks = $('input[name="unhelpful_paths"]').not(noRoadblocks);
+
+        noRoadblocks.change(function() {
+            if ($(this).is(':checked')) {
+                otherRoadblocks.prop('checked', false).prop('disabled', true);
+                $('input[name="unhelpful_paths_other"]').prop('disabled', true);
+            } else {
+                otherRoadblocks.prop('disabled', false);
+            }
+        });
+
+        otherRoadblocks.change(function() {
+            if ($(this).is(':checked')) {
+                noRoadblocks.prop('checked', false);
+            }
+        });
+
         // Form submission
         let is_submitted = false;
         $('#query-btn').click(function () {
             // Reset validation states
             $('.is-invalid').removeClass('is-invalid');
             let isValid = true;
+            let firstInvalidElement = null;
+
+            // Helper to set focus
+            const setFocus = (element) => {
+                if (!firstInvalidElement) {
+                    firstInvalidElement = element;
+                }
+            };
 
             // Validation for overall difficulty
             if (!$('input[name="difficulty_actual"]:checked').val()) {
-                $('input[name="difficulty_actual"]').closest('.btn-group').addClass('is-invalid');
+                const container = $('input[name="difficulty_actual"]').closest('.btn-group');
+                container.addClass('is-invalid');
+                setFocus(container.find('input').first());
                 isValid = false;
             }
 
@@ -252,10 +296,13 @@
             const ahaMoment = $('input[name="aha_moment_type"]:checked');
             const ahaMomentOther = $('input[name="aha_moment_other"]');
             if (!ahaMoment.val()) {
-                $('input[name="aha_moment_type"]').closest('.w-100').addClass('is-invalid');
+                const container = $('input[name="aha_moment_type"]').closest('.w-100');
+                container.addClass('is-invalid');
+                setFocus(container.find('input').first());
                 isValid = false;
             } else if (ahaMoment.val() === 'other' && ahaMomentOther.val().trim() === '') {
                 ahaMomentOther.addClass('is-invalid');
+                setFocus(ahaMomentOther);
                 isValid = false;
             }
 
@@ -263,14 +310,20 @@
             const strategyShift = $('input[name="strategy_shift"]:checked');
             const strategyShiftOther = $('input[name="strategy_shift_other"]');
             if (!strategyShift.val()) {
-                $('input[name="strategy_shift"]').closest('.w-100').addClass('is-invalid');
+                const container = $('input[name="strategy_shift"]').closest('.w-100');
+                container.addClass('is-invalid');
+                setFocus(container.find('input').first());
                 isValid = false;
             } else if (strategyShift.val() === 'other' && strategyShiftOther.val().trim() === '') {
                 strategyShiftOther.addClass('is-invalid');
+                setFocus(strategyShiftOther);
                 isValid = false;
             }
 
             if (!isValid) {
+                if (firstInvalidElement) {
+                    firstInvalidElement.focus();
+                }
                 return;
             }
 
@@ -293,11 +346,6 @@
         });
         $('input[name="strategy_shift_other"]').on('input', () => $('input[name="strategy_shift_other"]').removeClass('is-invalid'));
 
-        window.addEventListener('beforeunload', function (e) {
-            if (!is_submitted) {
-                navigator.sendBeacon('/task/stop_annotation/', new Blob());
-            }
-        });
     });
 
     var trajectoriesCollapse = document.getElementById('collapseTrajectories');

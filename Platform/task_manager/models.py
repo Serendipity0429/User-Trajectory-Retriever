@@ -103,8 +103,6 @@ class PostTaskAnnotation(models.Model):
     strategy_shift = models.CharField(max_length=100, null=True)  # strategy shift during the task
     strategy_shift_other = models.TextField(null=True)  # other strategy shift
         
-    additional_reflection = models.TextField(null=True)  # reflection on the task
-
     # If task is cancelled
     cancel_category = models.CharField(max_length=100, null=True)  # refer to post_task_annotation.html
     cancel_reason = models.TextField(null=True)  # reason for cancellation
@@ -123,15 +121,31 @@ class TaskTrial(models.Model):
     is_correct = models.BooleanField(default=False)
     
     confidence = models.IntegerField()  # confidence level, 0->4, low -> high
-    source_url_and_text = models.JSONField()
-    reasoning_method = models.CharField(max_length=100)  # reasoning method used, e.g. "deductive", "inductive", etc.
+    answer_formulation_method = models.CharField(max_length=100)  # reasoning method used, e.g. "deductive", "inductive", etc.
     
-    additional_explanation = models.TextField(null=True)  # explanation of the answer
-
     belong_task = models.ForeignKey(
         Task,
         on_delete=models.CASCADE,
     )
+
+
+# Justification
+class Justification(models.Model):
+    belong_task_trial = models.ForeignKey(
+        TaskTrial,
+        on_delete=models.CASCADE,
+        related_name='justifications'
+    )
+    url = models.URLField(max_length=1000)
+    page_title = models.TextField(null=True, blank=True)
+    text = models.TextField(null=True, blank=True)
+    dom_position = models.TextField(null=True, blank=True)  # To store CSS selector
+    status = models.CharField(max_length=10, default='active', choices=[('active', 'Active'), ('abandoned', 'Abandoned')])
+    confidence = models.IntegerField()  # 1-3, low, medium, high
+    relevance = models.IntegerField(null=True, blank=True)  # 1: Low, 2: Medium, 3: High
+    credibility = models.IntegerField(null=True, blank=True)  # 1: Low, 2: Medium, 3: High
+    evidence_type = models.CharField(max_length=20, default='text_selection')
+    element_details = models.JSONField(null=True, blank=True)
 
 
 # Webpages

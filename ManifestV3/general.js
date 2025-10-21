@@ -105,6 +105,30 @@ const annotation_module = {
 const event_tracker = {
     is_passive_mode: config.is_passive_mode,
 
+    getCssSelector(el) {
+        if (!(el instanceof Element)) return;
+        const path = [];
+        while (el.nodeType === Node.ELEMENT_NODE) {
+            let selector = el.nodeName.toLowerCase();
+            if (el.id) {
+                selector += '#' + el.id;
+                path.unshift(selector);
+                break;
+            } else {
+                let sib = el, nth = 1;
+                while (sib = sib.previousElementSibling) {
+                    if (sib.nodeName.toLowerCase() == selector)
+                       nth++;
+                }
+                if (nth != 1)
+                    selector += ":nth-of-type("+nth+")";
+            }
+            path.unshift(selector);
+            el = el.parentNode;
+        }
+        return path.join(" > ");
+    },
+
     throttle(func, limit) {
         let in_throttle;
         return function(...args) {
@@ -209,6 +233,7 @@ const event_tracker = {
         const e = event || window.event;
         const target = e.target;
         const related_info = this.getRelatedInfo(target, type);
+        related_info.dom_position = this.getCssSelector(target);
 
         if (this.is_passive_mode) {
             const hierarchy = this.getElementHierarchyHTML(target);
@@ -223,6 +248,7 @@ const event_tracker = {
         const target = e.target;
         const hierarchy = this.getElementHierarchyHTML(target);
         const related_info = this.getRelatedInfo(target, type, e);
+        related_info.dom_position = this.getCssSelector(target);
         unitPage.addPassiveEvent(type, Date.now(), e.screenX, e.screenY, e.clientX, e.clientY, target.tagName, this.getElementContent(target), hierarchy, related_info);
     },
 

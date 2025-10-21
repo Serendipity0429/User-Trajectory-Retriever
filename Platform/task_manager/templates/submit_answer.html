@@ -2,6 +2,20 @@
 {% load task_manager_extras %}
 {% block title %}Answer Submission{% endblock %}
 
+{% block head %}
+<style>
+    .justification-item.abandoned {
+        opacity: 0.6;
+    }
+    .justification-item.abandoned blockquote {
+        text-decoration: line-through;
+    }
+    .justification-item.is-invalid {
+        border: 1px solid #dc3545;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="container">
     <div class="row justify-content-center">
@@ -95,47 +109,73 @@
                             <div class="invalid-feedback">Please select your confidence level.</div>
                         </div>
 
-                        <div id="source-container" class="mb-4 p-3 border rounded">
-                            <h5><strong>3. Justification</strong></h5>
-                            <p>Please provide at least one source URL and the relevant text from that source.</p>
-                            <div class="source-entry card p-3 mb-2">
-                                <div class="form-floating mb-2">
-                                    <input type="url" class="form-control" name="source_url_0" required placeholder="Source URL">
-                                    <label>Source URL</label>
-                                    <div class="invalid-feedback">Please provide a source URL.</div>
+                        <div id="justification-container" class="mb-4 p-3 border rounded">
+                            <h5><strong>3. Justifications</strong></h5>
+                            <p>Use the right-click menu on any webpage to add a justification.</p>
+                            
+                            <div class="accordion" id="text-evidence-accordion" style="display: none;">
+                                <div class="accordion-item">
+                                    <h2 class="accordion-header" id="text-evidence-heading">
+                                        <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-text-evidence" aria-expanded="true" aria-controls="collapse-text-evidence">
+                                            Textual Evidence
+                                        </button>
+                                    </h2>
+                                    <div id="collapse-text-evidence" class="accordion-collapse collapse show" aria-labelledby="text-evidence-heading" data-bs-parent="#text-evidence-accordion">
+                                        <div class="accordion-body" id="text-justification-list">
+                                            <!-- Text justifications will be loaded here -->
+                                        </div>
+                                    </div>
                                 </div>
-                                <div class="form-floating">
-                                    <textarea class="form-control" name="source_text_0" rows="3" required placeholder="Source Text"></textarea>
-                                    <label>Source Text</label>
-                                    <div class="invalid-feedback">Please provide the source text.</div>
+                            </div>
+
+                                                            <div class="accordion mt-3" id="element-evidence-accordion" style="display: none;">
+                                                            <div class="accordion-item">
+                                                                <h2 class="accordion-header" id="element-evidence-heading">
+                                                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-element-evidence" aria-expanded="false" aria-controls="collapse-element-evidence">
+                                                                        Other Evidence
+                                                                    </button>
+                                                                </h2>
+                                                                <div id="collapse-element-evidence" class="accordion-collapse collapse" aria-labelledby="element-evidence-heading" data-bs-parent="#element-evidence-accordion">
+                                                                    <div class="accordion-body" id="element-justification-list">
+                                                                        <!-- Element justifications will be loaded here -->
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                            <div class="accordion mt-3" id="abandoned-accordion" style="display: none;">
+                                <div class="accordion-item">
+                                    <h2 class="accordion-header" id="abandoned-heading">
+                                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-abandoned" aria-expanded="false" aria-controls="collapse-abandoned">
+                                            Abandoned Justifications
+                                        </button>
+                                    </h2>
+                                    <div id="collapse-abandoned" class="accordion-collapse collapse" aria-labelledby="abandoned-heading" data-bs-parent="#abandoned-accordion">
+                                        <div class="accordion-body" id="abandoned-justification-list">
+                                            <!-- Abandoned justifications will be loaded here -->
+                                        </div>
+                                    </div>
                                 </div>
-                                <button type="button" class="btn btn-danger btn-sm remove-source mt-2 align-self-end" style="display: none;">Remove</button>
                             </div>
                         </div>
-                        <button type="button" id="add-source" class="btn btn-outline-success btn-sm mb-3"><i class="bi bi-plus-circle-fill me-2"></i>Add Another Source</button>
 
                         <div class="mb-4 p-3 border rounded">
-                            <h5><strong>4. Reasoning Method</strong></h5>
-                            <p> Which reasoning method did you primarily use to arrive at your answer?</p>
-                            <div class="w-100" role="group" aria-label="Reasoning Method">
-                                {% for value, text in reasoning_choices %}
+                            <h5><strong>4. Answer Formulation Method</strong></h5>
+                            <p> Which method did you primarily use to formulate your answer?</p>
+                            <div class="w-100" role="group" aria-label="Answer Formulation Method">
+                                {% for value, text in answer_formulation_choices %}
                                 <div class="d-flex mb-2">
-                                    <input type="radio" class="btn-check" name="reasoning_method" id="rm{{ forloop.counter }}" value="{{ value }}" autocomplete="off" required>
-                                    <label class="btn btn-outline-primary {% if value != 'other' %}w-100{% endif %} text-start" for="rm{{ forloop.counter }}">{{ text }}</label>
+                                    <input type="radio" class="btn-check" name="answer_formulation_method" id="afm{{ forloop.counter }}" value="{{ value }}" autocomplete="off" required>
+                                    <label class="btn btn-outline-primary {% if value != 'other' %}w-100{% endif %} text-start" for="afm{{ forloop.counter }}">{{ text|safe }}</label>
                                     {% if value == 'other' %}
-                                    <input type="text" class="form-control form-control-sm ms-2" name="reasoning_method_other" placeholder="Please specify..." disabled>
-                                    <div class="invalid-feedback">Please specify your "Other" reasoning method.</div>
+                                    <input type="text" class="form-control form-control-sm ms-2" name="answer_formulation_method_other" placeholder="Please specify..." disabled>
+                                    <div class="invalid-feedback">Please specify your "Other" method.</div>
                                     {% endif %}
                                 </div>
                                 {% endfor %}
                             </div>
-                            <div class="invalid-feedback">Please select a reasoning method.</div>
+                            <div class="invalid-feedback">Please select a method.</div>
                         </div>
 
-                        <div class="mb-4 p-3 border rounded">
-                            <h5><strong>5. (Optional) Additional Explanation</strong></h5>
-                            <textarea class="form-control" id="additional_explanation" name="additional_explanation" rows="3"></textarea>
-                        </div>
                     </form>
 
                     <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
@@ -159,56 +199,192 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // Add/Remove Sources
-    document.getElementById('add-source').addEventListener('click', function() {
-        const container = document.getElementById('source-container');
-        const count = container.getElementsByClassName('source-entry').length;
-        const newSource = document.createElement('div');
-        newSource.className = 'source-entry card p-3 mb-2';
-        newSource.innerHTML = `
-            <div class="form-floating mb-2">
-                <input type="url" class="form-control" name="source_url_${count}" required placeholder="Source URL">
-                <label>Source URL</label>
-            </div>
-            <div class="form-floating">
-                <textarea class="form-control" name="source_text_${count}" rows="3" required placeholder="Source Text"></textarea>
-                <label>Source Text</label>
-            </div>
-            <button type="button" class="btn btn-danger btn-sm remove-source mt-2 align-self-end">Remove</button>`;
-        container.appendChild(newSource);
-        updateRemoveButtons();
-    });
+    // Justification fetching and rendering
+    const justificationList = document.getElementById('justification-list');
+    const taskId = {{ task_id }};
 
-    document.getElementById('source-container').addEventListener('click', function(e) {
-        if (e.target && e.target.classList.contains('remove-source')) {
-            e.target.closest('.source-entry').remove();
-            reindexSources();
-            updateRemoveButtons();
+    async function fetchJustifications() {
+        try {
+            const response = await fetch(`/task/justification/get/${taskId}/`);
+            const data = await response.json();
+            renderJustifications(data.justifications);
+        } catch (error) {
+            console.error('Error fetching justifications:', error);
+        }
+    }
+
+    function renderJustifications(justifications) {
+        const textList = document.getElementById('text-justification-list');
+        const elementList = document.getElementById('element-justification-list');
+        const abandonedList = document.getElementById('abandoned-justification-list');
+        
+        const textAccordion = document.getElementById('text-evidence-accordion');
+        const elementAccordion = document.getElementById('element-evidence-accordion');
+        const abandonedAccordion = document.getElementById('abandoned-accordion');
+
+        // Clear all lists
+        textList.innerHTML = '';
+        elementList.innerHTML = '';
+        abandonedList.innerHTML = '';
+
+        const activeJustifications = justifications.filter(j => j.status === 'active');
+        const textJustifications = activeJustifications.filter(j => j.evidence_type === 'text_selection');
+        const elementJustifications = activeJustifications.filter(j => j.evidence_type === 'element');
+        const abandonedJustifications = justifications.filter(j => j.status === 'abandoned');
+
+        // Populate Textual Evidence
+        if (textJustifications.length > 0) {
+            textAccordion.style.display = 'block';
+            textJustifications.forEach(j => textList.appendChild(createJustificationElement(j)));
+        } else {
+            textAccordion.style.display = 'none';
+        }
+
+        // Populate Other Evidence
+        if (elementJustifications.length > 0) {
+            elementAccordion.style.display = 'block';
+            elementJustifications.forEach(j => elementList.appendChild(createJustificationElement(j)));
+        } else {
+            elementAccordion.style.display = 'none';
+        }
+
+        // Populate Abandoned Justifications
+        if (abandonedJustifications.length > 0) {
+            abandonedAccordion.style.display = 'block';
+            abandonedJustifications.forEach(j => abandonedList.appendChild(createJustificationElement(j)));
+        } else {
+            abandonedAccordion.style.display = 'none';
+        }
+    }
+
+    function createJustificationElement(j) {
+        const justificationEl = document.createElement('div');
+        justificationEl.className = `card p-3 mb-2 justification-item ${j.status === 'abandoned' ? 'abandoned' : ''}`;
+        justificationEl.dataset.id = j.id;
+
+        // Ensure element_details is an object
+        if (typeof j.element_details === 'string') {
+            try {
+                j.element_details = JSON.parse(j.element_details);
+            } catch (e) {
+                console.error("Failed to parse element_details:", e);
+                j.element_details = null;
+            }
+        }
+
+        let contentHtml = '';
+        if (j.evidence_type === 'element' && j.element_details) {
+            const tagName = j.element_details.tagName || 'Element';
+            contentHtml = `<p class="mb-1"><strong>Evidence:</strong> [${tagName.toUpperCase()}]</p>`;
+        } else {
+            contentHtml = `<blockquote class="blockquote bg-light p-2 rounded" style="font-size: 0.9rem;">${j.text || ''}</blockquote>`;
+        }
+
+        let relevanceHtml = '';
+        if (j.status !== 'abandoned' && j.evidence_type === 'text_selection') {
+            relevanceHtml = `
+                <div class="relevance-annotation d-flex align-items-center">
+                    <div>
+                        <strong>Relevance:</strong>
+                        <div class="btn-group ms-2" role="group" aria-label="Relevance">
+                            <input type="radio" class="btn-check" name="relevance_${j.id}" id="relevance_low_${j.id}" value="1" ${j.relevance == 1 ? 'checked' : ''} autocomplete="off">
+                            <label class="btn btn-outline-primary btn-sm" for="relevance_low_${j.id}">Low</label>
+
+                            <input type="radio" class="btn-check" name="relevance_${j.id}" id="relevance_medium_${j.id}" value="2" ${j.relevance == 2 ? 'checked' : ''} autocomplete="off">
+                            <label class="btn btn-outline-primary btn-sm" for="relevance_medium_${j.id}">Medium</label>
+
+                            <input type="radio" class="btn-check" name="relevance_${j.id}" id="relevance_high_${j.id}" value="3" ${j.relevance == 3 ? 'checked' : ''} autocomplete="off">
+                            <label class="btn btn-outline-primary btn-sm" for="relevance_high_${j.id}">High</label>
+                        </div>
+                    </div>
+                    <div class="ms-4">
+                        <strong>Credibility:</strong>
+                        <div class="btn-group ms-2" role="group" aria-label="Credibility">
+                            <input type="radio" class="btn-check" name="credibility_${j.id}" id="credibility_low_${j.id}" value="1" ${j.credibility == 1 ? 'checked' : ''} autocomplete="off">
+                            <label class="btn btn-outline-primary btn-sm" for="credibility_low_${j.id}">Low</label>
+
+                            <input type="radio" class="btn-check" name="credibility_${j.id}" id="credibility_medium_${j.id}" value="2" ${j.credibility == 2 ? 'checked' : ''} autocomplete="off">
+                            <label class="btn btn-outline-primary btn-sm" for="credibility_medium_${j.id}">Medium</label>
+
+                            <input type="radio" class="btn-check" name="credibility_${j.id}" id="credibility_high_${j.id}" value="3" ${j.credibility == 3 ? 'checked' : ''} autocomplete="off">
+                            <label class="btn btn-outline-primary btn-sm" for="credibility_high_${j.id}">High</label>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        const buttonsHtml = `
+            <div>
+                <button type="button" class="btn btn-sm btn-outline-danger btn-abandon" style="${j.status === 'abandoned' ? 'display:none;' : ''}">Abandon</button>
+                <button type="button" class="btn btn-sm btn-outline-success btn-recover" style="${j.status !== 'abandoned' ? 'display:none;' : ''}">Recover</button>
+            </div>
+        `;
+
+        justificationEl.innerHTML = `
+            <p class="mb-1"><strong>Title:</strong> ${j.page_title || 'No title found'}</p>
+            <p class="mb-1"><strong>URL:</strong> <a href="${j.url}" target="_blank">${j.url}</a></p>
+            ${contentHtml}
+            <div class="d-flex justify-content-between align-items-center mt-3">
+                ${relevanceHtml}
+                ${buttonsHtml}
+            </div>
+        `;
+        return justificationEl;
+    }
+
+    const justificationContainer = document.getElementById('justification-container');
+
+    async function updateJustificationStatus(id, status) {
+        try {
+            await fetch(`/task/justification/update/${id}/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: JSON.stringify({ status: status })
+            });
+            fetchJustifications(); // Re-fetch to update the UI
+        } catch (error) {
+            console.error('Error updating justification status:', error);
+        }
+    }
+
+    justificationContainer.addEventListener('click', function(e) {
+        const target = e.target;
+        const justificationItem = target.closest('.justification-item');
+        if (!justificationItem) return;
+
+        const justificationId = justificationItem.dataset.id;
+        if (target.classList.contains('btn-abandon')) {
+            updateJustificationStatus(justificationId, 'abandoned');
+        } else if (target.classList.contains('btn-recover')) {
+            updateJustificationStatus(justificationId, 'active');
         }
     });
 
-    function reindexSources() {
-        const entries = document.getElementsByClassName('source-entry');
-        Array.from(entries).forEach((entry, i) => {
-            entry.querySelector('input[type="url"]').name = `source_url_${i}`;
-            entry.querySelector('textarea').name = `source_text_${i}`;
-        });
-    }
 
-    function updateRemoveButtons() {
-        const buttons = document.getElementsByClassName('remove-source');
-        const display = buttons.length > 1 ? 'block' : 'none';
-        Array.from(buttons).forEach(btn => btn.style.display = display);
-    }
+    // Initial fetch
+    fetchJustifications();
 
     // Reasoning Method Other
-    document.querySelectorAll('input[name="reasoning_method"]').forEach(radio => {
+    document.querySelectorAll('input[name="answer_formulation_method"]').forEach(radio => {
         radio.addEventListener('change', function() {
-            const otherInput = document.querySelector('input[name="reasoning_method_other"]');
+            const otherInput = document.querySelector('input[name="answer_formulation_method_other"]');
             if (otherInput) {
                 otherInput.disabled = this.value !== 'other';
             }
         });
+    });
+
+    justificationContainer.addEventListener('change', function(e) {
+        if (e.target.type === 'radio' && e.target.name.startsWith('relevance_')) {
+            const justificationItem = e.target.closest('.justification-item');
+            if (justificationItem) {
+                justificationItem.classList.remove('is-invalid');
+            }
+        }
     });
 
     // Form Submission
@@ -234,29 +410,35 @@ document.addEventListener('DOMContentLoaded', function() {
             isValid = false;
         }
 
-        // Validation for justification
-        const sourceUrl = document.querySelector('input[name="source_url_0"]');
-        const sourceText = document.querySelector('textarea[name="source_text_0"]');
-        if (sourceUrl.value.trim() === '') {
-            sourceUrl.classList.add('is-invalid');
+        // Validation for answer formulation method
+        const answerFormulationMethod = document.querySelector('input[name="answer_formulation_method"]:checked');
+        const answerFormulationMethodOther = document.querySelector('input[name="answer_formulation_method_other"]');
+        if (!answerFormulationMethod) {
+            document.querySelector('.w-100[aria-label="Answer Formulation Method"]').classList.add('is-invalid');
             isValid = false;
-        }
-        if (sourceText.value.trim() === '') {
-            sourceText.classList.add('is-invalid');
+        } else if (answerFormulationMethod.value === 'other' && answerFormulationMethodOther.value.trim() === '') {
+            answerFormulationMethodOther.classList.add('is-invalid');
+            answerFormulationMethodOther.focus();
             isValid = false;
         }
 
-        // Validation for reasoning method
-        const reasoningMethod = document.querySelector('input[name="reasoning_method"]:checked');
-        const reasoningMethodOther = document.querySelector('input[name="reasoning_method_other"]');
-        if (!reasoningMethod) {
-            document.querySelector('.w-100[aria-label="Reasoning Method"]').classList.add('is-invalid');
-            isValid = false;
-        } else if (reasoningMethod.value === 'other' && reasoningMethodOther.value.trim() === '') {
-            reasoningMethodOther.classList.add('is-invalid');
-            reasoningMethodOther.focus();
-            isValid = false;
-        }
+        // Validation for textual evidence relevance
+        const textJustifications = document.querySelectorAll('#text-justification-list .justification-item');
+        textJustifications.forEach(item => {
+            const justificationId = item.dataset.id;
+            const relevanceSelection = item.querySelector(`input[name="relevance_${justificationId}"]:checked`);
+            if (!relevanceSelection) {
+                item.classList.add('is-invalid');
+                item.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                isValid = false;
+            }
+            const credibilitySelection = item.querySelector(`input[name="credibility_${justificationId}"]:checked`);
+            if (!credibilitySelection) {
+                item.classList.add('is-invalid');
+                item.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                isValid = false;
+            }
+        });
 
         if (!isValid) {
             return;
@@ -277,25 +459,19 @@ document.addEventListener('DOMContentLoaded', function() {
             document.querySelector('.btn-group[aria-label="Confidence"]').classList.remove('is-invalid');
         });
     });
-    document.querySelector('input[name="source_url_0"]').addEventListener('input', () => {
-        document.querySelector('input[name="source_url_0"]').classList.remove('is-invalid');
-    });
-    document.querySelector('textarea[name="source_text_0"]').addEventListener('input', () => {
-        document.querySelector('textarea[name="source_text_0"]').classList.remove('is-invalid');
-    });
-    document.querySelectorAll('input[name="reasoning_method"]').forEach(radio => {
+    document.querySelectorAll('input[name="answer_formulation_method"]').forEach(radio => {
         radio.addEventListener('change', () => {
-            document.querySelector('.w-100[aria-label="Reasoning Method"]').classList.remove('is-invalid');
-            const reasoningMethodOther = document.querySelector('input[name="reasoning_method_other"]');
-            if (reasoningMethodOther) {
-                reasoningMethodOther.classList.remove('is-invalid');
+            document.querySelector('.w-100[aria-label="Answer Formulation Method"]').classList.remove('is-invalid');
+            const answerFormulationMethodOther = document.querySelector('input[name="answer_formulation_method_other"]');
+            if (answerFormulationMethodOther) {
+                answerFormulationMethodOther.classList.remove('is-invalid');
             }
         });
     });
-    const reasoningMethodOtherInput = document.querySelector('input[name="reasoning_method_other"]');
-    if (reasoningMethodOtherInput) {
-        reasoningMethodOtherInput.addEventListener('input', () => {
-            reasoningMethodOtherInput.classList.remove('is-invalid');
+    const answerFormulationMethodOtherInput = document.querySelector('input[name="answer_formulation_method_other"]');
+    if (answerFormulationMethodOtherInput) {
+        answerFormulationMethodOtherInput.addEventListener('input', () => {
+            answerFormulationMethodOtherInput.classList.remove('is-invalid');
         });
     }
 
@@ -319,6 +495,31 @@ document.addEventListener('DOMContentLoaded', function() {
             window.dispatchEvent(new Event('resize'));
         });
     }
+
+    // Listen for messages from the background script
+    chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+        if (message.command === "add_justification") {
+            const container = document.getElementById('source-container');
+            const firstEntry = container.querySelector('.source-entry');
+            const firstUrlInput = firstEntry.querySelector('input[type="url"]');
+            const firstTextInput = firstEntry.querySelector('textarea');
+
+            // If the first justification is empty, use it
+            if (firstUrlInput.value.trim() === '' && firstTextInput.value.trim() === '') {
+                firstUrlInput.value = message.url;
+                firstTextInput.value = message.text;
+            } else {
+                // Otherwise, add a new one
+                document.getElementById('add-source').click();
+                const newEntry = container.querySelector('.source-entry:last-child');
+                newEntry.querySelector('input[type="url"]').value = message.url;
+                newEntry.querySelector('textarea').value = message.text;
+            }
+            
+            // Bring the window to the front
+            window.focus();
+        }
+    });
 });
 </script>
 {% endblock %}

@@ -3,6 +3,51 @@
  * Manages the lifecycle of page tracking and communication with the service worker.
  */
 
+let lastRightClickedElement;
+document.addEventListener('mousedown', function(event) {
+    if (event.button === 2) { // Right-click
+        lastRightClickedElement = event.target;
+    }
+}, true);
+
+function getElementDetails() {
+    const targetElement = lastRightClickedElement;
+    if (!targetElement) return null;
+
+    const getCssSelector = (el) => {
+        if (!(el instanceof Element)) return;
+        const path = [];
+        while (el.nodeType === Node.ELEMENT_NODE) {
+            let selector = el.nodeName.toLowerCase();
+            if (el.id) {
+                selector += '#' + el.id;
+                path.unshift(selector);
+                break;
+            } else {
+                let sib = el, nth = 1;
+                while (sib = sib.previousElementSibling) {
+                    if (sib.nodeName.toLowerCase() == selector)
+                       nth++;
+                }
+                if (nth != 1)
+                    selector += ":nth-of-type("+nth+")";
+            }
+            path.unshift(selector);
+            el = el.parentNode;
+        }
+        return path.join(" > ");
+    }
+
+    const selector = getCssSelector(targetElement);
+    const tagName = targetElement.tagName;
+    const attributes = {};
+    for (const attr of targetElement.attributes) {
+        attributes[attr.name] = attr.value;
+    }
+
+    return { selector, tagName, attributes };
+}
+
 const MSG_TYPE_POPUP = "msg_from_popup";
 
 let _content_vars = {
@@ -183,6 +228,19 @@ window.addEventListener('popstate', () => {
 });
 
 chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
+    // Handle messages from the background script
+    if (message.command === 'get-element-details') {
+        sendResponse(getElementDetails());
+        return true; // Keep channel open for async response
+    }
+
+    if (message.command === 'evidence-added-successfully') {
+        displayLoadedBox("Evidence added successfully!");
+        sendResponse({success: true});
+        return true;
+    }
+
+    // Handle messages from the popup
     if (message.type === MSG_TYPE_POPUP) {
         if (document.visibilityState === 'hidden') {
             printDebug("content", "Page is hidden, not responding to popup.");

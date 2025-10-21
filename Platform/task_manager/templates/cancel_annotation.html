@@ -41,15 +41,15 @@
                         {% csrf_token %}
 
                         <div class="mb-4 p-3 border rounded">
-                            <label class="form-label"><strong>1. Primary Reason for Cancellation</strong></label>
-                            <p class="form-text text-muted">Select the main reason you are cancelling this task.</p>
+                            <label class="form-label"><strong>1. Cancellation Reason</strong></label>
+                            <p class="form-text text-muted">Select the primary reason you are unable to complete this task.</p>
                             <div class="w-100" role="group" aria-label="Cancellation Reason">
                                 {% for key, value in CANCEL_CATEGORY_MAP.items %}
                                 <div class="d-flex mb-2">
                                     <input class="btn-check" type="radio" name="cancel_category" id="cancel_{{ key }}" value="{{ key }}" required autocomplete="off">
-                                    <label class="btn btn-outline-primary {% if key != 'other' %}w-100{% endif %} text-start" for="cancel_{{ key }}">{{ value }}</label>
+                                    <label class="btn btn-outline-primary {% if key != 'other' %}w-100{% endif %} text-start" for="cancel_{{ key }}">{{ value|safe }}</label>
                                     {% if key == 'other' %}
-                                    <input type="text" name="cancel_reason" class="form-control ms-2" placeholder="Please specify...">
+                                    <input type="text" name="cancel_reason" id="cancel_reason_other_text" class="form-control ms-2" placeholder="Please specify..." disabled>
                                     {% endif %}
                                 </div>
                                 {% endfor %}
@@ -57,14 +57,8 @@
                         </div>
 
                         <div class="mb-4 p-3 border rounded">
-                            <label for="cancel_reason" class="form-label"><strong>2. Detailed Explanation</strong></label>
-                            <p class="form-text text-muted">What specific obstacle prevented you from completing the task? What was your final attempt?</p>
-                            <textarea class="form-control" id="cancel_reason" name="cancel_reason" rows="3" required></textarea>
-                        </div>
-
-                        <div class="mb-4 p-3 border rounded">
-                            <label class="form-label"><strong>3. Missing Resources</strong></label>
-                            <p class="form-text text-muted"><strong>What was needed to make this task solvable? Check all that apply and drag to reorder.</strong></p>
+                            <label class="form-label"><strong>2. Missing Resources</strong></label>
+                            <p class="form-text text-muted">What was needed to make this task solvable? <strong>Check all that apply and drag to reorder.</strong></p>
                             <div id="selected-resources-list" class="sortable-list list-group mb-2"></div>
                             <hr id="selection-separator" style="display: none;">
                             <div id="unselected-resources-list" class="list-group">
@@ -85,12 +79,6 @@
                                 {% endfor %}
                             </div>
                             <input type="hidden" name="cancel_missing_resources_list" id="cancel_missing_resources_list" />
-                        </div>
-
-                        <div class="mb-4 p-3 border rounded">
-                            <label for="cancel_additional_reflection" class="form-label"><strong>4. (Optional) Additional Reflection</strong></label>
-                            <p class="form-text text-muted">Any other thoughts on this task?</p>
-                            <textarea class="form-control" id="cancel_additional_reflection" name="cancel_additional_reflection" rows="3"></textarea>
                         </div>
 
                         <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-5">
@@ -179,15 +167,26 @@ $(function () {
 
     initializeSortable("selected-resources-list", "unselected-resources-list", "cancel_missing_resources", "cancel_missing_resources_list", "selection-separator");
 
+    // Handle enabling/disabling of the 'Other' reason text input
+    const otherReasonInput = $('#cancel_reason_other_text');
+    $('input[name="cancel_category"]').change(function() {
+        if ($(this).val() === 'other' && this.checked) {
+            otherReasonInput.prop('disabled', false);
+        } else {
+            otherReasonInput.prop('disabled', true);
+            otherReasonInput.val(''); // Clear the value when another option is selected
+        }
+    });
+
     let is_submitted = false;
     $('#query-btn').click(function () {
         if ($('input[name="cancel_category"]:checked').length === 0) {
             alert('Please select a primary reason for cancellation.');
             return;
         }
-        if ($('#cancel_reason').val().trim() === '') {
-            alert('Please provide a detailed explanation.');
-            $('#cancel_reason').focus();
+        if ($('input[name="cancel_category"][value="other"]').is(':checked') && otherReasonInput.val().trim() === '') {
+            alert('Please specify your "Other" reason for cancellation.');
+            otherReasonInput.focus();
             return;
         }
         if ($('input[name="cancel_missing_resources"]:checked').length === 0) {

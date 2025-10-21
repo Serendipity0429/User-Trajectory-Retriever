@@ -82,8 +82,6 @@ function showFailMessage(message_type) {
 function switchUiState(show_login) {
     let loggedDiv = document.getElementById('logged');
     let loginDiv = document.getElementById('login');
-    printDebug("popup", "loggedDiv:", loggedDiv, "loginDiv:", loginDiv);
-    printDebug("popup", "show_login:", show_login);
     if (show_login) { // Display login interface
         loggedDiv.style.display = 'none';
         loginDiv.style.display = 'block';

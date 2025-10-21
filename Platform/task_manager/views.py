@@ -26,6 +26,7 @@ from .models import (
     Webpage,
     TaskTrial,
     ReflectionAnnotation,
+    Justification,
 )
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
 from rest_framework.permissions import IsAuthenticated
@@ -210,9 +211,6 @@ def post_task_annotation(request, task_id):
             post_annotation.unhelpful_paths_other = request.POST.get("unhelpful_paths_other")
             post_annotation.strategy_shift = request.POST.get("strategy_shift")
             post_annotation.strategy_shift_other = request.POST.get("strategy_shift_other")
-            post_annotation.additional_reflection = request.POST.get(
-                "additional_reflection"
-            )
             post_annotation.belong_task = task
             post_annotation.save()
 
@@ -241,6 +239,10 @@ def post_task_annotation(request, task_id):
         answer = json.loads(task.content.answer)
         print_debug(answer)
 
+        # Get the user's answer from the latest trial
+        latest_trial = TaskTrial.objects.filter(belong_task=task).order_by('-num_trial').first()
+        user_answer = latest_trial.answer if latest_trial else ""
+
         start_annotating("post_task_annotation")
         return render(
             request,
@@ -251,6 +253,7 @@ def post_task_annotation(request, task_id):
                 "webpages": webpages,
                 "question": question,
                 "answer": answer,
+                "user_answer": user_answer,
                 "DIFFICULTY_MAP": DIFFICULTY_MAP,
                 "AHA_MOMENT_MAP": AHA_MOMENT_MAP,
                 "UNHELPFUL_PATHS_MAP": UNHELPFUL_PATHS_MAP,
@@ -440,11 +443,11 @@ FAMILIARITY_EXPLANATION_MAP = {
 }
 
 DIFFICULTY_EXPLANATION_MAP = {
-    0: "You expect to find the answer almost immediately.",
-    1: "You expect to find the answer with a simple search.",
-    2: "You expect to need to browse a few pages or perform a few searches.",
-    3: "You expect to need to do some in-depth research and synthesis.",
-    4: "You expect this to be a very challenging task that may require significant effort.",
+    0: "You can find the answer almost immediately.",
+    1: "You can find the answer with a simple search.",
+    2: "You can need to browse a few pages or perform a few searches.",
+    3: "You can need to do some in-depth research and synthesis.",
+    4: "This is a very challenging task that may require significant effort.",
 }
 
 CONFIDENCE_MAP = {
@@ -455,13 +458,13 @@ CONFIDENCE_MAP = {
     5: "5 - Certain",
 }
 
-REASONING_METHOD_MAP = {
-    "direct_fact": "The answer was a direct fact or number stated clearly on the page.",
-    "synthesis_single_page": "I had to combine multiple pieces of information from the same page.",
-    "synthesis_multi_page": "I had to combine information from different webpages.",
-    "calculation": "I had to perform a calculation based on data I found.",
-    "inference": "I had to make an inference or deduction that was not explicitly stated.",
-    "other": "Other",
+ANSWER_FORMULATION_MAP = {
+    "direct_fact": "<strong>Direct Answer:</strong> The answer was stated clearly on a single page.",
+    "synthesis_single_page": "<strong>Synthesis (Same Page):</strong> I had to combine multiple pieces of information from the same page.",
+    "synthesis_multi_page": "<strong>Synthesis (Multiple Pages):</strong> I had to combine information from different webpages.",
+    "calculation": "<strong>Calculation:</strong> I had to perform a calculation based on data I found.",
+    "inference": "<strong>Inference:</strong> I had to make an inference or deduction that was not explicitly stated.",
+    "other": "<strong>Other</strong>",
 }
 
 FAILURE_CATEGORY_MAP = {
@@ -492,40 +495,40 @@ CORRECTIVE_PLAN_MAP = {
 }
 
 AHA_MOMENT_MAP = {
-    "data_table": "A data table or chart with the exact answer.",
-    "direct_statement": "A direct statement in a paragraph.",
-    "official_document": "Finding an official document or report (e.g., PDF, government site).",
-    "key_definition": "Understanding a key definition or concept.",
-    "synthesis": "Connecting two pieces of information that finally made sense together.",
-    "other": "Other:",
+    "data_table": "Data Table / Chart",
+    "direct_statement": "Direct Statement / Paragraph",
+    "official_document": "Official Document / Report",
+    "key_definition": "Key Definition / Concept",
+    "synthesis": "Synthesizing Multiple Sources",
+    "other": "Other",
 }
 
 UNHELPFUL_PATHS_MAP = {
-    "no_major_roadblocks": "I did not encounter any major roadblocks.",
-    "irrelevant_results": "Search results were mostly irrelevant.",
-    "outdated_info": "Found sites with outdated information.",
-    "low_quality": "Visited low-quality, spam, or untrustworthy sites.",
-    "paywall": "Hit a paywall or login requirement.",
-    "contradictory_info": "Found contradictory information on different sites.",
-    "other": "Other:",
+    "no_major_roadblocks": "<strong>No Roadblocks:</strong> The search process was straightforward.",
+    "irrelevant_results": "<strong>Irrelevant Results:</strong> Search results were not relevant to the task.",
+    "outdated_info": "<strong>Outdated Information:</strong> I found information that was no longer accurate.",
+    "low_quality": "<strong>Low-Quality Sources:</strong> I encountered untrustworthy or difficult-to-use websites.",
+    "paywall": "<strong>Paywall:</strong> I was blocked by a paywall or a login requirement.",
+    "contradictory_info": "<strong>Contradictory Information:</strong> I found conflicting information on different websites.",
+    "other": "<strong>Other:</strong>",
 }
 
 STRATEGY_SHIFT_MAP = {
-    "no_change": "It didn't change much; my first approach worked.",
-    "narrowed_search": "I had to significantly narrow my search to be more specific.",
-    "broadened_search": "I had to broaden my search to find related concepts first.",
-    "changed_source_type": "I realized I was looking at the wrong type of sources and switched.",
-    "re-evaluated_assumption": "I realized my initial assumption was wrong and changed my approach.",
-    "other": "Other:",
+    "no_change": "<strong>No Change:</strong> My initial plan was effective and did not need to change.",
+    "narrowed_search": "<strong>Narrowed Search:</strong> I made my search queries more specific to narrow down the results.",
+    "broadened_search": "<strong>Broadened Search:</strong> I made my search queries more general to get a broader overview.",
+    "changed_source_type": "<strong>Changed Source Type:</strong> I switched from one type of source to another (e.g., news to academic papers).",
+    "re-evaluated_assumption": "<strong>Re-evaluated Assumption:</strong> I realized an initial assumption was wrong, which changed my approach.",
+    "other": "<strong>Other:</strong>",
 }
 
 AHA_MOMENT_EXPLANATION_MAP = {
-    "data_table": "You found a table or chart that contained the answer.",
-    "direct_statement": "You found a sentence or paragraph that directly stated the answer.",
-    "official_document": "You found an official document, such as a PDF from a government agency or a scientific paper, that contained the answer.",
-    "key_definition": "Understanding a specific term or concept was the key to finding the answer.",
-    "synthesis": "You had to combine information from multiple sources or sections to arrive at the answer.",
-    "other": "None of the above.",
+    "data_table": "The answer was found in a structured table or chart.",
+    "direct_statement": "The answer was explicitly stated in a sentence or paragraph.",
+    "official_document": "An authoritative document (e.g., PDF, government site) provided the answer.",
+    "key_definition": "Understanding a specific term or concept was the key.",
+    "synthesis": "The answer was derived by combining information from different sources or sections.",
+    "other": "A different type of information was critical.",
 }
 
 UNHELPFUL_PATHS_EXPLANATION_MAP = {
@@ -598,24 +601,19 @@ CORRECTIVE_ACTION_EXPLANATION_MAP = {
 
 
 CANCEL_CATEGORY_MAP = {
-    "info_unavailable": "I believe the information is not publicly available online.",
-    "too_difficult": "The task is too complex or difficult for me to solve.",
-    "no_idea": "I am completely stuck and have no idea how to proceed.",
-    "too_long": "The task is taking too much time to complete.",
-    "technical_issue": "I encountered a technical barrier (e.g., paywall, login, broken site).",
-    "other": "Other:",
+    "info_unavailable": "<strong>Information Unavailable:</strong> I believe the information is not publicly available online.",
+    "ambiguous_question": "<strong>Ambiguous Question:</strong> The task is unclear, ambiguous, or appears to contain incorrect assumptions.",
+    "scope_too_large": "<strong>Excessive Scope:</strong> The amount of research, synthesis, or steps required is much larger than anticipated.",
+    "too_long": "<strong>Too Time-Consuming:</strong> The task is taking too much time to complete.",
+    "technical_issue": "<strong>Technical Barrier:</strong> I encountered a technical barrier (e.g., paywall, login, broken site).",
+    "other": "<strong>Other:</strong>",
 }
 
 MISSING_RESOURCES_MAP = {
     "expert_knowledge": "Deep, specialized domain knowledge.",
     "paid_access": "Access to a paid subscription, database, or service.",
-    "better_tools": "A more powerful or specialized search tool.",
-    "different_question": "The question itself was too ambiguous or unanswerable.",
-    "info_not_online": "The information is unlikely to exist publicly online.",
-    "time_limit": "More time to research and explore.",
-    "team_help": "Help from a team or community.",
-    "guidance": "Guidance or mentorship from an expert.",
-    "better_question": "A better-formulated question or clearer instructions.",
+    "better_tools": "A more powerful or specialized search tool (e.g., a scientific database, code interpreter).",
+    "team_help": "Help or collaboration from a team or community.",
     "other": "Other:",
 }
 
@@ -721,7 +719,7 @@ def show_task(request, task_id):
         "DIFFICULTY_MAP": DIFFICULTY_MAP,
         "EFFORT_MAP": EFFORT_MAP,
         "CONFIDENCE_MAP": CONFIDENCE_MAP,
-        "REASONING_METHOD_MAP": REASONING_METHOD_MAP,
+        "ANSWER_FORMULATION_MAP": ANSWER_FORMULATION_MAP,
         "FAILURE_CATEGORY_MAP": FAILURE_CATEGORY_MAP,
         "CORRECTIVE_PLAN_MAP": CORRECTIVE_PLAN_MAP,
         "AHA_MOMENT_MAP": AHA_MOMENT_MAP,
@@ -790,9 +788,6 @@ def cancel_annotation(request, task_id, end_timestamp):
         )
         cancel_annotation.cancel_missing_resources_other = request.POST.get(
             "cancel_missing_resources_other"
-        )
-        cancel_annotation.cancel_additional_reflection = request.POST.get(
-            "cancel_additional_reflection"
         )
         cancel_annotation.save()
         stop_annotating()
@@ -928,7 +923,7 @@ def submit_answer(request, task_id, timestamp):
         answer = request.POST.get("answer")
         additional_explanation = request.POST.get("additional_explanation")
         confidence = request.POST.get("confidence")
-        reasoning_method = request.POST.get("reasoning_method")
+        answer_formulation_method = request.POST.get("answer_formulation_method")
 
         task_trial = TaskTrial()
         task_trial.belong_task = task
@@ -939,7 +934,7 @@ def submit_answer(request, task_id, timestamp):
         task_trial.end_timestamp = timezone.make_aware(datetime.fromtimestamp(timestamp / 1000))
         task_trial.additional_explanation = additional_explanation
         task_trial.confidence = confidence
-        task_trial.reasoning_method = reasoning_method
+        task_trial.answer_formulation_method = answer_formulation_method
 
         # Deal with source_url_and_text
         source_id = 0
@@ -964,6 +959,27 @@ def submit_answer(request, task_id, timestamp):
 
         task_trial.save()
         task.save()
+
+        # Save relevance and credibility annotations
+        for key, value in request.POST.items():
+            if key.startswith('relevance_'):
+                justification_id = key.split('_')[1]
+                try:
+                    justification = Justification.objects.get(id=justification_id)
+                    if justification.belong_task_trial.belong_task.user == user:
+                        justification.relevance = int(value)
+                        justification.save()
+                except (Justification.DoesNotExist, ValueError):
+                    pass  # Optionally log this error
+            elif key.startswith('credibility_'):
+                justification_id = key.split('_')[1]
+                try:
+                    justification = Justification.objects.get(id=justification_id)
+                    if justification.belong_task_trial.belong_task.user == user:
+                        justification.credibility = int(value)
+                        justification.save()
+                except (Justification.DoesNotExist, ValueError):
+                    pass # Optionally log this error
 
         if is_correct:
             redirect_url = reverse("task_manager:post_task_annotation", args=[task_id])
@@ -992,7 +1008,7 @@ def submit_answer(request, task_id, timestamp):
                 "webpages": webpages,
                 "num_trial": num_trial + 1,
                 "confidence_choices": CONFIDENCE_MAP.items(),
-                "reasoning_choices": REASONING_METHOD_MAP.items(),
+                "answer_formulation_choices": ANSWER_FORMULATION_MAP.items(),
             },
         )
 
@@ -1027,4 +1043,95 @@ def remove_task(request, task_id):
         return HttpResponse(f"No task found with task_id={task_id}")
     task.delete()
     return HttpResponse("Task removed successfully")
+
+
+@csrf_exempt
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def add_justification(request):
+    """
+    Adds a justification for a given task.
+    """
+    user = request.user
+    task_id = request.data.get("task_id")
+    url = request.data.get("url")
+    page_title = request.data.get("page_title")
+    text = request.data.get("text")
+    dom_position = request.data.get("dom_position")
+    evidence_type = request.data.get("evidence_type", "text_selection")
+    element_details = request.data.get("element_details")
+
+    task = Task.objects.filter(id=task_id, user=user, active=True).first()
+    if not task:
+        return JsonResponse({"status": "error", "message": "Active task not found."}, status=404)
+
+    trial = TaskTrial.objects.filter(belong_task=task).order_by("-num_trial").first()
+    if not trial:
+        # If no trial exists, create one
+        trial = TaskTrial.objects.create(
+            belong_task=task,
+            num_trial=1,
+            answer="",
+            confidence=0,
+            answer_formulation_method="direct_fact"
+        )
+        task.num_trial = 1
+        task.save()
+
+    Justification.objects.create(
+        belong_task_trial=trial,
+        url=url,
+        page_title=page_title,
+        text=text,
+        dom_position=dom_position,
+        evidence_type=evidence_type,
+        element_details=element_details,
+        confidence=1 # Default confidence
+    )
+
+    return JsonResponse({"status": "success"})
+
+
+@csrf_exempt
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def update_justification_status(request, justification_id):
+    """
+    Updates the status of a justification.
+    """
+    user = request.user
+    try:
+        justification = Justification.objects.get(id=justification_id)
+        # Check if the user has permission to update this justification
+        if justification.belong_task_trial.belong_task.user != user:
+            return JsonResponse({"status": "error", "message": "Permission denied."}, status=403)
+
+        new_status = request.data.get("status")
+        if new_status in ['active', 'abandoned']:
+            justification.status = new_status
+            justification.save()
+            return JsonResponse({"status": "success", "new_status": new_status})
+        else:
+            return JsonResponse({"status": "error", "message": "Invalid status."}, status=400)
+    except Justification.DoesNotExist:
+        return JsonResponse({"status": "error", "message": "Justification not found."}, status=404)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def get_justifications(request, task_id):
+    """
+    Retrieves all justifications for the current trial of a given task.
+    """
+    user = request.user
+    task = Task.objects.filter(id=task_id, user=user, active=True).first()
+    if not task:
+        return JsonResponse({"status": "error", "message": "Active task not found."}, status=404)
+
+    trial = TaskTrial.objects.filter(belong_task=task).order_by("-num_trial").first()
+    if not trial:
+        return JsonResponse({"status": "success", "justifications": []})
+
+    justifications = Justification.objects.filter(belong_task_trial=trial).values('id', 'url', 'page_title', 'text', 'status', 'evidence_type', 'element_details', 'relevance', 'credibility')
+    return JsonResponse({"status": "success", "justifications": list(justifications)})
 

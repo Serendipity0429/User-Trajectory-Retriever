@@ -252,15 +252,26 @@ $(function () {
         // Reset validation states
         $('.is-invalid').removeClass('is-invalid');
         let isValid = true;
+        let firstInvalidElement = null;
+
+        // Helper to set focus
+        const setFocus = (element) => {
+            if (!firstInvalidElement) {
+                firstInvalidElement = element;
+            }
+        };
 
         // Validation for failure categories
         const failureCategories = $('input[name="failure_category"]:checked');
         const failureCategoryOther = $('input[name="failure_category_other"]');
         if (failureCategories.length === 0) {
-            $('#unselected-failure-categories').addClass('is-invalid');
+            const container = $('#unselected-failure-categories');
+            container.addClass('is-invalid');
+            setFocus(container.find('input').first());
             isValid = false;
         } else if ($('input[name="failure_category"][value="other"]').is(':checked') && failureCategoryOther.val().trim() === '') {
             failureCategoryOther.addClass('is-invalid');
+            setFocus(failureCategoryOther);
             isValid = false;
         }
 
@@ -268,6 +279,7 @@ $(function () {
         const failureReason = $('#failure_reason');
         if (failureReason.val().trim() === '') {
             failureReason.addClass('is-invalid');
+            setFocus(failureReason);
             isValid = false;
         }
 
@@ -275,26 +287,36 @@ $(function () {
         const correctiveActions = $('input[name="future_plan_actions"]:checked');
         const correctiveActionOther = $('input[name="future_plan_other"]');
         if (correctiveActions.length === 0) {
-            $('#unselected-corrective-actions').addClass('is-invalid');
+            const container = $('#unselected-corrective-actions');
+            container.addClass('is-invalid');
+            setFocus(container.find('input').first());
             isValid = false;
         } else if ($('input[name="future_plan_actions"][value="other"]').is(':checked') && correctiveActionOther.val().trim() === '') {
             correctiveActionOther.addClass('is-invalid');
+            setFocus(correctiveActionOther);
             isValid = false;
         }
 
         // Validation for estimated time left
         if (!$('input[name="estimated_time"]:checked').val()) {
-            $('input[name="estimated_time"]').closest('.btn-group').addClass('is-invalid');
+            const container = $('input[name="estimated_time"]').closest('.btn-group');
+            container.addClass('is-invalid');
+            setFocus(container.find('input').first());
             isValid = false;
         }
 
         // Validation for adjusted difficulty
         if (!$('input[name="adjusted_difficulty"]:checked').val()) {
-            $('input[name="adjusted_difficulty"]').closest('.btn-group').addClass('is-invalid');
+            const container = $('input[name="adjusted_difficulty"]').closest('.btn-group');
+            container.addClass('is-invalid');
+            setFocus(container.find('input').first());
             isValid = false;
         }
 
         if (!isValid) {
+            if (firstInvalidElement) {
+                firstInvalidElement.focus();
+            }
             return;
         }
 

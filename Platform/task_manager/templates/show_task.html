@@ -100,13 +100,17 @@
         {{ pre_task_annotation.initial_guess }}
     {% endif %}
 </p>
-<p><span class="annotation-key"><i class="bi bi-compass me-2"></i>Expected Source of Answer:</span> 
-    {{ EXPECTED_SOURCES_MAP|get_item:pre_task_annotation.expected_source }}
-    {% if pre_task_annotation.expected_source_other %}
-        ({{ pre_task_annotation.expected_source_other }})
-    {% endif %}
-</p>
-                </div>
+                    <p class="d-flex flex-column">
+                        <span class="annotation-key"><i class="bi bi-compass me-2"></i>Expected Source of Answer:</span>
+                        <span class="ps-4">
+                            {% for source in pre_task_annotation.expected_source %}
+                                &bull; {{ EXPECTED_SOURCES_MAP|get_item:source }}<br>
+                            {% endfor %}
+                            {% if pre_task_annotation.expected_source_other %}
+                                &bull; Other: {{ pre_task_annotation.expected_source_other }}
+                            {% endif %}
+                        </span>
+                    </p>                </div>
             </div>
             {% endif %}
         </div>
@@ -192,7 +196,7 @@
                                     <p><span class="annotation-key">Confidence:</span> {{ CONFIDENCE_MAP|get_item:trial.confidence }}</p>
                                     <p><span class="annotation-key">Justification:</span></p>
                                     <ul class="list-unstyled">
-                                        {% for justification in trial.justifications %}
+                                        {% for justification in trial.justifications.all %}
                                         <li class="mb-2">
                                             <p class="mb-1"><span class="annotation-key">URL:</span> <a href="{{ justification.url }}" target="_blank">{{ justification.url }}</a></p>
                                             <p class="mb-1"><span class="annotation-key">Confidence:</span> 
@@ -207,7 +211,7 @@
                                         </li>
                                         {% endfor %}
                                     </ul>
-                                    <p><span class="annotation-key">Answer Formulation Method:</span> {{ ANSWER_FORMULATION_MAP|get_item:trial.answer_formulation_method }}</p>
+                                    <p><span class="annotation-key">Answer Formulation Method:</span> {{ ANSWER_FORMULATION_MAP|get_item:trial.answer_formulation_method|safe }}</p>
 
                                     {% if not trial.is_correct and trial.reflection_annotation %}
                                     <hr>
@@ -215,14 +219,14 @@
                                     <p><span class="annotation-key">Primary Reasons for Failure:</span></p>
                                     <ul>
                                         {% for reason in trial.reflection_annotation.failure_reasons %}
-                                        <li>{{ FAILURE_CATEGORY_MAP|get_item:reason }}</li>
+                                        <li>{{ FAILURE_CATEGORY_MAP|get_item:reason|safe }}</li>
                                         {% endfor %}
                                     </ul>
                                     <p><span class="annotation-key">Failure Analysis:</span> {{ trial.reflection_annotation.failure_analysis }}</p>
                                     <p><span class="annotation-key">Corrective Plan:</span></p>
                                     <ul>
                                         {% for plan in trial.reflection_annotation.corrective_plan %}
-                                        <li>{{ CORRECTIVE_PLAN_MAP|get_item:plan }}</li>
+                                        <li>{{ CORRECTIVE_PLAN_MAP|get_item:plan|safe }}</li>
                                         {% endfor %}
                                     </ul>
                                     <p><span class="annotation-key">Remaining Effort:</span> {{ trial.reflection_annotation.remaining_effort }} minutes</p>
@@ -247,9 +251,9 @@
                         </div>
                         <div class="card-body">
                             <p><span class="annotation-key">Overall Difficulty:</span> {{ DIFFICULTY_MAP|get_item:post_task_annotation.difficulty_actual }}</p>
-                            <p><span class="annotation-key">"Aha!" Moment:</span> {{ AHA_MOMENT_MAP|get_item:post_task_annotation.aha_moment_type }}</p>
+                            <p><span class="annotation-key">"Aha!" Moment:</span> {{ AHA_MOMENT_MAP|get_item:post_task_annotation.aha_moment_type|safe }}</p>
                             {% if post_task_annotation.aha_moment_other %}<p><span class="annotation-key">Details:</span> {{ post_task_annotation.aha_moment_other }}</p>{% endif %}
-                            <p><span class="annotation-key">Strategic Shift:</span> {{ STRATEGY_SHIFT_MAP|get_item:post_task_annotation.strategy_shift }}</p>
+                            <p><span class="annotation-key">Strategic Shift:</span> {{ STRATEGY_SHIFT_MAP|get_item:post_task_annotation.strategy_shift|safe }}</p>
                             {% if post_task_annotation.strategy_shift_other %}<p><span class="annotation-key">Details:</span> {{ post_task_annotation.strategy_shift_other }}</p>{% endif %}
                             {% if post_task_annotation.additional_reflection %}<p><span class="annotation-key">Additional Reflection:</span> {{ post_task_annotation.additional_reflection }}</p>{% endif %}
                         </div>
@@ -264,7 +268,7 @@
                             <span class="badge bg-danger"><i class="bi bi-x-circle-fill me-1"></i> Cancelled</span>
                         </div>
                         <div class="card-body">
-                            <p><span class="annotation-key">Reason for Cancellation:</span> {{ CANCEL_CATEGORY_MAP|get_item:cancel_annotation.cancel_category }}</p>
+                            <p><span class="annotation-key">Reason for Cancellation:</span> {{ CANCEL_CATEGORY_MAP|get_item:cancel_annotation.cancel_category|safe }}</p>
                             {% if cancel_annotation.cancel_reason %}<p><span class="annotation-key">Detailed Explanation:</span> {{ cancel_annotation.cancel_reason }}</p>{% endif %}
                             {% if cancel_annotation.cancel_additional_reflection %}<p><span class="annotation-key">Additional Reflection:</span> {{ cancel_annotation.cancel_additional_reflection }}</p>{% endif %}
                         </div>

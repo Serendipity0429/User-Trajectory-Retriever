@@ -333,12 +333,29 @@ async function handleCancelTask() {
     document.getElementById('startTaskBtn').addEventListener('click', handleStartTask);
     document.getElementById('submitAnswerBtn').addEventListener('click', handleEndTask);
     document.getElementById('cancelAnnotationBtn').addEventListener('click', handleCancelTask);
+    document.getElementById('pendingAnnotationBtn').addEventListener('click', () => {
+        sendMessageFromPopup({ command: "check_logging_status" }).then(response => {
+            if (response.pending_url) {
+                openTaskWindow(response.pending_url);
+            }
+        });
+    });
 
-    const { access_token } = await _get_local(['access_token']);
-    if (access_token) {
+    const response = await sendMessageFromPopup({ command: "check_logging_status" });
+    if (response.log_status) {
         await showUserTab();
-        // chrome.action.setBadgeText({ text: 'on' });
-        // chrome.action.setBadgeBackgroundColor({ color: [202, 181, 225, 255] });
+        const pendingBtn = document.getElementById('pendingAnnotationBtn');
+        const submitBtn = document.getElementById('submitAnswerBtn');
+        const cancelBtn = document.getElementById('cancelAnnotationBtn');
+
+        if (response.pending_url) {
+            showAlert("You have a pending annotation.", "Pending Annotation");
+            pendingBtn.style.display = 'block';
+            submitBtn.style.display = 'none';
+            cancelBtn.style.display = 'none';
+        } else {
+            pendingBtn.style.display = 'none';
+        }
     } else {
         showLoginTab();
         chrome.action.setBadgeText({ text: '' });

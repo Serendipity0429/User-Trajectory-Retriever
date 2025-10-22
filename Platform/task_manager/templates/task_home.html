@@ -13,6 +13,13 @@
                 <div class="card-body p-5">
                     <p class="text-center text-muted mb-4">Here is a summary of your annotation progress.</p>
 
+                    {% if pending_annotation_url %}
+                    <div class="alert alert-warning text-center" role="alert">
+                        <strong>You have a pending annotation.</strong> Please complete it before starting a new task.<br/>
+                        <a href="{{ pending_annotation_url }}" class="btn btn-warning btn-sm mt-3">Go to Annotation</a>
+                    </div>
+                    {% endif %}
+
                     <div class="row gx-4 gy-4 mb-5">
                         <div class="col-md-6">
                             <div class="card text-center h-100 shadow-sm">

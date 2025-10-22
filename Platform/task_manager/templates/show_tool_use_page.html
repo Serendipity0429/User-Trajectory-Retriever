@@ -15,13 +15,13 @@
                         {% csrf_token %}
                         <input type="hidden" name="tool" id="tool-hidden">
                         <div class="d-grid gap-3">
-                            <button type="button" class="btn btn-outline-primary btn-lg" onclick="submitForm('math')">
+                            <button type="button" class="btn btn-outline-primary btn-lg" onclick="submitForm('math', this)">
                                 <i class="bi bi-calculator-fill me-2"></i>Math
                             </button>
-                            <button type="button" class="btn btn-outline-primary btn-lg" onclick="submitForm('graph')">
+                            <button type="button" class="btn btn-outline-primary btn-lg" onclick="submitForm('graph', this)">
                                 <i class="bi bi-bar-chart-line-fill me-2"></i>Graph
                             </button>
-                            <button type="button" class="btn btn-outline-primary btn-lg" onclick="submitForm('code')">
+                            <button type="button" class="btn btn-outline-primary btn-lg" onclick="submitForm('code', this)">
                                 <i class="bi bi-code-slash me-2"></i>Code
                             </button>
                         </div>
@@ -38,7 +38,16 @@
 
 {% block scripts %}
 <script>
-    function submitForm(toolValue) {
+    function submitForm(toolValue, buttonElement) {
+        // Disable all tool buttons
+        var buttons = document.querySelectorAll('.btn-outline-primary');
+        buttons.forEach(function(button) {
+            button.disabled = true;
+        });
+
+        // Show loading state on the clicked button
+        buttonElement.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Loading...';
+
         document.getElementById('tool-hidden').value = toolValue;
         document.getElementById('tool_use_form').submit();
     }

@@ -91,8 +91,8 @@
                                             </div>
                                         </div>
                         <div class="mb-4 p-3 border rounded">
-                            <h5><strong>3. Primary Reasons for Failure</strong></h5>
-                            <p><strong>Select at least one reason and drag to reorder by priority.</strong></p>
+                            <h5><strong>3. Reasons for Failure</strong></h5>
+                            <p>What do you think that led to the failure? <strong>Select at least one reason and drag to reorder by priority.</strong></p>
                             <div id="selected-failure-categories" class="sortable-list list-group mb-2"></div>
                             <hr id="failure-separator" style="display: none;">
                             <div id="unselected-failure-categories" class="list-group">
@@ -102,13 +102,13 @@
                                     <span class="drag-handle me-2"><i class="bi bi-grip-vertical"></i></span>
                                     <span class="priority-number me-2"></span>
                                     {% if key == 'other' %}
-                                    <span>{{ value }}</span>
+                                    <span>{{ value|safe }}</span>
                                     <div class="d-flex align-items-center flex-grow-1">
                                         <input type="text" name="failure_category_other" class="form-control form-control-sm ms-2" style="display:none;" placeholder="Please specify...">
                                         <div class="invalid-feedback">Please specify your "Other" failure reason.</div>
                                     </div>
                                     {% else %}
-                                    <span class="flex-grow-1">{{ value }}</span>
+                                    <span class="flex-grow-1">{{ value|safe }}</span>
                                     {% endif %}
                                 </div>
                                 {% endfor %}
@@ -118,15 +118,8 @@
                         </div>
 
                         <div class="mb-4 p-3 border rounded">
-                            <h5><strong>4. Failure Analysis</strong></h5>
-                            <p>Please elaborate on what went wrong (e.g., "I trusted an outdated blog post," "I misread the column header.").</p>
-                            <textarea class="form-control" id="failure_reason" name="failure_reason" rows="3" required></textarea>
-                            <div class="invalid-feedback">Please provide a failure analysis.</div>
-                        </div>
-
-                        <div class="mb-4 p-3 border rounded">
-                            <h5><strong>5. Corrective Plan</strong></h5>
-                            <p><strong>What will you do in your next attempt? Select at least one and drag to reorder.</strong></p>
+                            <h5><strong>4. Future Plan</strong></h5>
+                            <p>What will you do in your next attempt? <strong>Select at least one and drag to reorder.</strong></p>
                             <div id="selected-corrective-actions" class="sortable-list list-group mb-2"></div>
                             <hr id="corrective-separator" style="display: none;">
                             <div id="unselected-corrective-actions" class="list-group">
@@ -136,13 +129,13 @@
                                     <span class="drag-handle me-2"><i class="bi bi-grip-vertical"></i></span>
                                     <span class="priority-number me-2"></span>
                                     {% if key == 'other' %}
-                                    <span>{{ value }}</span>
+                                    <span>{{ value|safe }}</span>
                                     <div class="d-flex align-items-center flex-grow-1">
                                         <input type="text" name="future_plan_other" class="form-control form-control-sm ms-2" style="display:none;" placeholder="Please specify...">
                                         <div class="invalid-feedback">Please specify your "Other" corrective action.</div>
                                     </div>
                                     {% else %}
-                                    <span class="flex-grow-1">{{ value }}</span>
+                                    <span class="flex-grow-1">{{ value|safe }}</span>
                                     {% endif %}
                                 </div>
                                 {% endfor %}
@@ -152,7 +145,7 @@
                         </div>
 
                         <div class="mb-4 p-3 border rounded">
-                            <h5><strong>6. Estimated Time Left</strong></h5>
+                            <h5><strong>5. Estimated Time Left</strong></h5>
                             <p>Please estimate how much more time you think you'll need to complete this task.</p>
                             <div class="btn-group" role="group" aria-label="Effort">
                                 {% for key, value in EFFORT_MAP.items %}
@@ -166,7 +159,7 @@
                         </div>
 
                         <div class="mb-4 p-3 border rounded">
-                            <h5><strong>7. Adjusted Difficulty</strong></h5>
+                            <h5><strong>6. Adjusted Difficulty</strong></h5>
                             <p>After this attempt, how would you rate the difficulty of the task?</p>
                             <div class="btn-group" role="group" aria-label="Adjusted Difficulty">
                                 {% for key, value in DIFFICULTY_MAP.items %}
@@ -177,12 +170,6 @@
                                 {% endfor %}
                             </div>
                             <div class="invalid-feedback">Please select the adjusted difficulty.</div>
-                        </div>
-
-                        <div class="mb-4 p-3 border rounded">
-                            <h5><strong>8. (Optional) Additional Reflection</strong></h5>
-                            <p>Any other thoughts on this attempt?</p>
-                            <textarea class="form-control" id="additional_reflection" name="additional_reflection" rows="3"></textarea>
                         </div>
 
                         <div class="d-grid gap-2 d-md-flex justify-content-md-end">
@@ -275,14 +262,6 @@ $(function () {
             isValid = false;
         }
 
-        // Validation for failure reason
-        const failureReason = $('#failure_reason');
-        if (failureReason.val().trim() === '') {
-            failureReason.addClass('is-invalid');
-            setFocus(failureReason);
-            isValid = false;
-        }
-
         // Validation for corrective plan
         const correctiveActions = $('input[name="future_plan_actions"]:checked');
         const correctiveActionOther = $('input[name="future_plan_other"]');
@@ -322,6 +301,9 @@ $(function () {
 
         if (confirm("Are you sure you want to submit your reflection?")) {
             is_submitted = true;
+            // Disable button and show loading state
+            $(this).prop('disabled', true);
+            $(this).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Submitting...');
             $('#query-form').submit();
         }
     });
@@ -332,7 +314,6 @@ $(function () {
         $('input[name="failure_category_other"]').removeClass('is-invalid');
     });
     $('input[name="failure_category_other"]').on('input', () => $('input[name="failure_category_other"]').removeClass('is-invalid'));
-    $('#failure_reason').on('input', () => $('#failure_reason').removeClass('is-invalid'));
     $('input[name="future_plan_actions"]').change(() => {
         $('#unselected-corrective-actions').removeClass('is-invalid');
         $('input[name="future_plan_other"]').removeClass('is-invalid');

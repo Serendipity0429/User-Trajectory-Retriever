@@ -131,8 +131,6 @@
                                 {% endfor %}
                             </div>
                             <div class="invalid-feedback">Please select your "Aha!" moment.</div>
-                            <label for="aha_moment_source" class="form-label mt-2">(Optional) What was the source of this breakthrough? (e.g., URL, search query)</label>
-                            <input type="text" class="form-control" id="aha_moment_source" name="aha_moment_source">
                         </div>
 
                         <!-- Unhelpful Paths -->
@@ -329,6 +327,9 @@
 
             if (confirm("Are you sure you want to submit?")) {
                 is_submitted = true;
+                // Disable button and show loading state
+                $(this).prop('disabled', true);
+                $(this).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Submitting...');
                 $('#query-form').submit();
             }
         });

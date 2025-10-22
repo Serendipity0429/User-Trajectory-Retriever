@@ -33,7 +33,7 @@
                             <p class="text-muted mb-0">
                                 Your answer must be an <strong>exact match</strong>. Do not include extra words or sentences. Capitalization will be ignored.
                             </p>
-                            <div class="mt-2" style="font-size: 0.8rem; line-height: 1.4;">
+                            <div class="mt-2" style="font-size: 1rem; line-height: 1.4;">
                                 <p class="mb-1">For example:</p>
                                 <div class="p-2 bg-light rounded">
                                     <p class="mb-1"><strong>Question:</strong></p>
@@ -258,6 +258,9 @@
 
             if (confirm("Are you sure you want to submit?")) {
                 is_submitted = true;
+                // Disable button and show loading state
+                $(this).prop('disabled', true);
+                $(this).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Submitting...');
                 $('#query-form').submit();
             }
         });

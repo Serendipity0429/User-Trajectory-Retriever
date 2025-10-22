@@ -30,13 +30,13 @@ class AnnotationState:
         self.annotation_start_time = time.time()
         self.annotation_name = name
         self.is_annotating = True
-        logger.info(f"Started annotating for {name}.")
+        print_debug(f"Started annotating for {name}.")
 
     def stop_annotating(self):
         self.annotation_start_time = float('inf')
         self.annotation_name = 'none'
         self.is_annotating = False
-        logger.info("Stopped annotating.")
+        print_debug("Stopped annotating.")
 
 annotation_state = AnnotationState()
 
@@ -166,3 +166,33 @@ def get_active_task_dataset():
     except Exception as e:
         print(f"Error getting active dataset {active_dataset}, error: {e}")
     return active_dataset
+
+
+def get_pending_annotation(user):
+    """
+    Checks for pending annotations for a user and returns the URL to the annotation page if found.
+    """
+    from django.urls import reverse
+    from .models import Task, TaskTrial
+    from django.core.exceptions import ObjectDoesNotExist
+
+    try:
+        # Check for pending post-task annotations
+        pending_post_task = Task.objects.filter(
+            user=user, active=False, cancelled=False, posttaskannotation__isnull=True
+        ).first()
+        if pending_post_task:
+            return reverse("task_manager:post_task_annotation", args=[pending_post_task.id])
+
+        # Check for pending reflection annotations
+        pending_reflection_trials = TaskTrial.objects.filter(
+            belong_task__user=user, is_correct=False, reflectionannotation__isnull=True
+        ).order_by('end_timestamp')
+
+        if pending_reflection_trials.exists():
+            trial_to_annotate = pending_reflection_trials.first()
+            return reverse("task_manager:reflection_annotation", args=[trial_to_annotate.id])
+    except ObjectDoesNotExist:
+        return None
+
+    return None

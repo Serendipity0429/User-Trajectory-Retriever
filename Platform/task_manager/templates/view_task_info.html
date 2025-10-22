@@ -45,6 +45,10 @@
 {% block scripts %}
 <script>
     document.getElementById('confirm-btn').addEventListener('click', function() {
+        // Disable button and show loading state
+        this.disabled = true;
+        this.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Closing...';
+
         window.close();
     });
 </script>

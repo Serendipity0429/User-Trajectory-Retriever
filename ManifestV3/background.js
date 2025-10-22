@@ -358,10 +358,21 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                         chrome.action.setBadgeText({ text: 'off' });
                         chrome.action.setBadgeBackgroundColor({ color: [202, 181, 225, 255] });
                     }
-                    response = { log_status: true };
+                    
+                    try {
+                        const pending_response = await _get(config.urls.check_pending_annotations);
+                        if (pending_response && pending_response.pending) {
+                            response = { log_status: true, pending_url: pending_response.url };
+                        } else {
+                            response = { log_status: true, pending_url: "" };
+                        }
+                    } catch (error) {
+                        console.error("Error checking pending annotations:", error);
+                        response = { log_status: true, pending_url: "" };
+                    }
                 } else {
                     chrome.action.setBadgeText({ text: '' });
-                    response = { log_status: false };
+                    response = { log_status: false, pending_url: "" };
                 }
                 sendResponse(response);
                 break;

@@ -78,6 +78,8 @@ h1 {
     width: 100%;
     font-size: 16px;
     padding-right: 35px; /* Space for the icon */
+    padding-left: 8px;
+    letter-spacing: 3px;
     flex: 1;
 }
 
@@ -138,6 +140,14 @@ h1 {
 
 #signupBtn, #homeBtnLoggedOut, #homeBtnLoggedIn {
     background-color: #808080; /* Grey */
+}
+
+#pendingAnnotationBtn {
+    background-color: #f39c12; /* Orange */
+}
+
+#pendingAnnotationBtn:hover {
+    background-color: #e67e22; /* Darker Orange */
 }
 
 #signupBtn:hover, #homeBtnLoggedOut:hover, #homeBtnLoggedIn:hover {
@@ -313,4 +323,3 @@ h1 {
 .content[hidden] {
     display: none;
 }
-

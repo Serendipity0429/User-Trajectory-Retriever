@@ -329,6 +329,12 @@ h2.text-success {
 
 }
 
+/* Custom validation styles for sortable list groups */
+.list-group.is-invalid {
+    border: 1px solid #dc3545;
+    border-radius: 0.25rem;
+}
 
-
-
+.list-group.is-invalid + .invalid-feedback {
+    display: block;
+}

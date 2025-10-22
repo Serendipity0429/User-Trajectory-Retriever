@@ -4,6 +4,7 @@
 import logging
 from datetime import datetime
 from django.utils import timezone
+from django.db import transaction
 
 from django.shortcuts import render
 
@@ -17,12 +18,14 @@ from .utils import (
     start_annotating,
     wait_until_data_stored,
     check_answer,
+    get_pending_annotation,
 )
 from .models import (
     Task,
     TaskDatasetEntry,
     PreTaskAnnotation,
     PostTaskAnnotation,
+    CancelAnnotation,
     Webpage,
     TaskTrial,
     ReflectionAnnotation,
@@ -46,6 +49,8 @@ except ImportError:
     import json
 from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
 from django.contrib.auth import login
+
+logger = logging.getLogger(__name__)
 
 
 @csrf_exempt
@@ -121,6 +126,11 @@ def data(request):
 def pre_task_annotation(request, timestamp):
     print_debug("function pre_task_annotation")
     user = request.user
+
+    pending_annotation_url = get_pending_annotation(user)
+    if pending_annotation_url:
+        return HttpResponseRedirect(pending_annotation_url)
+
     if request.method == "POST":
         # Start a new task
         print_debug("start_task")
@@ -206,7 +216,6 @@ def post_task_annotation(request, task_id):
             post_annotation.difficulty_actual = request.POST.get("difficulty_actual")
             post_annotation.aha_moment_type = request.POST.get("aha_moment_type")
             post_annotation.aha_moment_other = request.POST.get("aha_moment_other")
-            post_annotation.aha_moment_source = request.POST.get("aha_moment_source")
             post_annotation.unhelpful_paths = request.POST.getlist("unhelpful_paths")
             post_annotation.unhelpful_paths_other = request.POST.get("unhelpful_paths_other")
             post_annotation.strategy_shift = request.POST.get("strategy_shift")
@@ -317,6 +326,7 @@ def task_home(request):
     user = request.user
     completed_num = len(Task.objects.filter(user=user, active=False))
     pending_num = len(Task.objects.filter(user=user, active=True))
+    pending_annotation_url = get_pending_annotation(user)
     return render(
         request,
         "task_home.html",
@@ -324,6 +334,7 @@ def task_home(request):
             "cur_user": user,
             "completed_num": completed_num,
             "pending_num": pending_num,
+            "pending_annotation_url": pending_annotation_url,
         },
     )
 
@@ -379,6 +390,7 @@ def annotation_home(request):
             )
         )
 
+    pending_annotation_url = get_pending_annotation(user)
     return render(
         request,
         "annotation_home.html",
@@ -386,6 +398,7 @@ def annotation_home(request):
             "cur_user": user,
             "unannotated_tasks_to_webpages": unannotated_tasks_to_webpages,
             "annotated_tasks_to_webpages": annotated_tasks_to_webpages,
+            "pending_annotation_url": pending_annotation_url,
         },
     )
 
@@ -468,30 +481,19 @@ ANSWER_FORMULATION_MAP = {
 }
 
 FAILURE_CATEGORY_MAP = {
-    "bad_query": "My search query was ineffective or misleading.",
-    "misinterpreted_info": "I found the right page, but misinterpreted the information.",
-    "info_not_found": "I could not find the necessary information on the websites I visited.",
-    "logic_error": "I made a logical or calculation error based on the information I found.",
-    "ambiguous_info": "The information I found was ambiguous.",
-    "outdated_info": "The information I found was outdated or no longer accurate.",
-    "trusting_source": "I trusted a source that was not reliable or authoritative.",
-    "time_pressure": "I was under time pressure and could not verify the information thoroughly.",
-    "lack_expertise": "I lacked the necessary expertise to understand or evaluate the information.",
-    "format_error": "I made a formatting error in my answer (e.g., missing units, incorrect decimal places).",
-    "other": "Other:",
+    "ineffective_search": "<strong>Ineffective Search Strategy</strong>: poor keywords, couldn't find info, etc.",
+    "misunderstood_info": "<strong>Misunderstood Information</strong>: misinterpreted text, calculation error, etc.",
+    "unreliable_source": "<strong>Unreliable or Unclear Source</strong>: outdated, ambiguous, untrustworthy, etc.",
+    "format_error": "<strong>Answer Formatting Error</strong>: wrong units, incorrect decimal places, etc.",
+    "other": "<strong>Other</strong>:",
 }
 
 CORRECTIVE_PLAN_MAP = {
-    "refine_query": "Use different or more specific search keywords.",
-    "broaden_query": "Use more general search keywords.",
-    "find_new_source_type": "Look for a different type of source (e.g., official report, news, academic paper).",
-    "re-evaluate_info": "Re-examine the information I've already found more carefully.",
-    "check_recency": "Specifically look for more recent information.",
-    "check_reliability": "Check the reliability and authority of the sources I use.",
-    "improve_logic": "Improve my logical reasoning or calculation methods.",
-    "validate_source": "Try to find the same information on a second, independent source to validate it.",
-    "reformulate_answer": "Reformulate my answer to meet the format requirements (e.g., adding units, correcting decimal places).",
-    "other": "Other:",
+    "improve_search": "<strong>Improve Search Strategy</strong>: use different keywords, find new source types, etc.",
+    "improve_evaluation": "<strong>Improve Source Evaluation</strong>: check reliability, validate with other sources, etc.",
+    "improve_analysis": "<strong>Improve Information Analysis</strong>: re-read carefully, check logic, etc.",
+    "correct_format": "<strong>Correct Answer Formatting</strong>: fix units, decimal places, etc.",
+    "other": "<strong>Other</strong>:",
 }
 
 AHA_MOMENT_MAP = {
@@ -573,29 +575,18 @@ MISSING_RESOURCES_EXPLANATION_MAP = {
 }
 
 FAILURE_CATEGORY_EXPLANATION_MAP = {
-    "bad_query": "Your search terms were too broad, too narrow, or did not capture the intent of the question.",
-    "misinterpreted_info": "You found the correct data but misunderstood its meaning or context.",
-    "info_not_found": "The information does not appear to be available on the pages you visited.",
-    "logic_error": "You made a mistake in reasoning, calculation, or synthesis of the information.",
-    "ambiguous_info": "The information you found was unclear, contradictory, or could be interpreted in multiple ways.",
-    "outdated_info": "The information was once correct but is no longer valid.",
-    "trusting_source": "You relied on a source that was biased, incorrect, or not authoritative.",
-    "time_pressure": "You rushed and did not have enough time to find or verify the best answer.",
-    "lack_expertise": "You could not understand the subject matter well enough to answer correctly.",
-    "format_error": "Your answer was factually correct but did not follow the required format.",
+    "ineffective_search": "Select this if your search strategy was flawed. This includes using ineffective keywords (too broad/narrow), or being unable to locate the necessary information online.",
+    "misunderstood_info": "Select this if you found the correct information but misinterpreted it. This includes misunderstanding the text, making a calculation error, or lacking the expertise to evaluate it correctly.",
+    "unreliable_source": "Select this if the information you used was problematic. This includes sources that were outdated, ambiguous, contradictory, or not authoritative.",
+    "format_error": "Select this if your answer was factually correct but did not follow the required format (e.g., wrong units, incorrect decimal places).",
     "other": "A reason for failure not listed here.",
 }
 
 CORRECTIVE_ACTION_EXPLANATION_MAP = {
-    "refine_query": "Make your search terms more specific to narrow down the results.",
-    "broaden_query": "Use more general terms to get a broader understanding of the topic first.",
-    "find_new_source_type": "Switch from looking at blogs or forums to official reports, news, or academic papers.",
-    "re-evaluate_info": "Read the pages you have already visited again, more slowly and carefully.",
-    "check_recency": "Filter your search results by date to find the most current information.",
-    "check_reliability": "Prioritize well-known, authoritative sources over anonymous or biased ones.",
-    "improve_logic": "Double-check your calculations or the steps in your reasoning process.",
-    "validate_source": "Confirm the information by finding at least one other independent source that says the same thing.",
-    "reformulate_answer": "Check the instructions again to ensure your answer is in the correct format.",
+    "improve_search": "Select this if you plan to change how you search. This includes using different/better keywords or looking for new types of sources (e.g., news, academic papers).",
+    "improve_evaluation": "Select this if you plan to be more critical of your sources. This includes checking the authority and recency of a source, or cross-referencing with other sources.",
+    "improve_analysis": "Select this if you plan to analyze the information you find more carefully. This includes re-reading the text, double-checking your logic, or re-doing calculations.",
+    "correct_format": "Select this if you need to fix the format of your answer to meet the requirements.",
     "other": "A corrective action not listed here.",
 }
 
@@ -678,29 +669,20 @@ def show_task(request, task_id):
         trial.webpages = Webpage.objects.filter(
             belong_task_trial=trial, is_redirected=False, during_annotation=False
         ).order_by("start_timestamp")
-        try:
-            trial.submitted_sources = []
-            sources_dict = json.loads(trial.source_url_and_text)
-            for url, texts in sources_dict.items():
-                for text in texts:
-                    trial.submitted_sources.append({"url": url, "text": text})
-        except (json.JSONDecodeError, TypeError):
-            pass
+        trial.submitted_sources = trial.justifications.all()
 
     # 4. Fetch Post-Task or Cancellation Annotation
-    final_annotation = PostTaskAnnotation.objects.filter(belong_task=task).first()
     post_task_annotation = None
     cancel_annotation = None
-    if final_annotation:
-        if task.cancelled:
-            cancel_annotation = final_annotation
-        else:
-            post_task_annotation = final_annotation
+    if task.cancelled:
+        cancel_annotation = CancelAnnotation.objects.filter(belong_task=task).first()
+    else:
+        post_task_annotation = PostTaskAnnotation.objects.filter(belong_task=task).first()
 
     cancel_missing_resources = []
     if cancel_annotation:
         cancel_missing_resources = map_json_list(
-            cancel_annotation.cancel_missing_resources, MISSING_RESOURCES_MAP
+            cancel_annotation.missing_resources, MISSING_RESOURCES_MAP
         )
 
     # 5. Assemble the final context and render the template
@@ -779,14 +761,14 @@ def cancel_annotation(request, task_id, end_timestamp):
     if request.method == "POST":
         task.cancelled = True
         task.save()
-        cancel_annotation = PostTaskAnnotation()
+        cancel_annotation = CancelAnnotation()
         cancel_annotation.belong_task = task
-        cancel_annotation.cancel_category = request.POST.get("cancel_category")
-        cancel_annotation.cancel_reason = request.POST.get("cancel_reason")
-        cancel_annotation.cancel_missing_resources = request.POST.get(
+        cancel_annotation.category = request.POST.get("cancel_category")
+        cancel_annotation.reason = request.POST.get("cancel_reason")
+        cancel_annotation.missing_resources = request.POST.get(
             "cancel_missing_resources_list"
         )
-        cancel_annotation.cancel_missing_resources_other = request.POST.get(
+        cancel_annotation.missing_resources_other = request.POST.get(
             "cancel_missing_resources_other"
         )
         cancel_annotation.save()
@@ -839,12 +821,11 @@ def reflection_annotation(request, task_trial_id):
         ref_annotation = ReflectionAnnotation(
             belong_task_trial=task_trial,
             failure_category=request.POST.get("failure_category_list"),
-            failure_reason=request.POST.get("failure_reason"),
+            failure_category_other=request.POST.get("failure_category_other"),
             future_plan_actions=request.POST.get("future_plan_actions_list"),
             future_plan_other=request.POST.get("future_plan_other"),
             estimated_time=request.POST.get("estimated_time"),
             adjusted_difficulty=request.POST.get("adjusted_difficulty"),
-            additional_reflection=request.POST.get("additional_reflection"),
         )
         ref_annotation.save()
 
@@ -893,110 +874,119 @@ def reflection_annotation(request, task_trial_id):
 def submit_answer(request, task_id, timestamp):
     print_debug("function submit_answer")
     user = request.user
-    task = Task.objects.filter(id=task_id, user=user).first()
-    if task is None:
-        return HttpResponse(f"No task found with task_id={task_id}")
-    question = task.content.question
-    start_timestamp = task.start_timestamp
-    num_trial = task.num_trial
-    if num_trial > 0:
-        last_task_trial = TaskTrial.objects.filter(
-            belong_task=task, num_trial=num_trial
-        ).first()
-        assert (
-            last_task_trial is not None
-        )  # Ensure that the last task trial exists, which should always be the case
-        start_timestamp = last_task_trial.end_timestamp
 
-    # Filter the webpage whose timestamp is within the range of start_timestamp and timestamp
-    end_datetime = timezone.make_aware(datetime.fromtimestamp(timestamp / 1000))
-    all_webpages = Webpage.objects.filter(
-        belong_task=task, start_timestamp__gte=start_timestamp
-    )
-    webpages = all_webpages.filter(
-        start_timestamp__lte=end_datetime, is_redirected=False, during_annotation=False
-    )
-    # Sort by start_timestamp
-    webpages = sorted(webpages, key=lambda item: item.start_timestamp)
+    pending_annotation_url = get_pending_annotation(user)
+    if pending_annotation_url:
+        return HttpResponseRedirect(pending_annotation_url)
 
     if request.method == "POST":
-        answer = request.POST.get("answer")
-        additional_explanation = request.POST.get("additional_explanation")
-        confidence = request.POST.get("confidence")
-        answer_formulation_method = request.POST.get("answer_formulation_method")
+        with transaction.atomic():
+            try:
+                task = Task.objects.select_for_update().get(id=task_id, user=user)
+            except Task.DoesNotExist:
+                return HttpResponse(f"No task found with task_id={task_id}", status=404)
 
-        task_trial = TaskTrial()
-        task_trial.belong_task = task
-        task_trial.num_trial = num_trial + 1
-        task.num_trial += 1
-        task_trial.answer = answer
-        task_trial.start_timestamp = start_timestamp
-        task_trial.end_timestamp = timezone.make_aware(datetime.fromtimestamp(timestamp / 1000))
-        task_trial.additional_explanation = additional_explanation
-        task_trial.confidence = confidence
-        task_trial.answer_formulation_method = answer_formulation_method
+            start_timestamp = task.start_timestamp
+            num_trial = task.num_trial
+            if num_trial > 0:
+                last_task_trial = TaskTrial.objects.filter(
+                    belong_task=task, num_trial=num_trial
+                ).first()
+                if last_task_trial:
+                    start_timestamp = last_task_trial.end_timestamp
 
-        # Deal with source_url_and_text
-        source_id = 0
-        source_url_and_text = {}
-        while f"source_url_{source_id}" in request.POST:
-            source_url = request.POST[f"source_url_{source_id}"]
-            source_text = request.POST[f"source_text_{source_id}"]
-            if source_url and source_text:
-                if source_url not in source_url_and_text:
-                    source_url_and_text[source_url] = []
-                source_url_and_text[source_url].append(source_text)
-            source_id += 1
-        source_url_and_text = json.dumps(source_url_and_text)
-        task_trial.source_url_and_text = source_url_and_text
+            answer = request.POST.get("answer")
+            confidence = request.POST.get("confidence")
+            answer_formulation_method = request.POST.get("answer_formulation_method")
 
-        is_correct = check_answer(task.content, answer)
-        task_trial.is_correct = is_correct
-        if is_correct:
-            task.end_timestamp = timezone.make_aware(
-                datetime.fromtimestamp(timestamp / 1000)
+            current_trial_num = task.num_trial + 1
+
+            task_trial, created = TaskTrial.objects.get_or_create(
+                belong_task=task,
+                num_trial=current_trial_num,
             )
 
-        task_trial.save()
-        task.save()
+            task_trial.answer = answer.strip().lower() if answer else ""
+            task_trial.start_timestamp = start_timestamp
+            task_trial.end_timestamp = timezone.make_aware(datetime.fromtimestamp(timestamp / 1000))
+            task_trial.confidence = confidence
+            task_trial.answer_formulation_method = answer_formulation_method
 
-        # Save relevance and credibility annotations
-        for key, value in request.POST.items():
-            if key.startswith('relevance_'):
-                justification_id = key.split('_')[1]
-                try:
-                    justification = Justification.objects.get(id=justification_id)
-                    if justification.belong_task_trial.belong_task.user == user:
-                        justification.relevance = int(value)
-                        justification.save()
-                except (Justification.DoesNotExist, ValueError):
-                    pass  # Optionally log this error
-            elif key.startswith('credibility_'):
-                justification_id = key.split('_')[1]
-                try:
-                    justification = Justification.objects.get(id=justification_id)
-                    if justification.belong_task_trial.belong_task.user == user:
-                        justification.credibility = int(value)
-                        justification.save()
-                except (Justification.DoesNotExist, ValueError):
-                    pass # Optionally log this error
+            is_correct = check_answer(task.content, task_trial.answer)
+            task_trial.is_correct = is_correct
 
-        if is_correct:
-            redirect_url = reverse("task_manager:post_task_annotation", args=[task_id])
-        else:
-            redirect_url = reverse(
-                "task_manager:reflection_annotation", args=[task_trial.id]
+            if is_correct:
+                task.end_timestamp = timezone.make_aware(
+                    datetime.fromtimestamp(timestamp / 1000)
+                )
+
+            task_trial.save()
+
+            task.num_trial = current_trial_num
+            task.save()
+
+            end_datetime = timezone.make_aware(datetime.fromtimestamp(timestamp / 1000))
+            all_webpages = Webpage.objects.filter(
+                belong_task=task, start_timestamp__gte=start_timestamp
             )
 
-        for webpage in all_webpages:
-            webpage.belong_task_trial = task_trial
-            webpage.save()
-        stop_annotating()
+            for key, value in request.POST.items():
+                if key.startswith('relevance_'):
+                    justification_id = key.split('_')[1]
+                    try:
+                        justification = Justification.objects.get(id=justification_id)
+                        if justification.belong_task_trial.belong_task.user == user:
+                            justification.relevance = int(value)
+                            justification.save()
+                    except (Justification.DoesNotExist, ValueError):
+                        pass
+                elif key.startswith('credibility_'):
+                    justification_id = key.split('_')[1]
+                    try:
+                        justification = Justification.objects.get(id=justification_id)
+                        if justification.belong_task_trial.belong_task.user == user:
+                            justification.credibility = int(value)
+                            justification.save()
+                    except (Justification.DoesNotExist, ValueError):
+                        pass
 
-        return HttpResponseRedirect(redirect_url)
+            if is_correct:
+                redirect_url = reverse("task_manager:post_task_annotation", args=[task_id])
+            else:
+                redirect_url = reverse(
+                    "task_manager:reflection_annotation", args=[task_trial.id]
+                )
 
+            for webpage in all_webpages:
+                webpage.belong_task_trial = task_trial
+                webpage.save()
+            stop_annotating()
+
+            return HttpResponseRedirect(redirect_url)
     else:
-        # Handle GET request
+        task = Task.objects.filter(id=task_id, user=user).first()
+        if task is None:
+            return HttpResponse(f"No task found with task_id={task_id}", status=404)
+        
+        question = task.content.question
+        start_timestamp = task.start_timestamp
+        num_trial = task.num_trial
+        if num_trial > 0:
+            last_task_trial = TaskTrial.objects.filter(
+                belong_task=task, num_trial=num_trial
+            ).first()
+            if last_task_trial:
+                start_timestamp = last_task_trial.end_timestamp
+
+        end_datetime = timezone.make_aware(datetime.fromtimestamp(timestamp / 1000))
+        all_webpages = Webpage.objects.filter(
+            belong_task=task, start_timestamp__gte=start_timestamp
+        )
+        webpages = all_webpages.filter(
+            start_timestamp__lte=end_datetime, is_redirected=False, during_annotation=False
+        )
+        webpages = sorted(webpages, key=lambda item: item.start_timestamp)
+
         start_annotating("submit_answer")
         return render(
             request,
@@ -1061,35 +1051,35 @@ def add_justification(request):
     evidence_type = request.data.get("evidence_type", "text_selection")
     element_details = request.data.get("element_details")
 
-    task = Task.objects.filter(id=task_id, user=user, active=True).first()
-    if not task:
+    try:
+        with transaction.atomic():
+            task = Task.objects.select_for_update().get(id=task_id, user=user, active=True)
+
+            # The trial being annotated is always the next one after the last completed trial.
+            trial_num_to_get = task.num_trial + 1
+
+            # Get or create a placeholder trial for this attempt.
+            trial, created = TaskTrial.objects.get_or_create(
+                belong_task=task,
+                num_trial=trial_num_to_get,
+            )
+
+            Justification.objects.create(
+                belong_task_trial=trial,
+                url=url,
+                page_title=page_title,
+                text=text,
+                dom_position=dom_position,
+                evidence_type=evidence_type,
+                element_details=element_details,
+                confidence=1  # Default confidence
+            )
+        return JsonResponse({"status": "success"})
+    except Task.DoesNotExist:
         return JsonResponse({"status": "error", "message": "Active task not found."}, status=404)
-
-    trial = TaskTrial.objects.filter(belong_task=task).order_by("-num_trial").first()
-    if not trial:
-        # If no trial exists, create one
-        trial = TaskTrial.objects.create(
-            belong_task=task,
-            num_trial=1,
-            answer="",
-            confidence=0,
-            answer_formulation_method="direct_fact"
-        )
-        task.num_trial = 1
-        task.save()
-
-    Justification.objects.create(
-        belong_task_trial=trial,
-        url=url,
-        page_title=page_title,
-        text=text,
-        dom_position=dom_position,
-        evidence_type=evidence_type,
-        element_details=element_details,
-        confidence=1 # Default confidence
-    )
-
-    return JsonResponse({"status": "success"})
+    except Exception as e:
+        logger.error(f"Error adding justification: {e}")
+        return JsonResponse({"status": "error", "message": "An internal error occurred."}, status=500)
 
 
 @csrf_exempt
@@ -1134,4 +1124,3 @@ def get_justifications(request, task_id):
 
     justifications = Justification.objects.filter(belong_task_trial=trial).values('id', 'url', 'page_title', 'text', 'status', 'evidence_type', 'element_details', 'relevance', 'credibility')
     return JsonResponse({"status": "success", "justifications": list(justifications)})
-

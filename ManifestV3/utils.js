@@ -20,6 +20,7 @@ const URLS = {
     home: `${URL_BASE}/task/home/`,
     stop_annotation: `${URL_BASE}/task/stop_annotation/`,
     add_justification: `${URL_BASE}/task/justification/add/`,
+    check_pending_annotations: `${URL_BASE}/user/check_pending_annotations/`,
     initial_page: "https://www.bing.com/",
 };
 

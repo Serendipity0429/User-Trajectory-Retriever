@@ -75,7 +75,7 @@ class ReflectionAnnotation(models.Model):
         on_delete=models.CASCADE,
     )
 
-    failure_reason = models.TextField() # reason for failure
+    failure_category_other = models.TextField() # reason for failure
     failure_category = models.JSONField(null=True)  # category of failure, e.g. "lack of resources", "lack of knowledge", etc.
     future_plan_actions = models.JSONField(null=True)  # actions to take in the future
     future_plan_other = models.TextField(null=True)  # other future plan actions
@@ -95,20 +95,25 @@ class PostTaskAnnotation(models.Model):
     
     aha_moment_type = models.CharField(max_length=100, null=True)  # type of aha moment, e.g. "insight", "realization", etc.
     aha_moment_other = models.TextField(null=True)  # other type of aha moment
-    aha_moment_source = models.TextField(null=True)  # source of aha moment, e.g. "webpage", "trial-and-error", etc.
 
     unhelpful_paths = models.JSONField(null=True)  # paths that were not helpful, e.g. ["path1", "path2"]
     unhelpful_paths_other = models.TextField(null=True)  # other unhelpful paths
 
     strategy_shift = models.CharField(max_length=100, null=True)  # strategy shift during the task
     strategy_shift_other = models.TextField(null=True)  # other strategy shift
-        
-    # If task is cancelled
-    cancel_category = models.CharField(max_length=100, null=True)  # refer to post_task_annotation.html
-    cancel_reason = models.TextField(null=True)  # reason for cancellation
-    cancel_additional_reflection = models.TextField(null=True)  # reflection on cancellation
-    cancel_missing_resources = models.JSONField(null=True)  # missing resources that led to cancellation
-    cancel_missing_resources_other = models.TextField(null=True)  # other missing resources
+
+
+# Cancel annotation
+class CancelAnnotation(models.Model):
+    belong_task = models.OneToOneField(
+        Task,
+        on_delete=models.CASCADE,
+    )
+
+    category = models.CharField(max_length=100, null=True)  # refer to post_task_annotation.html
+    reason = models.TextField(null=True)  # reason for cancellation
+    missing_resources = models.JSONField(null=True)  # missing resources that led to cancellation
+    missing_resources_other = models.TextField(null=True)  # other missing resources
 
 
 # Task Trial
@@ -117,11 +122,11 @@ class TaskTrial(models.Model):
     end_timestamp = models.DateTimeField(auto_now=True)
     num_trial = models.IntegerField()  # number of trials
 
-    answer = models.CharField(max_length=1000)
+    answer = models.CharField(max_length=1000, default='undefined')
     is_correct = models.BooleanField(default=False)
     
-    confidence = models.IntegerField()  # confidence level, 0->4, low -> high
-    answer_formulation_method = models.CharField(max_length=100)  # reasoning method used, e.g. "deductive", "inductive", etc.
+    confidence = models.IntegerField(default=-1)  # confidence level, 0->4, low -> high
+    answer_formulation_method = models.CharField(max_length=100, default='undefined')  # reasoning method used, e.g. "deductive", "inductive", etc.
     
     belong_task = models.ForeignKey(
         Task,

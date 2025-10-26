@@ -10,3 +10,4 @@ node_modules
 00*
 migrations/0*.py
 tempFiles
+.env

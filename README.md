@@ -1,11 +1,3 @@
-# User-Trajectory-Retriever
-
-[![THUIR](https://img.shields.io/badge/THUIR-ver%201.0-blueviolet)](http://www.thuir.cn)
-[![License](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
-[![made-with-python](https://img.shields.io/badge/Made%20with-Python-red.svg)](#python)
-[![made-with-js](https://img.shields.io/badge/Made%20with-JS-yellow.svg)](#javascript)
-![Static Badge](https://img.shields.io/badge/made_by-Zhang_Xinkai-blue)
-
 A comprehensive platform for recording, replaying, and annotating user trajectories for web interaction research. This system consists of a web-based annotation platform and a browser extension for data collection.
 
 ## Overview
@@ -29,6 +21,13 @@ The system is composed of two main parts:
 - **Frontend (Browser Extension):** Built as a Chrome Extension using Manifest V3 and vanilla JavaScript. It utilizes the `rrweb` library to capture DOM snapshots and interaction events.
 - **Backend (Web Platform):** A monolithic application built with Python and the Django Web Framework. It serves the user interface, manages the database, and handles data processing.
 
+## Prerequisites
+
+Before you begin, ensure you have the following installed:
+- Python 3.8+
+- pip (Python package installer)
+- virtualenv (optional, but recommended)
+
 ## Installation
 
 To get the system up and running, you need to set up both the backend platform and the browser extension.
@@ -50,12 +49,24 @@ The backend server is located in the `Platform/` directory.
     pip install -r ../requirements.txt
     ```
 
-3.  **Apply database migrations:**
+3.  **Configure environment variables:**
+    ```bash
+    cp .env.example .env
+    ```
+    Open the `.env` file and add your email server configuration.
+
+4.  **Apply database migrations:**
     ```bash
     python manage.py migrate
     ```
 
-4.  **Start the development server:**
+5.  **Create a superuser:**
+    ```bash
+    python manage.py createsuperuser
+    ```
+    Follow the prompts to create an administrator account.
+
+6.  **Start the development server:**
     ```bash
     python manage.py runserver
     ```
@@ -88,6 +99,14 @@ The extension is located in the `ManifestV3/` directory.
 ├── requirements.txt  # Python dependencies for the platform
 └── README.md         # This file
 ```
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a pull request or open an issue if you have any suggestions or find any bugs.
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](./LICENSE) file for details.
 
 ## Contact
 If you have any questions, please feel free to contact me via [stevenzhangx@163.com]() or open an issue.

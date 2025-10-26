@@ -30,6 +30,7 @@ const config = {
     is_passive_mode: IS_PASSIVE_MODE,
     urls: URLS,
     version: chrome.runtime.getManifest().version,
+    max_retries: 1, // number of retries for API requests
     cancel_trial_threshold: CANCEL_TRIAL_THRESHOLD,
 };
 
@@ -112,60 +113,68 @@ async function refreshToken() {
 }
 
 async function _request(method, url, data = {}, json_response = true, raw_data = false, send_as_json = false) {
-    try {
-        const { access_token } = await _get_local('access_token');
-        let headers = {};
-        let body;
-        let request_url = url;
+    const MAX_RETRIES = config.max_retries || 3;
+    let attempt = 0;
+    while (attempt < MAX_RETRIES) {
+        try {
+            const { access_token } = await _get_local('access_token');
+            let headers = {};
+            let body;
+            let request_url = url;
 
-        if (method.toUpperCase() === 'POST') {
-            if (send_as_json) {
-                headers["Content-Type"] = "application/json";
-                body = JSON.stringify(data);
-            } else if (!raw_data) {
-                headers["Content-Type"] = "application/x-www-form-urlencoded";
-                body = new URLSearchParams(data);
-            } else {
-                headers["Content-Type"] = "text/plain";
-                body = typeof data === "string" ? data : String(data);
+            if (method.toUpperCase() === 'POST') {
+                if (send_as_json) {
+                    headers["Content-Type"] = "application/json";
+                    body = JSON.stringify(data);
+                } else if (!raw_data) {
+                    headers["Content-Type"] = "application/x-www-form-urlencoded";
+                    body = new URLSearchParams(data);
+                } else {
+                    headers["Content-Type"] = "text/plain";
+                    body = typeof data === "string" ? data : String(data);
+                }
             }
-        }
 
-        if (access_token && url !== URLS.token_login) {
-            headers["Authorization"] = `Bearer ${access_token}`;
-        }
-
-        let response = await fetch(request_url, {
-            method: method.toUpperCase(),
-            headers,
-            body,
-        });
-
-        if (response.status === 401) {
-            const new_token = await refreshToken();
-            if (new_token) {
-                headers["Authorization"] = `Bearer ${new_token}`;
-                response = await fetch(request_url, {
-                    method: method.toUpperCase(),
-                    headers,
-                    body,
-                });
-            } else {
-                throw new Error("Authentication failed.");
+            if (access_token && url !== URLS.token_login) {
+                headers["Authorization"] = `Bearer ${access_token}`;
             }
-        }
 
-        if (!response.ok) {
-            throw new Error(`Server error: ${response.status}`);
-        }
+            let response = await fetch(request_url, {
+                method: method.toUpperCase(),
+                headers,
+                body,
+            });
 
-        if (json_response) {
-            return await response.json();
+            if (response.status === 401) {
+                const new_token = await refreshToken();
+                if (new_token) {
+                    headers["Authorization"] = `Bearer ${new_token}`;
+                    response = await fetch(request_url, {
+                        method: method.toUpperCase(),
+                        headers,
+                        body,
+                    });
+                } else {
+                    throw new Error("Authentication failed.");
+                }
+            }
+
+            if (!response.ok) {
+                throw new Error(`Server error: ${response.status}`);
+            }
+
+            if (json_response) {
+                return await response.json();
+            }
+            return response;
+        } catch (error) {
+            attempt++;
+            if (attempt >= MAX_RETRIES) {
+                printDebug("utils", `API request failed after ${MAX_RETRIES} attempts: ${url}`, error);
+                throw error;
+            }
+            await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
         }
-        return response;
-    } catch (error) {
-        printDebug("utils", `API request failed: ${url}`, error);
-        throw error; // Re-throw the error to be handled by the caller
     }
 }
 

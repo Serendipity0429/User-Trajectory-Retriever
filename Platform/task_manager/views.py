@@ -1064,13 +1064,27 @@ def add_justification(request):
     Adds a justification for a given task.
     """
     user = request.user
-    task_id = request.data.get("task_id")
-    url = request.data.get("url")
-    page_title = request.data.get("page_title")
-    text = request.data.get("text")
-    dom_position = request.data.get("dom_position")
-    evidence_type = request.data.get("evidence_type", "text_selection")
-    element_details = request.data.get("element_details")
+    data = request.data
+    task_id = data.get("task_id")
+    url = data.get("url")
+    page_title = data.get("page_title")
+    text = data.get("text")
+    dom_position = data.get("dom_position")
+    evidence_type = data.get("evidence_type", "text_selection")
+    element_details = data.get("element_details")
+
+    # Input validation
+    if not all([task_id, url]):
+        return JsonResponse({"status": "error", "message": "Missing required fields."}, status=400)
+
+    if len(page_title) > 255:
+        return JsonResponse({"status": "error", "message": "Page title is too long."}, status=400)
+
+    if len(text) > 10000:
+        return JsonResponse({"status": "error", "message": "Text is too long."}, status=400)
+
+    if len(dom_position) > 1000:
+        return JsonResponse({"status": "error", "message": "DOM position is too long."}, status=400)
 
     try:
         with transaction.atomic():
@@ -1153,7 +1167,7 @@ def get_justifications(request, task_id):
 
     trial = TaskTrial.objects.filter(belong_task=task).order_by("-num_trial").first()
     if not trial:
-        return JsonResponse({"status": "success", "justifications": []})
+        return JsonResponse({"status": "success", "justifications": [], "trial_num": -1})
 
     justifications = Justification.objects.filter(belong_task_trial=trial)
     justifications_data = []
@@ -1170,4 +1184,4 @@ def get_justifications(request, task_id):
             'credibility': j.credibility,
             'evidence_image_url': j.evidence_image.url if j.evidence_image else None,
         })
-    return JsonResponse({"status": "success", "justifications": justifications_data})
+    return JsonResponse({"status": "success", "justifications": justifications_data, "trial_num": trial.num_trial})

@@ -378,16 +378,30 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
 
-        let contentHtml = '';
+        let contentEl;
         if (j.evidence_type === 'element' && j.element_details) {
             const tagName = j.element_details.tagName || 'Element';
             if (tagName.toUpperCase() === 'IMG' && j.evidence_image_url) {
-                contentHtml = `<p class="mb-1"><strong>Evidence:</strong></p><img src="${j.evidence_image_url}" class="evidence-image" alt="Evidence Image">`;
+                contentEl = document.createElement('div');
+                const p = document.createElement('p');
+                p.className = 'mb-1';
+                p.innerHTML = '<strong>Evidence:</strong>';
+                const img = document.createElement('img');
+                img.src = j.evidence_image_url;
+                img.className = 'evidence-image';
+                img.alt = 'Evidence Image';
+                contentEl.appendChild(p);
+                contentEl.appendChild(img);
             } else {
-                contentHtml = `<p class="mb-1"><strong>Evidence:</strong> [${tagName.toUpperCase()}]</p>`;
+                contentEl = document.createElement('p');
+                contentEl.className = 'mb-1';
+                contentEl.innerHTML = `<strong>Evidence:</strong> [${tagName.toUpperCase()}]`;
             }
         } else {
-            contentHtml = `<blockquote class="blockquote bg-light p-2 rounded" style="font-size: 0.9rem;">${j.text || ''}</blockquote>`;
+            contentEl = document.createElement('blockquote');
+            contentEl.className = 'blockquote bg-light p-2 rounded';
+            contentEl.style.fontSize = '0.9rem';
+            contentEl.textContent = j.text || '';
         }
 
         let relevanceHtml = '';
@@ -439,7 +453,7 @@ document.addEventListener('DOMContentLoaded', function() {
         justificationEl.innerHTML = `
             <p class="mb-1"><strong>Title:</strong> ${j.page_title || 'No title found'}</p>
             <p class="mb-1"><strong>URL:</strong> <a href="${j.url}" target="_blank" title="${j.url}" class="justification-url">${displayUrl}</a></p>
-            ${contentHtml}
+            ${contentEl.outerHTML}
             <div class="d-flex justify-content-between align-items-center mt-3">
                 ${relevanceHtml}
                 ${buttonsHtml}

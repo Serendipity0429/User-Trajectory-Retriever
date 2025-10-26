@@ -16,6 +16,7 @@ const TASK_INFO_KEY = 'current_task_info';
 
 const ALARM_CLEAR_STORAGE = 'clear_local_storage';
 const ALARM_CHECK_TASK = 'check_active_task';
+const ALARM_UPDATE_EVIDENCE_COUNT = 'update_evidence_count';
 
 const MSG_CHECK_LOGGING_STATUS = 'check_logging_status';
 const MSG_ALTER_LOGGING_STATUS = 'alter_logging_status';
@@ -67,7 +68,8 @@ async function hasPendingAnnotation() {
     try {
         const pending_response = await _get(config.urls.check_pending_annotations);
         return pending_response && pending_response.pending;
-    } catch (error) {
+    }
+    catch (error) {
         console.error("Error checking pending annotations:", error);
         return false;
     }
@@ -232,6 +234,9 @@ function createContextMenu() {
 
 chrome.runtime.onInstalled.addListener(() => {
     createContextMenu();
+    chrome.alarms.create(ALARM_CLEAR_STORAGE, { periodInMinutes: 1 });
+    chrome.alarms.create(ALARM_CHECK_TASK, { delayInMinutes: 1, periodInMinutes: 5 });
+    chrome.alarms.create(ALARM_UPDATE_EVIDENCE_COUNT, { delayInMinutes: 0.2, periodInMinutes: 0.2 });
 });
 
 function getSelectionDetails() {
@@ -490,7 +495,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                         console.error("Error getting justifications:", error);
                         sendResponse(null);
                     }
-                } else {
+                }
+                else {
                     sendResponse(null);
                 }
                 break;
@@ -505,6 +511,7 @@ chrome.runtime.onStartup.addListener(async () => {
         await flush();
         chrome.alarms.create(ALARM_CLEAR_STORAGE, { periodInMinutes: 1 });
         chrome.alarms.create(ALARM_CHECK_TASK, { delayInMinutes: 1, periodInMinutes: 5 });
+        chrome.alarms.create(ALARM_UPDATE_EVIDENCE_COUNT, { delayInMinutes: 0.2, periodInMinutes: 0.2 });
     } catch (error) {
         console.error("Error during onStartup:", error);
     }
@@ -519,6 +526,29 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
         case ALARM_CHECK_TASK:
             printDebug("background", "Checking active task ID from alarm...");
             await checkActiveTaskID();
+            break;
+        case ALARM_UPDATE_EVIDENCE_COUNT:
+            printDebug("background", "Updating evidence count from alarm...");
+            const task_id = await getCurrentTask();
+            if (task_id !== -1) {
+                try {
+                    const response = await _get(`${config.urls.get_justifications}/${task_id}/`);
+                    if (response && response.justifications) {
+                        const newCount = response.justifications.length;
+                        chrome.tabs.query({}, (tabs) => {
+                            tabs.forEach(tab => {
+                                chrome.tabs.sendMessage(tab.id, { command: "update_evidence_count", count: newCount }, (response) => {
+                                    if (chrome.runtime.lastError) {
+                                        // Suppress the error message for tabs without the content script
+                                    }
+                                });
+                            });
+                        });
+                    }
+                } catch (error) {
+                    console.error("Error getting justifications for count:", error);
+                }
+            }
             break;
     }
 });

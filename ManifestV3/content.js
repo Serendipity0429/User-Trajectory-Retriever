@@ -313,6 +313,15 @@ chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
         return true;
     }
 
+    if (message.command === 'update_evidence_count') {
+        const countEl = document.getElementById('evidence-count');
+        if (countEl && typeof message.count !== 'undefined') {
+            countEl.textContent = message.count;
+        }
+        sendResponse({success: true});
+        return true;
+    }
+
     // Handle messages from the popup
     if (message.type === MSG_TYPE_POPUP) {
         if (document.visibilityState === 'hidden') {

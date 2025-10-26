@@ -193,6 +193,7 @@
                                 </div>
                                 <div class="card-body p-4">
                                     <p><span class="annotation-key">Your Answer:</span> {{ trial.answer }}</p>
+                                    <p><span class="annotation-key">Evidence Count:</span> <span id="evidence-count-{{ trial.num_trial }}">{{ trial.justifications.all|length }}</span></p>
                                     <p><span class="annotation-key">Confidence:</span> {{ CONFIDENCE_MAP|get_item:trial.confidence }}</p>
                                     <p><span class="annotation-key">Justification:</span></p>
                                     <ul class="list-unstyled">

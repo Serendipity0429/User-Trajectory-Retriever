@@ -1077,13 +1077,13 @@ def add_justification(request):
     if not all([task_id, url]):
         return JsonResponse({"status": "error", "message": "Missing required fields."}, status=400)
 
-    if len(page_title) > 255:
+    if page_title and len(page_title) > 255:
         return JsonResponse({"status": "error", "message": "Page title is too long."}, status=400)
 
-    if len(text) > 10000:
+    if text and len(text) > 10000:
         return JsonResponse({"status": "error", "message": "Text is too long."}, status=400)
 
-    if len(dom_position) > 1000:
+    if dom_position and len(dom_position) > 1000:
         return JsonResponse({"status": "error", "message": "DOM position is too long."}, status=400)
 
     try:
@@ -1165,9 +1165,11 @@ def get_justifications(request, task_id):
     if not task:
         return JsonResponse({"status": "error", "message": "Active task not found."}, status=404)
 
-    trial = TaskTrial.objects.filter(belong_task=task).order_by("-num_trial").first()
+    trial_num_to_get = task.num_trial + 1
+    trial = TaskTrial.objects.filter(belong_task=task, num_trial=trial_num_to_get).first()
+
     if not trial:
-        return JsonResponse({"status": "success", "justifications": [], "trial_num": -1})
+        return JsonResponse({"status": "success", "justifications": [], "trial_num": trial_num_to_get})
 
     justifications = Justification.objects.filter(belong_task_trial=trial)
     justifications_data = []

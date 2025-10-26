@@ -264,6 +264,7 @@ async function initialize() {
                 emit(event) {
                     unitPage.addRRWebEvent(event);
                 },
+                recordCrossOriginIframes: true, // NOTICE: enable cross-origin iframe recording, which is under experimental stage
             });
             printDebug("content", "rrweb recording started.");
         }

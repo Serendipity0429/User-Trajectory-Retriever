@@ -2,7 +2,7 @@ import os
 work_dir = os.path.dirname(os.path.abspath(__file__))
 
 
-DEBUG = True
+DEBUG = False
 
 if DEBUG:
     # Linux

@@ -385,6 +385,7 @@ def check_pending_annotations(request):
     """
     user = request.user
     pending_annotation_url = get_pending_annotation(user)
+    print_debug(f"Pending annotation URL for user {user.username}: {pending_annotation_url}")
     if pending_annotation_url:
         return JsonResponse({"pending": True, "url": pending_annotation_url})
     else:

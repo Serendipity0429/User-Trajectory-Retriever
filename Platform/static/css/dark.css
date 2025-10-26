@@ -297,6 +297,37 @@
     color: #adb5bd;
 }
 
+
+.dark-mode .justification-url {
+    color: #8AC7DB !important;
+}
+
 .dark-mode #sidebarCollapse:hover {
     color: #e0e0e0;
+}
+
+.dark-mode .bg-custom-dark-blue {
+    background-color: #1e1e1e;
+}
+
+.dark-mode .btn-custom-dark-blue {
+    background-color: #8AC7DB;
+    border-color: #8AC7DB;
+    color: #fff;
+}
+
+.dark-mode .btn-custom-dark-blue:hover {
+    background-color: #a0d1e2;
+    border-color: #a0d1e2;
+}
+
+.dark-mode .btn-outline-custom-dark-blue {
+    color: #8AC7DB;
+    border-color: #8AC7DB;
+}
+
+.dark-mode .btn-check:checked + .btn-outline-custom-dark-blue,
+.dark-mode .btn-outline-custom-dark-blue:hover {
+    background-color: #8AC7DB;
+    color: #fff;
 }

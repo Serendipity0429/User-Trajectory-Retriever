@@ -5,8 +5,10 @@ import logging
 from datetime import datetime
 from django.utils import timezone
 from django.db import transaction
-
 from django.shortcuts import render
+from django.core.files.base import ContentFile
+import base64
+import uuid
 
 from .utils import (
     print_debug,
@@ -209,8 +211,12 @@ def post_task_annotation(request, task_id):
         # End a task
         print_debug("end_task")
         task = Task.objects.filter(id=task_id, user=user).first()
-        if task is not None and task.active:
-            task.active = False
+        if task is not None:
+            # Check if an annotation already exists to prevent duplicates
+            if PostTaskAnnotation.objects.filter(belong_task=task).exists():
+                print_debug(f"PostTaskAnnotation for task {task_id} already exists.")
+                stop_annotating()
+                return close_window()
 
             post_annotation = PostTaskAnnotation()
             post_annotation.difficulty_actual = request.POST.get("difficulty_actual")
@@ -223,18 +229,22 @@ def post_task_annotation(request, task_id):
             post_annotation.belong_task = task
             post_annotation.save()
 
-            task.save()
             stop_annotating()
             return close_window()
         else:
             stop_annotating()
-            return HttpResponse("Task not found or already inactive", status=404)
+            return HttpResponse("Task not found", status=404)
 
     else:
         # Fetch task and relevant webpages
         task = Task.objects.filter(id=task_id, user=user).first()
         if task is None:
             return HttpResponse(f"No task found with task_id={task_id}")
+
+        # Deactivate the task as soon as the user lands on the page
+        if task.active:
+            task.active = False
+            task.save()
 
         # filter relevant webpages
         webpages = Webpage.objects.filter(
@@ -594,7 +604,7 @@ CORRECTIVE_ACTION_EXPLANATION_MAP = {
 CANCEL_CATEGORY_MAP = {
     "info_unavailable": "<strong>Information Unavailable:</strong> I believe the information is not publicly available online.",
     "ambiguous_question": "<strong>Ambiguous Question:</strong> The task is unclear, ambiguous, or appears to contain incorrect assumptions.",
-    "scope_too_large": "<strong>Excessive Scope:</strong> The amount of research, synthesis, or steps required is much larger than anticipated.",
+    "scope_too_large": "<strong>Excessive Scope:</strong> The amount of research or synthesis required is much larger than anticipated.",
     "too_long": "<strong>Too Time-Consuming:</strong> The task is taking too much time to complete.",
     "technical_issue": "<strong>Technical Barrier:</strong> I encountered a technical barrier (e.g., paywall, login, broken site).",
     "other": "<strong>Other:</strong>",
@@ -759,6 +769,11 @@ def cancel_annotation(request, task_id, end_timestamp):
         return HttpResponse(f"No task found with task_id={task_id}")
 
     if request.method == "POST":
+        if CancelAnnotation.objects.filter(belong_task=task).exists():
+            print_debug(f"CancelAnnotation for task {task_id} already exists.")
+            stop_annotating()
+            return close_window()
+
         task.cancelled = True
         task.save()
         cancel_annotation = CancelAnnotation()
@@ -776,9 +791,10 @@ def cancel_annotation(request, task_id, end_timestamp):
         return close_window()
 
     else:
-        task.active = False
         task.end_timestamp = timezone.make_aware(datetime.fromtimestamp(end_timestamp / 1000))
-        task.save()
+        if task.active:
+            task.active = False
+            task.save()
 
         entry = task.content
         question = entry.question
@@ -818,6 +834,11 @@ def reflection_annotation(request, task_trial_id):
     question = entry.question
 
     if request.method == "POST":
+        if ReflectionAnnotation.objects.filter(belong_task_trial=task_trial).exists():
+            print_debug(f"ReflectionAnnotation for trial {task_trial.id} already exists.")
+            stop_annotating()
+            return close_window()
+
         ref_annotation = ReflectionAnnotation(
             belong_task_trial=task_trial,
             failure_category=request.POST.get("failure_category_list"),
@@ -1064,16 +1085,28 @@ def add_justification(request):
                 num_trial=trial_num_to_get,
             )
 
-            Justification.objects.create(
+            justification = Justification.objects.create(
                 belong_task_trial=trial,
                 url=url,
                 page_title=page_title,
                 text=text,
                 dom_position=dom_position,
                 evidence_type=evidence_type,
-                element_details=element_details,
-                confidence=1  # Default confidence
+                element_details=element_details
             )
+
+            if element_details:
+                image_data = element_details.get('attributes', {}).get('imageData')
+                if image_data:
+                    try:
+                        format, imgstr = image_data.split(';base64,')
+                        ext = format.split('/')[-1]
+                        filename = f"{uuid.uuid4()}.{ext}"
+                        data = ContentFile(base64.b64decode(imgstr), name=filename)
+                        justification.evidence_image.save(filename, data, save=True)
+                    except Exception as e:
+                        logger.error(f"Could not save image evidence: {e}")
+
         return JsonResponse({"status": "success"})
     except Task.DoesNotExist:
         return JsonResponse({"status": "error", "message": "Active task not found."}, status=404)
@@ -1122,5 +1155,19 @@ def get_justifications(request, task_id):
     if not trial:
         return JsonResponse({"status": "success", "justifications": []})
 
-    justifications = Justification.objects.filter(belong_task_trial=trial).values('id', 'url', 'page_title', 'text', 'status', 'evidence_type', 'element_details', 'relevance', 'credibility')
-    return JsonResponse({"status": "success", "justifications": list(justifications)})
+    justifications = Justification.objects.filter(belong_task_trial=trial)
+    justifications_data = []
+    for j in justifications:
+        justifications_data.append({
+            'id': j.id,
+            'url': j.url,
+            'page_title': j.page_title,
+            'text': j.text,
+            'status': j.status,
+            'evidence_type': j.evidence_type,
+            'element_details': j.element_details,
+            'relevance': j.relevance,
+            'credibility': j.credibility,
+            'evidence_image_url': j.evidence_image.url if j.evidence_image else None,
+        })
+    return JsonResponse({"status": "success", "justifications": justifications_data})

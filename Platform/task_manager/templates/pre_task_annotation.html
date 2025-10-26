@@ -7,7 +7,7 @@
     <div class="row justify-content-center">
         <div class="col-lg-8">
             <div class="card shadow-sm">
-                <div class="card-header">
+                <div class="card-header bg-custom-dark-blue">
                     <h3 class="mb-0"><i class="bi bi-pencil-square me-2"></i>Pre-Task Annotation</h3>
                 </div>
                 <div class="card-body">
@@ -63,7 +63,7 @@
                             <div class="btn-group" role="group" aria-label="Familiarity">
                                 {% for key, value in FAMILIARITY_MAP.items %}
                                 <input type="radio" class="btn-check" name="familiarity" id="familiarity{{ key }}" value="{{ key }}" autocomplete="off" required>
-                                <label class="btn btn-outline-primary" for="familiarity{{ key }}" data-bs-toggle="tooltip" data-bs-placement="top" title="{{ FAMILIARITY_EXPLANATION_MAP|get_item:key }}">
+                                <label class="btn btn-outline-custom-dark-blue" for="familiarity{{ key }}" data-bs-toggle="tooltip" data-bs-placement="top" title="{{ FAMILIARITY_EXPLANATION_MAP|get_item:key }}">
                                     <strong>{{ key }}</strong><br>{{ value|split:" - "|slice:"1:"|join:" - " }}
                                 </label>
                                 {% endfor %}
@@ -78,7 +78,7 @@
                             <div class="btn-group" role="group" aria-label="Difficulty">
                                 {% for key, value in DIFFICULTY_MAP.items %}
                                 <input type="radio" class="btn-check" name="difficulty" id="difficulty{{ key }}" value="{{ key }}" autocomplete="off" required>
-                                <label class="btn btn-outline-primary" for="difficulty{{ key }}" data-bs-toggle="tooltip" data-bs-placement="top" title="{{ DIFFICULTY_EXPLANATION_MAP|get_item:key }}">
+                                <label class="btn btn-outline-custom-dark-blue" for="difficulty{{ key }}" data-bs-toggle="tooltip" data-bs-placement="top" title="{{ DIFFICULTY_EXPLANATION_MAP|get_item:key }}">
                                     <strong>{{ key }}</strong><br>{{ value|split:" - "|slice:"1:"|join:" - " }}
                                 </label>
                                 {% endfor %}
@@ -93,7 +93,7 @@
                             <div class="btn-group" role="group" aria-label="Effort">
                                 {% for key, value in EFFORT_MAP.items %}
                                 <input type="radio" class="btn-check" name="effort" id="effort{{ key }}" value="{{ key }}" autocomplete="off" required>
-                                <label class="btn btn-outline-primary" for="effort{{ key }}" data-bs-toggle="tooltip" data-bs-placement="top" title="{{ EFFORT_EXPLANATION_MAP|get_item:key }}">
+                                <label class="btn btn-outline-custom-dark-blue" for="effort{{ key }}" data-bs-toggle="tooltip" data-bs-placement="top" title="{{ EFFORT_EXPLANATION_MAP|get_item:key }}">
                                     {{ value }}
                                 </label>
                                 {% endfor %}
@@ -130,7 +130,7 @@
                             <div class="btn-group flex-wrap" role="group" aria-label="Expected Source">
                                 {% for key, value in EXPECTED_SOURCES_MAP.items %}
                                 <input type="checkbox" class="btn-check" name="expected_source" id="source_{{ key }}" value="{{ key }}" autocomplete="off">
-                                <label class="btn btn-outline-primary mb-2 me-2" for="source_{{ key }}">{{ value }}</label>
+                                <label class="btn btn-outline-custom-dark-blue mb-2 me-2" for="source_{{ key }}">{{ value }}</label>
                                 {% endfor %}
                             </div>
                             <input type="text" class="form-control mt-2" id="expected_source_other" name="expected_source_other" placeholder="If other, please specify" style="display: none;">
@@ -138,8 +138,23 @@
                             <div class="invalid-feedback" id="expected_source_other_feedback">Please specify the other expected source.</div>
                         </div>
 
+                        <!-- Pre-Task Checklist -->
+                        <div class="mb-4 p-3 border rounded">
+                            <h5><strong>9. Pre-Task Checklist</strong></h5>
+                            <p class="text-danger">
+                                <strong>Important:</strong> Before you begin, please ensure that you have saved any important work in other browser tabs. <strong>The task will close tabs or navigate away from your current pages.</strong>
+                            </p>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="preTaskCheck" required>
+                                <label class="form-check-label" for="preTaskCheck">
+                                    I have checked my other tabs and saved any important work.
+                                </label>
+                                <div class="invalid-feedback">You must confirm this before starting the task.</div>
+                            </div>
+                        </div>
+
                         <div class="d-grid">
-                            <button type="button" id="query-btn" class="btn btn-primary btn-lg btn-submit">Start Task</button>
+                            <button type="button" id="query-btn" class="btn btn-custom-dark-blue btn-lg btn-submit" disabled>Start Task</button>
                         </div>
                     </form>
                 </div>
@@ -175,6 +190,15 @@
                 $('#expected_source_other').show();
             } else {
                 $('#expected_source_other').hide();
+            }
+        });
+
+        // Enable/disable submit button based on pre-task check
+        $('#preTaskCheck').change(function() {
+            if ($(this).is(':checked')) {
+                $('#query-btn').prop('disabled', false);
+            } else {
+                $('#query-btn').prop('disabled', true);
             }
         });
 
@@ -234,20 +258,33 @@
 
             // Validation for expected source
             const expectedSourceCheckboxes = $("input[name='expected_source']:checked");
+            const expectedSourceContainer = $("input[name='expected_source']").closest('.btn-group');
             const expectedSourceOther = $('#expected_source_other');
             const otherIsChecked = $('#source_other').is(':checked');
+            const genericFeedback = expectedSourceContainer.nextAll('.invalid-feedback').first();
+            const otherFeedback = $('#expected_source_other_feedback');
 
             if (expectedSourceCheckboxes.length === 0) {
-                const container = $("input[name='expected_source']").closest('.btn-group');
-                container.addClass('is-invalid');
-                setFocus(container.find('input').first());
+                expectedSourceContainer.addClass('is-invalid');
+                genericFeedback.css('display', 'block');
+                otherFeedback.css('display', 'none');
+                setFocus(expectedSourceContainer.find('input').first());
                 isValid = false;
             } else if (otherIsChecked && expectedSourceOther.val().trim() === '') {
                 expectedSourceOther.addClass('is-invalid');
-                $('#expected_source_other_feedback').show();
+                genericFeedback.css('display', 'none');
+                otherFeedback.css('display', 'block');
                 setFocus(expectedSourceOther);
                 isValid = false;
             }
+
+            // Validation for pre-task check
+            if (!$('#preTaskCheck').is(':checked')) {
+                $('#preTaskCheck').addClass('is-invalid');
+                setFocus($('#preTaskCheck'));
+                isValid = false;
+            }
+
 
             if (!isValid) {
                 if (firstInvalidElement) {
@@ -260,7 +297,7 @@
                 is_submitted = true;
                 // Disable button and show loading state
                 $(this).prop('disabled', true);
-                $(this).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Submitting...');
+                $(this).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Starting...');
                 $('#query-form').submit();
             }
         });
@@ -272,14 +309,18 @@
         $('#first_search_query').on('input', () => $('#first_search_query').removeClass('is-invalid'));
         $('#initial_guess, #initial_guess_unknown').on('input change', () => $('#initial_guess').removeClass('is-invalid'));
         $("input[name='expected_source']").change(() => {
-            $("input[name='expected_source']").closest('.btn-group').removeClass('is-invalid');
+            const container = $("input[name='expected_source']").closest('.btn-group');
+            container.removeClass('is-invalid');
             $('#expected_source_other').removeClass('is-invalid');
-            $('#expected_source_other_feedback').hide();
+            // Reset display styles to allow Bootstrap's CSS to take over again
+            container.nextAll('.invalid-feedback').first().css('display', '');
+            $('#expected_source_other_feedback').css('display', '');
         });
         $('#expected_source_other').on('input', () => {
             $('#expected_source_other').removeClass('is-invalid');
             $('#expected_source_other_feedback').hide();
         });
+        $('#preTaskCheck').change(() => $('#preTaskCheck').removeClass('is-invalid'));
 
         window.addEventListener('beforeunload', function (e) {
             if (!is_submitted) {

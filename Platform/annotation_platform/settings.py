@@ -62,6 +62,11 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
+SECURE_CONTENT_SECURITY_POLICY = {
+    'default-src': ["'self'"],
+    'font-src': ["'self'", 'https://assets.msn.com'],
+}
+
 ROOT_URLCONF = 'annotation_platform.urls'
 
 TEMPLATES = [
@@ -196,3 +201,6 @@ LOGGING = {
         'level': 'INFO',
     },
 }
+
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')

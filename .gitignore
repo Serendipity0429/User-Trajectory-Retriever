@@ -11,3 +11,4 @@ node_modules
 migrations/0*.py
 tempFiles
 .env
+media

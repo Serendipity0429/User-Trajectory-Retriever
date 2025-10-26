@@ -20,6 +20,7 @@ const URLS = {
     home: `${URL_BASE}/task/home/`,
     stop_annotation: `${URL_BASE}/task/stop_annotation/`,
     add_justification: `${URL_BASE}/task/justification/add/`,
+    get_justifications: `${URL_BASE}/task/justification/get`,
     check_pending_annotations: `${URL_BASE}/user/check_pending_annotations/`,
     initial_page: "https://www.bing.com/",
 };
@@ -240,21 +241,27 @@ function GENERATE_ANNOTATION_MODAL_HTML(type) {
     return ANNOTATION_MODAL_HTML;
 }
 
-function displayLoadedBox(message) {
+function displayMessageBox(message, type = 'info') {
     if (window.location.href.startsWith(config.urls.base)) return;
 
     const box = document.createElement('div');
     box.className = 'rr-ignore loaded-box rr-block';
+    
+    const isWarning = type === 'warning';
+    const borderColor = isWarning ? '#ffc107' : '#021e4d';
+    const backgroundColor = isWarning ? '#fff3cd' : '#f8f9fa';
+    const color = isWarning ? '#856404' : '#212529';
+
     box.style.cssText = `
         position: fixed;
         right: 10px;
-        background-color: #f8f9fa;
-        color: #212529;
+        background-color: ${backgroundColor};
+        color: ${color};
         padding: 1rem;
         border-radius: .25rem;
         z-index: 2147483647;
         box-shadow: 0 .5rem 1rem rgba(0,0,0,.15);
-        border-left: 5px solid #021e4d;
+        border-left: 5px solid ${borderColor};
         opacity: 0;
         transition: opacity 0.5s ease-in-out;
         font-size: 1rem;
@@ -277,10 +284,13 @@ function displayLoadedBox(message) {
     document.body.appendChild(box);
 
     setTimeout(() => { box.style.opacity = '1'; }, 10);
-    setTimeout(() => {
-        box.style.opacity = '0';
-        setTimeout(() => { box.remove(); }, 500);
-    }, 3000);
+
+    if (!isWarning) {
+        setTimeout(() => {
+            box.style.opacity = '0';
+            setTimeout(() => { box.remove(); }, 500);
+        }, 3000);
+    }
 }
 
 

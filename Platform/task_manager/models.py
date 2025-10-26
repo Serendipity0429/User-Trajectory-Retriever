@@ -123,7 +123,7 @@ class TaskTrial(models.Model):
     num_trial = models.IntegerField()  # number of trials
 
     answer = models.CharField(max_length=1000, default='undefined')
-    is_correct = models.BooleanField(default=False)
+    is_correct = models.BooleanField(null=True)
     
     confidence = models.IntegerField(default=-1)  # confidence level, 0->4, low -> high
     answer_formulation_method = models.CharField(max_length=100, default='undefined')  # reasoning method used, e.g. "deductive", "inductive", etc.
@@ -136,21 +136,21 @@ class TaskTrial(models.Model):
 
 # Justification
 class Justification(models.Model):
-    belong_task_trial = models.ForeignKey(
-        TaskTrial,
-        on_delete=models.CASCADE,
-        related_name='justifications'
-    )
-    url = models.URLField(max_length=1000)
-    page_title = models.TextField(null=True, blank=True)
-    text = models.TextField(null=True, blank=True)
-    dom_position = models.TextField(null=True, blank=True)  # To store CSS selector
-    status = models.CharField(max_length=10, default='active', choices=[('active', 'Active'), ('abandoned', 'Abandoned')])
-    confidence = models.IntegerField()  # 1-3, low, medium, high
-    relevance = models.IntegerField(null=True, blank=True)  # 1: Low, 2: Medium, 3: High
-    credibility = models.IntegerField(null=True, blank=True)  # 1: Low, 2: Medium, 3: High
+    belong_task_trial = models.ForeignKey(TaskTrial, on_delete=models.CASCADE, related_name='justifications')
+    url = models.URLField(max_length=2048)
+    page_title = models.CharField(max_length=255, blank=True, null=True)
+    text = models.TextField(blank=True, null=True)
+    dom_position = models.TextField(blank=True, null=True)
+    status = models.CharField(max_length=10, default='active')  # 'active' or 'abandoned'
     evidence_type = models.CharField(max_length=20, default='text_selection')
     element_details = models.JSONField(null=True, blank=True)
+    relevance = models.IntegerField(default=0)
+    credibility = models.IntegerField(default=0)
+    timestamp = models.DateTimeField(auto_now_add=True)
+    evidence_image = models.ImageField(upload_to='evidence_images/', null=True, blank=True)
+
+    def __str__(self):
+        return f"Justification for Trial {self.belong_task_trial.id} - {self.evidence_type}"
 
 
 # Webpages

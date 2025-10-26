@@ -6,13 +6,21 @@
 let lastRightClickedElement;
 document.addEventListener('mousedown', function(event) {
     if (event.button === 2) { // Right-click
-        lastRightClickedElement = event.target;
+        lastRightClickedElement = event.composedPath?.()[0] || event.target;
     }
 }, true);
 
-function getElementDetails() {
-    const targetElement = lastRightClickedElement;
+async function getElementDetails() {
+    let targetElement = lastRightClickedElement;
     if (!targetElement) return null;
+
+    // If the clicked element is not an image, try to find an image within it
+    if (targetElement.tagName.toUpperCase() !== 'IMG') {
+        const img = targetElement.querySelector('img');
+        if (img) {
+            targetElement = img;
+        }
+    }
 
     const getCssSelector = (el) => {
         if (!(el instanceof Element)) return;
@@ -30,7 +38,7 @@ function getElementDetails() {
                        nth++;
                 }
                 if (nth != 1)
-                    selector += ":nth-of-type("+nth+")";
+                    selector += `:nth-of-type(${nth})`;
             }
             path.unshift(selector);
             el = el.parentNode;
@@ -43,6 +51,23 @@ function getElementDetails() {
     const attributes = {};
     for (const attr of targetElement.attributes) {
         attributes[attr.name] = attr.value;
+    }
+
+    if (tagName.toUpperCase() === 'IMG' && attributes.src) {
+        const srcUrl = new URL(attributes.src, window.location.href).href;
+        attributes.src = srcUrl;
+        try {
+            const response = await fetch(srcUrl);
+            const blob = await response.blob();
+            const dataUrl = await new Promise(resolve => {
+                const reader = new FileReader();
+                reader.onloadend = () => resolve(reader.result);
+                reader.readAsDataURL(blob);
+            });
+            attributes.imageData = dataUrl; // Add base64 image data
+        } catch (e) {
+            console.error("Could not fetch image for evidence:", e);
+        }
     }
 
     return { selector, tagName, attributes };
@@ -81,9 +106,33 @@ function displayQuestionBox(question) {
         font-family: 'Noto Sans SC', sans-serif;
         pointer-events: none;
     `;
-    box.innerHTML = `<h5 style="margin-bottom: 0.5rem;margin-top: 0;"><strong>Task Question</strong></h5><p style="margin-bottom: 0;">${question}</p>`;
+    box.innerHTML = `
+        <h5 style="margin-bottom: 0.5rem;margin-top: 0;"><strong>Task Question</strong></h5>
+        <p style="margin-bottom: 0;">${question}</p>
+        <div id="evidence-count-container" style="margin-top: 10px; font-size: 0.9rem; color: #6c757d;">
+            Evidence Collected: <span id="evidence-count">0</span>
+        </div>
+    `;
 
     document.body.appendChild(box);
+    updateEvidenceCount();
+}
+
+async function updateEvidenceCount() {
+    const task_id = await new Promise((resolve) => {
+        chrome.runtime.sendMessage({ type: MSG_TYPE_POPUP, command: "get_active_task" }, (response) => {
+            resolve(response ? response.task_id : -1);
+        });
+    });
+
+    if (task_id !== -1) {
+        chrome.runtime.sendMessage({ command: "get_justifications", task_id: task_id }, (response) => {
+            const countEl = document.getElementById('evidence-count');
+            if (countEl && response && response.justifications) {
+                countEl.textContent = response.justifications.length;
+            }
+        });
+    }
 }
 
 async function getTaskInfo() {
@@ -136,7 +185,7 @@ async function setupTaskUI() {
     removeExistingBoxes();
     await getTaskInfo();
     if (!_is_server_page(_content_vars.url_now)) {
-        displayLoadedBox("You can start your task now!");
+        displayMessageBox("You can start your task now!");
     }
 }
 
@@ -200,6 +249,17 @@ async function initialize() {
         event_tracker.initialize();
 
         if (!_is_server_page(_content_vars.url_now)) {
+            const { is_recording_paused } = await new Promise((resolve) => {
+                chrome.storage.local.get('is_recording_paused', (result) => {
+                    resolve(result);
+                });
+            });
+
+            if (is_recording_paused) {
+                displayMessageBox("You have a pending annotation. \nPlease open the popup to complete it.", "warning");
+                printDebug("content", "Pending annotation message displayed.");
+            }
+
             rrweb.record({
                 emit(event) {
                     unitPage.addRRWebEvent(event);
@@ -230,12 +290,25 @@ window.addEventListener('popstate', () => {
 chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
     // Handle messages from the background script
     if (message.command === 'get-element-details') {
-        sendResponse(getElementDetails());
+        (async () => {
+            const details = await getElementDetails();
+            sendResponse(details);
+        })();
         return true; // Keep channel open for async response
     }
 
     if (message.command === 'evidence-added-successfully') {
-        displayLoadedBox("Evidence added successfully!");
+        displayMessageBox("Evidence added successfully!");
+        const countEl = document.getElementById('evidence-count');
+        if (countEl && typeof message.newCount !== 'undefined') {
+            countEl.textContent = message.newCount;
+        }
+        sendResponse({success: true});
+        return true;
+    }
+
+    if (message.command === 'refresh_justifications') {
+        window.postMessage({ type: 'refresh_justifications' }, '*');
         sendResponse({success: true});
         return true;
     }

@@ -11,11 +11,13 @@ if DEBUG:
         os.system(f"rm -rf {work_dir}/task_manager/migrations")
         os.system(f"rm -rf {work_dir}/user_system/migrations")
         os.system(f"rm -rf {work_dir}/db.sqlite3")
+        os.system(f"rm -rf {work_dir}/media")
     elif os.name == 'nt':
         # Windows
         os.system(f"rmdir /s /q \"{work_dir}\\task_manager\\migrations\"")
         os.system(f"rmdir /s /q \"{work_dir}\\user_system\\migrations\"")
         os.system(f"del /f /q \"{work_dir}\\db.sqlite3\"")
+        os.system(f"rmdir /s /q \"{work_dir}\\media\"")
 
 os.system(f"python \"{work_dir}/manage.py\" makemigrations task_manager")
 os.system(f"python \"{work_dir}/manage.py\" makemigrations user_system")

@@ -1,8 +1,10 @@
 {% extends "base.html" %}
 {% load task_manager_extras %}
+{% load static %}
 {% block title %}Answer Submission{% endblock %}
 
 {% block head %}
+<link rel="icon" href="{% static 'img/IR4.png' %}" type="image/png"/>
 <style>
     .justification-item.abandoned {
         opacity: 0.6;
@@ -13,6 +15,25 @@
     .justification-item.is-invalid {
         border: 1px solid #dc3545;
     }
+    .justification-url {
+        word-break: break-all;
+    }
+    .evidence-image {
+        max-width: 100%;
+        max-height: 200px;
+        width: 100%;
+        object-fit: contain;
+        border-radius: 5px;
+        margin-top: 10px;
+    }
+    @keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+    }
+    .icon-wrapper.spinning {
+        display: inline-block;
+        animation: spin 1s linear infinite;
+    }
 </style>
 {% endblock %}
 
@@ -21,8 +42,8 @@
     <div class="row justify-content-center">
         <div class="col-lg-10">
             <div class="card shadow-lg border-0 rounded-lg mt-5">
-                <div class="card-header bg-primary text-white text-center py-4">
-                    <h2 class="card-title mb-0">Trial {{ num_trial }} Submission</h2>
+                <div class="card-header text-white text-center py-4 bg-custom-dark-blue">
+                    <h2 class="card-title mb-0"><i class="bi bi-pencil-square me-2"></i>Trial {{ num_trial }} Submission</h2>
                 </div>
                 <div class="card-body p-5" id="card-body">
                     <div class="accordion mb-4" id="trajectoriesAccordion">
@@ -110,9 +131,15 @@
                         </div>
 
                         <div id="justification-container" class="mb-4 p-3 border rounded">
-                            <h5><strong>3. Justifications</strong></h5>
-                            <p>Use the right-click menu on any webpage to add a justification.</p>
-                            
+                            <div class="d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0"><strong>3. Justifications</strong></h5>
+                                <button type="button" id="refresh-justifications" class="btn btn-sm btn-outline-primary d-inline-flex align-items-center">
+                                    <span class="icon-wrapper"><i class="bi bi-arrow-repeat"></i></span>
+                                    <span class="button-text ms-1">Refresh</span>
+                                </button>
+                            </div>
+                            <p>Use the right-click menu on any webpage to add a justification. <i>Click "Refresh" button if you add new evidence and it isn't displayed below.</i></p>
+                             
                             <div class="accordion" id="text-evidence-accordion" style="display: none;">
                                 <div class="accordion-item">
                                     <h2 class="accordion-header" id="text-evidence-heading">
@@ -128,20 +155,35 @@
                                 </div>
                             </div>
 
-                                                            <div class="accordion mt-3" id="element-evidence-accordion" style="display: none;">
-                                                            <div class="accordion-item">
-                                                                <h2 class="accordion-header" id="element-evidence-heading">
-                                                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-element-evidence" aria-expanded="false" aria-controls="collapse-element-evidence">
-                                                                        Other Evidence
-                                                                    </button>
-                                                                </h2>
-                                                                <div id="collapse-element-evidence" class="accordion-collapse collapse" aria-labelledby="element-evidence-heading" data-bs-parent="#element-evidence-accordion">
-                                                                    <div class="accordion-body" id="element-justification-list">
-                                                                        <!-- Element justifications will be loaded here -->
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        </div>
+                            <div class="accordion mt-3" id="image-evidence-accordion" style="display: none;">
+                                <div class="accordion-item">
+                                    <h2 class="accordion-header" id="image-evidence-heading">
+                                        <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-image-evidence" aria-expanded="true" aria-controls="collapse-image-evidence">
+                                            Image Evidence
+                                        </button>
+                                    </h2>
+                                    <div id="collapse-image-evidence" class="accordion-collapse collapse show" aria-labelledby="image-evidence-heading" data-bs-parent="#image-evidence-accordion">
+                                        <div class="accordion-body" id="image-justification-list">
+                                            <!-- Image justifications will be loaded here -->
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="accordion mt-3" id="element-evidence-accordion" style="display: none;">
+                                <div class="accordion-item">
+                                    <h2 class="accordion-header" id="element-evidence-heading">
+                                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-element-evidence" aria-expanded="false" aria-controls="collapse-element-evidence">
+                                            Other Evidence
+                                        </button>
+                                    </h2>
+                                    <div id="collapse-element-evidence" class="accordion-collapse collapse" aria-labelledby="element-evidence-heading" data-bs-parent="#element-evidence-accordion">
+                                        <div class="accordion-body" id="element-justification-list">
+                                            <!-- Element justifications will be loaded here -->
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                             <div class="accordion mt-3" id="abandoned-accordion" style="display: none;">
                                 <div class="accordion-item">
                                     <h2 class="accordion-header" id="abandoned-heading">
@@ -180,7 +222,7 @@
 
                     <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
                         <button type="button" id="cancel-btn" class="btn btn-secondary btn-lg">Cancel</button>
-                        <button type="button" id="query-btn" class="btn btn-primary btn-lg btn-submit">Submit Answer</button>
+                        <button type="button" id="query-btn" class="btn btn-primary btn-lg btn-submit btn-custom-dark-blue">Submit Answer</button>
                     </div>
                 </div>
             </div>
@@ -203,33 +245,89 @@ document.addEventListener('DOMContentLoaded', function() {
     const justificationList = document.getElementById('justification-list');
     const taskId = {{ task_id }};
 
-    async function fetchJustifications() {
-        try {
-            const response = await fetch(`/task/justification/get/${taskId}/`);
-            const data = await response.json();
-            renderJustifications(data.justifications);
-        } catch (error) {
-            console.error('Error fetching justifications:', error);
+    function saveAnnotations() {
+        const annotations = {};
+        document.querySelectorAll('.justification-item').forEach(item => {
+            const justificationId = item.dataset.id;
+            const relevance = item.querySelector(`input[name="relevance_${justificationId}"]:checked`);
+            const credibility = item.querySelector(`input[name="credibility_${justificationId}"]:checked`);
+            annotations[justificationId] = {
+                relevance: relevance ? relevance.value : null,
+                credibility: credibility ? credibility.value : null,
+            };
+        });
+        return annotations;
+    }
+
+    function restoreAnnotations(annotations) {
+        for (const justificationId in annotations) {
+            const annotation = annotations[justificationId];
+            if (annotation.relevance) {
+                const relevanceInput = document.querySelector(`input[name="relevance_${justificationId}"][value="${annotation.relevance}"]`);
+                if (relevanceInput) relevanceInput.checked = true;
+            }
+            if (annotation.credibility) {
+                const credibilityInput = document.querySelector(`input[name="credibility_${justificationId}"][value="${annotation.credibility}"]`);
+                if (credibilityInput) credibilityInput.checked = true;
+            }
         }
+    }
+
+    async function fetchJustifications() {
+        const refreshButton = document.getElementById('refresh-justifications');
+        const iconWrapper = refreshButton.querySelector('.icon-wrapper');
+        
+        const savedAnnotations = saveAnnotations();
+        
+        iconWrapper.classList.add('spinning');
+        refreshButton.disabled = true;
+
+        const fetchPromise = fetch(`/task/justification/get/${taskId}/`)
+            .then(response => response.json())
+            .then(data => {
+                renderJustifications(data.justifications);
+                restoreAnnotations(savedAnnotations);
+            })
+            .catch(error => console.error('Error fetching justifications:', error));
+
+        const minimumWait = new Promise(resolve => setTimeout(resolve, 1000));
+
+        await Promise.all([fetchPromise, minimumWait]).finally(() => {
+            iconWrapper.classList.remove('spinning');
+            refreshButton.disabled = false;
+        });
     }
 
     function renderJustifications(justifications) {
         const textList = document.getElementById('text-justification-list');
+        const imageList = document.getElementById('image-justification-list');
         const elementList = document.getElementById('element-justification-list');
         const abandonedList = document.getElementById('abandoned-justification-list');
         
         const textAccordion = document.getElementById('text-evidence-accordion');
+        const imageAccordion = document.getElementById('image-evidence-accordion');
         const elementAccordion = document.getElementById('element-evidence-accordion');
         const abandonedAccordion = document.getElementById('abandoned-accordion');
 
         // Clear all lists
         textList.innerHTML = '';
+        imageList.innerHTML = '';
         elementList.innerHTML = '';
         abandonedList.innerHTML = '';
 
         const activeJustifications = justifications.filter(j => j.status === 'active');
         const textJustifications = activeJustifications.filter(j => j.evidence_type === 'text_selection');
-        const elementJustifications = activeJustifications.filter(j => j.evidence_type === 'element');
+        
+        const elementJustificationsAll = activeJustifications.filter(j => j.evidence_type === 'element');
+        const imageJustifications = elementJustificationsAll.filter(j => {
+            let details = j.element_details;
+            if (typeof details === 'string') {
+                try { details = JSON.parse(details); } catch (e) { details = {}; }
+            }
+            return details.tagName && details.tagName.toUpperCase() === 'IMG';
+        });
+        const elementJustifications = elementJustificationsAll.filter(j => !imageJustifications.includes(j));
+
         const abandonedJustifications = justifications.filter(j => j.status === 'abandoned');
 
         // Populate Textual Evidence
@@ -238,6 +336,14 @@ document.addEventListener('DOMContentLoaded', function() {
             textJustifications.forEach(j => textList.appendChild(createJustificationElement(j)));
         } else {
             textAccordion.style.display = 'none';
+        }
+
+        // Populate Image Evidence
+        if (imageJustifications.length > 0) {
+            imageAccordion.style.display = 'block';
+            imageJustifications.forEach(j => imageList.appendChild(createJustificationElement(j)));
+        } else {
+            imageAccordion.style.display = 'none';
         }
 
         // Populate Other Evidence
@@ -275,13 +381,20 @@ document.addEventListener('DOMContentLoaded', function() {
         let contentHtml = '';
         if (j.evidence_type === 'element' && j.element_details) {
             const tagName = j.element_details.tagName || 'Element';
-            contentHtml = `<p class="mb-1"><strong>Evidence:</strong> [${tagName.toUpperCase()}]</p>`;
+            if (tagName.toUpperCase() === 'IMG' && j.evidence_image_url) {
+                contentHtml = `<p class="mb-1"><strong>Evidence:</strong></p><img src="${j.evidence_image_url}" class="evidence-image" alt="Evidence Image">`;
+            } else {
+                contentHtml = `<p class="mb-1"><strong>Evidence:</strong> [${tagName.toUpperCase()}]</p>`;
+            }
         } else {
             contentHtml = `<blockquote class="blockquote bg-light p-2 rounded" style="font-size: 0.9rem;">${j.text || ''}</blockquote>`;
         }
 
         let relevanceHtml = '';
-        if (j.status !== 'abandoned' && j.evidence_type === 'text_selection') {
+        const isTextEvidence = j.evidence_type === 'text_selection';
+        const isImageEvidence = j.evidence_type === 'element' && j.element_details && j.element_details.tagName && j.element_details.tagName.toUpperCase() === 'IMG';
+
+        if (j.status !== 'abandoned' && (isTextEvidence || isImageEvidence)) {
             relevanceHtml = `
                 <div class="relevance-annotation d-flex align-items-center">
                     <div>
@@ -321,9 +434,11 @@ document.addEventListener('DOMContentLoaded', function() {
             </div>
         `;
 
+        const displayUrl = j.url.length > 100 ? j.url.substring(0, 97) + '...' : j.url;
+
         justificationEl.innerHTML = `
             <p class="mb-1"><strong>Title:</strong> ${j.page_title || 'No title found'}</p>
-            <p class="mb-1"><strong>URL:</strong> <a href="${j.url}" target="_blank">${j.url}</a></p>
+            <p class="mb-1"><strong>URL:</strong> <a href="${j.url}" target="_blank" title="${j.url}" class="justification-url">${displayUrl}</a></p>
             ${contentHtml}
             <div class="d-flex justify-content-between align-items-center mt-3">
                 ${relevanceHtml}
@@ -367,6 +482,22 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Initial fetch
     fetchJustifications();
+
+    // Refresh button
+    document.getElementById('refresh-justifications').addEventListener('click', fetchJustifications);
+
+    // Periodic check for justifications
+    const justificationCheckInterval = setInterval(fetchJustifications, 5000);
+
+    // Stop periodic check when the page is about to be unloaded
+    window.addEventListener('beforeunload', function() {
+        clearInterval(justificationCheckInterval);
+    });
+
+    // Also clear interval on form submission
+    document.getElementById('query-form').addEventListener('submit', function() {
+        clearInterval(justificationCheckInterval);
+    });
 
     // Reasoning Method Other
     document.querySelectorAll('input[name="answer_formulation_method"]').forEach(radio => {
@@ -422,9 +553,9 @@ document.addEventListener('DOMContentLoaded', function() {
             isValid = false;
         }
 
-        // Validation for textual evidence relevance
-        const textJustifications = document.querySelectorAll('#text-justification-list .justification-item');
-        textJustifications.forEach(item => {
+        // Validation for textual and image evidence relevance/credibility
+        const annotatableJustifications = document.querySelectorAll('#text-justification-list .justification-item, #image-justification-list .justification-item');
+        annotatableJustifications.forEach(item => {
             const justificationId = item.dataset.id;
             const relevanceSelection = item.querySelector(`input[name="relevance_${justificationId}"]:checked`);
             if (!relevanceSelection) {
@@ -499,28 +630,15 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Listen for messages from the background script
-    chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-        if (message.command === "add_justification") {
-            const container = document.getElementById('source-container');
-            const firstEntry = container.querySelector('.source-entry');
-            const firstUrlInput = firstEntry.querySelector('input[type="url"]');
-            const firstTextInput = firstEntry.querySelector('textarea');
+    // Listen for messages from the content script
+    window.addEventListener('message', function(event) {
+        // We only accept messages from ourselves
+        if (event.source != window) {
+            return;
+        }
 
-            // If the first justification is empty, use it
-            if (firstUrlInput.value.trim() === '' && firstTextInput.value.trim() === '') {
-                firstUrlInput.value = message.url;
-                firstTextInput.value = message.text;
-            } else {
-                // Otherwise, add a new one
-                document.getElementById('add-source').click();
-                const newEntry = container.querySelector('.source-entry:last-child');
-                newEntry.querySelector('input[type="url"]').value = message.url;
-                newEntry.querySelector('textarea').value = message.text;
-            }
-            
-            // Bring the window to the front
-            window.focus();
+        if (event.data.type && (event.data.type === "refresh_justifications")) {
+            fetchJustifications();
         }
     });
 });

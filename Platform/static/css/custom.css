@@ -90,7 +90,7 @@ a, a:hover, a:focus {
     background: #fff;
 }
 
-#sidebar ul li.active > a, a[aria-expanded="true"] {
+#sidebar ul li.active > a, a[aria-expanded]="true"] {
     color: #fff;
     background: transparent;
 }
@@ -337,4 +337,49 @@ h2.text-success {
 
 .list-group.is-invalid + .invalid-feedback {
     display: block;
+}
+
+.bg-custom-dark-blue {
+    background-color: #021e4d;
+    color: #fff;
+}
+
+.bg-custom-dark-blue h3, .bg-custom-dark-blue h2 {
+    color: #fff;
+}
+
+.btn-custom-dark-blue {
+    background-color: #021e4d;
+    border-color: #021e4d;
+    color: #fff;
+}
+
+.btn-custom-dark-blue:hover {
+    background-color: #01122e;
+    border-color: #01122e;
+    color: #fff;
+}
+
+.btn-custom-dark-blue:disabled {
+    background-color: #8ea4c1;
+    border-color: #8ea4c1;
+    color: #fff;
+}
+
+.btn-outline-custom-dark-blue {
+    color: #021e4d;
+    border-color: #021e4d;
+}
+
+.btn-check:not(:checked) + .btn-outline-custom-dark-blue:hover {
+    color: #021e4d;
+    border-color: #021e4d;
+    background-color: transparent;
+}
+
+.btn-check:checked + .btn-outline-custom-dark-blue,
+.btn-check:checked + .btn-outline-custom-dark-blue:hover {
+    color: #fff;
+    background-color: #021e4d;
+    border-color: #021e4d;
 }

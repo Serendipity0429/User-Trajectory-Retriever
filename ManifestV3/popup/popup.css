@@ -79,7 +79,7 @@ h1 {
     font-size: 16px;
     padding-right: 35px; /* Space for the icon */
     padding-left: 8px;
-    letter-spacing: 3px;
+    letter-spacing: 1px;
     flex: 1;
 }
 

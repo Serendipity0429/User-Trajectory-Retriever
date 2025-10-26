@@ -23,6 +23,7 @@ const MSG_INJECT_SCRIPT = 'inject_script';
 const MSG_SEND_MESSAGE = 'send_message';
 const MSG_GET_ACTIVE_TASK = 'get_active_task';
 const MSG_GET_TASK_INFO = 'get_task_info';
+const MSG_GET_JUSTIFICATIONS = 'get_justifications';
 
 
 // --- State Management ---
@@ -62,6 +63,16 @@ async function getTaskInfo(task_id) {
     }
 }
 
+async function hasPendingAnnotation() {
+    try {
+        const pending_response = await _get(config.urls.check_pending_annotations);
+        return pending_response && pending_response.pending;
+    } catch (error) {
+        console.error("Error checking pending annotations:", error);
+        return false;
+    }
+}
+
 async function checkActiveTaskID() {
     printDebug("background", "Checking active task ID...");
     const { logged_in } = await _get_local('logged_in');
@@ -91,7 +102,9 @@ async function checkActiveTaskID() {
 
         if (is_task_started || is_task_finished) {
             printDebug("background", `Task state changed. Old: ${old_task_id}, New: ${new_task_id}`);
-            closeAllIrrelevantTabs();
+            if (!await hasPendingAnnotation()) {
+                closeAllIrrelevantTabs();
+            }
         }
         await setCurrentTask(new_task_id);
         return new_task_id;
@@ -113,6 +126,7 @@ async function checkActiveTaskID() {
 }
 
 function closeAllIrrelevantTabs() {
+    
     printDebug("background", "Closing all irrelevant tabs...");
     chrome.tabs.query({}, (tabs) => {
         printDebug("background", "All open tabs:", tabs);
@@ -205,9 +219,14 @@ function createContextMenu() {
         contexts: ["selection"]
     });
     chrome.contextMenus.create({
-        id: "add-as-evidence-element",
-        title: "Add as Evidence (Others)",
-        contexts: ["image", "video", "audio"]
+        id: "add-as-evidence-image",
+        title: "Add as Evidence (Image)",
+        contexts: ["image"]
+    });
+    chrome.contextMenus.create({
+        id: "add-as-evidence-other",
+        title: "Add as Evidence (Other)",
+        contexts: ["video", "audio", "page"]
     });
 }
 
@@ -256,6 +275,10 @@ function getSelectionDetails() {
 }
 
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
+    if (_is_server_page(tab.url) || _is_extension_page(tab.url)) {
+        return;
+    }
+
     const task_id = await getCurrentTask();
     if (task_id === -1) {
         chrome.notifications.create({
@@ -289,8 +312,11 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
                         evidence_type: 'text_selection'
                     }, true, false, true); // send_as_json = true
 
+                    const justificationsResponse = await _get(`${config.urls.get_justifications}/${task_id}/`);
+                    const newCount = justificationsResponse?.justifications?.length ?? 0;
+
                     // Notify the content script to show a confirmation
-                    chrome.tabs.sendMessage(tab.id, { command: "evidence-added-successfully" });
+                    chrome.tabs.sendMessage(tab.id, { command: "evidence-added-successfully", newCount: newCount });
 
                     chrome.tabs.query({ url: `${config.urls.base}/task/submit_answer/*` }, (tabs) => {
                         if (tabs.length > 0) {
@@ -302,7 +328,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
                 }
             }
         });
-    } else if (info.menuItemId === "add-as-evidence-element") {
+    } else if (["add-as-evidence-image", "add-as-evidence-other"].includes(info.menuItemId)) {
         chrome.tabs.sendMessage(tab.id, { command: 'get-element-details' }, { frameId: info.frameId }, async (details) => {
             if (chrome.runtime.lastError) {
                 console.error("Error sending message:", chrome.runtime.lastError.message);
@@ -323,8 +349,11 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
                         }
                     }, true, false, true); // send_as_json = true
 
+                    const justificationsResponse = await _get(`${config.urls.get_justifications}/${task_id}/`);
+                    const newCount = justificationsResponse?.justifications?.length ?? 0;
+
                     // Notify the content script to show a confirmation
-                    chrome.tabs.sendMessage(tab.id, { command: "evidence-added-successfully" });
+                    chrome.tabs.sendMessage(tab.id, { command: "evidence-added-successfully", newCount: newCount });
 
                     chrome.tabs.query({ url: `${config.urls.base}/task/submit_answer/*` }, (tabs) => {
                         if (tabs.length > 0) {
@@ -362,16 +391,20 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     try {
                         const pending_response = await _get(config.urls.check_pending_annotations);
                         if (pending_response && pending_response.pending) {
+                            await _set_local({ is_recording_paused: true });
                             response = { log_status: true, pending_url: pending_response.url };
                         } else {
+                            await _set_local({ is_recording_paused: false });
                             response = { log_status: true, pending_url: "" };
                         }
                     } catch (error) {
                         console.error("Error checking pending annotations:", error);
+                        await _set_local({ is_recording_paused: false });
                         response = { log_status: true, pending_url: "" };
                     }
                 } else {
                     chrome.action.setBadgeText({ text: '' });
+                    await _set_local({ is_recording_paused: false });
                     response = { log_status: false, pending_url: "" };
                 }
                 sendResponse(response);
@@ -445,6 +478,21 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     }
                 }
                 sendResponse(task_info);
+                break;
+            
+            case MSG_GET_JUSTIFICATIONS:
+                const task_id_justifications = message.task_id;
+                if (task_id_justifications !== -1) {
+                    try {
+                        const response = await _get(`${config.urls.get_justifications}/${task_id_justifications}/`);
+                        sendResponse(response);
+                    } catch (error) {
+                        console.error("Error getting justifications:", error);
+                        sendResponse(null);
+                    }
+                } else {
+                    sendResponse(null);
+                }
                 break;
         }
     })();

@@ -189,6 +189,16 @@ async function getTaskInfo(task_id) {
     }
 }
 
+async function getJustifications(task_id) {
+    try {
+        const response = await sendMessageFromPopup({ command: "get_justifications", task_id: task_id });
+        return response;
+    } catch (error) {
+        console.error("Failed to get justifications from background script:", error);
+        return null;
+    }
+}
+
 async function openTaskWindow(path, is_new_window = false) {
     const { access_token } = await _get_local(['access_token']);
     if (!access_token) {
@@ -298,15 +308,20 @@ async function handleEndTask() {
     } else if (current_task_id === -1) {
         showAlert("There is no active task to submit.");
     } else {
-        const is_confirmed = await showConfirm("Do you want to submit the answer?");
-        if (is_confirmed) {
-            const tabs = await new Promise(resolve => chrome.tabs.query({ active: true, currentWindow: true }, resolve));
-            if (tabs[0]) {
-                chrome.tabs.sendMessage(tabs[0].id, { type: "msg_from_popup", update_webpage_info: true }, () => {
-                    const timestamp = Date.now();
-                    openTaskWindow(`/task/submit_answer/${current_task_id}/${timestamp}/`);
-                });
+        const justifications = await getJustifications(current_task_id);
+        if (justifications && justifications.justifications.length > 0) {
+            const is_confirmed = await showConfirm("Do you want to submit the answer?");
+            if (is_confirmed) {
+                const tabs = await new Promise(resolve => chrome.tabs.query({ active: true, currentWindow: true }, resolve));
+                if (tabs[0]) {
+                    chrome.tabs.sendMessage(tabs[0].id, { type: "msg_from_popup", update_webpage_info: true }, () => {
+                        const timestamp = Date.now();
+                        openTaskWindow(`/task/submit_answer/${current_task_id}/${timestamp}/`);
+                    });
+                }
             }
+        } else {
+            showAlert("You must collect at least one piece of evidence before submitting your answer.");
         }
     }
     document.getElementById('submitAnswerBtn').disabled = false;
@@ -347,12 +362,14 @@ async function handleCancelTask() {
         const pendingBtn = document.getElementById('pendingAnnotationBtn');
         const submitBtn = document.getElementById('submitAnswerBtn');
         const cancelBtn = document.getElementById('cancelAnnotationBtn');
+        const startTaskBtn = document.getElementById('startTaskBtn');
 
         if (response.pending_url) {
             showAlert("You have a pending annotation.", "Pending Annotation");
             pendingBtn.style.display = 'block';
             submitBtn.style.display = 'none';
             cancelBtn.style.display = 'none';
+            startTaskBtn.style.display = 'none';
         } else {
             pendingBtn.style.display = 'none';
         }

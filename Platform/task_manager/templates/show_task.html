@@ -196,22 +196,24 @@
                                     <p><span class="annotation-key">Evidence Count:</span> <span id="evidence-count-{{ trial.num_trial }}">{{ trial.justifications.all|length }}</span></p>
                                     <p><span class="annotation-key">Confidence:</span> {{ CONFIDENCE_MAP|get_item:trial.confidence }}</p>
                                     <p><span class="annotation-key">Justification:</span></p>
-                                    <ul class="list-unstyled">
-                                        {% for justification in trial.justifications.all %}
-                                        <li class="mb-2">
-                                            <p class="mb-1"><span class="annotation-key">URL:</span> <a href="{{ justification.url }}" target="_blank">{{ justification.url }}</a></p>
-                                            <p class="mb-1"><span class="annotation-key">Confidence:</span> 
-                                                {% if justification.confidence == 3 %} High
-                                                {% elif justification.confidence == 2 %} Medium
-                                                {% elif justification.confidence == 1 %} Low
-                                                {% endif %}
-                                            </p>
-                                            <blockquote class="blockquote bg-light p-2 rounded" style="font-size: 0.9rem;">
-                                                {{ justification.text }}
-                                            </blockquote>
-                                        </li>
-                                        {% endfor %}
-                                    </ul>
+                                    <div class="ps-4">
+                                        <ul class="list-unstyled">
+                                            {% for justification in trial.justifications.all %}
+                                            <li class="mb-2">
+                                                <p class="mb-1"><span class="annotation-key">URL:</span> <a href="{{ justification.url }}" target="_blank">{{ justification.url }}</a></p>
+                                                <p class="mb-1"><span class="annotation-key">Confidence:</span> 
+                                                    {% if justification.confidence == 3 %} High
+                                                    {% elif justification.confidence == 2 %} Medium
+                                                    {% elif justification.confidence == 1 %} Low
+                                                    {% endif %}
+                                                </p>
+                                                <blockquote class="blockquote bg-light p-2 rounded" style="font-size: 0.9rem;">
+                                                    {{ justification.text }}
+                                                </blockquote>
+                                            </li>
+                                            {% endfor %}
+                                        </ul>
+                                    </div>
                                     <p><span class="annotation-key">Answer Formulation Method:</span> {{ ANSWER_FORMULATION_MAP|get_item:trial.answer_formulation_method|safe }}</p>
 
                                     {% if not trial.is_correct and trial.reflection_annotation %}

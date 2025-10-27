@@ -215,7 +215,7 @@ class ViewState {
         this.is_sent = true;
     }
 
-        flush() {
+    flush() {
         if (this.is_sent) {
             return;
         }

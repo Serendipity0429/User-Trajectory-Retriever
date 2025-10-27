@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-__author__ = 'defaultstr'
+__author__ = 'steven'
 
 from rest_framework.response import Response
 from django.http import HttpResponse
@@ -70,6 +70,12 @@ def start_annotating(name):
 def stop_annotating():
     annotation_state.stop_annotating()
     
+def start_storing_data():
+    annotation_state.is_storing_data = True
+    
+def stop_storing_data():
+    annotation_state.is_storing_data = False
+    
     
 def store_data(message, user):
     annotation_state.is_storing_data = True
@@ -115,7 +121,8 @@ def store_data(message, user):
     task.end_timestamp = timezone.make_aware(datetime.fromtimestamp(message['end_timestamp'] / 1000))
     
     webpage.save()
-    annotation_state.is_storing_data = False
+    task.save()
+    stop_storing_data()
     
 def check_is_redirected_page(message):
     # A page is considered a redirect if the dwell time is very short (< 1000ms) or if there's no user interaction.
@@ -124,10 +131,10 @@ def check_is_redirected_page(message):
 def wait_until_data_stored(func):
     def wrapper(*args, **kwargs):
         # Sleep for a short duration to ensure the backend receives the data
-        time.sleep(0.1)
+        time.sleep(0.3)
         while annotation_state.is_storing_data:
             print_debug("Waiting for data to be stored...")
-            time.sleep(0.1)
+            time.sleep(0.3)
         return func(*args, **kwargs)
     return wrapper
     

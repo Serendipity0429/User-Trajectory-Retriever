@@ -265,6 +265,9 @@ async function initialize() {
                     unitPage.addRRWebEvent(event);
                 },
                 recordCrossOriginIframes: true, // NOTICE: enable cross-origin iframe recording, which is under experimental stage
+                recordCanvas: true, // NOTICE: enable canvas recording, which is under experimental stage
+                inlineImages: true, // NOTICE: enable image inlining to capture images as base64
+                collectFonts: true, // NOTICE: enable font collection to capture custom fonts
             });
             printDebug("content", "rrweb recording started.");
         }

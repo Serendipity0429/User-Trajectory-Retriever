@@ -144,17 +144,16 @@ DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 
 
 # CSRF and CORS
-# SECURITY WARNING: Allowing all origins is a security risk.
-# In production, you should restrict this to specific domains.
-CORS_ORIGIN_ALLOW_ALL = True
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:8080",
     "http://127.0.0.1:8000",
+    "http://101.6.41.59:32904",
 ]
 CSRF_TRUSTED_ORIGINS = [
     "http://localhost:8080",
     "http://127.0.0.1:8000",
+    "http://101.6.41.59:32904",
 ]
 CSRF_TRUSTED_ORIGINS_REGEXES = [
     r"^chrome-extension://.*$",

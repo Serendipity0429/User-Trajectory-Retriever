@@ -2,7 +2,8 @@
 
 // --- Configuration ---
 const IS_DEV = !('update_url' in chrome.runtime.getManifest());
-const URL_BASE = IS_DEV ? "http://127.0.0.1:8000" : "http://101.6.41.59:32904";
+const IS_REMOTE = true;
+const URL_BASE = !IS_REMOTE ? "http://127.0.0.1:8000" : "http://101.6.41.59:32904";
 const IS_PASSIVE_MODE = true;
 const CANCEL_TRIAL_THRESHOLD = 10; // number of trials before the user is allowed to cancel annotation
 
@@ -27,6 +28,7 @@ const URLS = {
 
 const config = {
     is_dev: IS_DEV,
+    is_remote: IS_REMOTE,
     is_passive_mode: IS_PASSIVE_MODE,
     urls: URLS,
     version: chrome.runtime.getManifest().version,

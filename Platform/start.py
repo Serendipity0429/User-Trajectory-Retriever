@@ -3,6 +3,7 @@ work_dir = os.path.dirname(os.path.abspath(__file__))
 
 
 DEBUG = True
+REMOTE = True
 
 if DEBUG:
     # Linux
@@ -35,5 +36,8 @@ if DEBUG:
     # Create a superuser for testing
     os.system(f"python \"{work_dir}/manage.py\" create_test_superuser admin thuirthuir --primary")
     
-# Start Server
-os.system(f"python \"{work_dir}/manage.py\" runserver")
+if REMOTE:
+    os.system(f"python \"{work_dir}/manage.py\" runserver 0.0.0.0:2904")
+else:
+    # Start Server
+    os.system(f"python \"{work_dir}/manage.py\" runserver")

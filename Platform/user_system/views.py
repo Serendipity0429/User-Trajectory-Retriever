@@ -10,6 +10,7 @@ from django.utils.timezone import now
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.urls import reverse
 import logging
+import json
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth import login as auth_login, logout as auth_logout
 from django.contrib.auth.decorators import login_required, user_passes_test
@@ -235,7 +236,6 @@ def login(request):
 
 
 def signup(request):
-    error_message = None
     if request.method == 'POST':
         form = SignupForm(request.POST)
         if form.is_valid():
@@ -256,18 +256,29 @@ def signup(request):
             user.save()
             return HttpResponseRedirect(reverse('user_system:login'))
         else:
-            error_fields = ', '.join(form.errors.keys())
-            error_message = f"Required field(s) unfilled: {error_fields}"
+            # Store form data and errors in session, then redirect
+            request.session['signup_form_data'] = request.POST
+            request.session['signup_form_errors'] = form.errors.as_json()
+            return HttpResponseRedirect(reverse('user_system:signup'))
     else:
-        form = SignupForm()
+        # On GET, check for session data from a failed POST
+        form_data = request.session.pop('signup_form_data', None)
+        # Clear any lingering error session data, as it's not needed
+        request.session.pop('signup_form_errors', None)
+
+        if form_data:
+            # Recreate the form with the user's data.
+            # Validation errors will be regenerated when the template accesses them.
+            form = SignupForm(form_data)
+        else:
+            # This is a fresh GET, create an empty form
+            form = SignupForm()
 
     return render(
         request,
         'signup.html',
-        {'form': form,
-         'error_message': error_message,
-        }
-        )
+        {'form': form}
+    )
 
 
 def logout(request):

@@ -67,7 +67,7 @@ class UserCreationForm(AuthUserCreationForm):
 class SignupForm(forms.Form):
     username = forms.CharField(
         required=True,
-        min_length=6,
+        min_length=3,
         label=u'Username',
         widget=forms.TextInput(
             attrs={
@@ -84,7 +84,8 @@ class SignupForm(forms.Form):
             attrs={
                 'class': 'form-control login-field',
                 'placeholder': u'Password',
-            }
+            },
+            render_value=True
         )
     )
     password_retype = forms.CharField(
@@ -95,7 +96,8 @@ class SignupForm(forms.Form):
             attrs={
                 'class': 'form-control login-field',
                 'placeholder': u'Please input the password again',
-            }
+            },
+            render_value=True
         )
     )
     name = forms.CharField(
@@ -200,6 +202,12 @@ class SignupForm(forms.Form):
             }
         )
     )
+
+    def clean_username(self):
+        username = self.cleaned_data.get('username')
+        if User.objects.filter(username=username).exists():
+            raise forms.ValidationError("This username has already been taken. Please choose a different one.")
+        return username
 
     def clean(self):
         cleaned_data = super(SignupForm, self).clean()

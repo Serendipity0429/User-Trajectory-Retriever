@@ -3,7 +3,7 @@ work_dir = os.path.dirname(os.path.abspath(__file__))
 
 
 DEBUG = True
-REMOTE = True
+REMOTE = False
 
 if DEBUG:
     # Linux

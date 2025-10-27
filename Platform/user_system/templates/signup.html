@@ -10,6 +10,13 @@
                     <h3 class="fw-light my-2">Create a New Account</h3>
                 </div>
                 <div class="card-body p-5">
+                    {% if form.non_field_errors %}
+                        <div class="alert alert-danger">
+                            {% for error in form.non_field_errors %}
+                                <p>{{ error }}</p>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
                     <form id="signup_form" name="signup_form" action="" method="POST" novalidate>
                         {% csrf_token %}
 
@@ -17,28 +24,48 @@
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <div class="form-floating">
-                                    <input type="text" name="username" class="form-control" id="id_username" placeholder="Username">
+                                    <input type="text" name="username" class="form-control {% if form.username.errors %}is-invalid{% endif %}" id="id_username" placeholder="Username" value="{{ form.username.value|default_if_none:'' }}">
                                     <label for="id_username"><i class="bi bi-person-fill me-2"></i>Username</label>
+                                    {% if form.username.errors %}
+                                        <div class="invalid-feedback">
+                                            {{ form.username.errors.as_text }}
+                                        </div>
+                                    {% endif %}
                                 </div>
                             </div>
                             <div class="col-md-6 mb-3">
                                 <div class="form-floating">
-                                    <input type="text" name="name" class="form-control" id="id_name" placeholder="Name">
+                                    <input type="text" name="name" class="form-control {% if form.name.errors %}is-invalid{% endif %}" id="id_name" placeholder="Name" value="{{ form.name.value|default_if_none:'' }}">
                                     <label for="id_name"><i class="bi bi-person-circle me-2"></i>Name</label>
+                                    {% if form.name.errors %}
+                                        <div class="invalid-feedback">
+                                            {{ form.name.errors.as_text }}
+                                        </div>
+                                    {% endif %}
                                 </div>
                             </div>
                             <div class="col-md-6 mb-3">
                                 <div class="form-floating position-relative">
-                                    <input type="password" name="password" class="form-control" id="id_password" placeholder="Password">
+                                    <input type="password" name="password" class="form-control {% if form.password.errors %}is-invalid{% endif %}" id="id_password" placeholder="Password" value="{{ form.password.value|default_if_none:'' }}">
                                     <label for="id_password"><i class="bi bi-key-fill me-2"></i>Password</label>
                                     <i class="bi bi-eye-slash position-absolute top-50 end-0 translate-middle-y me-3" id="togglePassword" style="cursor: pointer;"></i>
+                                    {% if form.password.errors %}
+                                        <div class="invalid-feedback">
+                                            {{ form.password.errors.as_text }}
+                                        </div>
+                                    {% endif %}
                                 </div>
                             </div>
                             <div class="col-md-6 mb-3">
                                 <div class="form-floating position-relative">
-                                    <input type="password" name="password_retype" class="form-control" id="id_password_retype" placeholder="Retype Password">
+                                    <input type="password" name="password_retype" class="form-control {% if form.password_retype.errors %}is-invalid{% endif %}" id="id_password_retype" placeholder="Retype Password" value="{{ form.password_retype.value|default_if_none:'' }}">
                                     <label for="id_password_retype"><i class="bi bi-key me-2"></i>Retype Password</label>
                                     <i class="bi bi-eye-slash position-absolute top-50 end-0 translate-middle-y me-3" id="togglePasswordRetype" style="cursor: pointer;"></i>
+                                    {% if form.password_retype.errors %}
+                                        <div class="invalid-feedback">
+                                            {{ form.password_retype.errors.as_text }}
+                                        </div>
+                                    {% endif %}
                                 </div>
                             </div>
                         </div>
@@ -56,58 +83,93 @@
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <div class="form-floating">
-                                    <input type="email" name="email" class="form-control" id="id_email" placeholder="Email">
+                                    <input type="email" name="email" class="form-control {% if form.email.errors %}is-invalid{% endif %}" id="id_email" placeholder="Email" value="{{ form.email.value|default_if_none:'' }}">
                                     <label for="id_email"><i class="bi bi-envelope-fill me-2"></i>Email</label>
+                                    {% if form.email.errors %}
+                                        <div class="invalid-feedback">
+                                            {{ form.email.errors.as_text }}
+                                        </div>
+                                    {% endif %}
                                 </div>
                             </div>
                             <div class="col-md-6 mb-3">
                                 <div class="form-floating">
-                                    <input type="text" name="phone" class="form-control" id="id_phone" placeholder="Phone">
+                                    <input type="text" name="phone" class="form-control {% if form.phone.errors %}is-invalid{% endif %}" id="id_phone" placeholder="Phone" value="{{ form.phone.value|default_if_none:'' }}">
                                     <label for="id_phone"><i class="bi bi-telephone-fill me-2"></i>Phone</label>
+                                    {% if form.phone.errors %}
+                                        <div class="invalid-feedback">
+                                            {{ form.phone.errors.as_text }}
+                                        </div>
+                                    {% endif %}
                                 </div>
                             </div>
                             <div class="col-md-4 mb-3">
                                 <div class="form-floating">
-                                    <select name="gender" class="form-select" id="id_gender">
+                                    <select name="gender" class="form-select {% if form.gender.errors %}is-invalid{% endif %}" id="id_gender">
                                         {% for value, text in form.fields.gender.choices %}
-                                            <option value="{{ value }}">{{ text }}</option>
+                                            <option value="{{ value }}" {% if form.gender.value == value %}selected{% endif %}>{{ text }}</option>
                                         {% endfor %}
                                     </select>
                                     <label for="id_gender"><i class="bi bi-gender-ambiguous me-2"></i>Gender</label>
+                                    {% if form.gender.errors %}
+                                        <div class="invalid-feedback">
+                                            {{ form.gender.errors.as_text }}
+                                        </div>
+                                    {% endif %}
                                 </div>
                             </div>
                             <div class="col-md-4 mb-3">
                                 <div class="form-floating">
-                                    <input type="number" name="age" class="form-control" id="id_age">
+                                    <input type="number" name="age" class="form-control {% if form.age.errors %}is-invalid{% endif %}" id="id_age" value="{{ form.age.value|default_if_none:'' }}">
                                     <label for="id_age"><i class="bi bi-calendar-event-fill me-2"></i>Age</label>
+                                    {% if form.age.errors %}
+                                        <div class="invalid-feedback">
+                                            {{ form.age.errors.as_text }}
+                                        </div>
+                                    {% endif %}
                                 </div>
                             </div>
                             <div class="col-md-4 mb-3">
                                 <div class="form-floating">
-                                    <select name="occupation" class="form-select" id="id_occupation">
+                                    <select name="occupation" class="form-select {% if form.occupation.errors %}is-invalid{% endif %}" id="id_occupation">
                                         {% for value, text in form.fields.occupation.choices %}
-                                            <option value="{{ value }}">{{ text }}</option>
+                                            <option value="{{ value }}" {% if form.occupation.value == value %}selected{% endif %}>{{ text }}</option>
                                         {% endfor %}
                                     </select>
                                     <label for="id_occupation"><i class="bi bi-briefcase-fill me-2"></i>Occupation</label>
+                                    {% if form.occupation.errors %}
+                                        <div class="invalid-feedback">
+                                            {{ form.occupation.errors.as_text }}
+                                        </div>
+                                    {% endif %}
                                 </div>
                             </div>
                         </div>
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <div class="form-floating">
-                                    <select name="education" class="form-select" id="id_education">
+                                    <select name="education" class="form-select {% if form.education.errors %}is-invalid{% endif %}" id="id_education">
                                         {% for value, text in form.fields.education.choices %}
-                                            <option value="{{ value }}">{{ text }}</option>
+                                            <option value="{{ value }}" {% if form.education.value == value %}selected{% endif %}>{{ text }}</option>
                                         {% endfor %}
                                     </select>
                                     <label for="id_education"><i class="bi bi-book-fill me-2"></i>Education Level</label>
+                                    {% if form.education.errors %}
+                                        <div class="invalid-feedback">
+                                            {{ form.education.errors.as_text }}
+                                        </div>
+                                    {% endif %}
                                 </div>
                             </div>
                             <div class="col-md-6 mb-3">
                                 <div class="form-floating">
-                                    <input type="text" name="field_of_expertise" class="form-control" id="id_field_of_expertise">
+                                    <input type="text" name="field_of_expertise" class="form-control {% if form.field_of_expertise.errors %}is-invalid{% endif %}" id="id_field_of_expertise" value="{{ form.field_of_expertise.value|default_if_none:'' }}">
                                     <label for="id_field_of_expertise"><i class="bi bi-lightbulb-fill me-2"></i>Field of Expertise</label>
+                                    {% if form.field_of_expertise.errors %}
+                                        <div class="invalid-feedback">
+                                            {{ form.field_of_expertise.errors.as_text }}
+                                        </div>
+                                    {% endif %}
                                 </div>
                             </div>
                         </div>
@@ -118,30 +180,33 @@
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <div class="form-floating">
-                                    <select name="llm_frequency" class="form-select" id="id_llm_frequency">
+                                    <select name="llm_frequency" class="form-select {% if form.llm_frequency.errors %}is-invalid{% endif %}" id="id_llm_frequency">
                                         {% for value, text in form.fields.llm_frequency.choices %}
-                                            <option value="{{ value }}">{{ text }}</option>
+                                            <option value="{{ value }}" {% if form.llm_frequency.value == value %}selected{% endif %}>{{ text }}</option>
                                         {% endfor %}
                                     </select>
                                     <label for="id_llm_frequency">How often do you use LLMs?</label>
+                                    {% if form.llm_frequency.errors %}
+                                        <div class="invalid-feedback">
+                                            {{ form.llm_frequency.errors.as_text }}
+                                        </div>
+                                    {% endif %}
                                 </div>
                             </div>
                             <div class="col-md-6 mb-3">
                                 <div class="form-floating">
-                                    <select name="llm_history" class="form-select" id="id_llm_history">
+                                    <select name="llm_history" class="form-select {% if form.llm_history.errors %}is-invalid{% endif %}" id="id_llm_history">
                                         {% for value, text in form.fields.llm_history.choices %}
-                                            <option value="{{ value }}">{{ text }}</option>
+                                            <option value="{{ value }}" {% if form.llm_history.value == value %}selected{% endif %}>{{ text }}</option>
                                         {% endfor %}
                                     </select>
                                     <label for="id_llm_history">How long have you been using LLMs?</label>
+                                    {% if form.llm_history.errors %}
+                                        <div class="invalid-feedback">
+                                            {{ form.llm_history.errors.as_text }}
+                                        </div>
+                                    {% endif %}
                                 </div>
-                            </div>
-                        </div>
-
-                        <div id="error-container" class="alert alert-danger d-flex align-items-center mt-4 {% if not error_message %}d-none{% endif %}" role="alert">
-                            <i class="bi bi-exclamation-triangle-fill me-2"></i>
-                            <div id="error-text">
-                                {% if error_message %}{{ error_message }}{% endif %}
                             </div>
                         </div>
 
@@ -159,62 +224,6 @@
 </div>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    const form = document.getElementById('signup_form');
-    const errorContainer = document.getElementById('error-container');
-    const errorText = document.getElementById('error-text');
-    const inputs = form.querySelectorAll('input:not([type="hidden"]), select');
-
-    // Function to update a single input's validity
-    const updateInputValidity = (input) => {
-        if (!input.value || input.value.trim() === '') {
-            input.classList.add('is-invalid');
-            return false;
-        } else {
-            input.classList.remove('is-invalid');
-            return true;
-        }
-    };
-
-    // Add event listeners to each input to validate on change
-    inputs.forEach(input => {
-        input.addEventListener('input', () => {
-            updateInputValidity(input);
-        });
-        // For select elements, 'change' event is more appropriate
-        if (input.tagName.toLowerCase() === 'select') {
-            input.addEventListener('change', () => {
-                updateInputValidity(input);
-            });
-        }
-    });
-
-    if (form) {
-        form.addEventListener('submit', function(event) {
-            let isFormValid = true;
-            
-            // Check all inputs on submit
-            inputs.forEach(input => {
-                if (!updateInputValidity(input)) {
-                    isFormValid = false;
-                }
-            });
-
-            if (!isFormValid) {
-                event.preventDefault();
-                if (errorText) {
-                    errorText.textContent = 'Please fill in all required fields.';
-                }
-                if (errorContainer) {
-                    errorContainer.classList.remove('d-none');
-                }
-            } else {
-                if (errorContainer) {
-                    errorContainer.classList.add('d-none');
-                }
-            }
-        });
-    }
-
     const togglePassword = document.querySelector('#togglePassword');
     const password = document.querySelector('#id_password');
 

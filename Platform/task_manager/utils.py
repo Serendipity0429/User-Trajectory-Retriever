@@ -186,7 +186,7 @@ def get_pending_annotation(user):
     try:
         # Check for pending post-task annotations
         pending_post_task = Task.objects.filter(
-            user=user, active=False, cancelled=False, posttaskannotation__isnull=True
+            user=user, active=False, cancelled=False, posttaskannotation__isnull=True, cancelannotation__isnull=True
         ).first()
         if pending_post_task:
             return reverse("task_manager:post_task_annotation", args=[pending_post_task.id])

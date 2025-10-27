@@ -501,17 +501,48 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('refresh-justifications').addEventListener('click', fetchJustifications);
 
     // Periodic check for justifications
-    const justificationCheckInterval = setInterval(fetchJustifications, 5000);
+    let justificationCheckInterval = null;
+
+    function startJustificationPolling() {
+        // Clear any existing interval
+        if (justificationCheckInterval) {
+            clearInterval(justificationCheckInterval);
+        }
+        // Start a new interval
+        justificationCheckInterval = setInterval(fetchJustifications, 10000); // Poll every 10 seconds
+    }
+
+    function stopJustificationPolling() {
+        if (justificationCheckInterval) {
+            clearInterval(justificationCheckInterval);
+            justificationCheckInterval = null;
+        }
+    }
+
+    // Start polling when the page is visible, stop when it's not
+    document.addEventListener('visibilitychange', function() {
+        if (document.visibilityState === 'visible') {
+            fetchJustifications(); // Fetch immediately on becoming visible
+            startJustificationPolling();
+        } else {
+            stopJustificationPolling();
+        }
+    });
 
     // Stop periodic check when the page is about to be unloaded
     window.addEventListener('beforeunload', function() {
-        clearInterval(justificationCheckInterval);
+        stopJustificationPolling();
     });
 
     // Also clear interval on form submission
     document.getElementById('query-form').addEventListener('submit', function() {
-        clearInterval(justificationCheckInterval);
+        stopJustificationPolling();
     });
+
+    // Initial start of polling if page is visible
+    if (document.visibilityState === 'visible') {
+        startJustificationPolling();
+    }
 
     // Reasoning Method Other
     document.querySelectorAll('input[name="answer_formulation_method"]').forEach(radio => {

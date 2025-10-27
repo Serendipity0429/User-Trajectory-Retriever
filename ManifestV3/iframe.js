@@ -7,6 +7,7 @@ async function initializeInIframe() {
             recordCrossOriginIframes: true,
             recordCanvas: true,
             // inlineImages: true,
+            
             collectFonts: true,
         });
         console.log("rrweb recording started in iframe.");

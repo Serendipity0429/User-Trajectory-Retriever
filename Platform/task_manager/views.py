@@ -249,13 +249,12 @@ def post_task_annotation(request, task_id):
             task.active = False
             task.save()
 
-        # filter relevant webpages
-        webpages = Webpage.objects.filter(
-            belong_task=task, is_redirected=False, during_annotation=False
-        )
-        # sort by start_timestamp
-        webpages = sorted(webpages, key=lambda item: item.start_timestamp)
-        # print_debug(webpages[0].event_list)
+        # Fetch trials and their relevant webpages
+        trials = TaskTrial.objects.filter(belong_task=task).order_by('num_trial')
+        for trial in trials:
+            trial.webpages = Webpage.objects.filter(
+                belong_task_trial=trial, is_redirected=False, during_annotation=False
+            ).order_by('start_timestamp')
 
         question = task.content.question
         answer = json.loads(task.content.answer)
@@ -272,7 +271,7 @@ def post_task_annotation(request, task_id):
             {
                 "cur_user": user,
                 "task_id": task.id,
-                "webpages": webpages,
+                "trials": trials,
                 "question": question,
                 "answer": answer,
                 "user_answer": user_answer,
@@ -571,6 +570,7 @@ def cancel_annotation(request, task_id, end_timestamp):
             return close_window()
 
         task.cancelled = True
+        task.active = False
         task.save()
         cancel_annotation = CancelAnnotation()
         cancel_annotation.belong_task = task
@@ -588,13 +588,42 @@ def cancel_annotation(request, task_id, end_timestamp):
 
     else:
         task.end_timestamp = timezone.make_aware(datetime.fromtimestamp(end_timestamp / 1000))
-        if task.active:
-            task.active = False
-            task.save()
+        # NOTICE: Give user change to reconsider cancellation
+        # So only after the form is submitted, the task is marked as cancelled  
 
         entry = task.content
         question = entry.question
         answer = json.loads(entry.answer)
+
+        # Fetch completed trials and their webpages
+        trials = list(TaskTrial.objects.filter(belong_task=task).order_by('num_trial'))
+        for trial in trials:
+            trial.webpages = Webpage.objects.filter(
+                belong_task_trial=trial, is_redirected=False, during_annotation=False
+            ).order_by('start_timestamp')
+
+        # Determine the start timestamp for the current trial
+        start_timestamp = task.start_timestamp
+        if trials:
+            last_trial = trials[-1]
+            start_timestamp = last_trial.end_timestamp
+
+        # Fetch webpages for the current (uncompleted) trial
+        current_webpages = Webpage.objects.filter(
+            belong_task=task, 
+            start_timestamp__gte=start_timestamp,
+            is_redirected=False, 
+            during_annotation=False
+        ).order_by('start_timestamp')
+
+        # Create a pseudo-trial object for the current trial to pass to the template
+        if current_webpages.exists():
+            from types import SimpleNamespace
+            current_trial = SimpleNamespace(
+                num_trial=task.num_trial + 1,
+                webpages=current_webpages
+            )
+            trials.append(current_trial)
 
         start_annotating("cancel_annotation")
         return render(
@@ -605,6 +634,7 @@ def cancel_annotation(request, task_id, end_timestamp):
                 "task_id": task_id,
                 "question": question,
                 "answer": answer,
+                "trials": trials,
                 "CANCEL_CATEGORY_MAP": CANCEL_CATEGORY_MAP,
                 "MISSING_RESOURCES_MAP": MISSING_RESOURCES_MAP,
                 "CANCEL_CATEGORY_EXPLANATION_MAP": CANCEL_CATEGORY_EXPLANATION_MAP,
@@ -713,6 +743,8 @@ def submit_answer(request, task_id, timestamp):
                     start_timestamp = last_task_trial.end_timestamp
 
             answer = request.POST.get("answer")
+            answer = answer if answer else ""
+            
             confidence = request.POST.get("confidence")
             answer_formulation_method = request.POST.get("answer_formulation_method")
 
@@ -723,7 +755,7 @@ def submit_answer(request, task_id, timestamp):
                 num_trial=current_trial_num,
             )
 
-            task_trial.answer = answer.strip().lower() if answer else ""
+            task_trial.answer = answer
             task_trial.start_timestamp = start_timestamp
             task_trial.end_timestamp = timezone.make_aware(datetime.fromtimestamp(timestamp / 1000))
             task_trial.confidence = confidence

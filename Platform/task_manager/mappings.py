@@ -196,9 +196,9 @@ CANCEL_CATEGORY_MAP = {
 }
 
 MISSING_RESOURCES_MAP = {
-    "expert_knowledge": "Deep, specialized domain knowledge.",
-    "paid_access": "Access to a paid subscription, database, or service.",
-    "better_tools": "A more powerful or specialized search tool (e.g., a scientific database, code interpreter).",
-    "team_help": "Help or collaboration from a team or community.",
-    "other": "Other:",
+    "expert_knowledge": "<strong>Specialized Knowledge:</strong> The task requires deep, specialized domain knowledge.",
+    "paid_access": "<strong>Paid Access:</strong> Access to a paid subscription, database, or service is needed.",
+    "better_tools": "<strong>Better Tools:</strong> A more powerful or specialized search tool is required.",
+    "team_help": "<strong>Collaboration:</strong> Help or collaboration from a team or community would be beneficial.",
+    "other": "<strong>Other:</strong>",
 }

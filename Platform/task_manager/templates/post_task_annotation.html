@@ -14,15 +14,16 @@
 
             <!-- Trajectories -->
             <div class="accordion mb-4" id="trajectoriesAccordion">
+                {% for trial in trials %}
                 <div class="accordion-item">
-                    <h2 class="accordion-header" id="headingOne">
-                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseTrajectories" aria-expanded="false" aria-controls="collapseTrajectories">
-                            <i class="bi bi-signpost-split-fill me-2"></i> <strong>View Trajectories</strong>&nbsp;(Click to expand)
+                    <h2 class="accordion-header" id="headingTrial{{ trial.num_trial }}">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseTrial{{ trial.num_trial }}" aria-expanded="false" aria-controls="collapseTrial{{ trial.num_trial }}">
+                            <i class="bi bi-signpost-split-fill me-2"></i> <strong>View Trajectories for Trial {{ trial.num_trial }}</strong>&nbsp;(Click to expand)
                         </button>
                     </h2>
-                    <div id="collapseTrajectories" class="accordion-collapse collapse" aria-labelledby="headingOne" data-bs-parent="#trajectoriesAccordion">
+                    <div id="collapseTrial{{ trial.num_trial }}" class="accordion-collapse collapse" aria-labelledby="headingTrial{{ trial.num_trial }}" data-bs-parent="#trajectoriesAccordion">
                         <div class="accordion-body">
-                            {% for webpage in webpages %}
+                            {% for webpage in trial.webpages %}
                             <div class="d-flex flex-column align-items-center mb-5 p-4 border rounded shadow-sm bg-light">
                                 <p class="h5"><a href="{{ webpage.url }}" target="_blank">{{ webpage.title }}</a></p>
                                 <div class="rrweb-player-wrapper" id="rrweb-player-{{ webpage.id }}" style="margin-top: 20px;"></div>
@@ -54,14 +55,13 @@
                                 </script>
                             </div>
                             {% endfor %}
-                            <div class="text-center mt-3">
-                                <button class="btn btn-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#collapseTrajectories" aria-expanded="false" aria-controls="collapseTrajectories">
-                                    Fold
-                                </button>
-                            </div>
+                            {% if not trial.webpages %}
+                            <p>No trajectories recorded for this trial.</p>
+                            {% endif %}
                         </div>
                     </div>
                 </div>
+                {% endfor %}
             </div>
 
             <!-- Annotation Form -->

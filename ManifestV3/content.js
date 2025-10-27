@@ -266,7 +266,7 @@ async function initialize() {
                 },
                 recordCrossOriginIframes: true, // NOTICE: enable cross-origin iframe recording, which is under experimental stage
                 recordCanvas: true, // NOTICE: enable canvas recording, which is under experimental stage
-                inlineImages: true, // NOTICE: enable image inlining to capture images as base64
+                // inlineImages: true, // NOTICE: enable image inlining to capture images as base64
                 collectFonts: true, // NOTICE: enable font collection to capture custom fonts
             });
             printDebug("content", "rrweb recording started.");
@@ -288,6 +288,13 @@ window.addEventListener('popstate', () => {
         viewState.flush();
         setupTaskUI();
         printDebug("content", "URL changed (popstate), re-initializing UI.");
+    }
+});
+
+window.addEventListener('message', (event) => {
+    // Check if the message is from an iframe and is an rrweb event
+    if (event.source !== window && event.data && event.data.type) {
+        unitPage.addRRWebEvent(event.data);
     }
 });
 

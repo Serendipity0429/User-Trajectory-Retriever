@@ -134,7 +134,7 @@ def wait_until_data_stored(func):
         time.sleep(0.3)
         while annotation_state.is_storing_data:
             print_debug("Waiting for data to be stored...")
-            time.sleep(0.3)
+            time.sleep(0.5)
         return func(*args, **kwargs)
     return wrapper
     

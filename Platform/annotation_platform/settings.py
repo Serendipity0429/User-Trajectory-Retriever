@@ -149,11 +149,13 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:8080",
     "http://127.0.0.1:8000",
     "http://101.6.41.59:32904",
+    "https://101.6.41.59:32904",
 ]
 CSRF_TRUSTED_ORIGINS = [
     "http://localhost:8080",
     "http://127.0.0.1:8000",
     "http://101.6.41.59:32904",
+    "https://101.6.41.59:32904",
 ]
 CSRF_TRUSTED_ORIGINS_REGEXES = [
     r"^chrome-extension://.*$",
@@ -182,10 +184,10 @@ REST_FRAMEWORK = {
     )
 }
 
-SESSION_COOKIE_SAMESITE = 'None'
-SESSION_COOKIE_SECURE = True
-CSRF_COOKIE_SAMESITE = 'None'
-CSRF_COOKIE_SECURE = True
+# SESSION_COOKIE_SAMESITE = 'None'  # Samesite='None' requires Secure=True
+SESSION_COOKIE_SECURE = False  # Set to False because the server uses HTTP
+# CSRF_COOKIE_SAMESITE = 'None'  # Samesite='None' requires Secure=True
+CSRF_COOKIE_SECURE = False  # Set to False because the server uses HTTP
 
 LOGGING = {
     'version': 1,

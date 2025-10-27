@@ -92,8 +92,8 @@ function switchUiState(show_login) {
     showFailMessage(0);
 }
 
-async function displayActiveTask() {
-    active_task_id = await getActiveTask();
+async function displayActiveTask(task_id, task_info) {
+    active_task_id = task_id;
     printDebug("popup", "Active task ID:", active_task_id);
     const activeTaskEl = document.getElementById('active_task');
     const startTaskBtn = document.getElementById('startTaskBtn');
@@ -111,7 +111,6 @@ async function displayActiveTask() {
         activeTaskEl.style.color = "#e13636";
         taskTrialEl.textContent = "0";
     } else {
-        const task_info = await getTaskInfo(active_task_id);
         if (task_info) {
             taskTrialEl.textContent = task_info.trial_num;
             switchTaskButtonStatus('on', task_info.trial_num);
@@ -124,12 +123,12 @@ async function displayActiveTask() {
     }
 }
 
-async function showUserTab() {
+async function showUserTab(task_id, task_info) {
     const { username } = await _get_local(['username']);
     document.getElementById('username_text_logged').textContent = "User: " + username;
     document.getElementById('submitAnswerBtn').style.display = 'none';
     printDebug("popup", "Switched to user tab for user:", username);    
-    await displayActiveTask();
+    await displayActiveTask(task_id, task_info);
     switchUiState(false);
 }
 
@@ -237,7 +236,8 @@ async function handleLoginAttempt() {
                 'logged_in': true
             });
             await sendMessageFromPopup({ command: "alter_logging_status", log_status: true });
-            await showUserTab();
+            const response = await sendMessageFromPopup({ command: "get_popup_data" });
+            await showUserTab(response.task_id, response.task_info);
             chrome.action.setBadgeText({ text: 'off' });
             chrome.action.setBadgeBackgroundColor({ color: [202, 181, 225, 255] });
         } else {
@@ -349,16 +349,16 @@ async function handleCancelTask() {
     document.getElementById('submitAnswerBtn').addEventListener('click', handleEndTask);
     document.getElementById('cancelAnnotationBtn').addEventListener('click', handleCancelTask);
     document.getElementById('pendingAnnotationBtn').addEventListener('click', () => {
-        sendMessageFromPopup({ command: "check_logging_status" }).then(response => {
+        sendMessageFromPopup({ command: "get_popup_data" }).then(response => {
             if (response.pending_url) {
                 openTaskWindow(response.pending_url);
             }
         });
     });
 
-    const response = await sendMessageFromPopup({ command: "check_logging_status" });
+    const response = await sendMessageFromPopup({ command: "get_popup_data" });
     if (response.log_status) {
-        await showUserTab();
+        await showUserTab(response.task_id, response.task_info);
         const pendingBtn = document.getElementById('pendingAnnotationBtn');
         const submitBtn = document.getElementById('submitAnswerBtn');
         const cancelBtn = document.getElementById('cancelAnnotationBtn');

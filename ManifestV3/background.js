@@ -25,6 +25,7 @@ const MSG_SEND_MESSAGE = 'send_message';
 const MSG_GET_ACTIVE_TASK = 'get_active_task';
 const MSG_GET_TASK_INFO = 'get_task_info';
 const MSG_GET_JUSTIFICATIONS = 'get_justifications';
+const MSG_GET_POPUP_DATA = 'get_popup_data';
 
 
 // --- State Management ---
@@ -381,37 +382,48 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     (async () => {
         let response;
         switch (message.command) {
-            case MSG_CHECK_LOGGING_STATUS:
+            case MSG_GET_POPUP_DATA:
                 const { logged_in } = await _get_local(['logged_in']);
-                if (logged_in) {
-                    const task_id = await getCurrentTask();
-                    if (task_id != -1) {
-                        chrome.action.setBadgeText({ text: 'on' });
-                        chrome.action.setBadgeBackgroundColor({ color: [202, 181, 225, 255] });
-                    } else {
-                        chrome.action.setBadgeText({ text: 'off' });
-                        chrome.action.setBadgeBackgroundColor({ color: [202, 181, 225, 255] });
-                    }
-                    
-                    try {
-                        const pending_response = await _get(config.urls.check_pending_annotations);
-                        if (pending_response && pending_response.pending) {
-                            await _set_local({ is_recording_paused: true });
-                            response = { log_status: true, pending_url: pending_response.url };
-                        } else {
-                            await _set_local({ is_recording_paused: false });
-                            response = { log_status: true, pending_url: "" };
-                        }
-                    } catch (error) {
-                        console.error("Error checking pending annotations:", error);
-                        await _set_local({ is_recording_paused: false });
-                        response = { log_status: true, pending_url: "" };
-                    }
-                } else {
-                    chrome.action.setBadgeText({ text: '' });
-                    await _set_local({ is_recording_paused: false });
-                    response = { log_status: false, pending_url: "" };
+                if (!logged_in) {
+                    sendResponse({ log_status: false });
+                    return;
                 }
+            
+                const task_id = await checkActiveTaskID();
+                let task_info = null;
+                if (task_id > 0) {
+                    task_info = await _get_local(TASK_INFO_KEY);
+                    if (!task_info) {
+                        await getTaskInfo(task_id);
+                        task_info = await _get_local(TASK_INFO_KEY);
+                    }
+                }
+            
+                let pending_url = "";
+                try {
+                    const pending_response = await _get(config.urls.check_pending_annotations);
+                    if (pending_response && pending_response.pending) {
+                        await _set_local({ is_recording_paused: true });
+                        pending_url = pending_response.url;
+                    } else {
+                        await _set_local({ is_recording_paused: false });
+                    }
+                } catch (error) {
+                    console.error("Error checking pending annotations:", error);
+                    await _set_local({ is_recording_paused: false });
+                }
+            
+                sendResponse({
+                    log_status: true,
+                    task_id: task_id,
+                    task_info: task_info ? task_info[TASK_INFO_KEY] : null,
+                    pending_url: pending_url
+                });
+                break;
+
+            case MSG_CHECK_LOGGING_STATUS:
+                const { logged_in: is_logged_in } = await _get_local(['logged_in']);
+                response = { log_status: is_logged_in };
                 sendResponse(response);
                 break;
 
@@ -460,37 +472,37 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 break;
 
             case MSG_GET_ACTIVE_TASK:
-                const task_id = await checkActiveTaskID();
-                const is_task_active = task_id !== -1;
-                printDebug("background", `Active task ID: ${task_id}`);
-                sendResponse({ is_task_active: is_task_active, task_id: task_id });
+                const active_task_id = await checkActiveTaskID();
+                const is_task_active = active_task_id !== -1;
+                printDebug("background", `Active task ID: ${active_task_id}`);
+                sendResponse({ is_task_active: is_task_active, task_id: active_task_id });
                 break;
             
             case MSG_GET_TASK_INFO:
-                let { [TASK_INFO_KEY]: task_info } = await _get_local(TASK_INFO_KEY);
-                if (!task_info) {
-                    const task_id = await getCurrentTask();
-                    if (task_id !== -1) {
+                let { [TASK_INFO_KEY]: task_info_data } = await _get_local(TASK_INFO_KEY);
+                if (!task_info_data) {
+                    const task_id_info = await getCurrentTask();
+                    if (task_id_info !== -1) {
                         try {
-                            const response = await _get(`${URL_GET_TASK_INFO}?task_id=${task_id}`);
-                            if (response) {
-                                await _set_local({ [TASK_INFO_KEY]: response });
-                                task_info = response;
+                            const response_task_info = await _get(`${URL_GET_TASK_INFO}?task_id=${task_id_info}`);
+                            if (response_task_info) {
+                                await _set_local({ [TASK_INFO_KEY]: response_task_info });
+                                task_info_data = response_task_info;
                             }
                         } catch (error) {
                             console.error("Error getting task info on demand:", error);
                         }
                     }
                 }
-                sendResponse(task_info);
+                sendResponse(task_info_data);
                 break;
             
             case MSG_GET_JUSTIFICATIONS:
                 const task_id_justifications = message.task_id;
                 if (task_id_justifications !== -1) {
                     try {
-                        const response = await _get(`${config.urls.get_justifications}/${task_id_justifications}/`);
-                        sendResponse(response);
+                        const response_justifications = await _get(`${config.urls.get_justifications}/${task_id_justifications}/`);
+                        sendResponse(response_justifications);
                     } catch (error) {
                         console.error("Error getting justifications:", error);
                         sendResponse(null);

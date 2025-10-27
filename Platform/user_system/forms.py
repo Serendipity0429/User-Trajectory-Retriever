@@ -203,6 +203,8 @@ class SignupForm(forms.Form):
 
     def clean(self):
         cleaned_data = super(SignupForm, self).clean()
+        password = cleaned_data.get('password')
+        password_retype = cleaned_data.get('password_retype')
         if password and password_retype and password != password_retype:
             self.add_error('password_retype', "The two passwords do not match.")
 
@@ -264,6 +266,9 @@ class EditPasswordForm(forms.Form):
     )
 
     def clean(self):
+        cleaned_data = super(EditPasswordForm, self).clean()
+        password = cleaned_data.get('new_password')
+        password_retype = cleaned_data.get('new_password_retype')
         if password and password_retype and password != password_retype:
             self.add_error('new_password_retype', "The two passwords do not match.")
 

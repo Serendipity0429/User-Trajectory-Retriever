@@ -32,6 +32,9 @@
     .timeline-item.danger:before {
         border-color: #dc3545;
     }
+    .strategy-shift-text {
+        color: dimgrey;
+    }
 </style>
 {% endblock %}
 
@@ -121,7 +124,7 @@
                 {% for trial in trials %}
                 <div class="timeline-item {% if trial.is_correct %}success{% else %}danger{% endif %}">
                     <div class="card shadow-sm">
-                        <div class="card-header d-flex justify-content-between align-items-center">
+                        <div class="card-header d-flex justify-content-between align-items-center collapsed" data-bs-toggle="collapse" data-bs-target="#collapse-trial-{{ trial.num_trial }}-main" aria-expanded="false" aria-controls="collapse-trial-{{ trial.num_trial }}-main" style="cursor: pointer;">
                             <h5 class="mb-0">Trial {{ trial.num_trial }}</h5>
                             {% if trial.is_correct %}
                             <span class="badge bg-success"><i class="bi bi-check-circle-fill me-1"></i> Correct</span>
@@ -129,115 +132,129 @@
                             <span class="badge bg-danger"><i class="bi bi-x-circle-fill me-1"></i> Incorrect</span>
                             {% endif %}
                         </div>
-                        <div class="card-body">
-                            <!-- Session Replay -->
-                            <div class="accordion mb-3" id="accordion-trial-{{ trial.num_trial }}">
-                                <div class="accordion-item">
-                                    <h2 class="accordion-header" id="heading-trial-{{ trial.num_trial }}">
-                                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-trial-{{ trial.num_trial }}" aria-expanded="false" aria-controls="collapse-trial-{{ trial.num_trial }}">
-                                            <i class="bi bi-display me-2"></i> <strong>Session Replay</strong>&nbsp;(Click to expand)
-                                        </button>
-                                    </h2>
-                                    <div id="collapse-trial-{{ trial.num_trial }}" class="accordion-collapse collapse" aria-labelledby="heading-trial-{{ trial.num_trial }}">
-                                        <div class="accordion-body">
-                                            {% for webpage in trial.webpages %}
-                                            <div class="d-flex flex-column align-items-center mb-5 p-4 border rounded shadow-sm bg-light">
-                                                <p class="h5"><a href="{{ webpage.url }}" target="_blank">{{ webpage.title }}</a></p>
-                                                <div class="rrweb-player-wrapper" id="rrweb-player-trial{{trial.num_trial}}-{{ webpage.id }}" style="margin-top: 20px;"></div>
-                                                <script>
-                                                    (function() {
-                                                        var target = document.getElementById('rrweb-player-trial{{trial.num_trial}}-{{ webpage.id }}');
-                                                        var events = {{ webpage.rrweb_record|safe }};
-                                                        
-                                                        if (!Array.isArray(events) || events.length === 0) {
-                                                            return;
-                                                        }
+                        <div id="collapse-trial-{{ trial.num_trial }}-main" class="collapse" aria-labelledby="heading-trial-{{ trial.num_trial }}-main">
+                            <div class="card-body">
+                                <!-- Session Replay -->
+                                <div class="accordion mb-3" id="accordion-trial-{{ trial.num_trial }}">
+                                    <div class="accordion-item">
+                                        <h2 class="accordion-header" id="heading-trial-{{ trial.num_trial }}">
+                                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-trial-{{ trial.num_trial }}" aria-expanded="false" aria-controls="collapse-trial-{{ trial.num_trial }}">
+                                                <i class="bi bi-display me-2"></i> <strong>Session Replay</strong>&nbsp;(Click to expand)
+                                            </button>
+                                        </h2>
+                                        <div id="collapse-trial-{{ trial.num_trial }}" class="accordion-collapse collapse" aria-labelledby="heading-trial-{{ trial.num_trial }}">
+                                            <div class="accordion-body">
+                                                {% for webpage in trial.webpages %}
+                                                <div class="d-flex flex-column align-items-center mb-5 p-4 border rounded shadow-sm bg-light">
+                                                    <p class="h5"><a href="{{ webpage.url }}" target="_blank">{{ webpage.title }}</a></p>
+                                                    <div class="rrweb-player-wrapper" id="rrweb-player-trial{{trial.num_trial}}-{{ webpage.id }}" style="margin-top: 20px;"></div>
+                                                    <script>
+                                                        (function() {
+                                                            var target = document.getElementById('rrweb-player-trial{{trial.num_trial}}-{{ webpage.id }}');
+                                                            var events = {{ webpage.rrweb_record|safe }};
+                                                            
+                                                            if (!Array.isArray(events) || events.length === 0) {
+                                                                return;
+                                                            }
 
-                                                        var container = target.closest('.card-body');
-                                                        if (container) {
-                                                            var containerWidth = container.clientWidth * 0.8;
-                                                            var screenRatio = window.innerHeight / window.innerWidth;
-                                                            var calculatedHeight = containerWidth * screenRatio;
+                                                            var container = target.closest('.card-body');
+                                                            if (container) {
+                                                                var containerWidth = container.clientWidth * 0.8;
+                                                                var screenRatio = window.innerHeight / window.innerWidth;
+                                                                var calculatedHeight = containerWidth * screenRatio;
 
-                                                            new rrwebPlayer({
-                                                                target: target,
-                                                                props: {
-                                                                    events: events,
-                                                                    autoPlay: false,
-                                                                    width: containerWidth,
-                                                                    height: calculatedHeight,
-                                                                    UNSAFE_replayCanvas: true,
-                                                                },
-                                                            });
-                                                        }
-                                                    })();
-                                                </script>
-                                            </div>
-                                            {% empty %}
-                                            <p>No recorded webpages for this trial.</p>
-                                            {% endfor %}
-                                            <div class="text-center mt-3">
-                                                <button class="btn btn-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-trial-{{ trial.num_trial }}" aria-expanded="false" aria-controls="collapse-trial-{{ trial.num_trial }}">
-                                                    Fold
-                                                </button>
+                                                                new rrwebPlayer({
+                                                                    target: target,
+                                                                    props: {
+                                                                        events: events,
+                                                                        autoPlay: false,
+                                                                        width: containerWidth,
+                                                                        height: calculatedHeight,
+                                                                        UNSAFE_replayCanvas: true,
+                                                                    },
+                                                                });
+                                                            }
+                                                        })();
+                                                    </script>
+                                                </div>
+                                                {% empty %}
+                                                <p>No recorded webpages for this trial.</p>
+                                                {% endfor %}
+                                                <div class="text-center mt-3">
+                                                    <button class="btn btn-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-trial-{{ trial.num_trial }}" aria-expanded="false" aria-controls="collapse-trial-{{ trial.num_trial }}">
+                                                        Fold
+                                                    </button>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
-                            </div>
-                            
-                            <!-- Submitted Answer & Reflection Card -->
-                            <div class="card shadow-sm">
-                                <div class="card-header">
-                                    <h6 class="mb-0"><i class="bi bi-file-earmark-text me-2"></i>Submitted Answer & Reflection</h6>
-                                </div>
-                                <div class="card-body p-4">
-                                    <p><span class="annotation-key">Your Answer:</span> {{ trial.answer }}</p>
-                                    <p><span class="annotation-key">Evidence Count:</span> <span id="evidence-count-{{ trial.num_trial }}">{{ trial.justifications.all|length }}</span></p>
-                                    <p><span class="annotation-key">Confidence:</span> {{ CONFIDENCE_MAP|get_item:trial.confidence }}</p>
-                                    <p><span class="annotation-key">Justification:</span></p>
-                                    <div class="ps-4">
-                                        <ul class="list-unstyled">
-                                            {% for justification in trial.justifications.all %}
-                                            <li class="mb-2">
-                                                <p class="mb-1"><span class="annotation-key">URL:</span> <a href="{{ justification.url }}" target="_blank">{{ justification.url }}</a></p>
-                                                <p class="mb-1"><span class="annotation-key">Confidence:</span> 
-                                                    {% if justification.confidence == 3 %} High
-                                                    {% elif justification.confidence == 2 %} Medium
-                                                    {% elif justification.confidence == 1 %} Low
-                                                    {% endif %}
-                                                </p>
-                                                <blockquote class="blockquote bg-light p-2 rounded" style="font-size: 0.9rem;">
-                                                    {{ justification.text }}
-                                                </blockquote>
-                                            </li>
-                                            {% endfor %}
-                                        </ul>
+                                
+                                <!-- Submitted Answer Card -->
+                                <div class="card shadow-sm mb-3">
+                                    <div class="card-header">
+                                        <h6 class="mb-0"><i class="bi bi-file-earmark-text me-2"></i>Submitted Answer</h6>
                                     </div>
-                                    <p><span class="annotation-key">Answer Formulation Method:</span> {{ ANSWER_FORMULATION_MAP|get_item:trial.answer_formulation_method|safe }}</p>
-
-                                    {% if not trial.is_correct and trial.reflection_annotation %}
-                                    <hr>
-                                    <h6><i class="bi bi-arrow-counterclockwise me-2"></i>Reflection</h6>
-                                    <p><span class="annotation-key">Primary Reasons for Failure:</span></p>
-                                    <ul>
-                                        {% for reason in trial.reflection_annotation.failure_reasons %}
-                                        <li>{{ FAILURE_CATEGORY_MAP|get_item:reason|safe }}</li>
-                                        {% endfor %}
-                                    </ul>
-                                    <p><span class="annotation-key">Failure Analysis:</span> {{ trial.reflection_annotation.failure_analysis }}</p>
-                                    <p><span class="annotation-key">Corrective Plan:</span></p>
-                                    <ul>
-                                        {% for plan in trial.reflection_annotation.corrective_plan %}
-                                        <li>{{ CORRECTIVE_PLAN_MAP|get_item:plan|safe }}</li>
-                                        {% endfor %}
-                                    </ul>
-                                    <p><span class="annotation-key">Remaining Effort:</span> {{ trial.reflection_annotation.remaining_effort }} minutes</p>
-                                    {% if trial.reflection_annotation.additional_reflection %}
-                                    <p><span class="annotation-key">Additional Reflection:</span> {{ trial.reflection_annotation.additional_reflection }}</p>
-                                    {% endif %}
-                                    {% endif %}
+                                    <div class="card-body p-4">
+                                        <p><span class="annotation-key">Your Answer:</span> {{ trial.answer }}</p>
+                                        <p><span class="annotation-key">Evidence Count:</span> <span id="evidence-count-{{ trial.num_trial }}">{{ trial.justifications.all|length }}</span></p>
+                                        <p><span class="annotation-key">Confidence:</span> {{ CONFIDENCE_MAP|get_item:trial.confidence }}</p>
+                                        <p><span class="annotation-key">Justification:</span></p>
+                                        <div class="ps-4">
+                                            <ul class="list-unstyled">
+                                                {% for justification in trial.justifications.all %}
+                                                <li class="mb-2">
+                                                    <p class="mb-1"><span class="annotation-key">URL:</span> <a href="{{ justification.url }}" target="_blank">{{ justification.url }}</a></p>
+                                                    <p class="mb-1"><span class="annotation-key">Confidence:</span> 
+                                                        {% if justification.confidence == 3 %} High
+                                                        {% elif justification.confidence == 2 %} Medium
+                                                        {% elif justification.confidence == 1 %} Low
+                                                        {% endif %}
+                                                    </p>
+                                                    <blockquote class="blockquote bg-light p-2 rounded" style="font-size: 0.9rem;">
+                                                        {{ justification.text }}
+                                                    </blockquote>
+                                                </li>
+                                                {% endfor %}
+                                            </ul>
+                                        </div>
+                                        <p><span class="annotation-key">Answer Formulation Method:</span> {{ ANSWER_FORMULATION_MAP|get_item:trial.answer_formulation_method|safe }}</p>
+                                    </div>
                                 </div>
+
+                                <!-- Reflection Card -->
+                                {% if not trial.is_correct and trial.reflectionannotation %}
+                                <div class="card shadow-sm">
+                                    <div class="card-header">
+                                        <h6 class="mb-0"><i class="bi bi-arrow-counterclockwise me-2"></i>Reflection</h6>
+                                    </div>
+                                    <div class="card-body p-4">
+                                        <p><span class="annotation-key">Primary Reasons for Failure:</span></p>
+                                        <ul>
+                                            {% for reason in trial.reflectionannotation.failure_category %}
+                                            <li class="reflection-text">{{ FAILURE_CATEGORY_MAP|get_item:reason|safe }}</li>
+                                            {% endfor %}
+                                            {% if trial.reflectionannotation.failure_category_other %}
+                                            <li class="reflection-text">Other: {{ trial.reflectionannotation.failure_category_other }}</li>
+                                            {% endif %}
+                                        </ul>
+                                        <p><span class="annotation-key">Corrective Plan:</span></p>
+                                        <ul>
+                                            {% for plan in trial.reflectionannotation.future_plan_actions %}
+                                            <li class="reflection-text">{{ CORRECTIVE_PLAN_MAP|get_item:plan|safe }}</li>
+                                            {% endfor %}
+                                            {% if trial.reflectionannotation.future_plan_other %}
+                                            <li class="reflection-text">Other: {{ trial.reflectionannotation.future_plan_other }}</li>
+                                            {% endif %}
+                                        </ul>
+                                        <p><span class="annotation-key">Adjusted Difficulty:</span> <span class="reflection-text">{{ DIFFICULTY_MAP|get_item:trial.reflectionannotation.adjusted_difficulty }}</span></p>
+                                        <p><span class="annotation-key">Estimated Time for Next Trial:</span> <span class="reflection-text">{{ EFFORT_MAP|get_item:trial.reflectionannotation.estimated_time }}</span></p>
+                                        {% if trial.reflectionannotation.additional_reflection %}
+                                        <p><span class="annotation-key">Additional Reflection:</span> <span class="reflection-text">{{ trial.reflectionannotation.additional_reflection }}</span></p>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                {% endif %}
                             </div>
                         </div>
                     </div>
@@ -248,17 +265,24 @@
                 {% if post_task_annotation %}
                 <div class="timeline-item success">
                     <div class="card shadow-sm">
-                        <div class="card-header d-flex justify-content-between align-items-center">
+                        <div class="card-header d-flex justify-content-between align-items-center collapsed" data-bs-toggle="collapse" data-bs-target="#collapse-final-annotation" aria-expanded="false" aria-controls="collapse-final-annotation" style="cursor: pointer;">
                             <h5 class="mb-0"><i class="bi bi-award-fill me-2"></i>Final Annotation</h5>
                             <span class="badge bg-success"><i class="bi bi-check-circle-fill me-1"></i> Successful</span>
                         </div>
-                        <div class="card-body">
-                            <p><span class="annotation-key">Overall Difficulty:</span> {{ DIFFICULTY_MAP|get_item:post_task_annotation.difficulty_actual }}</p>
-                            <p><span class="annotation-key">"Aha!" Moment:</span> {{ AHA_MOMENT_MAP|get_item:post_task_annotation.aha_moment_type|safe }}</p>
-                            {% if post_task_annotation.aha_moment_other %}<p><span class="annotation-key">Details:</span> {{ post_task_annotation.aha_moment_other }}</p>{% endif %}
-                            <p><span class="annotation-key">Strategic Shift:</span> {{ STRATEGY_SHIFT_MAP|get_item:post_task_annotation.strategy_shift|safe }}</p>
-                            {% if post_task_annotation.strategy_shift_other %}<p><span class="annotation-key">Details:</span> {{ post_task_annotation.strategy_shift_other }}</p>{% endif %}
-                            {% if post_task_annotation.additional_reflection %}<p><span class="annotation-key">Additional Reflection:</span> {{ post_task_annotation.additional_reflection }}</p>{% endif %}
+                        <div id="collapse-final-annotation" class="collapse">
+                            <div class="card-body">
+                                <p><span class="annotation-key">Overall Difficulty:</span> {{ DIFFICULTY_MAP|get_item:post_task_annotation.difficulty_actual }}</p>
+                                <p><span class="annotation-key">"Aha!" Moment:</span> {{ AHA_MOMENT_MAP|get_item:post_task_annotation.aha_moment_type|safe }}</p>
+                                {% if post_task_annotation.aha_moment_other %}<p><span class="annotation-key">Details:</span> {{ post_task_annotation.aha_moment_other }}</p>{% endif %}
+                                <p><span class="annotation-key">Strategic Shift:</span></p>
+                                <ul>
+                                    {% for shift in post_task_annotation.strategy_shift %}
+                                    <li class="strategy-shift-text">{{ STRATEGY_SHIFT_MAP|get_item:shift|safe }}</li>
+                                    {% endfor %}
+                                </ul>
+                                {% if post_task_annotation.strategy_shift_other %}<p><span class="annotation-key">Details:</span> {{ post_task_annotation.strategy_shift_other }}</p>{% endif %}
+                                {% if post_task_annotation.additional_reflection %}<p><span class="annotation-key">Additional Reflection:</span> {{ post_task_annotation.additional_reflection }}</p>{% endif %}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -266,14 +290,16 @@
                 {% if cancel_annotation %}
                 <div class="timeline-item danger">
                     <div class="card shadow-sm">
-                        <div class="card-header d-flex justify-content-between align-items-center">
+                        <div class="card-header d-flex justify-content-between align-items-center collapsed" data-bs-toggle="collapse" data-bs-target="#collapse-cancel-annotation" aria-expanded="false" aria-controls="collapse-cancel-annotation" style="cursor: pointer;">
                             <h5 class="mb-0"><i class="bi bi-exclamation-triangle-fill me-2"></i>Task Cancelled</h5>
                             <span class="badge bg-danger"><i class="bi bi-x-circle-fill me-1"></i> Cancelled</span>
                         </div>
-                        <div class="card-body">
-                            <p><span class="annotation-key">Reason for Cancellation:</span> {{ CANCEL_CATEGORY_MAP|get_item:cancel_annotation.cancel_category|safe }}</p>
-                            {% if cancel_annotation.cancel_reason %}<p><span class="annotation-key">Detailed Explanation:</span> {{ cancel_annotation.cancel_reason }}</p>{% endif %}
-                            {% if cancel_annotation.cancel_additional_reflection %}<p><span class="annotation-key">Additional Reflection:</span> {{ cancel_annotation.cancel_additional_reflection }}</p>{% endif %}
+                        <div id="collapse-cancel-annotation" class="collapse">
+                            <div class="card-body">
+                                <p><span class="annotation-key">Reason for Cancellation:</span> {{ CANCEL_CATEGORY_MAP|get_item:cancel_annotation.cancel_category|safe }}</p>
+                                {% if cancel_annotation.cancel_reason %}<p><span class="annotation-key">Detailed Explanation:</span> {{ cancel_annotation.cancel_reason }}</p>{% endif %}
+                                {% if cancel_annotation.cancel_additional_reflection %}<p><span class="annotation-key">Additional Reflection:</span> {{ cancel_annotation.cancel_additional_reflection }}</p>{% endif %}
+                            </div>
                         </div>
                     </div>
                 </div>

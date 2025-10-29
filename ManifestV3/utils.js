@@ -1,46 +1,10 @@
 // utils.js
 
-// --- Configuration ---
-const IS_DEV = !('update_url' in chrome.runtime.getManifest());
-const IS_REMOTE = true;
-const URL_BASE = !IS_REMOTE ? "http://127.0.0.1:8000" : "http://101.6.41.59:32904";
-const IS_PASSIVE_MODE = true;
-const CANCEL_TRIAL_THRESHOLD = 10; // number of trials before the user is allowed to cancel annotation
-
-const URLS = {
-    base: URL_BASE,
-    check: `${URL_BASE}/user/check/`,
-    login: `${URL_BASE}/user/login/`,
-    token_login: `${URL_BASE}/user/token_login/`,
-    token_refresh: `${URL_BASE}/user/token/refresh/`,
-    data: `${URL_BASE}/task/data/`,
-    cancel: `${URL_BASE}/task/cancel_annotation/`,
-    active_task: `${URL_BASE}/task/active_task/`,
-    get_task_info: `${URL_BASE}/task/get_task_info/`,
-    register: `${URL_BASE}/user/signup/`,
-    home: `${URL_BASE}/task/home/`,
-    stop_annotation: `${URL_BASE}/task/stop_annotation/`,
-    add_justification: `${URL_BASE}/task/justification/add/`,
-    get_justifications: `${URL_BASE}/task/justification/get`,
-    check_pending_annotations: `${URL_BASE}/user/check_pending_annotations/`,
-    initial_page: "https://www.bing.com/",
-};
-
-const config = {
-    is_dev: IS_DEV,
-    is_remote: IS_REMOTE,
-    is_passive_mode: IS_PASSIVE_MODE,
-    urls: URLS,
-    version: chrome.runtime.getManifest().version,
-    max_retries: 1, // number of retries for API requests
-    cancel_trial_threshold: CANCEL_TRIAL_THRESHOLD,
-};
-
-
 // --- Utility Functions ---
 
 function printDebug(source, ...messages) {
-    if (config.is_dev) {
+    const config = getConfig();
+    if (config && config.is_dev) {
         console.log(`[${source}]`, ...messages);
     }
 }
@@ -67,6 +31,7 @@ async function refreshToken() {
     }
 
     isRefreshing = true;
+    const config = getConfig();
 
     const { refresh_token } = await _get_local('refresh_token');
     if (!refresh_token) {
@@ -82,7 +47,7 @@ async function refreshToken() {
     }
 
     try {
-        const response = await fetch(URLS.token_refresh, {
+        const response = await fetch(config.urls.token_refresh, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
@@ -115,6 +80,7 @@ async function refreshToken() {
 }
 
 async function _request(method, url, data = {}, json_response = true, raw_data = false, send_as_json = false) {
+    const config = getConfig();
     const MAX_RETRIES = config.max_retries || 3;
     let attempt = 0;
     while (attempt < MAX_RETRIES) {
@@ -137,7 +103,7 @@ async function _request(method, url, data = {}, json_response = true, raw_data =
                 }
             }
 
-            if (access_token && url !== URLS.token_login) {
+            if (access_token && url !== config.urls.token_login) {
                 headers["Authorization"] = `Bearer ${access_token}`;
             }
 
@@ -204,56 +170,53 @@ async function _remove_local(key) {
     return chrome.storage.local.remove(key);
 }
 
+// --- Helpers ---
 
-// --- UI --- 
+function uint8ArrayToBase64(bytes) {
+  // Using a smaller chunk size is generally safer and performs well.
+  // 32768 is a common choice.
+  const CHUNK_SIZE = 0x8000;
+  let binary = '';
+  const len = bytes.length;
 
-const ANNOTATION_MODAL_STYLE = `
-        :root { --primary-purple: #6A1B9A; --secondary-purple: #9C27B0; --light-purple: #E1BEE7; }
-        .annotation-wrapper { position: fixed; }
-        .annotation-modal { background: white; padding: 5%; border-radius: 10px; box-shadow: 0 0 20px rgba(0,0,0,0.2); width: 90%; height: 90%; max-width: 500px; border: 2px solid var(--primary-purple); font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 16px; box-sizing: initial; color: #000; }
-        .annotation-modal .question-container { margin-bottom: 0; padding-left: 2%; }
-        .annotation-modal .question-container:has(textarea) { padding-left: 0; }
-        .annotation-modal h2 { color: var(--accent-purple); margin-top: 0; margin-bottom: 5px; display: block; font-size: 20px; font-weight: bold; unicode-bidi: isolate; }
-        .annotation-modal h2 div.event-type { color: var(--primary-purple); display: inline; }
-        .annotation-modal textarea { width: 96%; padding: 2%; border: 1px solid var(--light-purple); border-radius: 5px; resize: none; min-height: 90px; margin: 10px 0; font-size: 16px; }
-        .annotation-modal .checkbox-group { display: flex; align-items: center; gap: 10px; }
-        .annotation-modal input[type="checkbox"] { accent-color: var(--secondary-purple); width: 18px; height: 18px; }
-        .annotation-modal button { background: var(--secondary-purple); color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; transition: background 0.3s ease; font-size: 16px; }
-        .annotation-modal button:hover { background: var(--primary-purple); }
-        .annotation-modal .btn-ignore { background: #6c757d; color: white; }
-        .annotation-modal .btn-ignore:hover { background: #5a6268; }
-        .annotation-modal .form-footer { padding-top: 20px; display: flex; justify-content: space-between; align-items: center; bottom: 0; }
-        `;
+  for (let i = 0; i < len; i += CHUNK_SIZE) {
+    // Get a chunk of the Uint8Array
+    const chunk = bytes.subarray(i, i + CHUNK_SIZE);
 
-function GENERATE_ANNOTATION_MODAL_HTML(type) {
-    const ANNOTATION_MODAL_HTML = `
-    <div class="annotation-wrapper rr-ignore">
-        <div class="annotation-modal">
-            <div class="questions-container">
-                <div class="question-container">
-                    <h2>What is the purpose of this <div class="event-type">${type}</div> event?</h2>
-                    <textarea id="purpose" placeholder="Describe the event purpose..."></textarea>
-                </div>
-            </div>
-            <div class="question-container">
-                <h2>Event Classification</h2>
-                <div class="checkbox-group">
-                    <input type="checkbox" id="key-event">
-                    <label for="key-event">Mark as Key Event</label>
-                </div>
-            </div>
-            <div class="form-footer">
-                <button type="button" id="submit-btn">Submit</button>
-                <button type="button" id="ignore-btn" class="btn-ignore">Ignore this event</button>
-            </div>
-        </div>
-    </div>
-    `;
-    return ANNOTATION_MODAL_HTML;
+    // This is the most efficient way to convert a small chunk to a binary string
+    binary += String.fromCharCode.apply(null, chunk);
+  }
+
+  // The final binary string is then encoded to Base64
+  return btoa(binary);
+}
+
+function isJSONString(str) {
+    try {
+        JSON.parse(str);
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
+function _time_now() {
+    return Date.now();
+}
+
+function _is_server_page(url) {
+    const config = getConfig();
+    if (!config || !url) return false;
+    return url.startsWith(config.urls.base);
+}
+
+function _is_extension_page(url) {
+    return url.startsWith(chrome.runtime.getURL(''));
 }
 
 function displayMessageBox(message, type = 'info') {
-    if (window.location.href.startsWith(config.urls.base)) return;
+    const config = getConfig();
+    if (!config || window.location.href.startsWith(config.urls.base)) return;
 
     const box = document.createElement('div');
     box.className = 'rr-ignore loaded-box rr-block';
@@ -304,9 +267,6 @@ function displayMessageBox(message, type = 'info') {
     }
 }
 
-
-// --- Helpers ---
-
 function uint8ArrayToBase64(bytes) {
   // Using a smaller chunk size is generally safer and performs well.
   // 32768 is a common choice.
@@ -340,11 +300,11 @@ function _time_now() {
 }
 
 function _is_server_page(url) {
+    const config = getConfig();
+    if (!config || !url) return false;
     return url.startsWith(config.urls.base);
 }
 
 function _is_extension_page(url) {
     return url.startsWith(chrome.runtime.getURL(''));
 }
-
-printDebug("utils.js is loaded");

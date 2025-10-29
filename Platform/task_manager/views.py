@@ -9,6 +9,7 @@ from django.shortcuts import render
 from django.core.files.base import ContentFile
 import base64
 import uuid
+import json
 
 from .utils import (
     print_debug,
@@ -227,7 +228,7 @@ def post_task_annotation(request, task_id):
             post_annotation.aha_moment_other = request.POST.get("aha_moment_other")
             post_annotation.unhelpful_paths = request.POST.getlist("unhelpful_paths")
             post_annotation.unhelpful_paths_other = request.POST.get("unhelpful_paths_other")
-            post_annotation.strategy_shift = request.POST.get("strategy_shift")
+            post_annotation.strategy_shift = request.POST.getlist("strategy_shift")
             post_annotation.strategy_shift_other = request.POST.get("strategy_shift_other")
             post_annotation.belong_task = task
             post_annotation.save()
@@ -475,6 +476,17 @@ def show_task(request, task_id):
             belong_task_trial=trial, is_redirected=False, during_annotation=False
         ).order_by("start_timestamp")
         trial.submitted_sources = trial.justifications.all()
+        if hasattr(trial, 'reflectionannotation') and trial.reflectionannotation:
+            if isinstance(trial.reflectionannotation.failure_category, str):
+                try:
+                    trial.reflectionannotation.failure_category = json.loads(trial.reflectionannotation.failure_category)
+                except json.JSONDecodeError:
+                    trial.reflectionannotation.failure_category = []
+            if isinstance(trial.reflectionannotation.future_plan_actions, str):
+                try:
+                    trial.reflectionannotation.future_plan_actions = json.loads(trial.reflectionannotation.future_plan_actions)
+                except json.JSONDecodeError:
+                    trial.reflectionannotation.future_plan_actions = []
 
     # 4. Fetch Post-Task or Cancellation Annotation
     post_task_annotation = None

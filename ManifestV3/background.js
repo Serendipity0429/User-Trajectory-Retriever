@@ -2,15 +2,9 @@
 // This script runs in the background and handles communication between content scripts and the server
 
 // Import config variables and utility functions
-importScripts('./utils.js');
+importScripts('./config.js', './utils.js');
 
 // --- Constants ---
-const URL_CHECK = config.urls.check;
-const URL_DATA = config.urls.data;
-const URL_ACTIVE_TASK = config.urls.active_task;
-const URL_GET_TASK_INFO = config.urls.get_task_info;
-const URL_STOP_ANNOTATION = config.urls.stop_annotation;
-
 const TASK_STORAGE_KEY = 'current_task_id';
 const TASK_INFO_KEY = 'current_task_info';
 
@@ -27,6 +21,10 @@ const MSG_GET_TASK_INFO = 'get_task_info';
 const MSG_GET_JUSTIFICATIONS = 'get_justifications';
 const MSG_GET_POPUP_DATA = 'get_popup_data';
 
+(async () => {
+    await initializeConfig();
+
+})();
 
 // --- State Management ---
 
@@ -56,7 +54,8 @@ async function getUserInfo() {
 async function getTaskInfo(task_id) {
     if (task_id === -1) return;
     try {
-        const response = await _get(`${URL_GET_TASK_INFO}?task_id=${task_id}`);
+        const config = getConfig();
+        const response = await _get(`${config.urls.get_task_info}?task_id=${task_id}`);
         if (response && response.question) {
             await _set_local({ [TASK_INFO_KEY]: response });
         }
@@ -67,6 +66,7 @@ async function getTaskInfo(task_id) {
 
 async function hasPendingAnnotation() {
     try {
+        const config = getConfig();
         const pending_response = await _get(config.urls.check_pending_annotations);
         return pending_response && pending_response.pending;
     }
@@ -87,9 +87,10 @@ async function checkActiveTaskID() {
     try {
         printDebug("background", "Fetching active task ID from server...");
         const old_task_id = await getCurrentTask();
+        const config = getConfig();
         
         // Use a more robust API call with retry logic
-        const response = await _post(URL_ACTIVE_TASK, {}, false); // json_response = false to handle text
+        const response = await _post(config.urls.active_task, {}, false); // json_response = false to handle text
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -98,6 +99,14 @@ async function checkActiveTaskID() {
 
         const is_task_started = old_task_id === -1 && new_task_id > -1;
         const is_task_finished = old_task_id > -1 && new_task_id === -1;
+
+        if (new_task_id > -1) {
+            chrome.action.setBadgeText({ text: 'on' });
+            chrome.action.setBadgeBackgroundColor({ color: [202, 181, 225, 255] });
+        } else {
+            chrome.action.setBadgeText({ text: 'off' });
+            chrome.action.setBadgeBackgroundColor({ color: [202, 181, 225, 255] });
+        }
 
         if (is_task_started) {
             getTaskInfo(new_task_id);
@@ -129,21 +138,13 @@ async function checkActiveTaskID() {
 }
 
 function closeAllIrrelevantTabs() {
-    
+    const config = getConfig();
     printDebug("background", "Closing all irrelevant tabs...");
     chrome.tabs.query({}, (tabs) => {
         printDebug("background", "All open tabs:", tabs);
         const irrelevant_tab_ids = tabs
             .filter(tab => tab.url && !_is_server_page(tab.url) && !_is_extension_page(tab.url))
-            // .filter(tab => tab.url && !_is_extension_page(tab.url))
             .map(tab => tab.id);
-        const home_tab_ids = tabs
-            .filter(tab => tab.url && _is_server_page(tab.url))
-            .map(tab => tab.id);
-
-        // if (home_tab_ids.length === 0) {
-        //     chrome.tabs.create({ url: config.urls.initial_page, active: false });
-        // }
 
         chrome.tabs.create({ url: config.urls.initial_page, active: false });
 
@@ -162,8 +163,9 @@ async function sendInfo(message) {
     }
 
     try {
+        const config = getConfig();
         // TODO: Implement a retry mechanism for failed requests.
-        await _post(URL_DATA, { message }, true); // raw_data = true
+        await _post(config.urls.data, { message }, true); // raw_data = true
         printDebug("background", "Info sent successfully.");
     } catch (error) {
         console.error("Error sending info:", error);
@@ -232,6 +234,8 @@ function createContextMenu() {
         contexts: ["video", "audio", "page"]
     });
 }
+
+// --- Event Listeners ---
 
 chrome.runtime.onInstalled.addListener(() => {
     createContextMenu();
@@ -309,6 +313,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
             const [details] = injectionResults;
             if (details.result) {
                 try {
+                    const config = getConfig();
                     await _post(config.urls.add_justification, {
                         task_id: task_id,
                         url: tab.url,
@@ -343,6 +348,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 
             if (details) {
                 try {
+                    const config = getConfig();
                     await _post(config.urls.add_justification, {
                         task_id: task_id,
                         url: tab.url,
@@ -374,13 +380,11 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     }
 });
 
-
-// --- Event Listeners ---
-
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     printDebug("background", `Received message: ${message.command || 'unknown'}:`, message);
     (async () => {
         let response;
+        const config = getConfig();
         switch (message.command) {
             case MSG_GET_POPUP_DATA:
                 const { logged_in } = await _get_local(['logged_in']);
@@ -419,6 +423,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     task_info: task_info ? task_info[TASK_INFO_KEY] : null,
                     pending_url: pending_url
                 });
+                checkActiveTaskID();
                 break;
 
             case MSG_CHECK_LOGGING_STATUS:
@@ -484,7 +489,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     const task_id_info = await getCurrentTask();
                     if (task_id_info !== -1) {
                         try {
-                            const response_task_info = await _get(`${URL_GET_TASK_INFO}?task_id=${task_id_info}`);
+                            const response_task_info = await _get(`${config.urls.get_task_info}?task_id=${task_id_info}`);
                             if (response_task_info) {
                                 await _set_local({ [TASK_INFO_KEY]: response_task_info });
                                 task_info_data = response_task_info;
@@ -512,13 +517,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     sendResponse(null);
                 }
                 break;
+            
+
         }
     })();
     return true; // Required for async sendResponse
 });
 
 chrome.runtime.onStartup.addListener(async () => {
-    console.log("Extension starting up...");
+    printDebug("background", "Extension started up.");
     try {
         await flush();
         chrome.alarms.create(ALARM_CLEAR_STORAGE, { periodInMinutes: 1 });
@@ -530,6 +537,7 @@ chrome.runtime.onStartup.addListener(async () => {
 });
 
 chrome.alarms.onAlarm.addListener(async (alarm) => {
+    const config = getConfig();
     switch (alarm.name) {
         case ALARM_CLEAR_STORAGE:
             printDebug("background", "Clearing expired items from local storage...");

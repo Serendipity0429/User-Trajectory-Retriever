@@ -103,10 +103,10 @@
 
                         <!-- Initial Strategy -->
                         <div class="mb-4 p-3 border rounded">
-                            <label for="first_search_query" class="form-label"><h5><strong>6. Your First Search Query</strong></h5></label>
-                            <p>Please enter the first search query you will use to start this task.</p>
+                            <label for="first_search_query" class="form-label"><h5><strong>6. Your First Search Word(s)</strong></h5></label>
+                            <p>Please enter the first search word(s) you will use to start this task.</p>
                             <input type="text" class="form-control" id="first_search_query" name="first_search_query" required placeholder="e.g., capital of France">
-                            <div class="invalid-feedback">Please enter your first search query.</div>
+                            <div class="invalid-feedback">Please enter your first search word(s).</div>
                         </div>
 
                         <!-- Initial Guess -->
@@ -126,7 +126,7 @@
                         <!-- Expected Source of Answer -->
                         <div class="mb-4 p-3 border rounded">
                             <h5><strong>8. Expected Source of Answer</strong></h5>
-                            <p>Where do you think you will find the answer? (You can select multiple options)</p>
+                            <p>Where do you think you will find the answer? <strong>You can select multiple options</strong></p>
                             <div class="btn-group flex-wrap" role="group" aria-label="Expected Source">
                                 {% for key, value in EXPECTED_SOURCES_MAP.items %}
                                 <input type="checkbox" class="btn-check" name="expected_source" id="source_{{ key }}" value="{{ key }}" autocomplete="off">

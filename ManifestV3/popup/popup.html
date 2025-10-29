@@ -10,8 +10,45 @@
         <div class="container">
             <div class="header">
                 <img src="THUIR.png" alt="Logo" class="logo">
-                <h1>THUIR</h1>
+                <div class="title-container">
+                    <h1>THUIR</h1>
+                    <i class="fas fa-cog" id="control-panel-btn"></i>
+                </div>
                 <p>User Trajectory Retriever Toolkit</p>
+            </div>
+
+            <div id="control-panel" class="content" hidden>
+                <h2>Control Panel</h2>
+                <div class="warning-msg" style="display: flex;">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <p>Please do not change these settings unless instructed by an administrator.</p>
+                </div>
+                <div class="form-group">
+                    <label><i class="fas fa-network-wired"></i></label>
+                    <div class="radio-group">
+                        <input type="radio" id="server-type-local" name="server-type" value="local">
+                        <label for="server-type-local">Local</label>
+                        <input type="radio" id="server-type-remote" name="server-type" value="remote">
+                        <label for="server-type-remote">Remote</label>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="local-server-address"><i class="fas fa-server"></i></label>
+                    <input type="text" id="local-server-address" placeholder="Local Server Address">
+                </div>
+                <div class="form-group">
+                    <label for="remote-server-address"><i class="fas fa-globe"></i></label>
+                    <input type="text" id="remote-server-address" placeholder="Remote Server Address">
+                </div>
+                <div class="button-row">
+                    <button id="save-settings-btn" class="btn"><i class="fas fa-save"></i> Save</button>
+                    <button id="restore-defaults-btn" class="btn btn-secondary"><i class="fas fa-undo"></i> Restore Defaults</button>
+                    <button id="cancel-settings-btn" class="btn btn-danger"><i class="fas fa-times"></i> Cancel</button>
+                </div>
+                <div id="info-msg-container" class="info-msg" style="display: none;">
+                    <i class="fas fa-info-circle"></i>
+                    <p id="info-msg-text"></p>
+                </div>
             </div>
 
             <div id="login" class="content">
@@ -64,6 +101,7 @@
             </div>
         </div>
         <div id="modal-container"></div>
+        <script src="../config.js"></script>
         <script src="../utils.js"></script> 
         <script src="popup.js"></script>
     </body>

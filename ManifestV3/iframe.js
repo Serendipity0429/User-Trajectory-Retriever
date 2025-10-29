@@ -1,5 +1,6 @@
 async function initializeInIframe() {
     try {
+        await initializeConfig();
         rrweb.record({
             emit(event) {
                 window.parent.postMessage(event, '*');
@@ -10,7 +11,7 @@ async function initializeInIframe() {
             
             collectFonts: true,
         });
-        console.log("rrweb recording started in iframe.");
+        printDebug("iframe", "rrweb recording initialized in iframe.");
     } catch (error) {
         console.error("Error during iframe initialization:", error);
     }

@@ -232,5 +232,3 @@ class ViewState {
 const unitPage = new UnitPage();
 const pageManager = new PageManager();
 const viewState = new ViewState(unitPage, pageManager);
-
-printDebug("page", "page.js is loaded");

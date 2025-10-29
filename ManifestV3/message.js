@@ -21,6 +21,3 @@ class Message {
         this.sent_when_active = false;
     }
 }
-
-// Main body
-printDebug("message", "message.js is loaded");

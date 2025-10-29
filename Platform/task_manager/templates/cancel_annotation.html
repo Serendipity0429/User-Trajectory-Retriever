@@ -91,7 +91,7 @@
 
                         <div class="mb-4 p-3 border rounded">
                             <h5><span class="fw-bold">2. Cancellation Reason</span></h5>
-                            <p>Select the primary reason you are unable to complete this task.</p>
+                            <p>Select the primary reason you are unable to complete this task. <strong>Please select only one answer</strong></p>
                             <div class="w-100" role="group" aria-label="Cancellation Reason">
                                 {% for key, value in CANCEL_CATEGORY_MAP.items %}
                                 <div class="d-flex mb-2">
@@ -107,7 +107,7 @@
 
                         <div class="mb-4 p-3 border rounded">
                             <h5><span class="fw-bold">3. Missing Resources</span></h5>
-                            <p>What was needed to make this task solvable? <small class="text-muted fw-bold">(Check all that apply and drag to reorder)</small></p>
+                            <p>What was needed to make this task solvable? <small class="text-muted fw-bold">Check all that apply and drag to reorder</small></p>
                             <div id="selected-resources-list" class="sortable-list list-group mb-2"></div>
                             <hr id="selection-separator" style="display: none;">
                             <div id="unselected-resources-list" class="list-group">

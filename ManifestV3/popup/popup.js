@@ -1,9 +1,3 @@
-// --- Configuration ---
-const base_url = config.urls.base;
-const token_login_url = config.urls.token_login;
-const register_url = config.urls.register;
-const feedback_url = config.urls.home;
-
 // --- Global State ---
 let active_task_id = -1;
 
@@ -92,12 +86,13 @@ function switchUiState(show_login) {
     showFailMessage(0);
 }
 
-async function displayActiveTask(task_id, task_info) {
+function displayActiveTask(task_id, task_info) {
     active_task_id = task_id;
     printDebug("popup", "Active task ID:", active_task_id);
     const activeTaskEl = document.getElementById('active_task');
     const startTaskBtn = document.getElementById('startTaskBtn');
     const taskTrialEl = document.getElementById('task_trial');
+    const config = getConfig();
 
     if (active_task_id === -1) {
         switchTaskButtonStatus('off');
@@ -128,12 +123,17 @@ async function showUserTab(task_id, task_info) {
     document.getElementById('username_text_logged').textContent = "User: " + username;
     document.getElementById('submitAnswerBtn').style.display = 'none';
     printDebug("popup", "Switched to user tab for user:", username);    
-    await displayActiveTask(task_id, task_info);
+    displayActiveTask(task_id, task_info);
     switchUiState(false);
 }
 
 function showLoginTab() {
     switchUiState(true);
+    const loginBtn = document.getElementById('loginBtn');
+    if (loginBtn) {
+        loginBtn.disabled = false;
+        loginBtn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Login';
+    }
 }
 
 function switchTaskButtonStatus(task_status, trial_num = 0) {
@@ -141,6 +141,7 @@ function switchTaskButtonStatus(task_status, trial_num = 0) {
     const startTaskBtn = document.getElementById('startTaskBtn');
     const endTaskBtn = document.getElementById('submitAnswerBtn');
     const cancelTaskBtn = document.getElementById('cancelAnnotationBtn');
+    const config = getConfig();
 
     startTaskBtn.style.display = is_active ? 'none' : 'block';
     endTaskBtn.style.display = is_active ? 'block' : 'none';
@@ -204,8 +205,9 @@ async function openTaskWindow(path, is_new_window = false) {
         showAlert("Authentication failed. Please log out and log in again.");
         return;
     }
+    const config = getConfig();
     const encodedPath = encodeURIComponent(path);
-    const url = `${base_url}/task/auth_redirect/?token=${access_token}&next=${encodedPath}`;
+    const url = `${config.urls.base}/task/auth_redirect/?token=${access_token}&next=${encodedPath}`;
     const window_options = 'height=1000,width=1200,top=0,left=0,toolbar=no,menubar=no,scrollbars=no,resizable=no,location=no,status=no';
     window.open(url, is_new_window ? 'newwindow' : '_blank', is_new_window ? window_options : undefined);
 }
@@ -213,21 +215,29 @@ async function openTaskWindow(path, is_new_window = false) {
 // --- EVENT HANDLERS ---
 
 function handleRegister() {
-    window.open(register_url);
+    const config = getConfig();
+    window.open(config.urls.register);
 }
 
 async function handleLoginAttempt() {
+    const loginBtn = document.getElementById('loginBtn');
+    loginBtn.disabled = true;
+    loginBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Logging in...';
+
     const username = document.getElementById('username').value;
     const password = document.getElementById('password').value;
 
     if (!username || !password) {
         showAlert("Please enter both username and password.");
+        loginBtn.disabled = false;
+        loginBtn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Login';
         return;
     }
 
     const credentials = { username, password, ext: true };
     try {
-        const login_response = await _post(token_login_url, credentials, true, false, false);
+        const config = getConfig();
+        const login_response = await _post(config.urls.token_login, credentials, true, false, false);
         if (login_response?.access && login_response?.refresh) {
             await _set_local({
                 'username': username,
@@ -245,6 +255,8 @@ async function handleLoginAttempt() {
             const error_code = login_response?.error_code ?? -1;
             const message_map = { 1: 1, 2: 2, default: 3 };
             showFailMessage(message_map[error_code] || message_map.default);
+            loginBtn.disabled = false;
+            loginBtn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Login';
         }
     } catch (error) {
         if (error.message === "Authentication failed.") {
@@ -252,28 +264,36 @@ async function handleLoginAttempt() {
         } else {
             showFailMessage(3);
         }
+        loginBtn.disabled = false;
+        loginBtn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Login';
     }
 }
 
 async function handleFeedback() {
     const confirmed = await showConfirm("You are about to go to the task homepage. If you are in the middle of a task, this might interrupt your workflow. Continue?");
     if (confirmed) {
-        window.open(feedback_url);
+        const config = getConfig();
+        window.open(config.urls.home);
     }
 }
 
 async function handleFeedbackUnlogged() {
     const confirmed = await showConfirm("You are about to go to the task homepage. Continue?");
     if (confirmed) {
-        window.open(feedback_url);
+        const config = getConfig();
+        window.open(config.urls.home);
     }
 }
 
 
 async function handleLogout() {
     const tabs = await new Promise(resolve => chrome.tabs.query({ active: true, currentWindow: true }, resolve));
-    if (tabs[0]) {
-        chrome.tabs.sendMessage(tabs[0].id, { type: "msg_from_popup", update_webpage_info: true });
+    if (tabs[0] && tabs[0].id) {
+        chrome.tabs.sendMessage(tabs[0].id, { type: "msg_from_popup", update_webpage_info: true }, (response) => {
+            if (chrome.runtime.lastError) {
+                printDebug("popup", "Could not send message to active tab. It might not have a content script. Error: ", chrome.runtime.lastError.message);
+            }
+        });
     }
     await _remove_local(['username', 'access_token', 'refresh_token', 'logged_in']);
     await sendMessageFromPopup({ command: "alter_logging_status", log_status: false });
@@ -340,6 +360,103 @@ async function handleCancelTask() {
 
 // --- INITIALIZATION ---
 (async function initialize() {
+    await initializeConfig(); // Wait for config to be loaded
+
+    // --- Control Panel Logic ---
+    const controlPanelBtn = document.getElementById('control-panel-btn');
+    const controlPanel = document.getElementById('control-panel');
+    const saveSettingsBtn = document.getElementById('save-settings-btn');
+    const cancelSettingsBtn = document.getElementById('cancel-settings-btn');
+    const loginContent = document.getElementById('login');
+    const loggedInContent = document.getElementById('logged');
+    const localServerAddress = document.getElementById('local-server-address');
+    const remoteServerAddress = document.getElementById('remote-server-address');
+    const restoreDefaultsBtn = document.getElementById('restore-defaults-btn');
+
+    async function saveSettings() {
+        const serverType = document.querySelector('input[name="server-type"]:checked').value;
+        const localAddress = localServerAddress.value;
+        const remoteAddress = remoteServerAddress.value;
+        
+        await new Promise((resolve) => {
+            chrome.storage.local.set({
+                serverType: serverType,
+                localServerAddress: localAddress,
+                remoteServerAddress: remoteAddress
+            }, resolve);
+        });
+    }
+
+    async function loadSettings() {
+        const result = await new Promise((resolve) => {
+            chrome.storage.local.get(['serverType', 'localServerAddress', 'remoteServerAddress'], resolve);
+        });
+
+        if (result.serverType) {
+            document.getElementById('server-type-' + result.serverType).checked = true;
+        }
+        localServerAddress.value = result.localServerAddress || '';
+        remoteServerAddress.value = result.remoteServerAddress || '';
+    }
+
+    async function openControlPanel() {
+        await loadSettings();
+        loginContent.style.display = 'none';
+        loggedInContent.style.display = 'none';
+        controlPanel.style.display = 'block';
+    }
+
+    async function closeControlPanel() {
+        controlPanel.style.display = 'none';
+        const { logged_in } = await _get_local(['logged_in']);
+        if (logged_in) {
+            loggedInContent.style.display = 'block';
+        } else {
+            loginContent.style.display = 'block';
+        }
+    }
+
+    saveSettingsBtn.addEventListener('click', async () => {
+        await saveSettings();
+        const infoMsgContainer = document.getElementById('info-msg-container');
+        const infoMsgText = document.getElementById('info-msg-text');
+        infoMsgText.textContent = 'Saved!';
+        infoMsgContainer.style.display = 'flex';
+        setTimeout(() => {
+            infoMsgContainer.style.display = 'none';
+        }, 2000);
+    });
+
+    restoreDefaultsBtn.addEventListener('click', async () => {
+        const defaultConfig = {
+            serverType: 'local',
+            localServerAddress: 'http://127.0.0.1:8000',
+            remoteServerAddress: 'http://101.6.41.59:32904',
+        };
+
+        document.getElementById('server-type-' + defaultConfig.serverType).checked = true;
+        localServerAddress.value = defaultConfig.localServerAddress;
+        remoteServerAddress.value = defaultConfig.remoteServerAddress;
+
+        await saveSettings();
+
+        const infoMsgContainer = document.getElementById('info-msg-container');
+        const infoMsgText = document.getElementById('info-msg-text');
+        infoMsgText.textContent = "Defaults Restored!";
+        infoMsgContainer.style.display = 'flex';
+        setTimeout(() => {
+            infoMsgContainer.style.display = 'none';
+        }, 2000);
+    });
+
+    controlPanelBtn.addEventListener('click', openControlPanel);
+
+    cancelSettingsBtn.addEventListener('click', async () => {
+        await closeControlPanel();
+    });
+
+
+    // --- Original Initialization Logic ---
     document.getElementById('signupBtn').addEventListener('click', handleRegister);
     document.getElementById('loginBtn').addEventListener('click', handleLoginAttempt);
     document.getElementById('homeBtnLoggedOut').addEventListener('click', handleFeedbackUnlogged);

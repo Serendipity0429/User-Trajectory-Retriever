@@ -10,6 +10,7 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 import os
+from decouple import config
 
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 
@@ -19,14 +20,13 @@ BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 
 # SECURITY WARNING: It is strongly recommended to load the secret key from an environment variable
 # instead of hardcoding it in the settings file. This prevents the key from being exposed in source control.
-SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'f^i$dr8^cga!bvdf1dnru(i79*o=wx3bq+lqpc+c2rx5^9+u=@')
+SECRET_KEY = config('DJANGO_SECRET_KEY', default='s%45k1x(sst=dp92(kzve50jkhr*$)@#(2ly=w1q=_xr@y2(qp')
 
 
 # SECURITY WARNING: Running a production server with DEBUG = True is a major security risk.
 # It exposes sensitive information, such as detailed error pages and configuration details.
 # Always set DEBUG = False in a production environment.
-# DEBUG = os.environ.get('DJANGO_DEBUG', 'True') == 'True'
-DEBUG = True
+DEBUG = config('DJANGO_DEBUG', default=True, cast=bool)
 
 
 # As requested, host permissions are not being strictly configured for this stage.
@@ -64,7 +64,7 @@ MIDDLEWARE = [
 
 SECURE_CONTENT_SECURITY_POLICY = {
     'default-src': ["'self'"],
-    'font-src': ["'self'", 'https://assets.msn.com'],
+    'font-src': ["'self'", '*'],
 }
 
 ROOT_URLCONF = 'annotation_platform.urls'
@@ -101,9 +101,6 @@ DATABASES = {
 }
 
 
-# Internationalization
-# https://docs.djangoproject.com/en/4.2/topics/i18n/
-
 # LANGUAGE_CODE = 'zh-Hans'
 LANGUAGE_CODE = 'en-us'
 
@@ -132,7 +129,6 @@ APPEND_SLASH = True
 
 # Email
 # For production, configure your actual email service provider's settings.
-from decouple import config
 
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = config('EMAIL_HOST')
@@ -149,13 +145,11 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:8080",
     "http://127.0.0.1:8000",
     "http://101.6.41.59:32904",
-    "https://101.6.41.59:32904",
 ]
 CSRF_TRUSTED_ORIGINS = [
     "http://localhost:8080",
     "http://127.0.0.1:8000",
     "http://101.6.41.59:32904",
-    "https://101.6.41.59:32904",
 ]
 CSRF_TRUSTED_ORIGINS_REGEXES = [
     r"^chrome-extension://.*$",
@@ -171,7 +165,7 @@ CORS_ALLOW_METHODS = (
     'VIEW',
 )
 
-IP_TO_LAUNCH = os.environ.get('IP_TO_LAUNCH', 'http://127.0.0.1:8000/')
+IP_TO_LAUNCH = config('IP_TO_LAUNCH', default='http://127.0.0.1:8000/')
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (

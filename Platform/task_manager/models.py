@@ -99,7 +99,7 @@ class PostTaskAnnotation(models.Model):
     unhelpful_paths = models.JSONField(null=True)  # paths that were not helpful, e.g. ["path1", "path2"]
     unhelpful_paths_other = models.TextField(null=True)  # other unhelpful paths
 
-    strategy_shift = models.CharField(max_length=100, null=True)  # strategy shift during the task
+    strategy_shift = models.JSONField(null=True)  # strategy shift during the task
     strategy_shift_other = models.TextField(null=True)  # other strategy shift
 
 

@@ -117,7 +117,7 @@
                         <!-- "Aha!" Moment -->
                         <div class="mb-4 p-3 border rounded">
                             <h5><strong>3. The "Aha!" Moment</strong></h5>
-                            <p>What type of information was most critical to solving this task?</p>
+                            <p>What type of information was most critical to solving this task? <strong>Please select only one answer</strong></p>
                             <div class="w-100" role="group" aria-label="Aha! Moment">
                                 {% for key, value in AHA_MOMENT_MAP.items %}
                                 <div class="d-flex mb-2">
@@ -136,7 +136,7 @@
                         <!-- Unhelpful Paths -->
                         <div class="mb-4 p-3 border rounded">
                             <h5><strong>4. Unhelpful Paths</strong></h5>
-                            <p>Which of these roadblocks did you encounter? <small class="text-muted fw-bold">(Check all that apply)</small></p>
+                            <p>Which of these roadblocks did you encounter? <small class="text-muted fw-bold">Check all that apply</small></p>
                             <div class="w-100" role="group" aria-label="Unhelpful Paths">
                                 {% for key, value in UNHELPFUL_PATHS_MAP.items %}
                                 {% if key == 'no_major_roadblocks' %}
@@ -164,12 +164,12 @@
                         <!-- Strategic Shift -->
                         <div class="mb-4 p-3 border rounded">
                             <h5><strong>5. Strategic Shift</strong></h5>
-                            <p>How did your successful strategy evolve from your initial plan?</p>
+                            <p>How did your successful strategy evolve from your initial plan? <small class="text-muted fw-bold">Check all that apply</small></p>
                             <div class="w-100" role="group" aria-label="Strategic Shift">
                                 {% for key, value in STRATEGY_SHIFT_MAP.items %}
                                 {% if key == 'no_change' %}
                                 <div class="d-flex mb-2">
-                                    <input type="radio" class="btn-check" name="strategy_shift" id="strategy{{ key }}" value="{{ key }}" autocomplete="off" required>
+                                    <input type="checkbox" class="btn-check" name="strategy_shift" id="strategy{{ key }}" value="{{ key }}" autocomplete="off">
                                     <label class="btn btn-outline-primary w-100 text-start" for="strategy{{ key }}" data-bs-toggle="tooltip" data-bs-placement="top" title="{{ STRATEGY_SHIFT_EXPLANATION_MAP|get_item:key }}">{{ value|safe }}</label>
                                 </div>
                                 <hr>
@@ -178,7 +178,7 @@
                                 {% for key, value in STRATEGY_SHIFT_MAP.items %}
                                 {% if key != 'no_change' %}
                                 <div class="d-flex mb-2">
-                                    <input type="radio" class="btn-check" name="strategy_shift" id="strategy{{ key }}" value="{{ key }}" autocomplete="off" required>
+                                    <input type="checkbox" class="btn-check" name="strategy_shift" id="strategy{{ key }}" value="{{ key }}" autocomplete="off">
                                     <label class="btn btn-outline-primary {% if key != 'other' %}w-100{% endif %} text-start" for="strategy{{ key }}" data-bs-toggle="tooltip" data-bs-placement="top" title="{{ STRATEGY_SHIFT_EXPLANATION_MAP|get_item:key }}">{{ value|safe }}</label>
                                     {% if key == 'other' %}
                                     <input type="text" name="strategy_shift_other" class="form-control ms-2" disabled placeholder="Please specify...">
@@ -254,16 +254,33 @@
 
         noRoadblocks.change(function() {
             if ($(this).is(':checked')) {
-                otherRoadblocks.prop('checked', false).prop('disabled', true);
-                $('input[name="unhelpful_paths_other"]').prop('disabled', true);
-            } else {
-                otherRoadblocks.prop('disabled', false);
+                otherRoadblocks.prop('checked', false);
+                // Manually trigger change on 'other' to disable text input
+                $('input[name="unhelpful_paths"][value="other"]').trigger('change');
             }
         });
 
         otherRoadblocks.change(function() {
             if ($(this).is(':checked')) {
                 noRoadblocks.prop('checked', false);
+            }
+        });
+
+        // Strategic shift mutual exclusivity
+        const noChange = $('#strategyno_change');
+        const otherStrategies = $('input[name="strategy_shift"]').not(noChange);
+
+        noChange.change(function() {
+            if ($(this).is(':checked')) {
+                otherStrategies.prop('checked', false);
+                // Manually trigger change on 'other' to disable text input
+                $('input[name="strategy_shift"][value="other"]').trigger('change');
+            }
+        });
+
+        otherStrategies.change(function() {
+            if ($(this).is(':checked')) {
+                noChange.prop('checked', false);
             }
         });
 
@@ -307,15 +324,23 @@
             // Validation for strategic shift
             const strategyShift = $('input[name="strategy_shift"]:checked');
             const strategyShiftOther = $('input[name="strategy_shift_other"]');
-            if (!strategyShift.val()) {
+            if (strategyShift.length === 0) {
                 const container = $('input[name="strategy_shift"]').closest('.w-100');
                 container.addClass('is-invalid');
                 setFocus(container.find('input').first());
                 isValid = false;
-            } else if (strategyShift.val() === 'other' && strategyShiftOther.val().trim() === '') {
-                strategyShiftOther.addClass('is-invalid');
-                setFocus(strategyShiftOther);
-                isValid = false;
+            } else {
+                let isOtherChecked = false;
+                strategyShift.each(function() {
+                    if ($(this).val() === 'other') {
+                        isOtherChecked = true;
+                    }
+                });
+                if (isOtherChecked && strategyShiftOther.val().trim() === '') {
+                    strategyShiftOther.addClass('is-invalid');
+                    setFocus(strategyShiftOther);
+                    isValid = false;
+                }
             }
 
             if (!isValid) {

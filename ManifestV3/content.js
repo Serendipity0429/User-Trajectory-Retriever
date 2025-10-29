@@ -38,7 +38,7 @@ async function getElementDetails() {
                        nth++;
                 }
                 if (nth != 1)
-                    selector += `:nth-of-type(${nth})`;
+                    selector += ":nth-of-type(" + nth + ")";
             }
             path.unshift(selector);
             el = el.parentNode;
@@ -107,10 +107,10 @@ function displayQuestionBox(question) {
         pointer-events: none;
     `;
     box.innerHTML = `
-        <h5 style="margin-bottom: 0.5rem;margin-top: 0;"><strong>Task Question</strong></h5>
-        <p style="margin-bottom: 0;">${question}</p>
-        <div id="evidence-count-container" style="margin-top: 10px; font-size: 0.9rem; color: #6c757d;">
-            Evidence Collected: <span id="evidence-count">0</span>
+        <h5 style=\"margin-bottom: 0.5rem;margin-top: 0;"><strong>Task Question</strong></h5>
+        <p style=\"margin-bottom: 0;">${question}</p>
+        <div id=\"evidence-count-container\" style=\"margin-top: 10px; font-size: 0.9rem; color: #6c757d;">
+            Evidence Collected: <span id=\"evidence-count\">0</span>
         </div>
     `;
 
@@ -191,6 +191,7 @@ async function setupTaskUI() {
 
 async function initialize() {
     try {
+        await initializeConfig(); // Ensure config is loaded before proceeding
         const login_response = await new Promise((resolve, reject) => {
             chrome.runtime.sendMessage({ type: MSG_TYPE_POPUP, command: "check_logging_status" }, (response) => {
                 if (chrome.runtime.lastError) {
@@ -211,8 +212,6 @@ async function initialize() {
             printDebug("content", "No active task. Exiting content script.");
             return;
         }
-
-        await setupTaskUI();
 
         // Monkey-patch history API for SPA navigation tracking
         (function (history) {
@@ -246,7 +245,6 @@ async function initialize() {
         })(window.history);
 
         viewState.initialize();
-        event_tracker.initialize();
 
         if (!_is_server_page(_content_vars.url_now)) {
             const { is_recording_paused } = await new Promise((resolve) => {
@@ -271,8 +269,10 @@ async function initialize() {
             });
             printDebug("content", "rrweb recording started.");
         }
-
-    } catch (error) {
+            
+        printDebug("content", "content.js is loaded");
+        await setupTaskUI();
+        } catch (error) {
         console.error("Error during main initialization:", error);
     }
 }
@@ -281,7 +281,8 @@ async function initialize() {
 
 document.addEventListener("DOMContentLoaded", initialize);
 
-window.addEventListener('popstate', () => {
+window.addEventListener('popstate', async () => {
+    await initializeConfig(); // Ensure config is loaded
     if (_content_vars.url_now !== window.location.href) {
         _content_vars.referrer_now = _content_vars.url_now;
         _content_vars.url_now = window.location.href;
@@ -348,5 +349,3 @@ chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
         }
     }
 });
-
-printDebug("content", "content.js is loaded");

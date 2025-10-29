@@ -34,6 +34,9 @@
   "background": {
     "service_worker": "background.js"
   },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; connect-src http://127.0.0.1:8000 http://101.6.41.59:32904;"
+  },
   "content_scripts": [
     {
       "matches": [
@@ -63,6 +66,8 @@
         "https://101.6.41.59:32904/*"
       ],
       "js": [
+        "config.js",
+        "utils.js",
         "iframe.js"
       ],
       "run_at": "document_start",
@@ -85,10 +90,11 @@
         "https://101.6.41.59:32904/*"
       ],
       "js": [
+        "config.js",
         "utils.js",
+        "page.js",
         "mouseMove.js",
         "message.js",
-        "page.js",
         "general.js",
         "content.js"
       ],

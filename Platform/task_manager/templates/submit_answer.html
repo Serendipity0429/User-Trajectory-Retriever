@@ -107,32 +107,12 @@
                                  <div class="question-text">
                                      {{ question }}
                                  </div>
-                             </div>                        </div>
-
-                        <div class="mb-4 p-3 border rounded">
-                            <h5><strong>1. Your Answer</strong></h5>
-                            <textarea class="form-control" id="answer" name="answer" rows="3" required></textarea>
-                            <div class="invalid-feedback">Please provide your answer.</div>
-                        </div>
-
-                        <div class="mb-4 p-3 border rounded">
-                            <h5><strong>2. Confidence</strong></h5>
-                            <p>How confident are you in your answer?</p>
-                            <div class="btn-group" role="group" aria-label="Confidence">
-                                {% for value, text in confidence_choices %}
-                                <input type="radio" class="btn-check" name="confidence_radio" id="c{{ forloop.counter }}" value="{{ value }}" autocomplete="off" required>
-                                <label class="btn btn-outline-primary" for="c{{ forloop.counter }}">
-                                    <strong>{{ value }}</strong><br>{{ text|split:" - "|slice:"1:"|join:" - " }}
-                                </label>
-                                {% endfor %}
-                            </div>
-                            <input type="hidden" name="confidence" id="confidence_hidden" required>
-                            <div class="invalid-feedback">Please select your confidence level.</div>
+                             </div>                        
                         </div>
 
                         <div id="justification-container" class="mb-4 p-3 border rounded">
                             <div class="d-flex justify-content-between align-items-center">
-                                <h5 class="mb-0"><strong>3. Justifications</strong></h5>
+                                <h5 class="mb-0"><strong>1. Justifications</strong></h5>
                                 <button type="button" id="refresh-justifications" class="btn btn-sm btn-outline-primary d-inline-flex align-items-center">
                                     <span class="icon-wrapper"><i class="bi bi-arrow-repeat"></i></span>
                                     <span class="button-text ms-1">Refresh</span>
@@ -201,8 +181,30 @@
                         </div>
 
                         <div class="mb-4 p-3 border rounded">
+                            <h5><strong>2. Your Answer</strong></h5>
+                            <textarea class="form-control" id="answer" name="answer" rows="3" required></textarea>
+                            <div class="invalid-feedback">Please provide your answer.</div>
+                        </div>
+
+                        <div class="mb-4 p-3 border rounded">
+                            <h5><strong>3. Confidence</strong></h5>
+                            <p>How confident are you in your answer?</p>
+                            <div class="btn-group" role="group" aria-label="Confidence">
+                                {% for value, text in confidence_choices %}
+                                <input type="radio" class="btn-check" name="confidence_radio" id="c{{ forloop.counter }}" value="{{ value }}" autocomplete="off" required>
+                                <label class="btn btn-outline-primary" for="c{{ forloop.counter }}">
+                                    <strong>{{ value }}</strong><br>{{ text|split:" - "|slice:"1:"|join:" - " }}
+                                </label>
+                                {% endfor %}
+                            </div>
+                            <input type="hidden" name="confidence" id="confidence_hidden" required>
+                            <div class="invalid-feedback">Please select your confidence level.</div>
+                        </div>
+
+
+                        <div class="mb-4 p-3 border rounded">
                             <h5><strong>4. Answer Formulation Method</strong></h5>
-                            <p> Which method did you primarily use to formulate your answer?</p>
+                            <p> Which method did you primarily use to formulate your answer? <strong> Please select only one answer </strong>.</p>
                             <div class="w-100" role="group" aria-label="Answer Formulation Method">
                                 {% for value, text in answer_formulation_choices %}
                                 <div class="d-flex mb-2">

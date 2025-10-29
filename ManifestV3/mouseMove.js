@@ -72,5 +72,3 @@ const mouseRecord = {
         this.scrollPath = [];
     }
 };
-
-printDebug("mouseMove", "mouseMove.js is loaded");

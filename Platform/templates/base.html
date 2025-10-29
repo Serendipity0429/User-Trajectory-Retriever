@@ -4,6 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token }}">
     <title>{% block title %}THUIR Annotation Platform{% endblock %}</title>
     <link rel="icon" href="{% static 'img/THUIR32.png' %}" type="image/png"/>
 
@@ -20,39 +21,35 @@
     <link href="{% static 'css/custom.css' %}" rel="stylesheet">
     <link href="{% static 'css/vendor/bootstrap-icons.css' %}" rel="stylesheet">
     <link href="{% static 'css/rrweb-player.css' %}" rel="stylesheet"/>
-    <link href="{% static 'css/dark.css' %}" rel="stylesheet">
+    <link id="dark-mode-stylesheet" href="{% static 'css/dark.css' %}" rel="stylesheet" disabled>
     <link href="{% static 'css/custom_bootstrap_overrides.css' %}" rel="stylesheet">
 
-    <style>
-        .option-number {
-            display: inline-block;
-            width: 20px; /* Adjust as needed */
-            text-align: right;
-            margin-right: 10px; /* Space between number and text */
-            font-weight: bold;
-        }
-        .option-text {
-            display: inline-block;
-        }
-    </style>
 
     <script>
-        // Apply dark mode immediately to prevent flickering
+        // Apply settings immediately to prevent flickering
         (function() {
             if (localStorage.getItem('darkMode') === 'enabled') {
                 document.documentElement.classList.add('dark-mode');
+                document.getElementById('dark-mode-stylesheet').disabled = false;
+            }
+            if (localStorage.getItem('compactMode') === 'enabled') {
+                document.documentElement.classList.add('compact-mode');
+                document.getElementById('compact-mode-stylesheet').disabled = false;
+            }
+            const savedFontSize = localStorage.getItem('fontSize');
+            if (savedFontSize) {
+                document.documentElement.style.fontSize = savedFontSize + 'px';
             }
         })();
     </script>
 
     {% block css %}{% endblock %}
-    <script src="{% static 'js/rrweb-player.js' %}"></script>
     {% block head %}{% endblock %}
 </head>
 <body>
     <div class="wrapper">
         <!-- Sidebar -->
-        <nav id="sidebar" class="bg-dark active">
+        <nav id="sidebar" class="bg-dark">
             <div class="sidebar-header">
                 <h2>
                     <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -94,18 +91,83 @@
             </ul>
         </nav>
 
+        <div id="sidebar-backdrop"></div>
         <!-- Page Content -->
         <div id="content">
             <header class="sticky-top">
-                <nav class="navbar navbar-expand-lg navbar-light bg-light">
+                <nav class="navbar navbar-light bg-light custom-navbar">
                     <div class="container-fluid">
-                        <button type="button" id="sidebarCollapse">
-                            <span>Toggle Sidebar</span>
-                            <i class="bi bi-chevron-right"></i>
-                        </button>
-                        <div class="form-check form-switch ms-auto">
-                            <input class="form-check-input" type="checkbox" id="darkModeSwitch">
-                            <label class="form-check-label" for="darkModeSwitch">Dark Mode</label>
+                        <div class="d-flex align-items-center w-100">
+                            <div class="d-flex align-items-center">
+                                <button type="button" id="sidebarCollapse">
+                                    <span class="sidebar-toggle-text">Toggle Sidebar</span>
+                                    <i class="bi bi-chevron-right"></i>
+                                </button>
+                            </div>
+                            <div class="flex-grow-1 d-flex justify-content-center">
+                                {% block navbar_extra %}{% endblock %}
+                            </div>
+                            <div class="d-flex align-items-center">
+                                <div class="dropdown">
+                                    <button type="button" id="pageSettingsDropdown" class="page-settings-text-button" data-bs-toggle="dropdown" aria-expanded="false">
+                                        <span class="page-settings-text me-2">Page Settings</span>
+                                        <i class="bi bi-chevron-down"></i>
+                                    </button>
+                                    <div class="dropdown-menu dropdown-menu-end page-settings-dropdown-menu" aria-labelledby="pageSettingsDropdown">
+                                        <div class="px-3 py-1">
+                                            <label class="form-label d-flex align-items-center pb-1"><i class="bi bi-fonts me-2"></i>Font Size</label>
+                                            <div class="btn-group font-size-controls" role="group" aria-label="Font size controls">
+                                                <button id="decrease-font" class="btn btn-sm btn-outline-secondary"><i class="bi bi-zoom-out"></i></button>
+                                                <button id="increase-font" class="btn btn-sm btn-outline-secondary"><i class="bi bi-zoom-in"></i></button>
+                                                <button id="restore-font" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-counterclockwise"></i></button>
+                                            </div>
+                                        </div>
+                                        <div class="dropdown-divider"></div>
+                                        <div class="px-3 py-1">
+                                            <label class="form-label d-flex align-items-center"><i class="bi bi-gear-wide-connected me-2 pb-1"></i>Playback</label>
+                                            <div class="d-flex flex-column">
+                                                <div class="form-check form-switch mb-2">
+                                                    <input class="form-check-input" type="checkbox" id="skipInactiveSwitch">
+                                                    <label class="form-check-label" for="skipInactiveSwitch">Skip Inactivity</label>
+                                                </div>
+                                                <div class="btn-group" role="group" aria-label="Playback speed">
+                                                    <button type="button" class="btn btn-sm btn-outline-secondary playback-speed-btn" data-speed="1">1x</button>
+                                                    <button type="button" class="btn btn-sm btn-outline-secondary playback-speed-btn" data-speed="2">2x</button>
+                                                    <button type="button" class="btn btn-sm btn-outline-secondary playback-speed-btn" data-speed="4">4x</button>
+                                                    <button type="button" class="btn btn-sm btn-outline-secondary playback-speed-btn" data-speed="8">8x</button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="dropdown-divider"></div>
+                                        <div class="px-3 py-1">
+                                            <label class="form-label d-flex align-items-center"><i class="bi bi-distribute-vertical me-2 pb-1"></i>Layout</label>
+                                            <div class="form-check form-switch">
+                                                <input class="form-check-input" type="checkbox" id="compactModeSwitch">
+                                                <label class="form-check-label px-2" for="compactModeSwitch">Compact Mode</label>
+                                            </div>
+                                        </div>
+                                        <div class="dropdown-divider"></div>
+                                        <div class="px-3 py-1">
+                                            <label class="form-label d-flex align-items-center"><i class="bi bi-palette-fill me-2 pb-1"></i>Theme</label>
+                                            <div class="form-check form-switch">
+                                                <input class="form-check-input" type="checkbox" id="darkModeSwitch">
+                                                <label class="form-check-label" for="darkModeSwitch">
+                                                    <span class="light-mode-elements">
+                                                        <i class="bi bi-sun-fill px-2"></i><span class="mode-text"> Light Mode</span>
+                                                    </span>
+                                                    <span class="dark-mode-elements">
+                                                        <i class="bi bi-moon-fill px-2"></i><span class="mode-text"> Dark Mode</span>
+                                                    </span>
+                                                </label>
+                                            </div>
+                                        </div>
+                                        <div class="dropdown-divider"></div>
+                                        <div class="px-3 py-1">
+                                            <button id="clear-settings" class="btn btn-sm btn-danger w-100"><i class="bi bi-trash-fill me-2"></i>Clear Cached Settings</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </nav>
@@ -137,6 +199,10 @@
                 $(this).find('i').toggleClass('bi-chevron-right bi-chevron-left');
             });
 
+            $('#sidebar-backdrop').on('click', function () {
+                $('#sidebarCollapse').trigger('click');
+            });
+
             // Dark Mode Switcher
             const darkModeSwitch = document.getElementById('darkModeSwitch');
             const rootElement = document.documentElement;
@@ -144,17 +210,238 @@
             // Set the switch to the correct state on page load
             if (localStorage.getItem('darkMode') === 'enabled') {
                 darkModeSwitch.checked = true;
+                document.getElementById('dark-mode-stylesheet').disabled = false;
             }
 
             darkModeSwitch.addEventListener('change', () => {
                 if (darkModeSwitch.checked) {
                     rootElement.classList.add('dark-mode');
+                    document.getElementById('dark-mode-stylesheet').disabled = false;
                     localStorage.setItem('darkMode', 'enabled');
                 } else {
                     rootElement.classList.remove('dark-mode');
+                    document.getElementById('dark-mode-stylesheet').disabled = true;
                     localStorage.setItem('darkMode', 'disabled');
                 }
             });
+
+            // Font Size Adjuster
+            const increaseFontButton = document.getElementById('increase-font');
+            const decreaseFontButton = document.getElementById('decrease-font');
+            const restoreFontButton = document.getElementById('restore-font');
+            const body = document.body;
+            const defaultFontSize = 16;
+
+            function checkFontSize() {
+                const currentFontSize = parseFloat(window.getComputedStyle(document.documentElement, null).getPropertyValue('font-size'));
+                if (currentFontSize > 20) { // Threshold for "too large"
+                    document.documentElement.classList.add('font-size-large');
+                } else {
+                    document.documentElement.classList.remove('font-size-large');
+                }
+            }
+
+            // Playback Speed Control
+            const playbackSpeedButtons = document.querySelectorAll('.playback-speed-btn');
+            
+            function applyPlaybackSpeed(speed) {
+                playbackSpeedButtons.forEach(button => {
+                    if (button.dataset.speed === speed) {
+                        button.classList.add('active');
+                    } else {
+                        button.classList.remove('active');
+                    }
+                });
+                localStorage.setItem('playbackSpeed', speed);
+                // Note: This only sets the preference. The rrweb player needs to read this value.
+            }
+
+            playbackSpeedButtons.forEach(button => {
+                button.addEventListener('click', (event) => {
+                    event.stopPropagation();
+                    const speed = event.target.dataset.speed;
+                    applyPlaybackSpeed(speed);
+                });
+            });
+
+            // Skip Inactivity Switch
+            const skipInactiveSwitch = document.getElementById('skipInactiveSwitch');
+
+            skipInactiveSwitch.addEventListener('change', () => {
+                const enabled = skipInactiveSwitch.checked;
+                localStorage.setItem('skipInactive', enabled ? 'enabled' : 'disabled');
+                // Note: This only sets the preference. The rrweb player needs to read this value.
+            });
+
+            // Compact Mode Switch
+            const compactModeSwitch = document.getElementById('compactModeSwitch');
+
+            function applyCompactLayout(isCompact) {
+                const content = document.getElementById('content');
+                if (!content) return;
+
+                const elements = content.querySelectorAll('[class*="p-"], [class*="m-"], p, label.btn');
+                const spacingPattern = /^(p|m)(t|b|s|e|x|y)?-(\d)$/;
+                const classMap = { '5': '3', '4': '2', '3': '1', '2': '1', '1': '0' };
+
+                elements.forEach(el => {
+                    // Handle spacing utility classes
+                    if (isCompact) {
+                        if (el.hasAttribute('data-original-classes')) return;
+
+                        const originalClassesToStore = [];
+                        const classesToProcess = [...el.classList];
+
+                        classesToProcess.forEach(cls => {
+                            const match = cls.match(spacingPattern);
+                            if (match) {
+                                const originalSize = match[3];
+                                const newSize = classMap[originalSize];
+                                if (newSize !== undefined && newSize !== originalSize) {
+                                    originalClassesToStore.push(cls);
+                                    el.classList.remove(cls);
+                                    el.classList.add(cls.replace(originalSize, newSize));
+                                }
+                            }
+                        });
+
+                        if (originalClassesToStore.length > 0) {
+                            el.setAttribute('data-original-classes', originalClassesToStore.join(' '));
+                        }
+                    } else {
+                        if (el.hasAttribute('data-original-classes')) {
+                            const originalClasses = el.getAttribute('data-original-classes').split(' ');
+                            
+                            originalClasses.forEach(originalCls => {
+                                const match = originalCls.match(spacingPattern);
+                                if (match) {
+                                    const originalSize = match[3];
+                                    const newSize = classMap[originalSize];
+                                    if (newSize !== undefined) {
+                                        const compactedCls = originalCls.replace(originalSize, newSize);
+                                        el.classList.remove(compactedCls);
+                                    }
+                                }
+                            });
+
+                            originalClasses.forEach(cls => {
+                                el.classList.add(cls);
+                            });
+
+                            el.removeAttribute('data-original-classes');
+                        }
+                    }
+
+                    // Specifically handle <p> tag default margins
+                    if (el.tagName === 'P') {
+                        if (isCompact) {
+                            const hasMarginBottom = [...el.classList].some(cls => cls.startsWith('mb-'));
+                            if (!hasMarginBottom) {
+                                el.classList.add('mb-0');
+                                el.setAttribute('data-compact-p', 'true'); // Mark it
+                            }
+                        } else {
+                            if (el.hasAttribute('data-compact-p')) {
+                                el.classList.remove('mb-0');
+                                el.removeAttribute('data-compact-p');
+                            }
+                        }
+                    }
+
+                    // Specifically handle choice buttons
+                    if (el.tagName === 'LABEL' && el.classList.contains('btn')) {
+                        if (isCompact) {
+                            el.style.paddingTop = '0.25rem';
+                            el.style.paddingBottom = '0.25rem';
+                            el.style.fontSize = '0.9rem';
+                            el.setAttribute('data-compact-choice-btn', 'true');
+                        } else {
+                            if (el.hasAttribute('data-compact-choice-btn')) {
+                                el.style.paddingTop = '';
+                                el.style.paddingBottom = '';
+                                el.style.fontSize = '';
+                                el.removeAttribute('data-compact-choice-btn');
+                            }
+                        }
+                    }
+                });
+            }
+
+            compactModeSwitch.addEventListener('change', () => {
+                const isCompact = compactModeSwitch.checked;
+                applyCompactLayout(isCompact);
+                localStorage.setItem('compactMode', isCompact ? 'enabled' : 'disabled');
+            });
+
+            // Clear Settings Button
+            const clearSettingsButton = document.getElementById('clear-settings');
+
+            clearSettingsButton.addEventListener('click', (event) => {
+                event.stopPropagation();
+                if (confirm('Are you sure you want to clear all cached settings and restore defaults?')) {
+                    localStorage.clear();
+                    window.location.reload();
+                }
+            });
+
+            // Function to initialize all settings from localStorage on page load
+            function initializeSettings() {
+                // Font Size
+                const savedFontSize = localStorage.getItem('fontSize');
+                if (savedFontSize) {
+                    document.documentElement.style.fontSize = savedFontSize + 'px';
+                }
+                checkFontSize();
+
+                // Dark Mode
+                if (localStorage.getItem('darkMode') === 'enabled') {
+                    darkModeSwitch.checked = true;
+                    rootElement.classList.add('dark-mode');
+                    document.getElementById('dark-mode-stylesheet').disabled = false;
+                }
+
+                // Playback Speed
+                const savedSpeed = localStorage.getItem('playbackSpeed') || '1';
+                applyPlaybackSpeed(savedSpeed);
+
+                // Skip Inactivity
+                if (localStorage.getItem('skipInactive') === 'enabled') {
+                    skipInactiveSwitch.checked = true;
+                }
+
+                // Compact Mode
+                if (localStorage.getItem('compactMode') === 'enabled') {
+                    compactModeSwitch.checked = true;
+                    applyCompactLayout(true);
+                }
+            }
+
+            // Initialize all settings when the document is ready
+            initializeSettings();
+
+            increaseFontButton.addEventListener('click', (event) => {
+                event.stopPropagation();
+                changeFontSize(1);
+            });
+
+            decreaseFontButton.addEventListener('click', (event) => {
+                event.stopPropagation();
+                changeFontSize(-1);
+            });
+
+            restoreFontButton.addEventListener('click', (event) => {
+                event.stopPropagation();
+                document.documentElement.style.fontSize = defaultFontSize + 'px';
+                localStorage.removeItem('fontSize');
+            });
+
+            function changeFontSize(step) {
+                const currentFontSize = parseFloat(window.getComputedStyle(document.documentElement, null).getPropertyValue('font-size'));
+                const newSize = currentFontSize + step;
+                document.documentElement.style.fontSize = newSize + 'px';
+                localStorage.setItem('fontSize', newSize);
+                checkFontSize();
+            }
 
             // Handle floating labels for select elements
             function updateUserInterface() {
@@ -178,9 +465,20 @@
                     }
                 });
             });
+
+            // Page Settings Dropdown Icon Toggle
+            const pageSettingsDropdown = document.getElementById('pageSettingsDropdown');
+            if (pageSettingsDropdown) {
+                pageSettingsDropdown.addEventListener('show.bs.dropdown', function () {
+                    this.querySelector('i').classList.replace('bi-chevron-down', 'bi-chevron-up');
+                });
+                pageSettingsDropdown.addEventListener('hide.bs.dropdown', function () {
+                    this.querySelector('i').classList.replace('bi-chevron-up', 'bi-chevron-down');
+                });
+            }
         });
     </script>
 
-    {% block scripts %}{% endblock %}
+    {% block scripts %}<script src="{% static 'js/rrweb-player.js' %}"></script>{% endblock %}
 </body>
 </html>

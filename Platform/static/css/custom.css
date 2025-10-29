@@ -1,14 +1,19 @@
+:root {
+    --custom-dark-blue: #021e4d;
+}
+
 /*                                                                                                             
     MAIN STYLE                                                                                                 
 */                                                                                                             
 body {                                                                                                         
     font-family: 'Noto Sans SC', sans-serif;                                                                   
     background: #f8f9fa;                                                                                       
-    color: #333;                                                                                               
+    color: #333;
+    font-size: 18px;
 }                                                                                                              
                                                                                                                
 p {                                                                                                            
-    font-size: 1.1em;                                                                                          
+    font-size: inherit;                                                                                          
     font-weight: 300;                                                                                          
     line-height: 1.7em;                                                                                        
     color: #555;                                                                                               
@@ -49,27 +54,30 @@ a, a:hover, a:focus {
     width: 100%;                                                                                               
 }                                                                                                              
                                                                                                                
-#sidebar {                                                                                                     
-    width: 250px;                                                                                              
-    position: fixed;                                                                                           
-    top: 0;                                                                                                    
-    left: 0;                                                                                                   
-    height: 100vh;                                                                                             
-    z-index: 999;                                                                                              
-    background: #343a40;                                                                                       
-    color: #fff;                                                                                               
-    transition: all 0.3s;                                                                                      
-    overflow-y: auto;                                                                                          
-}                                                                                                              
-                                                                                                               
-#sidebar.active {                                                                                              
-    left: -250px;                                                                                              
-}                                                                                                              
-                                                                                                               
+#sidebar {
+    width: 250px;
+    position: fixed;
+    top: 0;
+    left: -250px;
+    height: 100%;
+    z-index: 999;
+    background: #343a40;
+    color: #fff;
+    transition: all 0.3s;
+    overflow-y: auto;
+}
+
+#sidebar.active {
+    left: 0;
+}                                                                                                               
 #sidebar .sidebar-header {                                                                                     
     padding: 20px;                                                                                             
     background: #212529;                                                                                       
 }                                                                                                              
+
+#sidebar .sidebar-header h2 {
+    color: #fff;
+}
                                                                                                                
 #sidebar ul.components {                                                                                       
     padding: 20px 0;                                                                                           
@@ -90,11 +98,21 @@ a, a:hover, a:focus {
     background: #fff;                                                                                          
 }                                                                                                              
                                                                                                                
-#sidebar ul li.active > a, a[aria-expanded="true"] {                                                          
-    color: #fff;                                                                                               
-    background: transparent;                                                                                   
-}                                                                                                              
-                                                                                                               
+#sidebar ul li.active > a, a[aria-expanded="true"] {
+    color: #fff;
+    background: transparent;
+}
+
+#sidebar-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 998;
+    display: none;
+}                                                                                                               
 ul ul a {                                                                                                      
     font-size: 0.9em !important;                                                                               
     padding-left: 30px !important;                                                                             
@@ -104,17 +122,16 @@ ul ul a {
 /* ---------------------------------------------------                                                         
     CONTENT STYLE                                                                                              
 ----------------------------------------------------- */                                                       
-#content {                                                                                                     
-    padding: 20px;                                                                                             
-    min-height: 100vh;                                                                                         
-    transition: margin-left 0.3s;                                                                              
-    margin-left: 250px;                                                                                        
-}                                                                                                              
-                                                                                                               
-#sidebar.active ~ #content {                                                                                   
-    margin-left: 0;                                                                                            
-}                                                                                                              
-                                                                                                               
+#content {
+    padding: 20px;
+    min-height: 100vh;
+    transition: margin-left 0.3s;
+    margin-left: 0;
+}
+
+#sidebar.active ~ #content {
+    margin-left: 250px;
+}                                                                                                               
 /* ---------------------------------------------------                                                         
     TASK CARDS                                                                                                 
 ----------------------------------------------------- */                                                       
@@ -151,7 +168,7 @@ ul ul a {
 }                                                                                                              
                                                                                                                
 .sortable-placeholder {                                                                                        
-    border: 2px dashed #021e4d;                                                                                
+    border: 2px dashed var(--custom-dark-blue);                                                                                
     background: #f8f9fa;                                                                                       
 }                                                                                                              
                                                                                                                
@@ -162,7 +179,7 @@ ul ul a {
                                                                                                                
 .priority-number {                                                                                             
     font-weight: bold;                                                                                         
-    color: #021e4d;                                                                                            
+    color: var(--custom-dark-blue);                                                                                            
     margin-right: 10px;                                                                                        
     min-width: 20px;                                                                                           
     text-align: center;                                                                                        
@@ -182,7 +199,7 @@ ul ul a {
 .tooltip-text {                                                                                                
     visibility: hidden;                                                                                        
     width: 250px;                                                                                              
-    background-color: #021e4d;                                                                                 
+    background-color: var(--custom-dark-blue);                                                                                 
     color: #fff;                                                                                               
     text-align: center;                                                                                        
     border-radius: 6px;                                                                                        
@@ -205,18 +222,37 @@ ul ul a {
 /* ---------------------------------------------------                                                         
     MEDIAQUERIES                                                                                               
 ----------------------------------------------------- */                                                       
-@media (max-width: 768px) {                                                                                    
-    #sidebar {                                                                                                 
-        left: -250px;                                                                                          
-    }                                                                                                          
-    #sidebar.active {                                                                                          
-        left: 0;                                                                                               
-    }                                                                                                          
-    #content {                                                                                                 
-        margin-left: 0;                                                                                        
-    }                                                                                                          
-}                                                                                                              
-                                                                                                               
+@media (max-width: 768px) {
+    #sidebar {
+        width: 200px;
+        left: -200px;
+    }
+
+    #sidebar.active {
+        left: 0;
+    }
+
+    #sidebar.active ~ #content {
+        margin-left: 200px;
+    }
+
+    #sidebar-backdrop {
+        display: block;
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity 0.3s, visibility 0.3s;
+    }
+
+    #sidebar.active ~ #sidebar-backdrop {
+        opacity: 1;
+        visibility: visible;
+    }
+
+    #content {
+        margin-left: 0;
+        transition: margin-left 0.3s;
+    }
+}                                                                                                               
                                                                                                                
 #sidebarCollapse {                                                                                             
     border: none;                                                                                              
@@ -250,18 +286,18 @@ h2.text-success {
                                                                                                                
 /* Style for the range input thumb */                                                                          
 .form-range::-webkit-slider-thumb {                                                                            
-    background-color: #021e4d;                                                                                 
+    background-color: var(--custom-dark-blue);                                                                                 
 }                                                                                                              
                                                                                                                
 .form-range::-moz-range-thumb {                                                                                
-    background-color: #021e4d;                                                                                 
+    background-color: var(--custom-dark-blue);                                                                                 
 }                                                                                                              
                                                                                                                
 .form-check-input:checked {                                                                                    
-    background-color: #021e4d;                                                                                 
-    border-color: #021e4d;                                                                                     
-}                                                                                                              
-                                                                                                               
+    background-color: var(--custom-dark-blue);                                                                                 
+    border-color: var(--custom-dark-blue);                                                                                     
+}                         
+                                                                                                         
 .btn-view-task   {                                                                                             
     background-color: #0d6efd !important;                                                                      
     border-color: #0d6efd !important;                                                                          
@@ -284,11 +320,12 @@ h2.text-success {
     font-size: 1.2em !important;                                                                               
 }                                                                                                              
                                                                                                                
-.question-text {                                                                                               
-    color: black !important;                                                                                   
-    font-weight: bold !important;                                                                              
-}                                                                                                              
                                                                                                                
+.form-control {
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
+    transition: border-color .15s ease-in-out,box-shadow .15s ease-in-out;
+}
+
 .form-floating > .form-control {                                                                               
     padding-right: 2.5rem; /* Make space for the icon */                                                       
 }                                                                                                              
@@ -313,7 +350,7 @@ h2.text-success {
 }                                                                                                              
                                                                                                                
 .bg-custom-dark-blue {                                                                                         
-    background-color: #021e4d;                                                                                 
+    background-color: var(--custom-dark-blue);                                                                                 
     color: #fff;                                                                                               
 }                                                                                                              
                                                                                                                
@@ -322,8 +359,8 @@ h2.text-success {
 }                                                                                                              
                                                                                                                
 .btn-custom-dark-blue {                                                                                        
-    background-color: #021e4d;                                                                                 
-    border-color: #021e4d;                                                                                     
+    background-color: var(--custom-dark-blue);                                                                                 
+    border-color: var(--custom-dark-blue);                                                                                     
     color: #fff;                                                                                               
 }                                                                                                              
                                                                                                                
@@ -340,23 +377,392 @@ h2.text-success {
 }                                                                                                              
                                                                                                                
 .btn-outline-custom-dark-blue {                                                                                
-    color: #021e4d;                                                                                            
-    border-color: #021e4d;                                                                                     
+    color: var(--custom-dark-blue);                                                                                            
+    border-color: var(--custom-dark-blue);                                                                                     
 }                                                                                                              
                                                                                                                
 .btn-check:not(:checked) + .btn-outline-custom-dark-blue:hover {                                               
-    color: #021e4d;                                                                                            
-    border-color: #021e4d;                                                                                     
-    background-color: transparent;                                                                             
-}                                                                                                              
-                                                                                                               
-.btn-check:checked + .btn-outline-custom-dark-blue,                                                            
-.btn-check:checked + .btn-outline-custom-dark-blue:hover {                                                     
-    color: #fff;                                                                                               
-    background-color: #021e4d;                                                                                 
-    border-color: #021e4d;                                                                                     
+    color: var(--custom-dark-blue);                                                                                            
+    border-color: var(--custom-dark-blue);      
+    background-color: rgba(13, 110, 253, 0.1);
+}
+
+.btn-check:checked + .btn-outline-custom-dark-blue,
+.btn-check:checked + .btn-outline-custom-dark-blue:hover {
+    background-color: var(--custom-dark-blue);
+    border-color: var(--custom-dark-blue);
+}
+
+.btn-check:checked + .btn-outline-custom-dark-blue {
+    color: #fff;
+}
+
+.btn-check:checked + .btn-outline-custom-dark-blue strong {
+    color: inherit;
 }
 
 .reflection-text {
     color: #6c757d;
+}
+
+@media (max-width: 768px) {
+    .custom-navbar .container-fluid:has(.question-in-header.visible) {
+        flex-wrap: wrap;
+        justify-content: space-between;
+    }
+
+    .custom-navbar .question-in-header {
+        order: 3;
+        width: 100%;
+        text-align: center;
+    }
+
+    .custom-navbar .question-in-header.visible {
+        margin-top: 10px;
+    }
+}
+
+@media (max-width: 768px) {
+    #sidebarCollapse .sidebar-toggle-text {
+        display: none !important;
+    }
+
+    #darkModeSwitch + label .mode-text {
+        display: none !important;
+    }
+
+    .page-settings-text-button .page-settings-text {
+        display: none !important;
+    }
+}
+
+.font-size-controls {
+    display: flex;
+    align-items: center;
+}
+
+.font-size-controls button {
+    margin: 0 5px;
+}
+
+.option-number {
+    display: inline-block;
+    width: 20px; /* Adjust as needed */
+    text-align: right;
+    margin-right: 10px; /* Space between number and text */
+    font-weight: bold;
+}
+.option-text {
+    display: inline-block;
+}
+
+.dark-mode-elements {
+    display: none;
+}
+.light-mode-elements {
+    display: inline-flex;
+    align-items: center;
+}
+
+.dropdown-menu .font-size-controls {
+    justify-content: space-around;
+}
+
+.dropdown-menu[aria-labelledby="pageSettingsDropdown"] {
+    min-width: 15rem;
+}
+
+/* Style for the Page Settings button to appear as plain text */
+.page-settings-text-button {
+    background: none;
+    border: none;
+    padding: 0;
+    font-size: inherit; /* Inherit font size from parent */
+    color: var(--bs-navbar-color); /* Inherit color from navbar text */
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    color: #6c757d;
+}
+
+.page-settings-text-button:hover,
+.page-settings-text-button:focus {
+    color: var(--bs-navbar-hover-color); /* Use navbar hover color */
+    text-decoration: none;
+    outline: none;
+}
+
+.page-settings-text-button .page-settings-text {
+    margin-right: 0.5rem; /* Space between text and icon */
+}
+
+.form-check-input {
+    vertical-align: middle;
+}
+
+.login-error-message {
+    border: solid 2px red;
+    background: lightpink;
+    border-radius: 4px;
+    padding: 0px 10px 0px 10px;
+    margin: 10px 0px 10px 0px;
+    color: red;
+    font-size: smaller;
+}
+
+.user-info {
+    background: #edeff1;
+    border-radius: 4px;
+    padding: 24px 23px 20px;
+}
+
+.list-header {
+    background: #edeff1;
+    border-bottom: 2px solid #343a40;
+}
+
+.list-header b {
+    color: #021e4d;
+}
+
+.list-row {
+    font-size: smaller;
+    padding: 1px;
+}
+
+.row2 {
+    background: #edeff1;
+}
+
+.control-panel {
+    background: #edeff1;
+    border-top: 2px solid #021e4d;
+    border-radius: 0 0 4px 4px;
+    margin-bottom: 10px;
+}
+
+
+.btn-primary {
+    background-color: #021e4d;
+    margin-top: 10px;
+    margin-bottom: 10px;
+    font-size: large;
+    /* font-weight: bold; */
+}
+
+.btn-primary:hover {
+    background-color: #032b6b;
+}
+
+.btn-primary:active {
+    background-color: #011536;
+}
+
+.btn-primary:focus {
+    background-color: #011536;
+    outline: none;
+}
+
+h1, h2, h3, h4, h5, h6, b {
+    color: #021e4d;
+}
+
+.card-header h1, .card-header h2, .card-header h3, .card-header h4, .card-header h5, .card-header h6 {
+    color: inherit;
+}
+
+div.question-wrapper {
+    margin-bottom: 10px;
+}
+
+div.question-wrapper .question-text, .loaded-box .question-text {
+    font-size: 1.2em;
+    color: #333;
+    font-weight: bold;
+}
+
+div.question-wrapper .notice {
+    font-style: italic;
+}
+
+div.question-wrapper > :not(.question-text, input, textarea) {
+    padding-left: 20px;
+}
+
+.static-task-info {
+    color: #cb4f02;
+    font-weight: bold;
+    font-size: larger;
+}
+
+.rrweb-player-wrapper {
+    background: #7f7f88;
+}
+
+.webpage-wrapper {
+    margin: 20px 0 20px 0;
+}
+
+.task_wrapper {
+    border-radius: 4px;
+    padding: 10px 23px 20px;
+    margin: 5px 0px 5px 0px;
+    border: 1px solid #c2c9c9;
+    transition: all 0.2s ease-in-out;
+}
+
+.task_wrapper:hover {
+    transform: scale(1.01);
+    transition: all 0.2s ease-in-out;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    cursor: pointer;
+}
+
+
+.btn-cancel {
+    background-color: #6c757d;
+    border-color: #6c757d;
+    color: #fff;
+}
+
+.btn-cancel:hover {
+    background-color: #5a6268;
+    border-color: #545b62;
+    color: #fff;
+}
+
+.cancel-button {
+    background-color: #777e7e !important;
+}
+
+.cancel-button:hover {
+    background-color: #555757 !important;
+}
+
+.cancel-button:active {
+    background-color: #444545 !important;
+}
+
+.tool-block {
+    margin-bottom: 10px;
+}
+
+.sheet {
+    border: 1px dashed #000;
+    border-radius: 0 0 10px 10px;
+    padding: 20px;
+    margin-bottom: 10px;
+}
+
+.question-wrapper textarea, input[type="text"], input[type="url"] {
+    padding: 5px 7px !important;
+    font-size: medium;
+    line-height: normal;
+}
+
+.question-wrapper textarea{
+    max-width: 100%;
+    min-width: 100%;
+}
+
+input {
+    accent-color: #021e4d;
+}
+
+label {
+    margin-bottom: 0 !important;
+}
+
+.navbar-brand:hover {
+    color: #e79562 !important;
+}
+
+details:hover {
+    cursor: pointer !important;
+}
+
+button.add-source {
+    background-color: #227fae !important;
+    color: white !important;
+}
+
+button.add-source:hover {
+    background-color: #1a5f7f !important;
+}
+
+button.remove-source {
+    background-color: #b3502f !important;
+    color: white !important;
+}
+
+button.remove-source:hover {
+    background-color: #9e3a24 !important;
+}
+
+.navbar-collapse a {
+    color: white;
+}
+
+.form-group a{
+    color: white;
+}
+
+a.btn {
+    color: white;
+}
+
+
+.task-process-container details {
+        margin-bottom: 20px;
+        border: 1px solid #c2c9c9;
+        border-radius: 4px;
+    }
+.task-process-container summary, .summary {
+    font-size: large; /* Larger text for summary */
+    font-weight: bold;
+    cursor: pointer;
+    padding: 5px 10px;
+    /* Using list-header style from your CSS */
+    background: #edeff1;
+    border-bottom: 2px solid #021e4d;
+    color: #021e4d;
+    list-style: none; /* Remove default arrow/marker */
+    display: block;
+}
+.task-process-container summary::-webkit-details-marker {
+    display: none; /* Remove arrow in Chrome/Safari */
+}
+.summary, .task-process-container details[open] > summary {
+        border-bottom: 1px solid #ddd;
+}
+.annotation-body {
+    padding: 20px;
+    border-top: 1px dashed #000;
+}
+.annotation-block {
+    margin-bottom: 20px;
+}
+
+.annotation-value {
+    padding: 10px;
+    background-color: #fff;
+    border: 1px solid #eee;
+    border-radius: 4px;
+    display: block;
+    width: 100%;
+    word-wrap: break-word;
+    font-size: medium;
+}
+.annotation-value ul {
+    padding-left: 20px;
+    margin-bottom: 0;
+}
+.status-right { color: #4CAF50; }
+.status-wrong { color: #F44336; }
+.status-cancelled { color: #f0ad4e; }
+
+
+.font-size-large #sidebarCollapse .sidebar-toggle-text,
+.font-size-large .page-settings-text-button .page-settings-text {
+    display: none !important;
 }

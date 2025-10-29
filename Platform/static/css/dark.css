@@ -3,6 +3,7 @@
     --bs-body-bg: #2a2a2a; /* Lighter background */
     --bs-body-color: #e0e0e0;
     --bs-border-color: #444;
+    --primary-accent-color: #8AC7DB;
 }
 
 .dark-mode body, .dark-mode #content {
@@ -33,7 +34,7 @@
 }
 
 .dark-mode a:not(.btn-view-task) {
-    color: #8AC7DB;
+    color: var(--primary-accent-color);
 }
 
 .dark-mode a:not(.btn-view-task):hover {
@@ -54,7 +55,7 @@
 }
 
 .dark-mode h1, .dark-mode h2:not(.text-success), .dark-mode h3, .dark-mode h4, .dark-mode h5, .dark-mode h6,
-.dark-mode p, .dark-mode span, .dark-mode label, .dark-mode strong {
+.dark-mode p, .dark-mode span {
     color: var(--bs-body-color) !important;
 }
 
@@ -89,14 +90,14 @@
 }
 
 .dark-mode .form-control::placeholder {
-    color: transparent;
+    color: #888;
     opacity: 1;
 }
 
 .dark-mode .form-control:focus {
     background-color: #3a3a3c !important;
     color: var(--bs-body-color) !important;
-    border-color: #8AC7DB !important;
+    border-color: var(--primary-accent-color) !important;
     box-shadow: 0 0 0 0.25rem rgba(138, 199, 219, 0.5) !important;
 }
 
@@ -111,8 +112,8 @@
 
 /* === Primary Button Overrides for Dark Mode === */
 .dark-mode .btn-primary:not(.btn-view-task) {
-    background-color: #8AC7DB !important;
-    border-color: #8AC7DB !important;
+    background-color: var(--primary-accent-color) !important;
+    border-color: var(--primary-accent-color) !important;
     color: #fff !important;
 }
 
@@ -122,13 +123,13 @@
 }
 
 .dark-mode .btn-outline-primary {
-    color: #8AC7DB !important;
-    border-color: #8AC7DB !important;
+    color: var(--primary-accent-color) !important;
+    border-color: var(--primary-accent-color) !important;
 }
 
 .dark-mode .btn-check:checked + .btn-outline-primary,
 .dark-mode .btn-outline-primary:hover {
-    background-color: #8AC7DB !important;
+    background-color: var(--primary-accent-color) !important;
     color: #fff !important;
 }
 
@@ -149,13 +150,36 @@
 }
 
 .dark-mode .btn-link {
-    color: #8AC7DB !important;
+    color: var(--primary-accent-color) !important;
 }
 
 
-.dark-mode .drag-option {
-    background: #3a3a3c;
-    border-color: #555;
+.dark-mode .drag-option:hover {
+    border-color: var(--primary-accent-color) !important;
+}
+
+.dark-mode .drag-option .form-check-input:checked + .drag-handle + .priority-number + span,
+.dark-mode .drag-option .form-check-input:checked + .drag-handle + .priority-number + span + div > span {
+    color: #212529 !important;
+}
+
+.dark-mode .drag-option .form-check-input:checked ~ .flex-grow-1 {
+    color: #212529 !important;
+}
+
+.dark-mode .drag-option .form-check-input:checked ~ * {
+    color: #212529 !important;
+}
+
+.dark-mode .drag-option .form-check-input:checked {
+    background-color: #fff !important;
+    border-color: #fff !important;
+}
+
+.dark-mode .drag-option.list-group-item:has(.form-check-input:checked) {
+    background-color: var(--primary-accent-color) !important;
+    border-color: var(--primary-accent-color) !important;
+    color: #212529 !important;
 }
 
 .dark-mode .drag-handle, .dark-mode .tooltip-icon {
@@ -207,7 +231,7 @@
 .dark-mode .nav-link.active,
 .dark-mode .nav-link:focus,
 .dark-mode .nav-link:hover {
-    color: #8AC7DB !important;
+    color: var(--primary-accent-color) !important;
     border-color: #444 #444 #343434 #444 !important;
 }
 
@@ -237,6 +261,15 @@
     background-color: #252525 !important;
     color: #888 !important;
     opacity: 0.7;
+}
+
+
+.dark-mode .form-control:-webkit-autofill,
+.dark-mode .form-control:-webkit-autofill:hover,
+.dark-mode .form-control:-webkit-autofill:focus,
+.dark-mode .form-control:-webkit-autofill:active {
+    -webkit-box-shadow: 0 0 0 30px #3a3a3c inset !important;
+    -webkit-text-fill-color: var(--bs-body-color) !important;
 }
 
 .dark-mode .form-floating > .form-control:-webkit-autofill,
@@ -299,7 +332,7 @@
 
 
 .dark-mode .justification-url {
-    color: #8AC7DB !important;
+    color: var(--primary-accent-color) !important;
 }
 
 .dark-mode #sidebarCollapse:hover {
@@ -311,8 +344,8 @@
 }
 
 .dark-mode .btn-custom-dark-blue {
-    background-color: #8AC7DB;
-    border-color: #8AC7DB;
+    background-color: var(--primary-accent-color);
+    border-color: var(--primary-accent-color);
     color: #fff;
 }
 
@@ -322,12 +355,71 @@
 }
 
 .dark-mode .btn-outline-custom-dark-blue {
-    color: #8AC7DB;
-    border-color: #8AC7DB;
+    color: var(--primary-accent-color);
+    border-color: var(--primary-accent-color);
 }
 
-.dark-mode .btn-check:checked + .btn-outline-custom-dark-blue,
-.dark-mode .btn-outline-custom-dark-blue:hover {
-    background-color: #8AC7DB;
-    color: #fff;
+.dark-mode .btn-check:not(:checked) + .btn-outline-custom-dark-blue:hover {
+    color: #a0d1e2;
+    background-color: rgba(138, 199, 219, 0.1); /* Subtle hover glow */
+    border-color: #a0d1e2;
+}
+
+.dark-mode .btn-check:checked + .btn-outline-custom-dark-blue {
+    color: #212529; /* Dark color for selected text */
+    background-color: var(--primary-accent-color);
+    border-color: var(--primary-accent-color);
+}
+
+.dark-mode .btn-check:checked + .btn-outline-custom-dark-blue {
+    color: #212529; /* Dark color for selected text */
+}
+
+.dark-mode .btn-check:checked + .btn-outline-custom-dark-blue strong {
+    color: inherit !important; /* Inherit the dark color from the parent label */
+}
+
+.dark-mode .btn-check:checked + .btn-outline-custom-dark-blue:hover {
+    color: #212529; /* Keep text dark */
+    background-color: #a0d1e2; /* Lighter accent color on hover */
+    border-color: #a0d1e2;
+}
+
+.dark-mode .light-mode-elements {
+    display: none;
+}
+
+.dark-mode .dark-mode-elements {
+    display: inline-flex;
+    align-items: center;
+}
+
+/* Elegant selection for dark mode */
+.dark-mode ::selection {
+    background-color: var(--primary-accent-color);
+    color: #212529; /* Dark color for selected text */
+}
+
+/* Custom radio and checkbox styling for dark mode */
+.dark-mode .form-check-input {
+    background-color: #3a3a3c;
+    border-color: var(--bs-border-color);
+}
+
+.dark-mode .form-check-input:hover {
+    border-color: var(--primary-accent-color);
+}
+
+.dark-mode .form-check-input:checked {
+    background-color: var(--primary-accent-color);
+    border-color: var(--primary-accent-color);
+}
+
+.dark-mode .form-check-input:checked:hover {
+    background-color: #a0d1e2; /* Slightly lighter for hover */
+    border-color: #a0d1e2;
+}
+
+.dark-mode .text-danger {
+    color: #ea7171 !important;
 }

@@ -2,6 +2,47 @@
 {% load task_manager_extras %}
 {% block title %} Pre-Task Annotation {% endblock %}
 
+{% block navbar_extra %}
+<div id="navbar-question" class="question-in-header flex-grow-1 d-flex justify-content-center" style="min-width: 0;"> <!-- flex-grow-1 allows this to fill space -->
+    <span class="question-text-snippet"><strong>Question:</strong> {{ question }}</span>
+</div>
+{% endblock %}
+
+{% block css %}
+<style>
+.question-in-header {
+    display: none; /* Hidden by default */
+    opacity: 0;
+    transition: opacity 0.3s ease-in-out;
+}
+.question-in-header.visible {
+    display: flex !important; /* Becomes a flex container when visible */
+    opacity: 1;
+}
+.question-in-header .question-text-snippet {
+    white-space: nowrap;
+    overflow-x: auto;
+    padding-bottom: 5px; /* Add some space for the scrollbar */
+    padding-top: 5px;
+}
+/* Simple scrollbar styling for webkit browsers */
+.question-in-header .question-text-snippet::-webkit-scrollbar {
+    height: 5px;
+}
+.question-in-header .question-text-snippet::-webkit-scrollbar-track {
+    background: transparent;
+}
+.question-in-header .question-text-snippet::-webkit-scrollbar-thumb {
+    background-color: rgba(0,0,0,.2);
+    border-radius: 10px;
+}
+.dark-mode .question-in-header .question-text-snippet::-webkit-scrollbar-thumb {
+    background-color: rgba(255,255,255,.2);
+}
+
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="container">
     <div class="row justify-content-center">
@@ -13,25 +54,27 @@
                 <div class="card-body">
                     <p class="text-muted">Please answer the following questions before you begin the task.</p>
                     <hr>
+                    
                     <form id="query-form" action="" method="post" enctype="multipart/form-data">
                         {% csrf_token %}
                         <input type="hidden" name="entry_id" id="entry-id" value="{{entry_id}}">
 
                         <!-- Task Description -->
-                        <div class="mb-4 p-3 border rounded">
+                        <div id="original-question-container" class="mb-4 p-3 border rounded">
                             <h5><strong>1. Understand the Task</strong></h5>
                             <p>Your goal is to answer the following question accurately.</p>
                             <div class="p-3 bg-light rounded loaded-box">
                                 <div class="question-text">
                                     {{ question }}
                                 </div>
-                            </div>                        </div>
+                            </div>
+                        </div>
 
                         <!-- Task Completion Criteria -->
                         <div class="mb-4 p-3 border rounded">
                             <h5><strong>2. How to Format Your Answer</strong></h5>
                             <p class="text-muted mb-0">
-                                Your answer must be an <strong>exact match</strong>. Do not include extra words or sentences. Capitalization will be ignored.
+                                Your answer must be an <strong>exact match</strong>. Do not include <strong> punctuations </strong>, extra words, or sentences. Capitalization will be ignored.
                             </p>
                             <div class="mt-2" style="font-size: 1rem; line-height: 1.4;">
                                 <p class="mb-1">For example:</p>
@@ -48,9 +91,9 @@
 
                                     <p class="mb-1"><strong>Incorrect Answers:</strong></p>
                                     <ul class="list-group">
-                                        <li class="list-group-item list-group-item py-1 px-2">"The capital of France is Paris." <span class="text-muted">(contains extra words)</span></li>
-                                        <li class="list-group-item py-1 px-2">"Paris is the capital of France." <span class="text-muted">(contains extra words)</span></li>
-                                        <li class="list-group-item py-1 px-2">"Paris." <span class="text-muted">(contains a period)</span></li>
+                                        <li class="list-group-item bg-white list-group-item py-1 px-2">"The capital of France is Paris." <span class="text-muted">(contains extra words)</span></li>
+                                        <li class="list-group-item bg-white py-1 px-2">"Paris is the capital of France." <span class="text-muted">(contains extra words)</span></li>
+                                        <li class="list-group-item bg-white py-1 px-2">"Paris." <span class="text-muted">(contains a period)</span></li>
                                     </ul>
                                 </div>
                             </div>
@@ -112,18 +155,18 @@
                         <!-- Initial Guess -->
                         <div class="mb-4 p-3 border rounded">
                             <label for="initial_guess" class="form-label"><h5><strong>7. Initial Guess</strong></h5></label>
-                            <p>If you have an initial idea of the answer, or a possible range for it, please specify it below.</p>
-                            <input type="text" class="form-control" id="initial_guess" name="initial_guess" placeholder="Your initial guess or range">
-                            <div class="form-check mt-2">
-                                <input class="form-check-input" type="checkbox" name="initial_guess_unknown" id="initial_guess_unknown">
-                                <label class="form-check-label" for="initial_guess_unknown">
-                                    I don't know
-                                </label>
+                            <p>If you have an idea of the answer, or a possible range for it, please specify it below.</p>
+                            <div class="d-flex align-items-stretch">
+                                <div class="flex-grow-1 me-3">
+                                    <input type="text" class="form-control h-100" id="initial_guess" name="initial_guess" placeholder="Your initial guess or range">
+                                </div>
+                                <div>
+                                    <input type="checkbox" class="btn-check" name="initial_guess_unknown" id="initial_guess_unknown" autocomplete="off">
+                                    <label class="btn btn-outline-custom-dark-blue h-100 d-flex align-items-center" for="initial_guess_unknown">I don't know</label>
+                                </div>
                             </div>
                             <div class="invalid-feedback">Please provide an initial guess or check "I don't know".</div>
-                        </div>
-
-                        <!-- Expected Source of Answer -->
+                        </div>                        <!-- Expected Source of Answer -->
                         <div class="mb-4 p-3 border rounded">
                             <h5><strong>8. Expected Source of Answer</strong></h5>
                             <p>Where do you think you will find the answer? <strong>You can select multiple options</strong></p>
@@ -327,6 +370,36 @@
                 navigator.sendBeacon('/task/stop_annotation/', new Blob());
             }
         });
+
+        // Show/hide question in header based on scroll
+        const headerQuestion = $('.question-in-header');
+        const originalQuestion = $('#original-question-container');
+        
+        $(window).scroll(function() {
+            if (originalQuestion.length > 0) {
+                const questionBottom = originalQuestion.offset().top + originalQuestion.outerHeight();
+                if ($(window).scrollTop() > questionBottom) {
+                    headerQuestion.addClass('visible');
+                } else {
+                    headerQuestion.removeClass('visible');
+                }
+            }
+        });
+
+        // Align header question with main content
+        const mainContentColumn = $('.col-lg-8').first();
+        const headerQuestionSnippet = $('.question-text-snippet');
+
+        function alignHeaderQuestion() {
+            if (mainContentColumn.length > 0 && headerQuestionSnippet.length > 0) {
+                const contentWidth = mainContentColumn.outerWidth();
+                headerQuestionSnippet.css('max-width', contentWidth + 'px');
+            }
+        }
+
+        // Align on load and on window resize
+        alignHeaderQuestion();
+        $(window).resize(alignHeaderQuestion);
     });
 </script>
 {% endblock %}

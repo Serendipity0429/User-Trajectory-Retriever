@@ -478,7 +478,10 @@
             }
         });
     </script>
-
-    {% block scripts %}<script src="{% static 'js/rrweb-player.js' %}"></script>{% endblock %}
+    
+    <!-- rrweb-player.js -->
+    <script src="{% static 'js/rrweb-player.js' %}"></script>
+    
+    {% block scripts %}{% endblock %}
 </body>
 </html>

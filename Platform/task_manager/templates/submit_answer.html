@@ -627,7 +627,27 @@ document.addEventListener('DOMContentLoaded', function() {
             // Disable button and show loading state
             this.disabled = true;
             this.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Submitting...';
-            document.getElementById('query-form').submit();
+            
+            const form = document.getElementById('query-form');
+            const formData = new FormData(form);
+
+            fetch(form.action, {
+                method: 'POST',
+                body: formData,
+            }).then(response => {
+                if (response.ok && response.redirected) {
+                    window.location.replace(response.url);
+                } else {
+                    this.disabled = false;
+                    this.innerHTML = 'Submit Answer';
+                    alert('Submission failed. Please try again.');
+                }
+            }).catch(error => {
+                console.error('Error submitting form:', error);
+                this.disabled = false;
+                this.innerHTML = 'Submit Answer';
+                alert('An error occurred during submission.');
+            });
         }
     });
 

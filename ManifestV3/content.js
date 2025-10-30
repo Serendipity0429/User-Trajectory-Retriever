@@ -93,23 +93,23 @@ function displayQuestionBox(question) {
         right: 10px;
         background-color: #f8f9fa;
         color: #212529;
-        padding: 1rem;
-        border-radius: .25rem;
+        padding: 1.2vw;
+        border-radius: 0.25vw;
         z-index: 2147483647;
-        max-width: 300px;
-        font-size: 1.2rem;
+        max-width: 25vw;
+        font-size: 1.2vw;
         line-height: 1.5;
-        box-shadow: 0 .5rem 1rem rgba(0,0,0,.15);
+        box-shadow: 0 0.6vw 1.2vw rgba(0,0,0,.15);
         border-left: 5px solid #021e4d;
         opacity: 0.8;
         transition: opacity 0.3s ease-in-out;
-        font-family: 'Noto Sans SC', sans-serif;
+        font-family: 'Noto Sans SC', sans-serif !important;
         pointer-events: none;
     `;
     box.innerHTML = `
-        <h5 style=\"margin-bottom: 0.5rem;margin-top: 0;"><strong>Task Question</strong></h5>
-        <p style=\"margin-bottom: 0;">${question}</p>
-        <div id=\"evidence-count-container\" style=\"margin-top: 10px; font-size: 0.9rem; color: #6c757d;">
+        <h5 style=\"font-size: 1.5vw; margin-bottom: 0.6vw;margin-top: 0;\"><strong>Task Question</strong></h5>
+        <p style=\"font-size: 1.4vw; margin-bottom: 0; margin-top:0;\">${question}</p>
+        <div id=\"evidence-count-container\" style=\"margin-top: 10px; font-size: 1.1vw; color: #212529;">
             Evidence Collected: <span id=\"evidence-count\">0</span>
         </div>
     `;

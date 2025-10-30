@@ -249,15 +249,15 @@ function displayMessageBox(message, type = 'info') {
         right: 10px;
         background-color: ${backgroundColor};
         color: ${color};
-        padding: 1rem;
-        border-radius: .25rem;
+        padding: 1.0vw;
+        border-radius: 0.25vw;
         z-index: 2147483647;
-        box-shadow: 0 .5rem 1rem rgba(0,0,0,.15);
+        box-shadow: 0 0.6vw 1.2vw rgba(0,0,0,.15);
         border-left: 5px solid ${borderColor};
         opacity: 0;
         transition: opacity 0.5s ease-in-out;
-        font-size: 1rem;
-        font-family: 'Noto Sans SC', sans-serif;
+        font-size: 1.2vw;
+        font-family: 'Noto Sans SC', sans-serif !important;
     `;
     box.innerText = message;
 

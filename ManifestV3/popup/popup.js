@@ -250,7 +250,8 @@ async function handleLoginAttempt() {
             const response = await sendMessageFromPopup({ command: "get_popup_data" });
             await showUserTab(response.task_id, response.task_info);
             chrome.action.setBadgeText({ text: 'off' });
-            chrome.action.setBadgeBackgroundColor({ color: [202, 181, 225, 255] });
+            chrome.action.setBadgeTextColor({ color: '#ffffff' });
+            chrome.action.setBadgeBackgroundColor({ color: '#660874' });
         } else {
             chrome.action.setBadgeText({ text: '' });
             const error_code = login_response?.error_code ?? -1;

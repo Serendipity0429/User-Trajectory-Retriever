@@ -86,48 +86,45 @@ let questionBoxMousemoveListener = null;
 function displayQuestionBox(question) {
     if (!question) return;
 
-    const box = document.createElement('div');
-    box.id = 'task-question-box';
-    box.className = 'rr-ignore rr-block';
-    box.style.cssText = `
-        position: fixed;
-        top: 10px;
-        right: 10px;
-        background-color: #f8f9fa;
-        color: #212529;
-        padding: 1.2vw;
-        border-radius: 0.25vw;
-        z-index: 2147483647;
-        max-width: 25vw;
-        font-size: 1.2vw;
-        line-height: 1.5;
-        box-shadow: 0 0.6vw 1.2vw rgba(0,0,0,.15);
-        border-left: 5px solid #021e4d;
-        opacity: 0.9;
-        transition: opacity 0.3s ease-in-out;
-        font-family: 'Noto Sans SC', sans-serif !important;
-        pointer-events: none;
-    `;
-    box.innerHTML = `
-        <h5 style=\"font-size: 1.5vw; margin-bottom: 0.6vw;margin-top: 0;\"><strong>Task Question</strong></h5>
-        <p style=\"font-size: 1.4vw; margin-bottom: 0; margin-top:0;\">${question}</p>
-        <div id=\"evidence-count-container\" style=\"margin-top: 10px; font-size: 1.1vw; color: #212529;">
-            Evidence Collected: <span id=\"evidence-count\">0</span>
+    const innerHTML = `
+        <h5 style="font-size: 1.5vw; margin-bottom: 0.6vw;margin-top: 0;"><strong>Task Question</strong></h5>
+        <p style="font-size: 1.4vw; margin-bottom: 0; margin-top:0;">${question}</p>
+        <div id="evidence-count-container" style="margin-top: 10px; font-size: 1.1vw; color: #212529;">
+            Evidence Collected: <span id="evidence-count">0</span>
         </div>
     `;
 
-    document.body.appendChild(box);
-    updateEvidenceCount();
+    const css = `
+        max-width: 25vw;
+        min-height: 5rem;
+        line-height: 1.5;
+        transition: opacity 0.3s ease-in-out;
+    `;
 
-    questionBoxMousemoveListener = (e) => {
-        const rect = box.getBoundingClientRect();
-        if (e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom) {
-            box.style.opacity = '0';
-        } else {
-            box.style.opacity = '0.9';
-        }
-    };
-    document.addEventListener('mousemove', questionBoxMousemoveListener);
+    displayMessageBox({
+        innerHTML,
+        type: 'info',
+        duration: 0, // Persists until manually removed
+        id: 'task-question-box',
+        css
+    });
+
+    const box = document.getElementById('task-question-box');
+    if (box) {
+        box.style.pointerEvents = 'none';
+        box.style.opacity = '0.9';
+        
+        questionBoxMousemoveListener = (e) => {
+            const rect = box.getBoundingClientRect();
+            if (e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom) {
+                box.style.opacity = '0';
+            } else {
+                box.style.opacity = '0.9';
+            }
+        };
+        document.addEventListener('mousemove', questionBoxMousemoveListener);
+    }
+    updateEvidenceCount();
 }
 
 async function updateEvidenceCount() {
@@ -201,7 +198,7 @@ async function setupTaskUI() {
     removeExistingBoxes();
     await getTaskInfo();
     if (!_is_server_page(_content_vars.url_now)) {
-        displayMessageBox("You can start your task now!");
+        displayMessageBox({ message: "You can start your task now!" });
     }
 }
 
@@ -276,7 +273,10 @@ async function initialize() {
             });
 
             if (is_recording_paused) {
-                displayMessageBox("You have a pending annotation. \nPlease open the popup to complete it.", "warning");
+                displayMessageBox({
+                    message: "You have a pending annotation. \nPlease open the popup to complete it.",
+                    type: "warning"
+                });
                 printDebug("content", "Pending annotation message displayed.");
             }
 
@@ -335,7 +335,7 @@ chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
     }
 
     if (message.command === 'evidence-added-successfully') {
-        displayMessageBox("Evidence added successfully!");
+        displayMessageBox({ message: "Evidence added successfully!" });
         const countEl = document.getElementById('evidence-count');
         if (countEl && typeof message.newCount !== 'undefined') {
             countEl.textContent = message.newCount;

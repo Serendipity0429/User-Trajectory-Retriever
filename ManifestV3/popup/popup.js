@@ -135,6 +135,10 @@ function showLoginTab() {
         loginBtn.disabled = false;
         loginBtn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Login';
     }
+    const usernameInput = document.getElementById('username');
+    if (usernameInput) {
+        setTimeout(() => usernameInput.focus(), 100);
+    }
 }
 
 function switchTaskButtonStatus(task_status, trial_num = 0) {
@@ -564,5 +568,21 @@ document.addEventListener('DOMContentLoaded', function () {
         // toggle the eye / eye slash icon
         this.classList.toggle('fa-eye');
         this.classList.toggle('fa-eye-slash');
+    });
+
+    const loginBtn = document.getElementById('loginBtn');
+
+    usernameInput.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            passwordInput.focus();
+        }
+    });
+
+    passwordInput.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            loginBtn.click();
+        }
     });
 });

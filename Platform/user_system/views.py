@@ -138,36 +138,44 @@ def token_login(request):
     if request.method != 'POST':
         return JsonResponse({'error': 'Only POST method is allowed'}, status=405)
 
-    print_debug(request.POST)
-    username = request.POST.get('username')
-    password = request.POST.get('password')
+    try:
+        print_debug(request.POST)
+        username = request.POST.get('username')
+        password = request.POST.get('password')
 
-    # Assuming 'authenticate' is a custom utility function you have defined in utils.py
-    # from .utils import authenticate
-    error_code, user = authenticate(username, password)
+        # Assuming 'authenticate' is a custom utility function you have defined in utils.py
+        # from .utils import authenticate
+        error_code, user = authenticate(username, password)
 
-    if error_code == 0 and user:
-        # Authentication successful, generate JWT token
-        logging.debug(f'User {username} authenticated successfully for token login')
-        refresh = RefreshToken.for_user(user)
-        user.login_num += 1
-        user.last_login = now()
-        user.save()
+        if error_code == 0 and user:
+            # Authentication successful, generate JWT token
+            print_debug(f'User {username} authenticated successfully for token login')
+            refresh = RefreshToken.for_user(user)
+            user.login_num += 1
+            user.last_login = now()
+            user.save()
 
+            return JsonResponse({
+                'refresh': str(refresh),
+                'access': str(refresh.access_token),
+            })
+        else:
+            print_debug(f'User {username} authentication failed with error code {error_code}')
+            error_messages = {
+                1: 'User does not exist',
+                2: 'Incorrect password',
+                4: 'Authentication failed',
+            }
+            return JsonResponse({
+                'error': error_messages.get(error_code, 'Authentication failed'),
+                'error_code': error_code
+            }, status=401)
+    except Exception as e:
+        logging.error(f"An unexpected error occurred during token login: {e}")
         return JsonResponse({
-            'refresh': str(refresh),
-            'access': str(refresh.access_token),
-        })
-    else:
-        logging.debug(f'User {username} authentication failed with error code {error_code}')
-        error_messages = {
-            1: 'User does not exist',
-            2: 'Incorrect password',
-        }
-        return JsonResponse({
-            'error': error_messages.get(error_code, 'Authentication failed'),
-            'error_code': error_code
-        }, status=401)
+            'error': 'An unexpected error occurred. Please try again later.',
+            'error_code': 3
+        }, status=500)
 
 
 @login_required

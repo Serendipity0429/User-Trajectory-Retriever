@@ -7,10 +7,15 @@ from django.http import HttpRequest
 from django.core.mail import EmailMultiAlternatives
 import smtplib
 from django.conf import settings
+import logging
 
-def print_debug(msg):
+logger = logging.getLogger(__name__)
+
+
+def print_debug(*args, **kwargs):
     if settings.DEBUG:
-        print(msg)
+        message = " ".join(map(str, args)) + " ".join(f"{k}={v}" for k, v in kwargs.items())
+        logger.info(message)
 
 
 def get_user_from_request(req):

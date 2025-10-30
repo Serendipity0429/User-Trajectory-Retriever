@@ -113,7 +113,7 @@ async function _request(method, url, data = {}, json_response = true, raw_data =
                 body,
             });
 
-            if (response.status === 401) {
+            if (response.status === 401 && url !== config.urls.token_login) {
                 const new_token = await refreshToken();
                 if (new_token) {
                     headers["Authorization"] = `Bearer ${new_token}`;
@@ -128,6 +128,16 @@ async function _request(method, url, data = {}, json_response = true, raw_data =
             }
 
             if (!response.ok) {
+                // Try to parse the response as JSON, as it might contain error details
+                if (json_response) {
+                    try {
+                        const error_data = await response.json();
+                        return error_data; // Return the JSON error response
+                    } catch (e) {
+                        // If parsing fails, throw a generic error
+                        throw new Error(`Server error: ${response.status}`);
+                    }
+                }
                 throw new Error(`Server error: ${response.status}`);
             }
 

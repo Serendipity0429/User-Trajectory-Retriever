@@ -90,11 +90,8 @@ async function checkActiveTaskID() {
         const config = getConfig();
         
         // Use a more robust API call with retry logic
-        const response = await _post(config.urls.active_task, {}, false); // json_response = false to handle text
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        const data = await response.text();
+        const response = await _post(config.urls.active_task);
+        const data = response.task_id;
         const new_task_id = (data !== null && data !== undefined && !isNaN(data)) ? parseInt(data, 10) : -1;
 
         const is_task_started = old_task_id === -1 && new_task_id > -1;
@@ -122,12 +119,13 @@ async function checkActiveTaskID() {
         return new_task_id;
     } catch (error) {
         console.error("Error checking active task ID:", error);
+        await setCurrentTask(-1); // Clear current task on error
         if (error.message === "Authentication failed.") {
             // Force logout if authentication fails
             await _remove_local(['access_token', 'refresh_token', 'username', 'logged_in']);
             chrome.runtime.sendMessage({ command: "alter_logging_status", log_status: false });
             chrome.action.setBadgeText({ text: '' });
-        } else if (error.message.startsWith("Server error:")) {
+        } else if (error.message.startsWith("Server error:") || error instanceof TypeError) {
             // Indicate server error on the badge
             chrome.action.setBadgeText({ text: 'err' });
             chrome.action.setBadgeTextColor({ color: [255, 255, 255, 255] });
@@ -164,8 +162,7 @@ async function sendInfo(message) {
 
     try {
         const config = getConfig();
-        // TODO: Implement a retry mechanism for failed requests.
-        await _post(config.urls.data, { message }, true); // raw_data = true
+        await _post(config.urls.data, { message });
         printDebug("background", "Info sent successfully.");
     } catch (error) {
         console.error("Error sending info:", error);
@@ -321,7 +318,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
                         text: details.result.text,
                         dom_position: details.result.selector,
                         evidence_type: 'text_selection'
-                    }, true, false, true); // send_as_json = true
+                    }, 'json', 'json'); // content_type = 'json', response_type = 'json'
 
                     const justificationsResponse = await _get(`${config.urls.get_justifications}/${task_id}/`);
                     const newCount = justificationsResponse?.justifications?.length ?? 0;
@@ -359,7 +356,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
                             tagName: details.tagName,
                             attributes: details.attributes
                         }
-                    }, true, false, true); // send_as_json = true
+                    }, 'json', 'json'); // content_type = json, response_type = json
 
                     const justificationsResponse = await _get(`${config.urls.get_justifications}/${task_id}/`);
                     const newCount = justificationsResponse?.justifications?.length ?? 0;
@@ -478,7 +475,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
             case MSG_GET_ACTIVE_TASK:
                 const active_task_id = await checkActiveTaskID();
-                const is_task_active = active_task_id !== -1;
+                const is_task_active = active_task_id > 0;
                 printDebug("background", `Active task ID: ${active_task_id}`);
                 sendResponse({ is_task_active: is_task_active, task_id: active_task_id });
                 break;

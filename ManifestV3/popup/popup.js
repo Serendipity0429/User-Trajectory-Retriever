@@ -238,7 +238,7 @@ async function handleLoginAttempt() {
     const credentials = { username, password, ext: true };
     try {
         const config = getConfig();
-        const login_response = await _post(config.urls.token_login, credentials, true);
+        const login_response = await _post(config.urls.token_login, credentials, 'form');
         if (login_response?.access && login_response?.refresh) {
             await _set_local({
                 'username': username,

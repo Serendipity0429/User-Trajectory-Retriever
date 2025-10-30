@@ -99,10 +99,12 @@ async function checkActiveTaskID() {
 
         if (new_task_id > -1) {
             chrome.action.setBadgeText({ text: 'on' });
-            chrome.action.setBadgeBackgroundColor({ color: [202, 181, 225, 255] });
+            chrome.action.setBadgeTextColor({ color: '#ffffff' });
+            chrome.action.setBadgeBackgroundColor({ color: '#660874' });
         } else {
             chrome.action.setBadgeText({ text: 'off' });
-            chrome.action.setBadgeBackgroundColor({ color: [202, 181, 225, 255] });
+            chrome.action.setBadgeTextColor({ color: '#ffffff' });
+            chrome.action.setBadgeBackgroundColor({ color: '#660874' });
         }
 
         if (is_task_started) {
@@ -128,8 +130,8 @@ async function checkActiveTaskID() {
         } else if (error.message.startsWith("Server error:") || error instanceof TypeError) {
             // Indicate server error on the badge
             chrome.action.setBadgeText({ text: 'err' });
-            chrome.action.setBadgeTextColor({ color: [255, 255, 255, 255] });
-            chrome.action.setBadgeBackgroundColor({ color: [255, 0, 0, 255] });
+            chrome.action.setBadgeTextColor({ color: '#ffffff' });
+            chrome.action.setBadgeBackgroundColor({ color: '#eb1313ff' });
         }
         return -2; // Indicate server failure
     }

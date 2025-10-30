@@ -81,6 +81,8 @@ let _content_vars = {
     is_task_active: false,
 };
 
+let questionBoxMousemoveListener = null;
+
 function displayQuestionBox(question) {
     if (!question) return;
 
@@ -101,7 +103,7 @@ function displayQuestionBox(question) {
         line-height: 1.5;
         box-shadow: 0 0.6vw 1.2vw rgba(0,0,0,.15);
         border-left: 5px solid #021e4d;
-        opacity: 0.8;
+        opacity: 0.9;
         transition: opacity 0.3s ease-in-out;
         font-family: 'Noto Sans SC', sans-serif !important;
         pointer-events: none;
@@ -116,6 +118,16 @@ function displayQuestionBox(question) {
 
     document.body.appendChild(box);
     updateEvidenceCount();
+
+    questionBoxMousemoveListener = (e) => {
+        const rect = box.getBoundingClientRect();
+        if (e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom) {
+            box.style.opacity = '0';
+        } else {
+            box.style.opacity = '0.9';
+        }
+    };
+    document.addEventListener('mousemove', questionBoxMousemoveListener);
 }
 
 async function updateEvidenceCount() {
@@ -173,6 +185,10 @@ function getTaskStatus() {
 }
 
 function removeExistingBoxes() {
+    if (questionBoxMousemoveListener) {
+        document.removeEventListener('mousemove', questionBoxMousemoveListener);
+        questionBoxMousemoveListener = null;
+    }
     const questionBox = document.getElementById('task-question-box');
     if (questionBox) {
         questionBox.remove();

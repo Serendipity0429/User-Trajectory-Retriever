@@ -232,12 +232,16 @@ function _is_extension_page(url) {
     return url.startsWith(chrome.runtime.getURL(''));
 }
 
-function displayMessageBox(message, type = 'info') {
+function displayMessageBox(options) {
+    const { message, innerHTML, type = 'info', duration = 3000, id = null, css = '' } = options;
     const config = getConfig();
     if (!config || window.location.href.startsWith(config.urls.base)) return;
 
     const box = document.createElement('div');
     box.className = 'rr-ignore loaded-box rr-block';
+    if (id) {
+        box.id = id;
+    }
     
     const isWarning = type === 'warning';
     const borderColor = isWarning ? '#ffc107' : '#021e4d';
@@ -257,9 +261,16 @@ function displayMessageBox(message, type = 'info') {
         opacity: 0;
         transition: opacity 0.5s ease-in-out;
         font-size: 1.2vw;
+        min-width: 15rem;
         font-family: 'Noto Sans SC', sans-serif !important;
+        ${css}
     `;
-    box.innerText = message;
+
+    if (innerHTML) {
+        box.innerHTML = innerHTML;
+    } else {
+        box.innerText = message;
+    }
 
     let topPosition = 10;
     const questionBox = document.getElementById('task-question-box');
@@ -277,11 +288,11 @@ function displayMessageBox(message, type = 'info') {
 
     setTimeout(() => { box.style.opacity = '1'; }, 10);
 
-    if (!isWarning) {
+    if (duration > 0) {
         setTimeout(() => {
             box.style.opacity = '0';
             setTimeout(() => { box.remove(); }, 500);
-        }, 3000);
+        }, duration);
     }
 }
 

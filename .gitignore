@@ -13,3 +13,4 @@ tempFiles
 .env
 media
 .DS_Store
+GEMINI.md

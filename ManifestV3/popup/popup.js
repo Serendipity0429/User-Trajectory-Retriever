@@ -58,7 +58,8 @@ function showFailMessage(message_type) {
         1: 'usernameError',
         2: 'passwordError',
         3: 'requestError',
-        4: 'authError'
+        4: 'authError',
+        5: 'connectionError'
     };
 
     Object.values(errorMessages).forEach(id => {
@@ -102,7 +103,7 @@ function displayActiveTask(task_id, task_info) {
     } else if (active_task_id === -2) {
         switchTaskButtonStatus('off');
         startTaskBtn.setAttribute("disabled", "true");
-        activeTaskEl.textContent = "Fail to connect to server";
+        activeTaskEl.textContent = "Connection Error";
         activeTaskEl.style.color = "#e13636";
         taskTrialEl.textContent = "0";
     } else {
@@ -237,7 +238,7 @@ async function handleLoginAttempt() {
     const credentials = { username, password, ext: true };
     try {
         const config = getConfig();
-        const login_response = await _post(config.urls.token_login, credentials, true, false, false);
+        const login_response = await _post(config.urls.token_login, credentials, true);
         if (login_response?.access && login_response?.refresh) {
             await _set_local({
                 'username': username,
@@ -253,7 +254,7 @@ async function handleLoginAttempt() {
         } else {
             chrome.action.setBadgeText({ text: '' });
             const error_code = login_response?.error_code ?? -1;
-            const message_map = { 1: 1, 2: 2, default: 3 };
+            const message_map = { 1: 1, 2: 2, 4: 4, default: 4 };
             showFailMessage(message_map[error_code] || message_map.default);
             loginBtn.disabled = false;
             loginBtn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Login';
@@ -262,7 +263,7 @@ async function handleLoginAttempt() {
         if (error.message === "Authentication failed.") {
             showFailMessage(4);
         } else {
-            showFailMessage(3);
+            showFailMessage(5);
         }
         loginBtn.disabled = false;
         loginBtn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Login';
@@ -306,7 +307,7 @@ async function handleStartTask() {
     const current_task_id = await getActiveTask();
 
     if (current_task_id === -2) {
-        showAlert("The server is not available. Please try again later.");
+        
     } else if (current_task_id !== -1) {
         showAlert("There is an active task. Please end the task first.");
     } else {
@@ -324,7 +325,7 @@ async function handleEndTask() {
     const current_task_id = await getActiveTask();
 
     if (current_task_id === -2) {
-        showAlert("The server is not available. Please try again later.");
+        
     } else if (current_task_id === -1) {
         showAlert("There is no active task to submit.");
     } else {
@@ -349,6 +350,9 @@ async function handleEndTask() {
 
 async function handleCancelTask() {
     const current_task_id = await getActiveTask();
+    if (current_task_id === -2) {
+        return;
+    }
     if (current_task_id !== -1) {
         const is_confirmed = await showConfirm("Do you want to cancel the task?");
         if (is_confirmed) {

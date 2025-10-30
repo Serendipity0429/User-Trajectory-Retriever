@@ -219,12 +219,15 @@ async function initialize() {
 
             history.pushState = function (...args) {
                 pushState.apply(history, args);
-                setTimeout(() => {
+                setTimeout(async () => {
                     if (_content_vars.url_now !== window.location.href) {
                         _content_vars.referrer_now = _content_vars.url_now;
                         _content_vars.url_now = window.location.href;
                         viewState.flush();
-                        setupTaskUI();
+                        await updateTaskStatus();
+                        if (getTaskStatus()) {
+                            setupTaskUI();
+                        }
                         printDebug("content", "URL changed (pushState), re-initializing UI.");
                     }
                 }, 0);
@@ -232,12 +235,15 @@ async function initialize() {
 
             history.replaceState = function (...args) {
                 replaceState.apply(history, args);
-                setTimeout(() => {
+                setTimeout(async () => {
                     if (_content_vars.url_now !== window.location.href) {
                         _content_vars.referrer_now = _content_vars.url_now;
                         _content_vars.url_now = window.location.href;
                         viewState.flush();
-                        setupTaskUI();
+                        await updateTaskStatus();
+                        if (getTaskStatus()) {
+                            setupTaskUI();
+                        }
                         printDebug("content", "URL changed (replaceState), re-initializing UI.");
                     }
                 }, 0);
@@ -287,7 +293,10 @@ window.addEventListener('popstate', async () => {
         _content_vars.referrer_now = _content_vars.url_now;
         _content_vars.url_now = window.location.href;
         viewState.flush();
-        setupTaskUI();
+        await updateTaskStatus();
+        if (getTaskStatus()) {
+            setupTaskUI();
+        }
         printDebug("content", "URL changed (popstate), re-initializing UI.");
     }
 });

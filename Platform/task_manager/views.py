@@ -298,17 +298,11 @@ def active_task(request):
     user = request.user
     task = Task.objects.filter(user=user, active=True).first()
     if task is None:
-        return HttpResponse(-1)
+        return JsonResponse({"task_id": -1})
 
     task_id = task.id
     print_debug("Current Task ID: ", task_id)
-    # Query Mode
-    if "task_id" in request.POST:
-        if request.POST["task_id"] == task_id:
-            return HttpResponse(1)
-        else:
-            return HttpResponse(-1)
-    return HttpResponse(task_id)
+    return JsonResponse({"task_id": task_id})
 
 
 # Initialize the task

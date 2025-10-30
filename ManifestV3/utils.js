@@ -79,7 +79,8 @@ async function refreshToken() {
     }
 }
 
-async function _request(method, url, data = {}, json_response = true, raw_data = false, send_as_json = false) {
+async function _request(method, url, data = {}, content_type = 'form', response_type = 'json')
+{
     const config = getConfig();
     const MAX_RETRIES = config.max_retries || 3;
     let attempt = 0;
@@ -91,15 +92,25 @@ async function _request(method, url, data = {}, json_response = true, raw_data =
             let request_url = url;
 
             if (method.toUpperCase() === 'POST') {
-                if (send_as_json) {
-                    headers["Content-Type"] = "application/json";
-                    body = JSON.stringify(data);
-                } else if (!raw_data) {
-                    headers["Content-Type"] = "application/x-www-form-urlencoded";
-                    body = new URLSearchParams(data);
+                // If data is empty, send an empty body
+                if (!data || Object.keys(data).length === 0) {
+                    body = null;
                 } else {
-                    headers["Content-Type"] = "text/plain";
-                    body = typeof data === "string" ? data : String(data);
+                    switch (content_type) {
+                        case 'json':
+                            headers["Content-Type"] = "application/json";
+                            body = JSON.stringify(data);
+                            break;
+                        case 'text':
+                            headers["Content-Type"] = "text/plain";
+                            body = typeof data === "string" ? data : String(data);
+                            break;
+                        case 'form':
+                        default:
+                            headers["Content-Type"] = "application/x-www-form-urlencoded";
+                            body = new URLSearchParams(data);
+                            break;
+                    }
                 }
             }
 
@@ -113,6 +124,7 @@ async function _request(method, url, data = {}, json_response = true, raw_data =
                 body,
             });
 
+            // Refresh token if unauthorized
             if (response.status === 401 && url !== config.urls.token_login) {
                 const new_token = await refreshToken();
                 if (new_token) {
@@ -127,41 +139,37 @@ async function _request(method, url, data = {}, json_response = true, raw_data =
                 }
             }
 
-            if (!response.ok) {
-                // Try to parse the response as JSON, as it might contain error details
-                if (json_response) {
+            switch (response_type) {
+                case 'json':
                     try {
-                        const error_data = await response.json();
-                        return error_data; // Return the JSON error response
+                        const json_response = await response.json();
+                        return json_response;
                     } catch (e) {
-                        // If parsing fails, throw a generic error
                         throw new Error(`Server error: ${response.status}`);
                     }
-                }
-                throw new Error(`Server error: ${response.status}`);
+                default:
+                    if (!response.ok) {
+                        throw new Error(`Server error: ${response.status}`);
+                    }
+                    return response;
             }
-
-            if (json_response) {
-                return await response.json();
-            }
-            return response;
         } catch (error) {
             attempt++;
             if (attempt >= MAX_RETRIES) {
                 printDebug("utils", `API request failed after ${MAX_RETRIES} attempts: ${url}`, error);
                 throw error;
             }
-            await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+            await new Promise(resolve => setTimeout(resolve, 500 * attempt));
         }
     }
 }
 
-async function _get(url, json_response = true) {
-    return _request('GET', url, {}, json_response);
+async function _get(url, response_type = 'json') {
+    return _request('GET', url, {}, 'none', response_type);
 }
 
-async function _post(url, data = {}, json_response = true, raw_data = false, send_as_json = false) {
-    return _request('POST', url, data, json_response, raw_data, send_as_json);
+async function _post(url, data = {}, content_type = 'form', response_type = 'json') {
+    return _request('POST', url, data, content_type, response_type);
 }
 
 // --- Storage --- 

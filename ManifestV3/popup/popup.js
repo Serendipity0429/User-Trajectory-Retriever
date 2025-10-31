@@ -381,6 +381,7 @@ async function handleCancelTask() {
     const localServerAddress = document.getElementById('local-server-address');
     const remoteServerAddress = document.getElementById('remote-server-address');
     const restoreDefaultsBtn = document.getElementById('restore-defaults-btn');
+    let originalSettings = {};
 
     async function saveSettings() {
         const serverType = document.querySelector('input[name="server-type"]:checked').value;
@@ -401,11 +402,15 @@ async function handleCancelTask() {
             chrome.storage.local.get(['serverType', 'localServerAddress', 'remoteServerAddress'], resolve);
         });
 
-        if (result.serverType) {
-            document.getElementById('server-type-' + result.serverType).checked = true;
-        }
-        localServerAddress.value = result.localServerAddress || '';
-        remoteServerAddress.value = result.remoteServerAddress || '';
+        originalSettings = {
+            serverType: result.serverType || 'local',
+            localServerAddress: result.localServerAddress || '',
+            remoteServerAddress: result.remoteServerAddress || ''
+        };
+
+        document.getElementById('server-type-' + originalSettings.serverType).checked = true;
+        localServerAddress.value = originalSettings.localServerAddress;
+        remoteServerAddress.value = originalSettings.remoteServerAddress;
     }
 
     async function openControlPanel() {
@@ -426,14 +431,36 @@ async function handleCancelTask() {
     }
 
     saveSettingsBtn.addEventListener('click', async () => {
-        await saveSettings();
-        const infoMsgContainer = document.getElementById('info-msg-container');
-        const infoMsgText = document.getElementById('info-msg-text');
-        infoMsgText.textContent = 'Saved!';
-        infoMsgContainer.style.display = 'flex';
-        setTimeout(() => {
-            infoMsgContainer.style.display = 'none';
-        }, 2000);
+        const currentSettings = {
+            serverType: document.querySelector('input[name="server-type"]:checked').value,
+            localServerAddress: localServerAddress.value,
+            remoteServerAddress: remoteServerAddress.value
+        };
+
+        const hasChanged = JSON.stringify(currentSettings) !== JSON.stringify(originalSettings);
+
+        if (hasChanged) {
+            const confirmed = await showConfirm("You have unsaved changes. Do you want to save them?");
+            if (confirmed) {
+                await saveSettings();
+                originalSettings = { ...currentSettings }; // Update original settings to reflect saved state
+                const infoMsgContainer = document.getElementById('info-msg-container');
+                const infoMsgText = document.getElementById('info-msg-text');
+                infoMsgText.textContent = 'Saved!';
+                infoMsgContainer.style.display = 'flex';
+                setTimeout(() => {
+                    infoMsgContainer.style.display = 'none';
+                }, 2000);
+            }
+        } else {
+            const infoMsgContainer = document.getElementById('info-msg-container');
+            const infoMsgText = document.getElementById('info-msg-text');
+            infoMsgText.textContent = 'No changes to save.';
+            infoMsgContainer.style.display = 'flex';
+            setTimeout(() => {
+                infoMsgContainer.style.display = 'none';
+            }, 2000);
+        }
     });
 
     restoreDefaultsBtn.addEventListener('click', async () => {
@@ -458,11 +485,34 @@ async function handleCancelTask() {
         }, 2000);
     });
 
-    controlPanelBtn.addEventListener('click', openControlPanel);
+    async function handleCloseControlPanel() {
+        const currentSettings = {
+            serverType: document.querySelector('input[name="server-type"]:checked').value,
+            localServerAddress: localServerAddress.value,
+            remoteServerAddress: remoteServerAddress.value
+        };
 
-    cancelSettingsBtn.addEventListener('click', async () => {
-        await closeControlPanel();
+        const hasChanged = JSON.stringify(currentSettings) !== JSON.stringify(originalSettings);
+
+        if (hasChanged) {
+            const confirmed = await showConfirm("You have unsaved changes. Do you want to discard them?");
+            if (confirmed) {
+                await closeControlPanel();
+            }
+        } else {
+            await closeControlPanel();
+        }
+    }
+
+    controlPanelBtn.addEventListener('click', async () => {
+        if (controlPanel.style.display === 'block') { // If control panel is open
+            await handleCloseControlPanel();
+        } else { // If control panel is closed
+            await openControlPanel();
+        }
     });
+
+    cancelSettingsBtn.addEventListener('click', handleCloseControlPanel);
 
 
     // --- Original Initialization Logic ---

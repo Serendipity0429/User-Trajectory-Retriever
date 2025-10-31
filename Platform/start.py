@@ -6,7 +6,7 @@ from pathlib import Path
 
 # --- Configuration ---
 # Set to True to clean the project and load development data
-DEBUG = True
+DEBUG = False
 # Set to True to run the server on 0.0.0.0:2904 for remote access
 REMOTE = False
 # --- End Configuration ---

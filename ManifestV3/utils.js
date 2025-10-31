@@ -233,7 +233,7 @@ function _is_extension_page(url) {
 }
 
 function displayMessageBox(options) {
-    const { message, innerHTML, type = 'info', duration = 3000, id = null, css = '' } = options;
+    const { message, innerHTML, type = 'info', duration = 3000, id = null, css = '', size = 'medium', position = 'top-right' } = options;
     const config = getConfig();
     if (!config || window.location.href.startsWith(config.urls.base)) return;
 
@@ -248,9 +248,26 @@ function displayMessageBox(options) {
     const backgroundColor = isWarning ? '#fff3cd' : '#f8f9fa';
     const color = isWarning ? '#856404' : '#212529';
 
+    const sizeMap = {
+        small: { width: '20vw', height: 'auto', minHeight: '10vh', fontSize: '1.0vw' },
+        medium: { width: '25vw', height: 'auto', minHeight: '15vh', fontSize: '1.2vw' },
+        large: { width: '30vw', height: 'auto', minHeight: '20vh', fontSize: '1.4vw' }
+    };
+
+    const positionMap = {
+        'top-left': { top: '10px', left: '10px', right: 'auto', bottom: 'auto', transform: 'none' },
+        'top-center': { top: '10px', left: '50%', right: 'auto', bottom: 'auto', transform: 'translateX(-50%)' },
+        'top-right': { top: '10px', right: '10px', left: 'auto', bottom: 'auto', transform: 'none' },
+        'middle-left': { top: '50%', left: '10px', right: 'auto', bottom: 'auto', transform: 'translateY(-50%)' },
+        'middle-center': { top: '50%', left: '50%', right: 'auto', bottom: 'auto', transform: 'translate(-50%, -50%)' },
+        'middle-right': { top: '50%', right: '10px', left: 'auto', bottom: 'auto', transform: 'translateY(-50%)' },
+        'bottom-left': { bottom: '10px', left: '10px', top: 'auto', right: 'auto', transform: 'none' },
+        'bottom-center': { bottom: '10px', left: '50%', top: 'auto', right: 'auto', transform: 'translateX(-50%)' },
+        'bottom-right': { bottom: '10px', right: '10px', top: 'auto', left: 'auto', transform: 'none' }
+    };
+
     box.style.cssText = `
         position: fixed;
-        right: 10px;
         background-color: ${backgroundColor};
         color: ${color};
         padding: 1.0vw;
@@ -259,30 +276,32 @@ function displayMessageBox(options) {
         box-shadow: 0 0.6vw 1.2vw rgba(0,0,0,.15);
         border-left: 5px solid ${borderColor};
         opacity: 0;
-        transition: opacity 0.5s ease-in-out;
-        font-size: 1.2vw;
-        min-width: 15rem;
+        transition: opacity 0.5s ease-in-out, width 0.3s ease, height 0.3s ease, top 0.3s ease, left 0.3s ease;
         font-family: 'Noto Sans SC', sans-serif !important;
         ${css}
     `;
+
+    if (id === 'task-question-box') {
+        const sizeStyles = sizeMap[size] || sizeMap.medium;
+        const positionStyles = positionMap[position] || positionMap['top-right'];
+        Object.assign(box.style, sizeStyles, positionStyles);
+    } else {
+        // Temporary notification box, use stacking logic
+        let topPosition = 10;
+        document.querySelectorAll('.loaded-box').forEach(existingBox => {
+            topPosition = Math.max(topPosition, existingBox.getBoundingClientRect().bottom + 10);
+        });
+        box.style.top = `${topPosition}px`;
+        box.style.right = '10px';
+        const sizeStyles = sizeMap['small']; // notifications are always small
+        Object.assign(box.style, sizeStyles);
+    }
 
     if (innerHTML) {
         box.innerHTML = innerHTML;
     } else {
         box.innerText = message;
     }
-
-    let topPosition = 10;
-    const questionBox = document.getElementById('task-question-box');
-    if (questionBox) {
-        topPosition = questionBox.getBoundingClientRect().bottom + 10;
-    }
-
-    const existingBoxes = document.querySelectorAll('.loaded-box');
-    existingBoxes.forEach(existingBox => {
-        topPosition = Math.max(topPosition, existingBox.getBoundingClientRect().bottom + 10);
-    });
-    box.style.top = `${topPosition}px`;
 
     document.body.appendChild(box);
 

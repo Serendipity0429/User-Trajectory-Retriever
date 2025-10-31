@@ -87,9 +87,9 @@ function displayQuestionBox(question) {
     if (!question) return;
 
     const innerHTML = `
-        <h5 style="font-size: 1.5vw; margin-bottom: 0.6vw;margin-top: 0;"><strong>Task Question</strong></h5>
-        <p style="font-size: 1.4vw; margin-bottom: 0; margin-top:0;">${question}</p>
-        <div id="evidence-count-container" style="margin-top: 10px; font-size: 1.1vw; color: #212529;">
+        <h5 style="font-size: 1.2em; margin-bottom: 0.5em; margin-top: 0;"><strong>Task Question</strong></h5>
+        <p style="font-size: 1.0em; margin-bottom: 0; margin-top:0;">${question}</p>
+        <div id="evidence-count-container" style="margin-top: 10px; font-size: 0.9em; color: #212529;">
             Evidence Collected: <span id="evidence-count">0</span>
         </div>
     `;
@@ -101,29 +101,35 @@ function displayQuestionBox(question) {
         transition: opacity 0.3s ease-in-out;
     `;
 
-    displayMessageBox({
-        innerHTML,
-        type: 'info',
-        duration: 0, // Persists until manually removed
-        id: 'task-question-box',
-        css
+    chrome.storage.local.get(['messageBoxSize', 'messageBoxPosition'], (result) => {
+        const options = {
+            innerHTML,
+            type: 'info',
+            duration: 0, // Persists until manually removed
+            id: 'task-question-box',
+            css,
+            size: result.messageBoxSize,
+            position: result.messageBoxPosition
+        };
+        displayMessageBox(options);
+
+        const box = document.getElementById('task-question-box');
+        if (box) {
+            box.style.pointerEvents = 'none';
+            box.style.opacity = '0.9';
+            
+            questionBoxMousemoveListener = (e) => {
+                const rect = box.getBoundingClientRect();
+                if (e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom) {
+                    box.style.opacity = '0';
+                } else {
+                    box.style.opacity = '0.9';
+                }
+            };
+            document.addEventListener('mousemove', questionBoxMousemoveListener);
+        }
     });
 
-    const box = document.getElementById('task-question-box');
-    if (box) {
-        box.style.pointerEvents = 'none';
-        box.style.opacity = '0.9';
-        
-        questionBoxMousemoveListener = (e) => {
-            const rect = box.getBoundingClientRect();
-            if (e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom) {
-                box.style.opacity = '0';
-            } else {
-                box.style.opacity = '0.9';
-            }
-        };
-        document.addEventListener('mousemove', questionBoxMousemoveListener);
-    }
     updateEvidenceCount();
 }
 
@@ -205,6 +211,7 @@ async function setupTaskUI() {
 async function initialize() {
     try {
         await initializeConfig(); // Ensure config is loaded before proceeding
+
         const login_response = await new Promise((resolve, reject) => {
             chrome.runtime.sendMessage({ type: MSG_TYPE_POPUP, command: "check_logging_status" }, (response) => {
                 if (chrome.runtime.lastError) {
@@ -373,4 +380,41 @@ chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
             sendResponse({ success: true });
         }
     }
+
+    if (message.type === 'update_message_box_style') {
+        applyMessageBoxStyle(message.style);
+        sendResponse({success: true});
+        return true;
+    }
 });
+
+function applyMessageBoxStyle(style) {
+    const questionBox = document.getElementById('task-question-box');
+    if (questionBox) {
+        const sizeMap = {
+            small: { width: '20vw', height: 'auto', minHeight: '10vh', fontSize: '1.0vw' },
+            medium: { width: '25vw', height: 'auto', minHeight: '15vh', fontSize: '1.2vw' },
+            large: { width: '30vw', height: 'auto', minHeight: '20vh', fontSize: '1.4vw' }
+        };
+
+        const positionMap = {
+            'top-left': { top: '10px', left: '10px', right: 'auto', bottom: 'auto', transform: 'none' },
+            'top-center': { top: '10px', left: '50%', right: 'auto', bottom: 'auto', transform: 'translateX(-50%)' },
+            'top-right': { top: '10px', right: '10px', left: 'auto', bottom: 'auto', transform: 'none' },
+            'middle-left': { top: '50%', left: '10px', right: 'auto', bottom: 'auto', transform: 'translateY(-50%)' },
+            'middle-center': { top: '50%', left: '50%', right: 'auto', bottom: 'auto', transform: 'translate(-50%, -50%)' },
+            'middle-right': { top: '50%', right: '10px', left: 'auto', bottom: 'auto', transform: 'translateY(-50%)' },
+            'bottom-left': { bottom: '10px', left: '10px', top: 'auto', right: 'auto', transform: 'none' },
+            'bottom-center': { bottom: '10px', left: '50%', top: 'auto', right: 'auto', transform: 'translateX(-50%)' },
+            'bottom-right': { bottom: '10px', right: '10px', top: 'auto', left: 'auto', transform: 'none' }
+        };
+
+        if (style.size && sizeMap[style.size]) {
+            Object.assign(questionBox.style, sizeMap[style.size]);
+        }
+
+        if (style.position && positionMap[style.position]) {
+            Object.assign(questionBox.style, positionMap[style.position]);
+        }
+    }
+}

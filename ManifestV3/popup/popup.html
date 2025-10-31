@@ -26,36 +26,24 @@
                             <i class="fas fa-exclamation-triangle"></i>
                             <p>Ask admin before change!</p>
                         </div>
-                        <div class="form-group">
-                            <label><i class="fas fa-network-wired"></i></label>
-                            <div class="radio-group">
-                                <input type="radio" id="server-type-local" name="server-type" value="local">
-                                <label for="server-type-local">Local</label>
-                                <input type="radio" id="server-type-remote" name="server-type" value="remote">
-                                <label for="server-type-remote">Remote</label>
-                            </div>
-                        </div>
-                        <div class="form-group">
+                        <div class="form-group server-choice-btn" data-server-type="local">
                             <label for="local-server-address"><i class="fas fa-server"></i></label>
                             <input type="text" id="local-server-address" placeholder="Local Server Address">
                         </div>
-                        <div class="form-group">
+                        <div class="form-group server-choice-btn" data-server-type="remote">
                             <label for="remote-server-address"><i class="fas fa-globe"></i></label>
                             <input type="text" id="remote-server-address" placeholder="Remote Server Address">
                         </div>
                     </div>
                     <div class="function-group">
                         <h3>Message Box Settings</h3>
-                        <div class="message-box-controls">
+                        <div class="concat-layout">
                             <div class="form-group">
                                 <label><i class="fas fa-expand-arrows-alt"></i></label>
-                                <div class="radio-group size-settings">
-                                    <input type="radio" id="size-small" name="message-box-size" value="small">
-                                    <label for="size-small">Small</label>
-                                    <input type="radio" id="size-medium" name="message-box-size" value="medium" checked>
-                                    <label for="size-medium">Medium</label>
-                                    <input type="radio" id="size-large" name="message-box-size" value="large">
-                                    <label for="size-large">Large</label>
+                                <div class="size-settings">
+                                    <div class="size-btn" data-size="small">Small</div>
+                                    <div class="size-btn" data-size="medium">Medium</div>
+                                    <div class="size-btn" data-size="large">Large</div>
                                 </div>
                             </div>
                             <div class="form-group">

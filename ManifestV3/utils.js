@@ -232,6 +232,21 @@ function _is_extension_page(url) {
     return url.startsWith(chrome.runtime.getURL(''));
 }
 
+function broadcastToTabs(message) {
+    chrome.tabs.query({}, (tabs) => {
+        for (let tab of tabs) {
+            // Avoid sending messages to extension pages or platform pages
+            if (tab.url && !_is_server_page(tab.url) && !_is_extension_page(tab.url)) {
+                chrome.tabs.sendMessage(tab.id, message, (response) => {
+                    if (chrome.runtime.lastError) {
+                        // Suppress errors for tabs that don't have the content script
+                    }
+                });
+            }
+        }
+    });
+}
+
 async function displayMessageBox(options) {
     const { message, innerHTML, type = 'info', duration = 3000, id = null, css = '', size = -1, position = -1 } = options;
     const config = getConfig();
@@ -250,10 +265,25 @@ async function displayMessageBox(options) {
         box.id = id;
     }
     
-    const isWarning = type === 'warning';
-    const borderColor = isWarning ? '#ffc107' : '#021e4d';
-    const backgroundColor = isWarning ? '#fff3cd' : '#f8f9fa';
-    const color = isWarning ? '#856404' : '#212529';
+    let borderColor, backgroundColor, color;
+    switch (type) {
+        case 'warning':
+            borderColor = '#ffc107';
+            backgroundColor = '#fff3cd';
+            color = '#856404';
+            break;
+        case 'error':
+            borderColor = '#dc3545';
+            backgroundColor = '#f8d7da';
+            color = '#721c24';
+            break;
+        case 'info':
+        default:
+            borderColor = '#021e4d';
+            backgroundColor = '#f8f9fa';
+            color = '#212529';
+            break;
+    }
 
     const sizeMap = {
         small: { height: 'auto', padding: '1.0em', fontSize: '1.0vw' },
@@ -319,6 +349,14 @@ async function displayMessageBox(options) {
             box.style.opacity = '0';
             setTimeout(() => { box.remove(); }, 500);
         }, duration);
+    }
+}
+
+function removeMessageBox(id) {
+    const box = document.getElementById(id);
+    if (box) {
+        box.style.opacity = '0';
+        setTimeout(() => { box.remove(); }, 500);
     }
 }
 

@@ -337,6 +337,18 @@ chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
         return true; // Keep channel open for async response
     }
 
+    if (message.command === 'remove_message_box') {
+        removeMessageBox(message.id);
+        sendResponse({success: true});
+        return true;
+    }
+
+    if (message.command === 'display_message') {
+        displayMessageBox(message.options);
+        sendResponse({success: true});
+        return true;
+    }
+
     if (message.command === 'evidence-added-successfully') {
         displayMessageBox({ message: "Evidence added successfully!" });
         const countEl = document.getElementById('evidence-count');

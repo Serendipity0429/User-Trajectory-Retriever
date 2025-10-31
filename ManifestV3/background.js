@@ -21,6 +21,8 @@ const MSG_GET_TASK_INFO = 'get_task_info';
 const MSG_GET_JUSTIFICATIONS = 'get_justifications';
 const MSG_GET_POPUP_DATA = 'get_popup_data';
 
+let isConnected = true;
+
 (async () => {
     await initializeConfig();
 
@@ -85,6 +87,21 @@ async function checkActiveTaskID() {
     }
 
     try {
+        if (!isConnected) {
+            isConnected = true;
+            broadcastToTabs({
+                command: 'remove_message_box',
+                id: 'connection-error-message'
+            });
+            broadcastToTabs({
+                command: 'display_message',
+                options: {
+                    message: 'Connection restored.',
+                    type: 'info',
+                    duration: 3000
+                }
+            });
+        }
         printDebug("background", "Fetching active task ID from server...");
         const old_task_id = await getCurrentTask();
         const config = getConfig();
@@ -121,6 +138,18 @@ async function checkActiveTaskID() {
         return new_task_id;
     } catch (error) {
         console.error("Error checking active task ID:", error);
+        if (isConnected && logged_in) {
+            isConnected = false;
+            broadcastToTabs({
+                command: 'display_message',
+                options: {
+                    id: 'connection-error-message',
+                    message: 'Connection error.\\nPlease check your internet connection and the server status.',
+                    type: 'error',
+                    duration: 0
+                }
+            });
+        }
         await setCurrentTask(-1); // Clear current task on error
         if (error.message === "Authentication failed.") {
             // Force logout if authentication fails
@@ -129,7 +158,7 @@ async function checkActiveTaskID() {
             chrome.action.setBadgeText({ text: '' });
         } else if (error.message.startsWith("Server error:") || error instanceof TypeError) {
             // Indicate server error on the badge
-            chrome.action.setBadgeText({ text: 'err' });
+            chrome.action.setBadgeText({ text: 'error' });
             chrome.action.setBadgeTextColor({ color: '#ffffff' });
             chrome.action.setBadgeBackgroundColor({ color: '#eb1313ff' });
         }

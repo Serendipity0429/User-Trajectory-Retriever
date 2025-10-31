@@ -62,7 +62,7 @@ h1 {
     border-radius: 8px;
     padding: 10px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-    margin-bottom: 15px;
+    margin-bottom: 10px; /* Made more compact */
     position: relative;
 }
 
@@ -124,8 +124,8 @@ h1 {
     align-items: center;
     justify-content: center;
     gap: 10px;
-    padding: 10px;
-    font-size: 16px;
+    padding: 8px; /* Made more compact */
+    font-size: 14px; /* Made more compact */
     font-weight: 500;
     cursor: pointer;
     text-decoration: none;
@@ -165,8 +165,8 @@ h1 {
 
 .button-row {
     display: flex;
-    gap: 15px;
-    margin-bottom: 10px;
+    gap: 10px; /* Made more compact */
+    margin-bottom: 5px; /* Made more compact */
     align-items: center;
 }
 
@@ -451,4 +451,19 @@ h1 {
 }
 .radio-group input[type="radio"]:focus + label::before {
     box-shadow: 0 0 0 2px rgba(103, 19, 114, 0.3);
+}
+
+.function-group {
+    background-color: var(--white);
+    border-radius: 8px;
+    padding: 10px; /* Made more compact */
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    margin-bottom: 10px; /* Made more compact */
+}
+
+.function-group h3 {
+    font-size: 18px;
+    color: var(--primary-color);
+    margin-bottom: 10px; /* Made more compact */
+    font-weight: 700;
 }

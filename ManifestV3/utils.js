@@ -248,7 +248,12 @@ function broadcastToTabs(message) {
 }
 
 async function displayMessageBox(options) {
-    const { message, innerHTML, type = 'info', duration = 3000, id = null, css = '', size = -1, position = -1 } = options;
+    const { message, innerHTML, title = '', type = 'info', duration = 3000, id = null, css = '' } = options;
+    
+    if (id && document.getElementById(id)) {
+        return; // Don't display if a box with the same ID already exists
+    }
+
     const config = getConfig();
     if (!config || window.location.href.startsWith(config.urls.base)) return;
 
@@ -286,9 +291,9 @@ async function displayMessageBox(options) {
     }
 
     const sizeMap = {
-        small: { height: 'auto', padding: '1.0em', fontSize: '1.0vw' },
-        medium: { height: 'auto', padding: '1.2em', fontSize: '1.2vw' },
-        large: { height: 'auto', padding: '1.5em', fontSize: '1.4vw' }
+        small: { height: 'auto', padding: '1.0em', fontSize: '1.0vw', 'max-width': '20vw' },
+        medium: { height: 'auto', padding: '1.2em', fontSize: '1.2vw', 'max-width': '25vw' },
+        large: { height: 'auto', padding: '1.5em', fontSize: '1.4vw', 'max-width': '30vw' }
     };
 
     const positionMap = {
@@ -315,6 +320,7 @@ async function displayMessageBox(options) {
         opacity: 0;
         transition: opacity 0.5s ease-in-out, width 0.3s ease, height 0.3s ease, top 0.3s ease, left 0.3s ease;
         font-family: 'Noto Sans SC', sans-serif !important;
+        word-wrap: break-word;
         ${css}
     `;
 
@@ -337,7 +343,11 @@ async function displayMessageBox(options) {
     if (innerHTML) {
         box.innerHTML = innerHTML;
     } else {
-        box.innerText = message;
+        if (title) {
+            box.innerHTML = `<strong>${title}</strong><br>${message}`;
+        } else {
+            box.innerText = message;
+        }
     }
 
     document.body.appendChild(box);
@@ -353,6 +363,7 @@ async function displayMessageBox(options) {
 }
 
 function removeMessageBox(id) {
+    if (!id || !document) return; // safety check
     const box = document.getElementById(id);
     if (box) {
         box.style.opacity = '0';

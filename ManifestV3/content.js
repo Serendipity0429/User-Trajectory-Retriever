@@ -277,8 +277,11 @@ async function initialize() {
 
             if (is_recording_paused) {
                 displayMessageBox({
-                    message: "You have a pending annotation. \nPlease open the popup to complete it.",
-                    type: "warning"
+                    title: "Recording Paused",
+                    message: "You have a pending annotation.\nPlease open the popup to complete it.",
+                    type: "warning",
+                    id: "server-pending-annotation-message",
+                    duration: 3000
                 });
                 printDebug("content", "Pending annotation message displayed.");
             }

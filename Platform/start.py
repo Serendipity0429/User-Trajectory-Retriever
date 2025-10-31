@@ -1,3 +1,4 @@
+import argparse
 import os
 import shutil
 import subprocess
@@ -5,8 +6,6 @@ import sys
 from pathlib import Path
 
 # --- Configuration ---
-# Set to True to clean the project and load development data
-DEBUG = False
 # Set to True to run the server on 0.0.0.0:2904 for remote access
 REMOTE = False
 # --- End Configuration ---
@@ -82,7 +81,18 @@ def setup_development_data():
 
 def main():
     """Main script execution."""
-    if DEBUG:
+    parser = argparse.ArgumentParser(description="Start the Django development server.")
+    parser.add_argument("--debug", action="store_true", help="Run in debug mode (clean project, load development data).", default=False)
+    args = parser.parse_args()
+    
+    if args.debug:
+        print("Are you sure you want to run in debug mode? This will delete the database and media files. (y/n): ", end="")
+        choice = input().strip().lower()
+        if choice != 'y':
+            print("Aborting debug mode.")
+            sys.exit(0)
+
+    if args.debug:
         clean_project()
 
     # Run migrations
@@ -93,7 +103,7 @@ def main():
     run_manage_py_command("migrate")
     print("--- Migrations complete ---")
 
-    if DEBUG:
+    if args.debug:
         setup_development_data()
 
     # Start the server

@@ -53,27 +53,75 @@ async function getUserInfo() {
 
 // --- Core Logic ---
 
+async function makeApiRequest(requestFunc) {
+    try {
+        const response = await requestFunc();
+        if (!isConnected) {
+            isConnected = true;
+            broadcastToTabs({ command: 'remove_message_box', id: 'connection-error-message' });
+            broadcastToTabs({
+                command: 'display_message',
+                options: { message: 'Connection restored.', type: 'warning', duration: 3000 }
+            });
+            // Reset badge on successful connection
+            const { logged_in } = await getUserInfo();
+            if (logged_in) {
+                const task_id = await getCurrentTask();
+                if (task_id > -1) {
+                    chrome.action.setBadgeText({ text: 'on' });
+                } else {
+                    chrome.action.setBadgeText({ text: 'off' });
+                }
+                chrome.action.setBadgeBackgroundColor({ color: '#660874' });
+            }
+        }
+        return response;
+    } catch (error) {
+        const { logged_in } = await getUserInfo();
+        if (isConnected && logged_in) {
+            isConnected = false;
+            broadcastToTabs({
+                command: 'display_message',
+                options: {
+                    id: 'connection-error-message',
+                    title: 'Connection Error',
+                    message: 'Please check your internet connection and the server status.',
+                    type: 'error',
+                    duration: 0
+                }
+            });
+        }
+        if (error.message.startsWith("Server error:") || error instanceof TypeError) {
+            chrome.action.setBadgeText({ text: 'err' });
+            chrome.action.setBadgeTextColor({ color: '#ffffff' });
+            chrome.action.setBadgeBackgroundColor({ color: '#eb1313ff' });
+        }
+        console.error("API Request Failed:", error.message);
+        throw error;
+    }
+}
+
 async function getTaskInfo(task_id) {
     if (task_id === -1) return;
     try {
         const config = getConfig();
-        const response = await _get(`${config.urls.get_task_info}?task_id=${task_id}`);
+        const response = await makeApiRequest(() => _get(`${config.urls.get_task_info}?task_id=${task_id}`));
         if (response && response.question) {
             await _set_local({ [TASK_INFO_KEY]: response });
         }
     } catch (error) {
-        console.error("Error getting task info:", error);
+        console.error("Error getting task info:", error.message);
     }
 }
 
 async function hasPendingAnnotation() {
     try {
         const config = getConfig();
-        const pending_response = await _get(config.urls.check_pending_annotations);
+        const pending_response = await makeApiRequest(() => _get(config.urls.check_pending_annotations));
         return pending_response && pending_response.pending;
     }
     catch (error) {
-        console.error("Error checking pending annotations:", error);
+        console.error("Error checking pending annotations:", error.message);
         return false;
     }
 }
@@ -87,27 +135,11 @@ async function checkActiveTaskID() {
     }
 
     try {
-        if (!isConnected) {
-            isConnected = true;
-            broadcastToTabs({
-                command: 'remove_message_box',
-                id: 'connection-error-message'
-            });
-            broadcastToTabs({
-                command: 'display_message',
-                options: {
-                    message: 'Connection restored.',
-                    type: 'info',
-                    duration: 3000
-                }
-            });
-        }
-        printDebug("background", "Fetching active task ID from server...");
         const old_task_id = await getCurrentTask();
         const config = getConfig();
         
-        // Use a more robust API call with retry logic
-        const response = await _post(config.urls.active_task);
+        const response = await makeApiRequest(() => _post(config.urls.active_task));
+        
         const data = response.task_id;
         const new_task_id = (data !== null && data !== undefined && !isNaN(data)) ? parseInt(data, 10) : -1;
 
@@ -137,30 +169,13 @@ async function checkActiveTaskID() {
         await setCurrentTask(new_task_id);
         return new_task_id;
     } catch (error) {
-        console.error("Error checking active task ID:", error);
-        if (isConnected && logged_in) {
-            isConnected = false;
-            broadcastToTabs({
-                command: 'display_message',
-                options: {
-                    id: 'connection-error-message',
-                    message: 'Connection error.\\nPlease check your internet connection and the server status.',
-                    type: 'error',
-                    duration: 0
-                }
-            });
-        }
-        await setCurrentTask(-1); // Clear current task on error
+        console.error("Error checking active task ID:", error.message);
         if (error.message === "Authentication failed.") {
+            await setCurrentTask(-1); // Clear current task on auth error
             // Force logout if authentication fails
             await _remove_local(['access_token', 'refresh_token', 'username', 'logged_in']);
             chrome.runtime.sendMessage({ command: "alter_logging_status", log_status: false });
             chrome.action.setBadgeText({ text: '' });
-        } else if (error.message.startsWith("Server error:") || error instanceof TypeError) {
-            // Indicate server error on the badge
-            chrome.action.setBadgeText({ text: 'error' });
-            chrome.action.setBadgeTextColor({ color: '#ffffff' });
-            chrome.action.setBadgeBackgroundColor({ color: '#eb1313ff' });
         }
         return -2; // Indicate server failure
     }
@@ -193,10 +208,10 @@ async function sendInfo(message) {
 
     try {
         const config = getConfig();
-        await _post(config.urls.data, { message });
+        await makeApiRequest(() => _post(config.urls.data, { message }));
         printDebug("background", "Info sent successfully.");
     } catch (error) {
-        console.error("Error sending info:", error);
+        console.error("Error sending info:", error.message);
     }
 }
 
@@ -342,16 +357,16 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
             if (details.result) {
                 try {
                     const config = getConfig();
-                    await _post(config.urls.add_justification, {
+                    await makeApiRequest(() => _post(config.urls.add_justification, {
                         task_id: task_id,
                         url: tab.url,
                         page_title: tab.title,
                         text: details.result.text,
                         dom_position: details.result.selector,
                         evidence_type: 'text_selection'
-                    }, 'json', 'json'); // content_type = 'json', response_type = 'json'
+                    }, 'json', 'json')); // content_type = 'json', response_type = 'json'
 
-                    const justificationsResponse = await _get(`${config.urls.get_justifications}/${task_id}/`);
+                    const justificationsResponse = await makeApiRequest(() => _get(`${config.urls.get_justifications}/${task_id}/`));
                     const newCount = justificationsResponse?.justifications?.length ?? 0;
 
                     // Notify the content script to show a confirmation
@@ -363,7 +378,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
                         }
                     });
                 } catch (error) {
-                    console.error("Error adding justification:", error);
+                    console.error("Error adding justification:", error.message);
                 }
             }
         });
@@ -377,7 +392,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
             if (details) {
                 try {
                     const config = getConfig();
-                    await _post(config.urls.add_justification, {
+                    await makeApiRequest(() => _post(config.urls.add_justification, {
                         task_id: task_id,
                         url: tab.url,
                         page_title: tab.title,
@@ -387,9 +402,9 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
                             tagName: details.tagName,
                             attributes: details.attributes
                         }
-                    }, 'json', 'json'); // content_type = json, response_type = json
+                    }, 'json', 'json')); // content_type = json, response_type = json
 
-                    const justificationsResponse = await _get(`${config.urls.get_justifications}/${task_id}/`);
+                    const justificationsResponse = await makeApiRequest(() => _get(`${config.urls.get_justifications}/${task_id}/`));
                     const newCount = justificationsResponse?.justifications?.length ?? 0;
 
                     // Notify the content script to show a confirmation
@@ -401,7 +416,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
                         }
                     });
                 } catch (error) {
-                    console.error("Error adding element evidence:", error);
+                    console.error("Error adding element evidence:", error.message);
                 }
             }
         });
@@ -439,10 +454,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                         pending_url = pending_response.url;
                     } else {
                         await _set_local({ is_recording_paused: false });
+                        broadcastToTabs({ command: 'remove_message_box', id: 'server-pending-annotation-message' });
                     }
                 } catch (error) {
                     console.error("Error checking pending annotations:", error);
                     await _set_local({ is_recording_paused: false });
+                    broadcastToTabs({ command: 'remove_message_box', id: 'server-pending-annotation-message' });
                 }
             
                 sendResponse({
@@ -580,7 +597,7 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
             const task_id = await getCurrentTask();
             if (task_id !== -1) {
                 try {
-                    const response = await _get(`${config.urls.get_justifications}/${task_id}/`);
+                    const response = await makeApiRequest(() => _get(`${config.urls.get_justifications}/${task_id}/`));
                     if (response && response.justifications) {
                         const newCount = response.justifications.length;
                         chrome.tabs.query({}, (tabs) => {
@@ -594,7 +611,7 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
                         });
                     }
                 } catch (error) {
-                    console.error("Error getting justifications for count:", error);
+                    console.error("Error getting justifications for count:", error.message);
                 }
             }
             break;

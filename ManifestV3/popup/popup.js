@@ -381,36 +381,52 @@ async function handleCancelTask() {
     const localServerAddress = document.getElementById('local-server-address');
     const remoteServerAddress = document.getElementById('remote-server-address');
     const restoreDefaultsBtn = document.getElementById('restore-defaults-btn');
+    const sizeRadios = document.querySelectorAll('input[name="message-box-size"]');
+    const positionGrid = document.querySelector('.position-grid');
     let originalSettings = {};
 
     async function saveSettings() {
         const serverType = document.querySelector('input[name="server-type"]:checked').value;
         const localAddress = localServerAddress.value;
         const remoteAddress = remoteServerAddress.value;
+        const messageBoxSize = document.querySelector('input[name="message-box-size"]:checked').value;
+        const selectedPosition = positionGrid.querySelector('.grid-cell.selected').dataset.position;
         
         await new Promise((resolve) => {
             chrome.storage.local.set({
                 serverType: serverType,
                 localServerAddress: localAddress,
-                remoteServerAddress: remoteAddress
+                remoteServerAddress: remoteAddress,
+                messageBoxSize: messageBoxSize,
+                messageBoxPosition: selectedPosition
             }, resolve);
         });
     }
 
     async function loadSettings() {
         const result = await new Promise((resolve) => {
-            chrome.storage.local.get(['serverType', 'localServerAddress', 'remoteServerAddress'], resolve);
+            chrome.storage.local.get(['serverType', 'localServerAddress', 'remoteServerAddress', 'messageBoxSize', 'messageBoxPosition'], resolve);
         });
 
         originalSettings = {
             serverType: result.serverType || 'local',
             localServerAddress: result.localServerAddress || '',
-            remoteServerAddress: result.remoteServerAddress || ''
+            remoteServerAddress: result.remoteServerAddress || '',
+            messageBoxSize: result.messageBoxSize || 'medium',
+            messageBoxPosition: result.messageBoxPosition || 'top-right'
         };
 
         document.getElementById('server-type-' + originalSettings.serverType).checked = true;
         localServerAddress.value = originalSettings.localServerAddress;
         remoteServerAddress.value = originalSettings.remoteServerAddress;
+        document.getElementById('size-' + originalSettings.messageBoxSize).checked = true;
+        
+        positionGrid.querySelectorAll('.grid-cell').forEach(cell => {
+            cell.classList.remove('selected');
+            if (cell.dataset.position === originalSettings.messageBoxPosition) {
+                cell.classList.add('selected');
+            }
+        });
     }
 
     async function openControlPanel() {
@@ -434,24 +450,23 @@ async function handleCancelTask() {
         const currentSettings = {
             serverType: document.querySelector('input[name="server-type"]:checked').value,
             localServerAddress: localServerAddress.value,
-            remoteServerAddress: remoteServerAddress.value
+            remoteServerAddress: remoteServerAddress.value,
+            messageBoxSize: document.querySelector('input[name="message-box-size"]:checked').value,
+            messageBoxPosition: positionGrid.querySelector('.grid-cell.selected').dataset.position
         };
 
         const hasChanged = JSON.stringify(currentSettings) !== JSON.stringify(originalSettings);
 
         if (hasChanged) {
-            const confirmed = await showConfirm("You have unsaved changes. Do you want to save them?");
-            if (confirmed) {
-                await saveSettings();
-                originalSettings = { ...currentSettings }; // Update original settings to reflect saved state
-                const infoMsgContainer = document.getElementById('info-msg-container');
-                const infoMsgText = document.getElementById('info-msg-text');
-                infoMsgText.textContent = 'Saved!';
-                infoMsgContainer.style.display = 'flex';
-                setTimeout(() => {
-                    infoMsgContainer.style.display = 'none';
-                }, 2000);
-            }
+            await saveSettings();
+            originalSettings = { ...currentSettings }; // Update original settings to reflect saved state
+            const infoMsgContainer = document.getElementById('info-msg-container');
+            const infoMsgText = document.getElementById('info-msg-text');
+            infoMsgText.textContent = 'Saved!';
+            infoMsgContainer.style.display = 'flex';
+            setTimeout(() => {
+                infoMsgContainer.style.display = 'none';
+            }, 2000);
         } else {
             const infoMsgContainer = document.getElementById('info-msg-container');
             const infoMsgText = document.getElementById('info-msg-text');
@@ -468,11 +483,20 @@ async function handleCancelTask() {
             serverType: 'local',
             localServerAddress: 'http://127.0.0.1:8000',
             remoteServerAddress: 'http://101.6.41.59:32904',
+            messageBoxSize: 'medium',
+            messageBoxPosition: 'top-right'
         };
 
         document.getElementById('server-type-' + defaultConfig.serverType).checked = true;
         localServerAddress.value = defaultConfig.localServerAddress;
         remoteServerAddress.value = defaultConfig.remoteServerAddress;
+        document.getElementById('size-' + defaultConfig.messageBoxSize).checked = true;
+        positionGrid.querySelectorAll('.grid-cell').forEach(cell => {
+            cell.classList.remove('selected');
+            if (cell.dataset.position === defaultConfig.messageBoxPosition) {
+                cell.classList.add('selected');
+            }
+        });
 
         await saveSettings();
 
@@ -489,7 +513,9 @@ async function handleCancelTask() {
         const currentSettings = {
             serverType: document.querySelector('input[name="server-type"]:checked').value,
             localServerAddress: localServerAddress.value,
-            remoteServerAddress: remoteServerAddress.value
+            remoteServerAddress: remoteServerAddress.value,
+            messageBoxSize: document.querySelector('input[name="message-box-size"]:checked').value,
+            messageBoxPosition: positionGrid.querySelector('.grid-cell.selected').dataset.position
         };
 
         const hasChanged = JSON.stringify(currentSettings) !== JSON.stringify(originalSettings);
@@ -513,6 +539,41 @@ async function handleCancelTask() {
     });
 
     cancelSettingsBtn.addEventListener('click', handleCloseControlPanel);
+
+    function sendMessageToContentScript(style, retries = 3) {
+        chrome.tabs.query({ active: true, currentWindow: true }, function(tabs) {
+            if (tabs[0] && tabs[0].id) {
+                chrome.tabs.sendMessage(tabs[0].id, {
+                    type: "update_message_box_style",
+                    style: style
+                }, function(response) {
+                    if (chrome.runtime.lastError || !response?.success) {
+                        if (retries > 0) {
+                            setTimeout(() => {
+                                sendMessageToContentScript(style, retries - 1);
+                            }, 100);
+                        } else {
+                            console.error("Failed to send message to content script after multiple retries.");
+                        }
+                    }
+                });
+            }
+        });
+    }
+
+    sizeRadios.forEach(radio => {
+        radio.addEventListener('change', (event) => {
+            sendMessageToContentScript({ size: event.target.value });
+        });
+    });
+
+    positionGrid.addEventListener('click', (event) => {
+        if (event.target.classList.contains('grid-cell')) {
+            positionGrid.querySelectorAll('.grid-cell').forEach(cell => cell.classList.remove('selected'));
+            event.target.classList.add('selected');
+            sendMessageToContentScript({ position: event.target.dataset.position });
+        }
+    });
 
 
     // --- Original Initialization Logic ---

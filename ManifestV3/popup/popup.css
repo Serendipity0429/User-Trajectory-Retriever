@@ -351,13 +351,9 @@ h1 {
     gap: 10px;
 }
 
-
-
 .content[hidden] {
     display: none;
 }
-
-
 
 .title-container {
     display: flex;
@@ -365,8 +361,6 @@ h1 {
     justify-content: center;
     gap: 10px;
 }
-
-
 
 #control-panel-btn {
     cursor: pointer;
@@ -376,21 +370,15 @@ h1 {
     margin-bottom: 8px;
 }
 
-
-
 #control-panel-btn:hover {
     transform: rotate(45deg);
 }
-
-
 
 #control-panel h2 {
     font-size: 20px;
     color: var(--primary-color);
     margin-bottom: 15px;
 }
-
-
 
 /* Custom Radio Button Styles */
 .radio-group {
@@ -448,6 +436,15 @@ h1 {
     box-shadow: 0 0 0 2px rgba(103, 19, 114, 0.3);
 }
 
+.function-groups-container {
+    display: flex;
+    gap: 10px;
+}
+
+.function-groups-container .function-group {
+    flex: 1;
+}
+
 .function-group {
     background-color: var(--white);
     border-radius: 8px;
@@ -461,4 +458,70 @@ h1 {
     color: var(--primary-color);
     margin-bottom: 10px; /* Made more compact */
     font-weight: 700;
+}
+
+.message-box-controls {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+}
+
+.message-box-controls .form-group {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+}
+
+.radio-group.size-settings {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.radio-group.size-settings label {
+    padding: 5px 10px;
+    border: 1px solid var(--primary-color);
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background-color 0.3s, color 0.3s;
+    position: static;
+    width: 75px; /* Adjusted width for 'Medium' */
+    text-align: center;
+    color: var(--primary-color);
+}
+
+.radio-group.size-settings input[type="radio"]:checked + label {
+    background-color: var(--primary-color);
+    color: var(--white);
+}
+
+.radio-group.size-settings label::before,
+.radio-group.size-settings label::after {
+    content: none;
+}
+
+.position-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 30px);
+    gap: 5px;
+    margin-left: 10px;
+}
+
+.grid-cell {
+    width: 30px;
+    height: 30px;
+    background-color: #eee;
+    border: 1px solid #ccc;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+.grid-cell:hover {
+    background-color: #ddd;
+}
+
+.grid-cell.selected {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
 }

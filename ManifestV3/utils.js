@@ -232,10 +232,17 @@ function _is_extension_page(url) {
     return url.startsWith(chrome.runtime.getURL(''));
 }
 
-function displayMessageBox(options) {
-    const { message, innerHTML, type = 'info', duration = 3000, id = null, css = '', size = 'medium', position = 'top-right' } = options;
+async function displayMessageBox(options) {
+    const { message, innerHTML, type = 'info', duration = 3000, id = null, css = '', size = -1, position = -1 } = options;
     const config = getConfig();
     if (!config || window.location.href.startsWith(config.urls.base)) return;
+
+    const settings = await new Promise((resolve) => {
+        chrome.storage.local.get(['messageBoxSize', 'messageBoxPosition'], resolve);
+    });
+
+    const boxSize = options.size || settings.messageBoxSize || 'medium';
+    const boxPosition = options.position || settings.messageBoxPosition || 'top-right';
 
     const box = document.createElement('div');
     box.className = 'rr-ignore loaded-box rr-block';
@@ -249,9 +256,9 @@ function displayMessageBox(options) {
     const color = isWarning ? '#856404' : '#212529';
 
     const sizeMap = {
-        small: { width: '20vw', height: 'auto', minHeight: '10vh', fontSize: '1.0vw' },
-        medium: { width: '25vw', height: 'auto', minHeight: '15vh', fontSize: '1.2vw' },
-        large: { width: '30vw', height: 'auto', minHeight: '20vh', fontSize: '1.4vw' }
+        small: { height: 'auto', padding: '1.0em', fontSize: '1.0vw' },
+        medium: { height: 'auto', padding: '1.2em', fontSize: '1.2vw' },
+        large: { height: 'auto', padding: '1.5em', fontSize: '1.4vw' }
     };
 
     const positionMap = {
@@ -282,8 +289,8 @@ function displayMessageBox(options) {
     `;
 
     if (id === 'task-question-box') {
-        const sizeStyles = sizeMap[size] || sizeMap.medium;
-        const positionStyles = positionMap[position] || positionMap['top-right'];
+        const sizeStyles = sizeMap[boxSize] || sizeMap.medium;
+        const positionStyles = positionMap[boxPosition] || positionMap['top-right'];
         Object.assign(box.style, sizeStyles, positionStyles);
     } else {
         // Temporary notification box, use stacking logic
@@ -293,7 +300,7 @@ function displayMessageBox(options) {
         });
         box.style.top = `${topPosition}px`;
         box.style.right = '10px';
-        const sizeStyles = sizeMap['small']; // notifications are always small
+        const sizeStyles = sizeMap[boxSize] || sizeMap['small']; // notifications are always small
         Object.assign(box.style, sizeStyles);
     }
 
@@ -305,7 +312,7 @@ function displayMessageBox(options) {
 
     document.body.appendChild(box);
 
-    setTimeout(() => { box.style.opacity = '1'; }, 10);
+    setTimeout(() => { box.style.opacity = '0.9'; }, 10);
 
     if (duration > 0) {
         setTimeout(() => {

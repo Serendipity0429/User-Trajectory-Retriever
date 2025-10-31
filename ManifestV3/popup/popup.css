@@ -71,6 +71,11 @@ h1 {
     margin-right: 5px;
 }
 
+#login .form-group i {
+    margin-left: 5px;
+    margin-right: 10px;
+}
+
 .form-group .concat-layout i {
     margin-right: 0; /* No margin for icons in concat-layout */
     margin-bottom: 5px;

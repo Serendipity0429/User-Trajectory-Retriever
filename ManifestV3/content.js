@@ -83,13 +83,13 @@ let _content_vars = {
 
 let questionBoxMousemoveListener = null;
 
-function displayQuestionBox(question) {
+async function displayQuestionBox(question) {
     if (!question) return;
 
     const innerHTML = `
         <h5 style="font-size: 1.2em; margin-bottom: 0.5em; margin-top: 0;"><strong>Task Question</strong></h5>
         <p style="font-size: 1.0em; margin-bottom: 0; margin-top:0;">${question}</p>
-        <div id="evidence-count-container" style="margin-top: 10px; font-size: 0.9em; color: #212529;">
+        <div id="evidence-count-container" style="margin-top: 10px; font-size: 0.9em; color: #58595a;">
             Evidence Collected: <span id="evidence-count">0</span>
         </div>
     `;
@@ -101,34 +101,30 @@ function displayQuestionBox(question) {
         transition: opacity 0.3s ease-in-out;
     `;
 
-    chrome.storage.local.get(['messageBoxSize', 'messageBoxPosition'], (result) => {
-        const options = {
-            innerHTML,
-            type: 'info',
-            duration: 0, // Persists until manually removed
-            id: 'task-question-box',
-            css,
-            size: result.messageBoxSize,
-            position: result.messageBoxPosition
-        };
-        displayMessageBox(options);
+    const options = {
+        innerHTML,
+        type: 'info',
+        duration: 0, // Persists until manually removed
+        id: 'task-question-box',
+        css,
+    };
+    await displayMessageBox(options);
 
-        const box = document.getElementById('task-question-box');
-        if (box) {
-            box.style.pointerEvents = 'none';
-            box.style.opacity = '0.9';
-            
-            questionBoxMousemoveListener = (e) => {
-                const rect = box.getBoundingClientRect();
-                if (e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom) {
-                    box.style.opacity = '0';
-                } else {
-                    box.style.opacity = '0.9';
-                }
-            };
-            document.addEventListener('mousemove', questionBoxMousemoveListener);
-        }
-    });
+    const box = document.getElementById('task-question-box');
+    if (box) {
+        box.style.pointerEvents = 'none';
+        box.style.opacity = '0.9';
+        
+        questionBoxMousemoveListener = (e) => {
+            const rect = box.getBoundingClientRect();
+            if (e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom) {
+                box.style.opacity = '0';
+            } else {
+                box.style.opacity = '0.9';
+            }
+        };
+        document.addEventListener('mousemove', questionBoxMousemoveListener);
+    }
 
     updateEvidenceCount();
 }
@@ -152,13 +148,13 @@ async function updateEvidenceCount() {
 
 async function getTaskInfo() {
     return new Promise((resolve, reject) => {
-        chrome.runtime.sendMessage({ type: MSG_TYPE_POPUP, command: "get_task_info" }, function (response) {
+        chrome.runtime.sendMessage({ type: MSG_TYPE_POPUP, command: "get_task_info" }, async function (response) {
             if (chrome.runtime.lastError) {
                 console.error("Error getting task info:", chrome.runtime.lastError.message);
                 return reject(chrome.runtime.lastError);
             }
             if (response && response.question) {
-                displayQuestionBox(response.question);
+                await displayQuestionBox(response.question);
             }
             resolve();
         });

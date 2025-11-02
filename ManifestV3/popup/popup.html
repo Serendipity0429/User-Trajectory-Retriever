@@ -20,58 +20,73 @@
             <div id="control-panel" class="content" hidden>
                 <h2>Control Panel</h2>
                 <div class="function-groups-container">
-                    <div class="function-group">
-                        <h3>Server Settings</h3>
-                        <div class="warning-msg" style="display: flex;">
-                            <i class="fas fa-exclamation-triangle"></i>
-                            <p>Ask admin before change!</p>
+                    <div class="function-group-row">
+                        <div class="function-group">
+                            <h3>Server Settings</h3>
+                            <div class="warning-msg" style="display: flex;">
+                                <i class="fas fa-exclamation-triangle"></i>
+                                <p>Ask admin before change!</p>
+                            </div>
+                            <div class="form-group server-choice-btn" data-server-type="local">
+                                <label for="local-server-address"><i class="fas fa-server"></i></label>
+                                <input type="text" id="local-server-address" placeholder="Local Server Address">
+                            </div>
+                            <div class="form-group server-choice-btn" data-server-type="remote">
+                                <label for="remote-server-address"><i class="fas fa-globe"></i></label>
+                                <input type="text" id="remote-server-address" placeholder="Remote Server Address">
+                            </div>
                         </div>
-                        <div class="form-group server-choice-btn" data-server-type="local">
-                            <label for="local-server-address"><i class="fas fa-server"></i></label>
-                            <input type="text" id="local-server-address" placeholder="Local Server Address">
-                        </div>
-                        <div class="form-group server-choice-btn" data-server-type="remote">
-                            <label for="remote-server-address"><i class="fas fa-globe"></i></label>
-                            <input type="text" id="remote-server-address" placeholder="Remote Server Address">
+                        <div class="function-group">
+                            <h3>Message Box Settings</h3>
+                            <div class="concat-layout">
+                                <div class="form-group">
+                                    <label><i class="fas fa-expand-arrows-alt"></i></label>
+                                    <div class="size-settings">
+                                        <div class="size-btn" data-size="small">Small</div>
+                                        <div class="size-btn" data-size="medium">Medium</div>
+                                        <div class="size-btn" data-size="large">Large</div>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label><i class="fas fa-th"></i></label>
+                                    <div class="position-grid">
+                                        <div class="grid-cell" data-position="top-left"></div>
+                                        <div class="grid-cell" data-position="top-center"></div>
+                                        <div class="grid-cell" data-position="top-right"></div>
+                                        <div class="grid-cell" data-position="middle-left"></div>
+                                        <div class="grid-cell" data-position="middle-center"></div>
+                                        <div class="grid-cell" data-position="middle-right"></div>
+                                        <div class="grid-cell" data-position="bottom-left"></div>
+                                        <div class="grid-cell" data-position="bottom-center"></div>
+                                        <div class="grid-cell" data-position="bottom-right"></div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                    <div class="function-group">
-                        <h3>Message Box Settings</h3>
-                        <div class="concat-layout">
-                            <div class="form-group">
-                                <label><i class="fas fa-expand-arrows-alt"></i></label>
-                                <div class="size-settings">
-                                    <div class="size-btn" data-size="small">Small</div>
-                                    <div class="size-btn" data-size="medium">Medium</div>
-                                    <div class="size-btn" data-size="large">Large</div>
-                                </div>
-                            </div>
-                            <div class="form-group">
-                                <label><i class="fas fa-th"></i></label>
-                                <div class="position-grid">
-                                    <div class="grid-cell" data-position="top-left"></div>
-                                    <div class="grid-cell" data-position="top-center"></div>
-                                    <div class="grid-cell" data-position="top-right"></div>
-                                    <div class="grid-cell" data-position="middle-left"></div>
-                                    <div class="grid-cell" data-position="middle-center"></div>
-                                    <div class="grid-cell" data-position="middle-right"></div>
-                                    <div class="grid-cell" data-position="bottom-left"></div>
-                                    <div class="grid-cell" data-position="bottom-center"></div>
-                                    <div class="grid-cell" data-position="bottom-right"></div>
-                                </div>
+                    <div class="function-group full-width-group">
+                        <h3>Popup Scale Settings</h3>
+                        <div class="form-group">
+                            <label for="popup-scale-slider"><i class="fas fa-text-height"></i></label>
+                            <div class="scale-slider-container">
+                                <span>50%</span>
+                                <input type="range" id="popup-scale-slider" min="0.5" max="1.5" step="0.01" value="1">
+                                <span>150%</span>
                             </div>
                         </div>
-                    </div>                
+                    </div>
                 </div>
-                <div class="button-row">
-                    <button id="save-settings-btn" class="btn"><i class="fas fa-save"></i> Save</button>
-                    <button id="cancel-settings-btn" class="btn btn-danger"><i class="fas fa-times"></i> Cancel</button>
-                </div>
-                <div class="button-row">
-                    <button id="restore-defaults-btn" class="btn btn-secondary"><i class="fas fa-undo"></i> Restore Defaults</button>
+                <div class="button-group-settings">
+                    <div class="button-row">
+                        <button id="save-settings-btn" class="btn"><i class="fas fa-save"></i> Save</button>
+                        <button id="cancel-settings-btn" class="btn btn-danger"><i class="fas fa-times"></i> Cancel</button>
+                    </div>
+                    <div class="button-row">
+                        <button id="restore-defaults-btn" class="btn btn-secondary"><i class="fas fa-undo"></i> Restore Defaults</button>
+                    </div>
                 </div>
                 <div id="info-msg-container" class="info-msg" style="display: none;">
-                    <i class="fas fa-info-circle"></i>
+                    <i class="fas fa-check-circle"></i>
                     <p id="info-msg-text"></p>
                 </div>
             </div>

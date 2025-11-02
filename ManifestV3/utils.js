@@ -291,9 +291,9 @@ async function displayMessageBox(options) {
     }
 
     const sizeMap = {
-        small: { height: 'auto', padding: '1.0em', fontSize: '1.0vw', 'max-width': '20vw' },
-        medium: { height: 'auto', padding: '1.2em', fontSize: '1.2vw', 'max-width': '25vw' },
-        large: { height: 'auto', padding: '1.5em', fontSize: '1.4vw', 'max-width': '30vw' }
+        small: { minWidth: '10vw', maxWidth: '20vw', padding: '1.0vw', fontSize: '0.8vw' },
+        medium: { minWidth: '15vw', maxWidth: '25vw', padding: '1.2vw', fontSize: '1.2vw' },
+        large: { minWidth: '20vw', maxWidth: '30vw', padding: '1.4vw', fontSize: '1.6vw' }
     };
 
     const positionMap = {

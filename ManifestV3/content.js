@@ -403,9 +403,9 @@ function applyMessageBoxStyle(style) {
     const questionBox = document.getElementById('task-question-box');
     if (questionBox) {
         const sizeMap = {
-            small: { width: '20vw', height: 'auto', minHeight: '10vh', fontSize: '1.0vw' },
-            medium: { width: '25vw', height: 'auto', minHeight: '15vh', fontSize: '1.2vw' },
-            large: { width: '30vw', height: 'auto', minHeight: '20vh', fontSize: '1.4vw' }
+            small: { width: '15vw', minHeight: '10vh', fontSize: '0.8vw', maxWidth: 'none' },
+            medium: { width: '22.5vw', minHeight: '15vh', fontSize: '1.2vw', maxWidth: 'none' },
+            large: { width: '30vw', minHeight: '20vh', fontSize: '1.6vw', maxWidth: 'none' }
         };
 
         const positionMap = {

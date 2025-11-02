@@ -410,6 +410,30 @@ async function handleCancelTask() {
         });
     }
 
+    function applySettingsToPanel(settings) {
+        document.querySelectorAll('.server-choice-btn').forEach(btn => {
+            btn.classList.remove('active');
+            if (btn.dataset.serverType === settings.serverType) {
+                btn.classList.add('active');
+            }
+        });
+        localServerAddress.value = settings.localServerAddress;
+        remoteServerAddress.value = settings.remoteServerAddress;
+        document.querySelectorAll('.size-btn').forEach(btn => {
+            btn.classList.remove('active');
+            if (btn.dataset.size === settings.messageBoxSize) {
+                btn.classList.add('active');
+            }
+        });
+        
+        positionGrid.querySelectorAll('.grid-cell').forEach(cell => {
+            cell.classList.remove('selected');
+            if (cell.dataset.position === settings.messageBoxPosition) {
+                cell.classList.add('selected');
+            }
+        });
+    }
+
     async function loadSettings() {
         const result = await new Promise((resolve) => {
             chrome.storage.local.get(['serverType', 'localServerAddress', 'remoteServerAddress', 'messageBoxSize', 'messageBoxPosition'], resolve);
@@ -423,27 +447,7 @@ async function handleCancelTask() {
             messageBoxPosition: result.messageBoxPosition || 'top-right'
         };
 
-        document.querySelectorAll('.server-choice-btn').forEach(btn => {
-            btn.classList.remove('active');
-            if (btn.dataset.serverType === originalSettings.serverType) {
-                btn.classList.add('active');
-            }
-        });
-        localServerAddress.value = originalSettings.localServerAddress;
-        remoteServerAddress.value = originalSettings.remoteServerAddress;
-        document.querySelectorAll('.size-btn').forEach(btn => {
-            btn.classList.remove('active');
-            if (btn.dataset.size === originalSettings.messageBoxSize) {
-                btn.classList.add('active');
-            }
-        });
-        
-        positionGrid.querySelectorAll('.grid-cell').forEach(cell => {
-            cell.classList.remove('selected');
-            if (cell.dataset.position === originalSettings.messageBoxPosition) {
-                cell.classList.add('selected');
-            }
-        });
+        applySettingsToPanel(originalSettings);
     }
 
     async function openControlPanel() {
@@ -464,7 +468,6 @@ async function handleCancelTask() {
             });
             localServerAddress.disabled = true;
             remoteServerAddress.disabled = true;
-            restoreDefaultsBtn.disabled = true;
     
             // Show a message
             warningMsg.innerHTML = '<i class="fas fa-exclamation-triangle"></i><p>Logout for modifications.</p>';
@@ -477,7 +480,6 @@ async function handleCancelTask() {
             });
             localServerAddress.disabled = false;
             remoteServerAddress.disabled = false;
-            restoreDefaultsBtn.disabled = false;
     
             warningMsg.innerHTML = '<i class="fas fa-exclamation-triangle"></i><p>Ask admin before change!</p>';
             warningMsg.style.display = 'flex';
@@ -507,6 +509,10 @@ async function handleCancelTask() {
 
         if (hasChanged) {
             await saveSettings();
+            sendMessageToContentScript({ 
+                size: currentSettings.messageBoxSize, 
+                position: currentSettings.messageBoxPosition 
+            });
             originalSettings = { ...currentSettings }; // Update original settings to reflect saved state
             const infoMsgContainer = document.getElementById('info-msg-container');
             const infoMsgText = document.getElementById('info-msg-text');
@@ -527,46 +533,61 @@ async function handleCancelTask() {
     });
 
     restoreDefaultsBtn.addEventListener('click', async () => {
-        const defaultConfig = {
-            serverType: 'local',
-            localServerAddress: 'http://127.0.0.1:8000',
-            remoteServerAddress: 'http://101.6.41.59:32904',
-            messageBoxSize: 'medium',
-            messageBoxPosition: 'top-right'
-        };
-
-        document.querySelectorAll('.server-choice-btn').forEach(btn => {
-            btn.classList.remove('active');
-            if (btn.dataset.serverType === defaultConfig.serverType) {
-                btn.classList.add('active');
-            }
-        });
-        localServerAddress.value = defaultConfig.localServerAddress;
-        remoteServerAddress.value = defaultConfig.remoteServerAddress;
+        const confirmed = await showConfirm("Are you sure you want to restore all settings to their default values?");
+        if (confirmed) {
+            const defaultConfig = {
+                serverType: 'local',
+                localServerAddress: 'http://127.0.0.1:8000',
+                remoteServerAddress: 'http://101.6.41.59:32904',
+                messageBoxSize: 'medium',
+                messageBoxPosition: 'top-right'
+            };
         
-        document.querySelectorAll('.size-btn').forEach(btn => {
-            btn.classList.remove('active');
-            if (btn.dataset.size === defaultConfig.messageBoxSize) {
-                btn.classList.add('active');
-            }
-        });
+            const { logged_in } = await _get_local(['logged_in']);
         
-        positionGrid.querySelectorAll('.grid-cell').forEach(cell => {
-            cell.classList.remove('selected');
-            if (cell.dataset.position === defaultConfig.messageBoxPosition) {
-                cell.classList.add('selected');
+            if (logged_in) {
+                // If logged in, only restore message box settings UI
+                document.querySelectorAll('.size-btn').forEach(btn => {
+                    btn.classList.remove('active');
+                    if (btn.dataset.size === defaultConfig.messageBoxSize) {
+                        btn.classList.add('active');
+                    }
+                });
+                positionGrid.querySelectorAll('.grid-cell').forEach(cell => {
+                    cell.classList.remove('selected');
+                    if (cell.dataset.position === defaultConfig.messageBoxPosition) {
+                        cell.classList.add('selected');
+                    }
+                });
+            } else {
+                // If not logged in, restore all settings UI
+                applySettingsToPanel(defaultConfig);
             }
-        });
+        
+            await saveSettings();
+            sendMessageToContentScript({ 
+                size: defaultConfig.messageBoxSize, 
+                position: defaultConfig.messageBoxPosition 
+            });
 
-        await saveSettings();
-
-        const infoMsgContainer = document.getElementById('info-msg-container');
-        const infoMsgText = document.getElementById('info-msg-text');
-        infoMsgText.textContent = "Defaults Restored!";
-        infoMsgContainer.style.display = 'flex';
-        setTimeout(() => {
-            infoMsgContainer.style.display = 'none';
-        }, 2000);
+            // Update originalSettings to prevent "unsaved changes" prompt
+            const newSettings = {
+                serverType: document.querySelector('.server-choice-btn.active').dataset.serverType,
+                localServerAddress: localServerAddress.value,
+                remoteServerAddress: remoteServerAddress.value,
+                messageBoxSize: document.querySelector('.size-btn.active').dataset.size,
+                messageBoxPosition: positionGrid.querySelector('.grid-cell.selected').dataset.position
+            };
+            originalSettings = { ...newSettings };
+        
+            const infoMsgContainer = document.getElementById('info-msg-container');
+            const infoMsgText = document.getElementById('info-msg-text');
+            infoMsgText.textContent = "Defaults Restored!";
+            infoMsgContainer.style.display = 'flex';
+            setTimeout(() => {
+                infoMsgContainer.style.display = 'none';
+            }, 2000);
+        }
     });
 
     async function handleCloseControlPanel() {
@@ -583,6 +604,7 @@ async function handleCancelTask() {
         if (hasChanged) {
             const confirmed = await showConfirm("You have unsaved changes. Do you want to discard them?");
             if (confirmed) {
+                applySettingsToPanel(originalSettings);
                 await closeControlPanel();
             }
         } else {
@@ -627,7 +649,6 @@ async function handleCancelTask() {
         btn.addEventListener('click', (event) => {
             sizeBtns.forEach(b => b.classList.remove('active'));
             event.target.classList.add('active');
-            sendMessageToContentScript({ size: event.target.dataset.size });
         });
     });
 
@@ -635,7 +656,6 @@ async function handleCancelTask() {
         if (event.target.classList.contains('grid-cell')) {
             positionGrid.querySelectorAll('.grid-cell').forEach(cell => cell.classList.remove('selected'));
             event.target.classList.add('selected');
-            sendMessageToContentScript({ position: event.target.dataset.position });
         }
     });
 

@@ -323,17 +323,17 @@
         initialize() {
             if (_is_server_page(_content_vars.url_now)) return;
             
-            document.body.addEventListener('click', (e) => this.handleEvent(e, 'click'), true);
+            document.addEventListener('click', (e) => this.handleEvent(e, 'click'), true);
 
             const throttled_hover = this.throttle((e) => this.passiveEventHandler(e, 'hover'), 50);
             const throttled_scroll = this.throttle((e) => this.passiveEventHandler(e, 'scroll'), 50);
-            document.body.addEventListener('mouseover', throttled_hover, true);
+            document.addEventListener('mouseover', throttled_hover, true);
             document.addEventListener('scroll', throttled_scroll, true);
             
             const passive_events = ['contextmenu', 'change', 'keypress', 'copy', 'paste', 'drag', 'drop'];
             passive_events.forEach(eventType => {
                 const handler = (e) => this.passiveEventHandler(e, eventType.replace('contextmenu', 'right click'));
-                document.body.addEventListener(eventType, handler, true);
+                document.addEventListener(eventType, handler, true);
             });
             
             window.addEventListener('blur', (e) => this.passiveEventHandler(e, 'blur'), true);

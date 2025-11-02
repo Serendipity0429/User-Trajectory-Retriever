@@ -383,7 +383,15 @@ async function handleCancelTask() {
     const restoreDefaultsBtn = document.getElementById('restore-defaults-btn');
     const positionGrid = document.querySelector('.position-grid');
     const serverChoiceBtns = document.querySelectorAll('.server-choice-btn');
+    const popupScaleSlider = document.getElementById('popup-scale-slider');
     let originalSettings = {};
+
+    await loadSettings();
+
+    popupScaleSlider.addEventListener('input', (event) => {
+        const scaleValue = event.target.value;
+        document.body.style.transform = `scale(${scaleValue})`;
+    });
 
     serverChoiceBtns.forEach(btn => {
         btn.addEventListener('click', () => {
@@ -398,6 +406,7 @@ async function handleCancelTask() {
         const remoteAddress = remoteServerAddress.value;
         const messageBoxSize = document.querySelector('.size-btn.active').dataset.size;
         const selectedPosition = positionGrid.querySelector('.grid-cell.selected').dataset.position;
+        const popupScale = parseFloat(popupScaleSlider.value);
         
         await new Promise((resolve) => {
             chrome.storage.local.set({
@@ -405,7 +414,8 @@ async function handleCancelTask() {
                 localServerAddress: localAddress,
                 remoteServerAddress: remoteAddress,
                 messageBoxSize: messageBoxSize,
-                messageBoxPosition: selectedPosition
+                messageBoxPosition: selectedPosition,
+                popupScale: popupScale
             }, resolve);
         });
     }
@@ -432,11 +442,14 @@ async function handleCancelTask() {
                 cell.classList.add('selected');
             }
         });
+
+        popupScaleSlider.value = settings.popupScale;
+        document.body.style.transform = `scale(${settings.popupScale})`;
     }
 
     async function loadSettings() {
         const result = await new Promise((resolve) => {
-            chrome.storage.local.get(['serverType', 'localServerAddress', 'remoteServerAddress', 'messageBoxSize', 'messageBoxPosition'], resolve);
+            chrome.storage.local.get(['serverType', 'localServerAddress', 'remoteServerAddress', 'messageBoxSize', 'messageBoxPosition', 'popupScale'], resolve);
         });
 
         originalSettings = {
@@ -444,13 +457,15 @@ async function handleCancelTask() {
             localServerAddress: result.localServerAddress || '',
             remoteServerAddress: result.remoteServerAddress || '',
             messageBoxSize: result.messageBoxSize || 'medium',
-            messageBoxPosition: result.messageBoxPosition || 'top-right'
+            messageBoxPosition: result.messageBoxPosition || 'top-right',
+            popupScale: result.popupScale || 1
         };
 
         applySettingsToPanel(originalSettings);
     }
 
     async function openControlPanel() {
+        document.body.classList.add('control-panel-active');
         await loadSettings();
         loginContent.style.display = 'none';
         loggedInContent.style.display = 'none';
@@ -487,6 +502,7 @@ async function handleCancelTask() {
     }
 
     async function closeControlPanel() {
+        document.body.classList.remove('control-panel-active');
         controlPanel.style.display = 'none';
         const { logged_in } = await _get_local(['logged_in']);
         if (logged_in) {
@@ -502,7 +518,8 @@ async function handleCancelTask() {
             localServerAddress: localServerAddress.value,
             remoteServerAddress: remoteServerAddress.value,
             messageBoxSize: document.querySelector('.size-btn.active').dataset.size,
-            messageBoxPosition: positionGrid.querySelector('.grid-cell.selected').dataset.position
+            messageBoxPosition: positionGrid.querySelector('.grid-cell.selected').dataset.position,
+            popupScale: parseFloat(popupScaleSlider.value)
         };
 
         const hasChanged = JSON.stringify(currentSettings) !== JSON.stringify(originalSettings);
@@ -540,7 +557,8 @@ async function handleCancelTask() {
                 localServerAddress: 'http://127.0.0.1:8000',
                 remoteServerAddress: 'http://101.6.41.59:32904',
                 messageBoxSize: 'medium',
-                messageBoxPosition: 'top-right'
+                messageBoxPosition: 'top-right',
+                popupScale: 1
             };
         
             const { logged_in } = await _get_local(['logged_in']);
@@ -576,7 +594,8 @@ async function handleCancelTask() {
                 localServerAddress: localServerAddress.value,
                 remoteServerAddress: remoteServerAddress.value,
                 messageBoxSize: document.querySelector('.size-btn.active').dataset.size,
-                messageBoxPosition: positionGrid.querySelector('.grid-cell.selected').dataset.position
+                messageBoxPosition: positionGrid.querySelector('.grid-cell.selected').dataset.position,
+                popupScale: parseFloat(popupScaleSlider.value)
             };
             originalSettings = { ...newSettings };
         
@@ -596,7 +615,8 @@ async function handleCancelTask() {
             localServerAddress: localServerAddress.value,
             remoteServerAddress: remoteServerAddress.value,
             messageBoxSize: document.querySelector('.size-btn.active').dataset.size,
-            messageBoxPosition: positionGrid.querySelector('.grid-cell.selected').dataset.position
+            messageBoxPosition: positionGrid.querySelector('.grid-cell.selected').dataset.position,
+            popupScale: parseFloat(popupScaleSlider.value)
         };
 
         const hasChanged = JSON.stringify(currentSettings) !== JSON.stringify(originalSettings);

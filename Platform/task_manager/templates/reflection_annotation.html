@@ -65,6 +65,7 @@
                 
                                     <form id="query-form" action="" method="post" enctype='multipart/form-data'>
                                         {% csrf_token %}
+                                        <input type="hidden" name="annotation_id" value="{{ annotation_id }}">
                                         <!-- Task Description -->
                                         <div class="mb-4 p-3 border rounded">
                                             <h5><strong>1. Understand the Task</strong></h5>
@@ -169,7 +170,7 @@
                         </div>
 
                         <div class="d-grid gap-2 d-md-flex justify-content-md-end">
-                            <button type="button" id="query-btn" class="btn btn-primary btn-lg btn-submit">Submit Reflection</button>
+                            <button type="button" id="query-btn" class="btn btn-primary-custom btn-lg btn-submit">Submit Reflection</button>
                         </div>
                     </form>
                 </div>
@@ -180,7 +181,6 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
 <script>
 $(function () {
     function initializeSortable(selectedListId, unselectedListId, inputName, hiddenInputId, separatorId) {
@@ -320,7 +320,9 @@ $(function () {
 
     window.addEventListener('beforeunload', function (e) {
         if (!is_submitted) {
-            navigator.sendBeacon('/task/stop_annotation/', new Blob());
+            const data = new FormData();
+            data.append('annotation_id', '{{ annotation_id }}');
+            navigator.sendBeacon('/task/stop_annotation/', data);
         }
     });
 });

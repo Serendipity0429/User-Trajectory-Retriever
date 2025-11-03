@@ -6,7 +6,7 @@
 {% block content %}
 <div class="container">
     <div class="row justify-content-center">
-        <div class="col-lg-8">
+        <div class="col-lg-10">
             <div class="card shadow-lg border-0 rounded-lg mt-5">
                 <div class="card-header bg-danger text-white text-center py-4">
                     <h2 class="card-title mb-0"><i class="bi bi-x-circle-fill me-2"></i>Cancel Task</h2>
@@ -37,7 +37,7 @@
                                                     return;
                                                 }
 
-                                                var accordionWidth = document.querySelector('.col-lg-8').clientWidth;
+                                                var accordionWidth = document.querySelector('#sheet-body').clientWidth;
                                                 var containerWidth = 0.8 * accordionWidth;
                                                 var screenRatio = window.innerHeight / window.innerWidth;
                                                 var calculatedHeight = containerWidth * screenRatio;
@@ -88,14 +88,15 @@
                 
                     <form id="query-form" action="" method="post" enctype='multipart/form-data'>
                         {% csrf_token %}
+                        <input type="hidden" name="annotation_id" value="{{ annotation_id }}">
 
                         <div class="mb-4 p-3 border rounded">
                             <h5><span class="fw-bold">2. Cancellation Reason</span></h5>
-                            <p>Select the primary reason you are unable to complete this task. <strong>Please select only one answer</strong></p>
+                            <p>Select the reasons you are unable to complete this task. <strong>Check all that apply</strong></p>
                             <div class="w-100" role="group" aria-label="Cancellation Reason">
                                 {% for key, value in CANCEL_CATEGORY_MAP.items %}
                                 <div class="d-flex mb-2">
-                                    <input class="btn-check" type="radio" name="cancel_category" id="cancel_{{ key }}" value="{{ key }}" required autocomplete="off">
+                                    <input class="btn-check" type="checkbox" name="cancel_category" id="cancel_{{ key }}" value="{{ key }}" autocomplete="off">
                                     <label class="btn btn-outline-primary {% if key != 'other' %}w-100{% endif %} text-start" for="cancel_{{ key }}">{{ value|safe }}</label>
                                     {% if key == 'other' %}
                                     <input type="text" name="cancel_reason" id="cancel_reason_other_text" class="form-control ms-2" placeholder="Please specify..." disabled>
@@ -256,11 +257,12 @@ $(function () {
         }
     });
 
-    window.addEventListener('beforeunload', function (e) {
-        if (!is_submitted) {
-            navigator.sendBeacon('/task/stop_annotation/', new Blob());
-        }
-    });
-});
+            window.addEventListener('beforeunload', function (e) {
+                if (!is_submitted) {
+                    const data = new FormData();
+                    data.append('annotation_id', '{{ annotation_id }}');
+                    navigator.sendBeacon('/task/stop_annotation/', data);
+                }
+            });});
 </script>
 {% endblock %}

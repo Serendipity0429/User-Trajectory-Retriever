@@ -22,8 +22,15 @@
     <link href="{% static 'css/vendor/bootstrap-icons.css' %}" rel="stylesheet">
     <link href="{% static 'css/rrweb-player.css' %}" rel="stylesheet"/>
     <link id="dark-mode-stylesheet" href="{% static 'css/dark.css' %}" rel="stylesheet" disabled>
+    <link id="compact-mode-stylesheet" href="{% static 'css/compact.css' %}" rel="stylesheet" disabled>
     <link href="{% static 'css/custom_bootstrap_overrides.css' %}" rel="stylesheet">
 
+    <!-- Bootstrap 5 JS -->
+    <script src="{% static 'js/vendor/bootstrap.bundle.min.js' %}"></script>
+    
+    <!-- jQuery -->
+    <script src="{% static 'js/vendor/jquery-3.6.0.min.js' %}"></script>
+    <script src="{% static 'js/jquery-ui.min.js' %}"></script>
 
     <script>
         // Apply settings immediately to prevent flickering
@@ -189,12 +196,6 @@
             </footer>
         </div>
     </div>
-
-    <!-- Bootstrap 5 JS -->
-    <script src="{% static 'js/vendor/bootstrap.bundle.min.js' %}"></script>
-    
-    <!-- jQuery -->
-    <script src="{% static 'js/vendor/jquery-3.6.0.min.js' %}"></script>
 
     <script type="text/javascript">
         $(document).ready(function () {

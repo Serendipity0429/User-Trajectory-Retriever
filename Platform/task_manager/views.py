@@ -59,15 +59,19 @@ logger = logging.getLogger(__name__)
 
 
 @csrf_exempt
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
 def stop_annotation_api(request):
     """
     A special API endpoint to stop the current annotation process.
     """
     user = request.user
-    print_debug("stop_annotation_api called")
-    print_debug(f"Received stop annotation signal for user {user.username}.")
-    stop_annotating()
-    return HttpResponse("Annotation stopped.", status=200)
+    annotation_id = request.data.get("annotation_id")
+    print_debug(f"Received stop annotation signal for user {user.username} with ID {annotation_id}.")
+    if stop_annotating(request, annotation_id):
+        return JsonResponse({"status": "success", "message": "Annotation stopped."}, status=200)
+    else:
+        return JsonResponse({"status": "error", "message": "Annotation ID mismatch or not found."}, status=400)
 
 
 # Redirect after authentication
@@ -116,13 +120,13 @@ def auth_redirect(request):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def data(request):
-    start_storing_data()
+    start_storing_data(request)
     print_debug("function data")
     message = request.POST["message"]
     # decompress the message if it is compressed
     message = decompress_json_data(message)
     user = request.user
-    store_data(message, user)
+    store_data(request, message, user)
     return JsonResponse({"status": "success"})
 
 
@@ -165,7 +169,7 @@ def pre_task_annotation(request, timestamp):
         pre_annotation.expected_source_other = request.POST.get("expected_source_other")
         pre_annotation.save()
 
-        stop_annotating()
+        stop_annotating(request)
 
         return close_window()
 
@@ -184,7 +188,7 @@ def pre_task_annotation(request, timestamp):
         print_debug(f"[Question] {entry.question}")
         print_debug(f"[Answer] {entry.answer}")
 
-        start_annotating("pre_task_annotation")
+        annotation_id = start_annotating(request, "pre_task_annotation")
         return render(
             request,
             "pre_task_annotation.html",
@@ -193,6 +197,7 @@ def pre_task_annotation(request, timestamp):
                 "task_timestamp": timestamp,
                 "question": entry.question,
                 "entry_id": entry.id,
+                "annotation_id": annotation_id,
                 "FAMILIARITY_MAP": FAMILIARITY_MAP,
                 "DIFFICULTY_MAP": DIFFICULTY_MAP,
                 "EFFORT_MAP": EFFORT_MAP,
@@ -219,7 +224,7 @@ def post_task_annotation(request, task_id):
             # Check if an annotation already exists to prevent duplicates
             if PostTaskAnnotation.objects.filter(belong_task=task).exists():
                 print_debug(f"PostTaskAnnotation for task {task_id} already exists.")
-                stop_annotating()
+                stop_annotating(request)
                 return close_window()
 
             post_annotation = PostTaskAnnotation()
@@ -233,10 +238,10 @@ def post_task_annotation(request, task_id):
             post_annotation.belong_task = task
             post_annotation.save()
 
-            stop_annotating()
+            stop_annotating(request)
             return close_window()
         else:
-            stop_annotating()
+            stop_annotating(request)
             return HttpResponse("Task not found", status=404)
 
     else:
@@ -265,7 +270,7 @@ def post_task_annotation(request, task_id):
         latest_trial = TaskTrial.objects.filter(belong_task=task).order_by('-num_trial').first()
         user_answer = latest_trial.answer if latest_trial else ""
 
-        start_annotating("post_task_annotation")
+        annotation_id = start_annotating(request, "post_task_annotation")
         return render(
             request,
             "post_task_annotation.html",
@@ -276,6 +281,7 @@ def post_task_annotation(request, task_id):
                 "question": question,
                 "answer": answer,
                 "user_answer": user_answer,
+                "annotation_id": annotation_id,
                 "DIFFICULTY_MAP": DIFFICULTY_MAP,
                 "AHA_MOMENT_MAP": AHA_MOMENT_MAP,
                 "UNHELPFUL_PATHS_MAP": UNHELPFUL_PATHS_MAP,
@@ -491,10 +497,15 @@ def show_task(request, task_id):
         post_task_annotation = PostTaskAnnotation.objects.filter(belong_task=task).first()
 
     cancel_missing_resources = []
+    cancel_categories = []
     if cancel_annotation:
         cancel_missing_resources = map_json_list(
             cancel_annotation.missing_resources, MISSING_RESOURCES_MAP
         )
+        if cancel_annotation.category:
+            # Ensure category is treated as a JSON string for map_json_list
+            category_json = json.dumps(cancel_annotation.category)
+            cancel_categories = map_json_list(category_json, CANCEL_CATEGORY_MAP)
 
     # 5. Assemble the final context and render the template
     context = {
@@ -506,6 +517,7 @@ def show_task(request, task_id):
         "trials": task_trials,
         "post_task_annotation": post_task_annotation,
         "cancel_annotation": cancel_annotation,
+        "cancel_categories": cancel_categories,
         "cancel_missing_resources": cancel_missing_resources,
         "task": task,
         "FAMILIARITY_MAP": FAMILIARITY_MAP,
@@ -572,7 +584,7 @@ def cancel_annotation(request, task_id, end_timestamp):
     if request.method == "POST":
         if CancelAnnotation.objects.filter(belong_task=task).exists():
             print_debug(f"CancelAnnotation for task {task_id} already exists.")
-            stop_annotating()
+            stop_annotating(request)
             return close_window()
 
         task.cancelled = True
@@ -580,7 +592,7 @@ def cancel_annotation(request, task_id, end_timestamp):
         task.save()
         cancel_annotation = CancelAnnotation()
         cancel_annotation.belong_task = task
-        cancel_annotation.category = request.POST.get("cancel_category")
+        cancel_annotation.category = request.POST.getlist("cancel_category")
         cancel_annotation.reason = request.POST.get("cancel_reason")
         cancel_annotation.missing_resources = request.POST.get(
             "cancel_missing_resources_list"
@@ -589,7 +601,7 @@ def cancel_annotation(request, task_id, end_timestamp):
             "cancel_missing_resources_other"
         )
         cancel_annotation.save()
-        stop_annotating()
+        stop_annotating(request)
         return close_window()
 
     else:
@@ -631,7 +643,7 @@ def cancel_annotation(request, task_id, end_timestamp):
             )
             trials.append(current_trial)
 
-        start_annotating("cancel_annotation")
+        annotation_id = start_annotating(request, "cancel_annotation")
         return render(
             request,
             "cancel_annotation.html",
@@ -641,6 +653,7 @@ def cancel_annotation(request, task_id, end_timestamp):
                 "question": question,
                 "answer": answer,
                 "trials": trials,
+                "annotation_id": annotation_id,
                 "CANCEL_CATEGORY_MAP": CANCEL_CATEGORY_MAP,
                 "MISSING_RESOURCES_MAP": MISSING_RESOURCES_MAP,
                 "CANCEL_CATEGORY_EXPLANATION_MAP": CANCEL_CATEGORY_EXPLANATION_MAP,
@@ -668,7 +681,7 @@ def reflection_annotation(request, task_trial_id):
     if request.method == "POST":
         if ReflectionAnnotation.objects.filter(belong_task_trial=task_trial).exists():
             print_debug(f"ReflectionAnnotation for trial {task_trial.id} already exists.")
-            stop_annotating()
+            stop_annotating(request)
             return close_window()
 
         ref_annotation = ReflectionAnnotation(
@@ -682,7 +695,7 @@ def reflection_annotation(request, task_trial_id):
         )
         ref_annotation.save()
 
-        stop_annotating()
+        stop_annotating(request)
 
         return close_window()
 
@@ -700,7 +713,7 @@ def reflection_annotation(request, task_trial_id):
         # User answer
         user_answer = task_trial.answer if task_trial.answer else ""
 
-        start_annotating("reflection_annotation")
+        annotation_id = start_annotating(request, "reflection_annotation")
         return render(
             request,
             "reflection_annotation.html",
@@ -710,6 +723,7 @@ def reflection_annotation(request, task_trial_id):
                 "question": question,
                 "webpages": webpages,
                 "user_answer": user_answer,
+                "annotation_id": annotation_id,
                 "FAILURE_CATEGORY_MAP": FAILURE_CATEGORY_MAP,
                 "CORRECTIVE_PLAN_MAP": CORRECTIVE_PLAN_MAP,
                 "DIFFICULTY_MAP": DIFFICULTY_MAP,
@@ -815,7 +829,7 @@ def submit_answer(request, task_id, timestamp):
             for webpage in all_webpages:
                 webpage.belong_task_trial = task_trial
                 webpage.save()
-            stop_annotating()
+            stop_annotating(request)
 
             return HttpResponseRedirect(redirect_url)
     else:
@@ -842,7 +856,7 @@ def submit_answer(request, task_id, timestamp):
         )
         webpages = sorted(webpages, key=lambda item: item.start_timestamp)
 
-        start_annotating("submit_answer")
+        annotation_id = start_annotating(request, "submit_answer")
         return render(
             request,
             "submit_answer.html",
@@ -852,31 +866,12 @@ def submit_answer(request, task_id, timestamp):
                 "question": question,
                 "webpages": webpages,
                 "num_trial": num_trial + 1,
+                "annotation_id": annotation_id,
                 "confidence_choices": CONFIDENCE_MAP.items(),
                 "answer_formulation_choices": ANSWER_FORMULATION_MAP.items(),
             },
         )
 
-
-@permission_classes([IsAuthenticated])
-def view_task_info(request, task_id):
-    print_debug("function view_task_info")
-    user = request.user
-    task = Task.objects.filter(id=task_id, user=user, active=True).first()
-    if task is None:
-        return HttpResponse(f"No task found with task_id={task_id}")
-
-    question = task.content.question
-
-    return render(
-        request,
-        "view_task_info.html",
-        {
-            "cur_user": user,
-            "task_id": task.id,
-            "question": question,
-        },
-    )
 
 
 @permission_classes([IsAuthenticated])

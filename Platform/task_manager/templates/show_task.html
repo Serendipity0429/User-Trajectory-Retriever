@@ -147,35 +147,8 @@
                                                 {% for webpage in trial.webpages %}
                                                 <div class="d-flex flex-column align-items-center mb-5 p-4 border rounded shadow-sm bg-light">
                                                     <p class="h5"><a href="{{ webpage.url }}" target="_blank">{{ webpage.title }}</a></p>
-                                                    <div class="rrweb-player-wrapper" id="rrweb-player-trial{{trial.num_trial}}-{{ webpage.id }}" style="margin-top: 20px;"></div>
-                                                    <script>
-                                                        (function() {
-                                                            var target = document.getElementById('rrweb-player-trial{{trial.num_trial}}-{{ webpage.id }}');
-                                                            var events = {{ webpage.rrweb_record|safe }};
-                                                            
-                                                            if (!Array.isArray(events) || events.length === 0) {
-                                                                return;
-                                                            }
+                                                    <div class="rrweb-player-wrapper" id="rrweb-player-trial{{trial.num_trial}}-{{ webpage.id }}" data-events="{{ webpage.rrweb_record|safe }}"></div>
 
-                                                            var container = target.closest('.card-body');
-                                                            if (container) {
-                                                                var containerWidth = container.clientWidth * 0.8;
-                                                                var screenRatio = window.innerHeight / window.innerWidth;
-                                                                var calculatedHeight = containerWidth * screenRatio;
-
-                                                                new rrwebPlayer({
-                                                                    target: target,
-                                                                    props: {
-                                                                        events: events,
-                                                                        autoPlay: false,
-                                                                        width: containerWidth,
-                                                                        height: calculatedHeight,
-                                                                        UNSAFE_replayCanvas: true,
-                                                                    },
-                                                                });
-                                                            }
-                                                        })();
-                                                    </script>
                                                 </div>
                                                 {% empty %}
                                                 <p>No recorded webpages for this trial.</p>
@@ -296,8 +269,13 @@
                         </div>
                         <div id="collapse-cancel-annotation" class="collapse">
                             <div class="card-body">
-                                <p><span class="annotation-key">Reason for Cancellation:</span> {{ CANCEL_CATEGORY_MAP|get_item:cancel_annotation.cancel_category|safe }}</p>
-                                {% if cancel_annotation.cancel_reason %}<p><span class="annotation-key">Detailed Explanation:</span> {{ cancel_annotation.cancel_reason }}</p>{% endif %}
+                                <p><span class="annotation-key">Reason for Cancellation:</span></p>
+                                <ul>
+                                    {% for category in cancel_categories %}
+                                    <li>{{ category|safe }}</li>
+                                    {% endfor %}
+                                </ul>
+                                {% if cancel_annotation.reason %}<p><span class="annotation-key">Detailed Explanation:</span> {{ cancel_annotation.reason }}</p>{% endif %}
                                 {% if cancel_annotation.cancel_additional_reflection %}<p><span class="annotation-key">Additional Reflection:</span> {{ cancel_annotation.cancel_additional_reflection }}</p>{% endif %}
                             </div>
                         </div>
@@ -341,7 +319,36 @@
         // Add event listener to all session replay accordions
         document.querySelectorAll('[id^="collapse-trial-"]').forEach(function(collapseEl) {
             collapseEl.addEventListener('shown.bs.collapse', function () {
-                window.dispatchEvent(new Event('resize'));
+                var playerWrappers = collapseEl.querySelectorAll('.rrweb-player-wrapper');
+                playerWrappers.forEach(function(wrapper) {
+                    if (wrapper.childElementCount > 0) {
+                        // Player already initialized
+                        return;
+                    }
+
+                    var events = JSON.parse(wrapper.dataset.events);
+                    if (!Array.isArray(events) || events.length === 0) {
+                        return;
+                    }
+
+                    var container = wrapper.closest('.card-body');
+                    if (container) {
+                        var containerWidth = container.clientWidth * 0.8;
+                        var screenRatio = window.innerHeight / window.innerWidth;
+                        var calculatedHeight = containerWidth * screenRatio;
+
+                        new rrwebPlayer({
+                            target: wrapper,
+                            props: {
+                                events: events,
+                                autoPlay: false,
+                                width: containerWidth,
+                                height: calculatedHeight,
+                                UNSAFE_replayCanvas: true,
+                            },
+                        });
+                    }
+                });
             });
         });
     });

@@ -72,6 +72,7 @@
                 <div class="card-body">
                     <form id="query-form" action="" method="post" enctype='multipart/form-data'>
                         {% csrf_token %}
+                        <input type="hidden" name="annotation_id" value="{{ annotation_id }}">
                         <!-- Task Info -->
                         <div class="mb-4 p-3 border rounded">
                             <h5><strong>1. Task Review</strong></h5>
@@ -192,7 +193,7 @@
                         </div>
 
                         <div class="d-grid">
-                            <button type="button" id="query-btn" class="btn btn-primary btn-lg btn-submit">Submit Annotation</button>
+                            <button type="button" id="query-btn" class="btn btn-primary-custom btn-lg btn-submit">Submit Annotation</button>
                         </div>
                     </form>
                 </div>
@@ -372,6 +373,13 @@
         });
         $('input[name="strategy_shift_other"]').on('input', () => $('input[name="strategy_shift_other"]').removeClass('is-invalid'));
 
+        window.addEventListener('beforeunload', function (e) {
+            if (!is_submitted) {
+                const data = new FormData();
+                data.append('annotation_id', '{{ annotation_id }}');
+                navigator.sendBeacon('/task/stop_annotation/', data);
+            }
+        });
     });
 
     var trajectoriesCollapse = document.getElementById('collapseTrajectories');

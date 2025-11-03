@@ -110,7 +110,7 @@ class CancelAnnotation(models.Model):
         on_delete=models.CASCADE,
     )
 
-    category = models.CharField(max_length=100, null=True)  # refer to post_task_annotation.html
+    category = models.JSONField(null=True)  # refer to post_task_annotation.html
     reason = models.TextField(null=True)  # reason for cancellation
     missing_resources = models.JSONField(null=True)  # missing resources that led to cancellation
     missing_resources_other = models.TextField(null=True)  # other missing resources

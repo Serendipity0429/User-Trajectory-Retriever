@@ -8,7 +8,7 @@
 }
 
 /* Scoped overrides for annotation area */
-.card #query-form .btn-primary {
+.card #query-form .btn-primary-custom {
     --bs-btn-color: #fff;
     --bs-btn-bg: #021e4d;
     --bs-btn-border-color: #021e4d;

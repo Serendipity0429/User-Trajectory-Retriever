@@ -54,12 +54,16 @@
     const annotation_module = {
         is_annotating: false,
         freeze_overlay: null,
+        annotation_id: 0,
 
         MODAL_STYLE: ANNOTATION_MODAL_STYLE,
         MODAL_HTML: (type) => GENERATE_ANNOTATION_MODAL_HTML(type),
 
         display(event, target, type, eventTime, screenX, screenY, clientX, clientY, tag, content, relatedInfo) {
             this.is_annotating = true;
+            this.annotation_id++;
+            const currentAnnotationId = this.annotation_id;
+
             this.freezePage();
             const style = document.createElement('style');
             style.innerHTML = this.MODAL_STYLE.replaceAll(';', ' !important;');
@@ -94,7 +98,10 @@
             document.body.appendChild(overlay);
             overlay.style.display = 'block';
 
-            const endAnnotation = () => {
+            const endAnnotation = (annotationId) => {
+                if (annotationId !== this.annotation_id) {
+                    return;
+                }
                 overlay.remove();
                 this.unfreezePage();
                 if (type === 'click') {
@@ -118,13 +125,13 @@
                 const hierarchy = event_tracker.getElementHierarchyHTML(target);
                 const annotation = { ignored: false, purpose, isKeyEvent: is_key_event, timestamp: eventTime };
                 unitPage.addActiveEvent(type, eventTime, screenX, screenY, clientX, clientY, tag, content, hierarchy, relatedInfo, annotation);
-                endAnnotation();
+                endAnnotation(currentAnnotationId);
             });
 
             document.getElementById('ignore-btn').addEventListener('click', () => {
                 const hierarchy = event_tracker.getElementHierarchyHTML(target);
                 unitPage.addActiveEvent(type, eventTime, screenX, screenY, clientX, clientY, tag, content, hierarchy, relatedInfo, null);
-                endAnnotation();
+                endAnnotation(currentAnnotationId);
             });
         },
 

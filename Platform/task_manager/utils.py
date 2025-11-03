@@ -18,27 +18,27 @@ except ImportError:
 import time
 import base64
 import zlib
+import uuid
 
-class AnnotationState:
-    def __init__(self):
-        self.is_annotating = False
-        self.is_storing_data = False
-        self.annotation_name = 'none'
-        self.annotation_start_time = float('inf')
+def get_annotation_state(request):
+    """Helper to get annotation state from session, initializing if not present."""
+    state = request.session.get('annotation_state', {})
+    if not isinstance(state, dict):  # Ensure it's a dictionary
+        state = {}
+    
+    # Set defaults for any missing keys
+    state.setdefault('is_annotating', False)
+    state.setdefault('is_storing_data', False)
+    state.setdefault('annotation_name', 'none')
+    state.setdefault('annotation_start_time', float('inf'))
+    state.setdefault('annotation_id', None)
+    
+    return state
 
-    def start_annotating(self, name):
-        self.annotation_start_time = time.time()
-        self.annotation_name = name
-        self.is_annotating = True
-        print_debug(f"Started annotating for {name}.")
-
-    def stop_annotating(self):
-        self.annotation_start_time = float('inf')
-        self.annotation_name = 'none'
-        self.is_annotating = False
-        print_debug("Stopped annotating.")
-
-annotation_state = AnnotationState()
+def set_annotation_state(request, state):
+    """Helper to save annotation state back to session."""
+    request.session['annotation_state'] = state
+    request.session.modified = True
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -64,65 +64,128 @@ def decompress_json_data(compressed_data):
     decompressed_json = json.loads(decompressed_bytes)
     return decompressed_json
 
-def start_annotating(name):
-    annotation_state.start_annotating(name)
+def start_annotating(request, name):
+    state = get_annotation_state(request)
+    state['annotation_start_time'] = time.time()
+    state['annotation_name'] = name
+    state['is_annotating'] = True
+    state['annotation_id'] = str(uuid.uuid4())
+    set_annotation_state(request, state)
+    print_debug(f"Started annotating for {name} with ID {state['annotation_id']}.")
+    return state['annotation_id']
+
+def stop_annotating(request, annotation_id=None):
+    state = get_annotation_state(request)
+    if annotation_id and annotation_id != state.get('annotation_id'):
+        print_debug(f"Annotation ID mismatch. Expected {state.get('annotation_id')}, got {annotation_id}. Not stopping.")
+        return False
     
-def stop_annotating():
-    annotation_state.stop_annotating()
+    state['annotation_start_time'] = float('inf')
+    state['annotation_name'] = 'none'
+    state['is_annotating'] = False
+    state['annotation_id'] = None
+    set_annotation_state(request, state)
+    print_debug("Stopped annotating.")
+    return True
     
-def start_storing_data():
-    annotation_state.is_storing_data = True
+def start_storing_data(request):
+    state = get_annotation_state(request)
+    state['is_storing_data'] = True
+    set_annotation_state(request, state)
     
-def stop_storing_data():
-    annotation_state.is_storing_data = False
+def stop_storing_data(request):
+    state = get_annotation_state(request)
+    state['is_storing_data'] = False
+    set_annotation_state(request, state)
     
     
-def store_data(message, user):
-    annotation_state.is_storing_data = True
+def store_data(request, message, user):
+    state = get_annotation_state(request)
+    state['is_storing_data'] = True
+    set_annotation_state(request, state)
     
     print_json_debug(message)
     if message['url'].startswith(settings.IP_TO_LAUNCH):
         print_debug("Skipping storing data for local URL:", message['url'])
-        annotation_state.is_storing_data = False
+        state['is_storing_data'] = False
+        set_annotation_state(request, state)
         return
     task = Task.objects.filter(user=user, active=True).first()
     if not task:
         print_debug("No active task found for user", user.username)
-        annotation_state.is_storing_data = False
+        state['is_storing_data'] = False
+        set_annotation_state(request, state)
         return
-    
-    webpage = Webpage()
-    # A page is considered a redirect if the dwell time is very short (< 200ms) or if there's no user interaction.
-    if check_is_redirected_page(message):
-        print_debug("Redirect detected, setting is_redirected to True")
-        webpage.is_redirected = True
-    
-    sent_when_active = message.get('sent_when_active', False)
-    
-    print_debug("Annotating:", annotation_state.is_annotating and not sent_when_active)  
-    webpage.during_annotation = annotation_state.is_annotating and not sent_when_active
-    webpage.annotation_name = annotation_state.annotation_name
-    webpage.user = user
-    
-    webpage.belong_task = task
-    webpage.title = message['title']
-    webpage.url = message['url']
-    webpage.referrer = message['referrer']
-    webpage.start_timestamp = timezone.make_aware(datetime.fromtimestamp(message['start_timestamp'] / 1000))
-    webpage.end_timestamp = timezone.make_aware(datetime.fromtimestamp(message['end_timestamp'] / 1000))
-    webpage.dwell_time = message['dwell_time']
-    webpage.mouse_moves = message['mouse_moves']
-    webpage.event_list = message['event_list']
-    # Replace the problematic string to prevent premature script tag closure in the template.
-    # The sequence '<\/script>' is safe for HTML parsers but correctly interpreted by JavaScript.
-    webpage.rrweb_record = message['rrweb_record'].replace(
-                "</script>", "<\\/script>"
-        )
+
+    from urllib.parse import urlparse
+
+    # Check for the most recent webpage for this task
+    last_webpage = Webpage.objects.filter(belong_task=task).order_by('-end_timestamp').first()
+
+    should_merge = False
+    if last_webpage:
+        try:
+            last_url = last_webpage.url
+            current_origin = message['url']
+            if last_url == current_origin:
+                should_merge = True
+        except Exception as e:
+            print_debug(f"Could not parse URL to determine origin: {e}")
+
+    if should_merge:
+        print_debug(f"Merging data for URL: {message['url']}")
+        last_webpage.end_timestamp = timezone.make_aware(datetime.fromtimestamp(message['end_timestamp'] / 1000))
+        last_webpage.dwell_time += message['dwell_time']
+        
+        # Append events, handling potential empty or invalid JSON
+        try:
+            existing_events = json.loads(last_webpage.event_list) if last_webpage.event_list else []
+            new_events = json.loads(message['event_list']) if message['event_list'] else []
+            last_webpage.event_list = json.dumps(existing_events + new_events)
+        except json.JSONDecodeError:
+            print_debug("Could not decode existing event_list, overwriting.")
+            last_webpage.event_list = message['event_list']
+
+        try:
+            existing_rrweb = json.loads(last_webpage.rrweb_record) if last_webpage.rrweb_record else []
+            new_rrweb = json.loads(message['rrweb_record']) if message['rrweb_record'] else []
+            last_webpage.rrweb_record = json.dumps(existing_rrweb + new_rrweb)
+        except json.JSONDecodeError:
+            print_debug("Could not decode existing rrweb_record, overwriting.")
+            last_webpage.rrweb_record = message['rrweb_record']
+            
+        last_webpage.save()
+    else:
+        print_debug(f"Creating new webpage entry for URL: {message['url']}")
+        webpage = Webpage()
+        if check_is_redirected_page(message):
+            print_debug("Redirect detected, setting is_redirected to True")
+            webpage.is_redirected = True
+        
+        sent_when_active = message.get('sent_when_active', False)
+        
+        print_debug("Annotating:", state['is_annotating'] and not sent_when_active)  
+        webpage.during_annotation = state['is_annotating'] and not sent_when_active
+        webpage.annotation_name = state['annotation_name']
+        webpage.user = user
+        
+        webpage.belong_task = task
+        webpage.title = message['title']
+        webpage.url = message['url']
+        webpage.referrer = message['referrer']
+        webpage.start_timestamp = timezone.make_aware(datetime.fromtimestamp(message['start_timestamp'] / 1000))
+        webpage.end_timestamp = timezone.make_aware(datetime.fromtimestamp(message['end_timestamp'] / 1000))
+        webpage.dwell_time = message['dwell_time']
+        webpage.mouse_moves = message['mouse_moves']
+        webpage.event_list = message['event_list']
+        webpage.rrweb_record = message['rrweb_record'].replace(
+                    "</script>", "<\\/script>"
+            )
+        webpage.save()
+
     task.end_timestamp = timezone.make_aware(datetime.fromtimestamp(message['end_timestamp'] / 1000))
-    
-    webpage.save()
     task.save()
-    stop_storing_data()
+    stop_storing_data(request)
     
 def check_is_redirected_page(message):
     # A page is considered a redirect if the dwell time is very short (< 1000ms) or if there's no user interaction.
@@ -130,11 +193,22 @@ def check_is_redirected_page(message):
 
 def wait_until_data_stored(func):
     def wrapper(*args, **kwargs):
-        # Sleep for a short duration to ensure the backend receives the data
-        time.sleep(0.3)
-        while annotation_state.is_storing_data:
-            print_debug("Waiting for data to be stored...")
-            time.sleep(0.5)
+        # Find the request object in the arguments
+        request = None
+        for arg in args:
+            if hasattr(arg, 'session'):
+                request = arg
+                break
+        
+        if request:
+            # Sleep for a short duration to ensure the backend receives the data
+            time.sleep(0.3)
+            state = get_annotation_state(request)
+            while state.get('is_storing_data', False):
+                print_debug("Waiting for data to be stored...")
+                time.sleep(0.5)
+                state = get_annotation_state(request)  # Re-fetch state
+        
         return func(*args, **kwargs)
     return wrapper
     

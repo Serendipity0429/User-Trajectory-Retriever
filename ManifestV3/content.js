@@ -204,7 +204,19 @@ async function setupTaskUI() {
     }
 }
 
+async function getSessionDataFromBackground(key) {
+    return new Promise((resolve) => {
+        chrome.runtime.sendMessage({ command: 'get_session_data', key }, (response) => {
+            resolve(response || {});
+        });
+    });
+}
+
 async function initialize() {
+    if (window.self !== window.top) {
+        // Not in the top frame, don't run initialization
+        return;
+    }
     try {
         await initializeConfig(); // Ensure config is loaded before proceeding
 
@@ -269,11 +281,7 @@ async function initialize() {
         viewState.initialize();
 
         if (!_is_server_page(_content_vars.url_now)) {
-            const { is_recording_paused } = await new Promise((resolve) => {
-                chrome.storage.session.get('is_recording_paused', (result) => {
-                    resolve(result);
-                });
-            });
+            const { is_recording_paused } = await getSessionDataFromBackground('is_recording_paused');
 
             if (is_recording_paused) {
                 displayMessageBox({

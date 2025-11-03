@@ -101,6 +101,7 @@
 
                     <form id="query-form" action="" method="post">
                         {% csrf_token %}
+                        <input type="hidden" name="annotation_id" value="{{ annotation_id }}">
                         <div class="mb-4 p-3 border rounded">
                             <h5><i class="bi bi-question-circle-fill me-2"></i><strong>Question</strong></h5>
                              <div class="p-3 bg-light rounded loaded-box">
@@ -119,6 +120,9 @@
                                 </button>
                             </div>
                             <p>Use the right-click menu on any webpage to add a justification. <i>Click "Refresh" button if you add new evidence and it isn't displayed below.</i></p>
+                            <div id="no-justifications-message" class="alert alert-danger" style="display: none;">
+                                You should keep at least one evidence!
+                            </div>
                              
                             <div class="accordion" id="text-evidence-accordion" style="display: none;">
                                 <div class="accordion-item">
@@ -300,6 +304,18 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    function checkActiveJustifications() {
+        const activeJustifications = document.querySelectorAll('.justification-item:not(.abandoned)');
+        const messageDiv = document.getElementById('no-justifications-message');
+        if (activeJustifications.length === 0) {
+            messageDiv.style.display = 'block';
+            return false;
+        } else {
+            messageDiv.style.display = 'none';
+            return true;
+        }
+    }
+
     function renderJustifications(justifications) {
         const textList = document.getElementById('text-justification-list');
         const imageList = document.getElementById('image-justification-list');
@@ -363,6 +379,8 @@ document.addEventListener('DOMContentLoaded', function() {
         } else {
             abandonedAccordion.style.display = 'none';
         }
+        
+        checkActiveJustifications();
     }
 
     function createJustificationElement(j) {
@@ -600,6 +618,11 @@ document.addEventListener('DOMContentLoaded', function() {
             isValid = false;
         }
 
+        // Validation for at least one active justification
+        if (!checkActiveJustifications()) {
+            isValid = false;
+        }
+
         // Validation for textual and image evidence relevance/credibility
         const annotatableJustifications = document.querySelectorAll('#text-justification-list .justification-item, #image-justification-list .justification-item');
         annotatableJustifications.forEach(item => {
@@ -684,7 +707,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
     window.addEventListener('beforeunload', function() {
         if (!is_submitted) {
-            navigator.sendBeacon('/task/stop_annotation/', new Blob());
+            const data = new FormData();
+            data.append('annotation_id', '{{ annotation_id }}');
+            navigator.sendBeacon('/task/stop_annotation/', data);
         }
     });
 

@@ -284,6 +284,7 @@ chrome.runtime.onInstalled.addListener(() => {
     chrome.alarms.create(ALARM_CLEAR_STORAGE, { periodInMinutes: 1 });
     chrome.alarms.create(ALARM_CHECK_TASK, { delayInMinutes: 1, periodInMinutes: 5 });
     chrome.alarms.create(ALARM_UPDATE_EVIDENCE_COUNT, { delayInMinutes: 0.2, periodInMinutes: 0.2 });
+    _set_session({ is_recording_paused: false });
 });
 
 function getSelectionDetails() {
@@ -391,6 +392,24 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
             if (details) {
                 try {
                     const config = getConfig();
+
+                    // If it's an image, fetch and encode it
+                    if (details.tagName === 'IMG' && details.attributes.src) {
+                        try {
+                            const response = await fetch(details.attributes.src);
+                            const blob = await response.blob();
+                            const dataUrl = await new Promise(resolve => {
+                                const reader = new FileReader();
+                                reader.onloadend = () => resolve(reader.result);
+                                reader.readAsDataURL(blob);
+                            });
+                            details.attributes.imageData = dataUrl; // Add base64 image data
+                        } catch (e) {
+                            console.error("Could not fetch image for evidence:", e);
+                            // Decide if you want to proceed without the image data or show an error
+                        }
+                    }
+
                     await makeApiRequest(() => _post(config.urls.add_justification, {
                         task_id: task_id,
                         url: tab.url,
@@ -562,6 +581,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 }
                 break;
             
+            case 'get_session_data':
+                if (message.key) {
+                    const result = await _get_session(message.key);
+                    sendResponse(result);
+                } else {
+                    sendResponse({});
+                }
+                break;
 
         }
     })();

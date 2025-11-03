@@ -4,6 +4,8 @@
     --bs-body-color: #e0e0e0;
     --bs-border-color: #444;
     --primary-accent-color: #8AC7DB;
+    --secondary-accent-color: #3c90ac;
+    --dark-color: #212529;
 }
 
 .dark-mode body, .dark-mode #content {
@@ -55,7 +57,7 @@
 }
 
 .dark-mode h1, .dark-mode h2:not(.text-success), .dark-mode h3, .dark-mode h4, .dark-mode h5, .dark-mode h6,
-.dark-mode p, .dark-mode span {
+.dark-mode p {
     color: var(--bs-body-color) !important;
 }
 
@@ -90,7 +92,7 @@
 }
 
 .dark-mode .form-control::placeholder {
-    color: #888;
+    color: #3a3a3c;
     opacity: 1;
 }
 
@@ -111,13 +113,13 @@
 }
 
 /* === Primary Button Overrides for Dark Mode === */
-.dark-mode .btn-primary:not(.btn-view-task) {
+.dark-mode .btn-primary-custom:not(.btn-view-task) {
     background-color: var(--primary-accent-color) !important;
     border-color: var(--primary-accent-color) !important;
-    color: #fff !important;
+    color: #212529 !important;
 }
 
-.dark-mode .btn-primary:not(.btn-view-task):hover {
+.dark-mode .btn-primary-custom:not(.btn-view-task):hover {
     background-color: #a0d1e2 !important;
     border-color: #a0d1e2 !important;
 }
@@ -130,7 +132,11 @@
 .dark-mode .btn-check:checked + .btn-outline-primary,
 .dark-mode .btn-outline-primary:hover {
     background-color: var(--primary-accent-color) !important;
-    color: #fff !important;
+    color: var(--dark-color) !important;
+}
+
+.dark-mode .btn-check:checked + .btn-outline-primary strong {
+    color: inherit !important;
 }
 
 .dark-mode .btn-outline-secondary {
@@ -160,26 +166,27 @@
 
 .dark-mode .drag-option .form-check-input:checked + .drag-handle + .priority-number + span,
 .dark-mode .drag-option .form-check-input:checked + .drag-handle + .priority-number + span + div > span {
-    color: #212529 !important;
+    color: var(--dark-color) !important;
 }
 
 .dark-mode .drag-option .form-check-input:checked ~ .flex-grow-1 {
-    color: #212529 !important;
+    color: var(--dark-color) !important;
 }
 
 .dark-mode .drag-option .form-check-input:checked ~ * {
-    color: #212529 !important;
+    color: var(--dark-color) !important;
 }
 
-.dark-mode .drag-option .form-check-input:checked {
-    background-color: #fff !important;
-    border-color: #fff !important;
-}
+
 
 .dark-mode .drag-option.list-group-item:has(.form-check-input:checked) {
     background-color: var(--primary-accent-color) !important;
     border-color: var(--primary-accent-color) !important;
-    color: #212529 !important;
+    color: var(--dark-color) !important;
+}
+
+.dark-mode .drag-option.list-group-item:has(.form-check-input:checked) * {
+    color: var(--dark-color) !important;
 }
 
 .dark-mode .drag-handle, .dark-mode .tooltip-icon {
@@ -326,7 +333,7 @@
     color: transparent;
 }
 
-.dark-mode #sidebarCollapse {
+.dark-mode #sidebarCollapse, #pageSettingsDropdown {
     color: #adb5bd;
 }
 
@@ -366,13 +373,13 @@
 }
 
 .dark-mode .btn-check:checked + .btn-outline-custom-dark-blue {
-    color: #212529; /* Dark color for selected text */
+    color: var(--dark-color); /* Dark color for selected text */
     background-color: var(--primary-accent-color);
     border-color: var(--primary-accent-color);
 }
 
 .dark-mode .btn-check:checked + .btn-outline-custom-dark-blue {
-    color: #212529; /* Dark color for selected text */
+    color: var(--dark-color); /* Dark color for selected text */
 }
 
 .dark-mode .btn-check:checked + .btn-outline-custom-dark-blue strong {
@@ -380,7 +387,7 @@
 }
 
 .dark-mode .btn-check:checked + .btn-outline-custom-dark-blue:hover {
-    color: #212529; /* Keep text dark */
+    color: var(--dark-color); /* Keep text dark */
     background-color: #a0d1e2; /* Lighter accent color on hover */
     border-color: #a0d1e2;
 }
@@ -397,7 +404,7 @@
 /* Elegant selection for dark mode */
 .dark-mode ::selection {
     background-color: var(--primary-accent-color);
-    color: #212529; /* Dark color for selected text */
+    color: var(--dark-color); /* Dark color for selected text */
 }
 
 /* Custom radio and checkbox styling for dark mode */
@@ -411,13 +418,13 @@
 }
 
 .dark-mode .form-check-input:checked {
-    background-color: var(--primary-accent-color);
-    border-color: var(--primary-accent-color);
+    background-color: var(--secondary-accent-color);
+    border-color: var(--secondary-accent-color);
 }
 
 .dark-mode .form-check-input:checked:hover {
-    background-color: #a0d1e2; /* Slightly lighter for hover */
-    border-color: #a0d1e2;
+    background-color: var(--secondary-accent-color);
+    border-color: var(--secondary-accent-color);
 }
 
 .dark-mode .text-danger {

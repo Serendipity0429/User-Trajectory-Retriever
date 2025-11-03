@@ -308,6 +308,10 @@ h1 {
     margin-bottom: 5px;
 }
 
+.messages {
+    margin: top 10px;
+}
+
 .info-item {
     display: flex;
     justify-content: space-between;
@@ -785,7 +789,7 @@ body.dark-mode .menu-item:hover {
 }
 
 body.dark-mode .menu-item.active:hover {
-    background-color: #520f5b; /* Slightly darker purple */
+    background-color: var(--primary-color); /* No change on hover */
 }
 
 body.dark-mode .server-choice-btn:not(.active) {
@@ -829,4 +833,8 @@ body.dark-mode .btn-secondary:not(:disabled):hover {
 
 body.dark-mode .server-choice-btn:not(.active) input[type="text"] {
     background-color: inherit;
+}
+
+body.dark-mode .btn:disabled {
+    color: #444; /* Darker text for disabled buttons in dark mode */
 }

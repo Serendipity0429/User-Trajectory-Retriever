@@ -46,7 +46,7 @@
 {% block content %}
 <div class="container">
     <div class="row justify-content-center">
-        <div class="col-lg-8">
+        <div class="col-lg-10" id='sheet-body'>
             <div class="card shadow-sm">
                 <div class="card-header bg-custom-dark-blue">
                     <h3 class="mb-0"><i class="bi bi-pencil-square me-2"></i>Pre-Task Annotation</h3>
@@ -58,6 +58,7 @@
                     <form id="query-form" action="" method="post" enctype="multipart/form-data">
                         {% csrf_token %}
                         <input type="hidden" name="entry_id" id="entry-id" value="{{entry_id}}">
+                        <input type="hidden" name="annotation_id" value="{{ annotation_id }}">
 
                         <!-- Task Description -->
                         <div id="original-question-container" class="mb-4 p-3 border rounded">
@@ -367,7 +368,9 @@
 
         window.addEventListener('beforeunload', function (e) {
             if (!is_submitted) {
-                navigator.sendBeacon('/task/stop_annotation/', new Blob());
+                const data = new FormData();
+                data.append('annotation_id', '{{ annotation_id }}');
+                navigator.sendBeacon('/task/stop_annotation/', data);
             }
         });
 
@@ -387,7 +390,7 @@
         });
 
         // Align header question with main content
-        const mainContentColumn = $('.col-lg-8').first();
+        const mainContentColumn = $('#sheet-body').first();
         const headerQuestionSnippet = $('.question-text-snippet');
 
         function alignHeaderQuestion() {

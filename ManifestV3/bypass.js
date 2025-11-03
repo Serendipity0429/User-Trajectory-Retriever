@@ -1,18 +1,15 @@
 
+// Note: The 'contextmenu' event listener has been moved to content.js.
+// This was done to resolve a conflict and consolidate the logic for capturing
+// the right-clicked element and bypassing website restrictions in one place.
 (function() {
     'use strict';
-
-    const allowRightClick = (e) => {
-        e.stopImmediatePropagation();
-        return true;
-    };
 
     const allowSelection = (e) => {
         e.stopImmediatePropagation();
         return true;
     };
 
-    document.addEventListener('contextmenu', allowRightClick, true);
     document.addEventListener('selectstart', allowSelection, true);
     document.addEventListener('mousedown', allowSelection, true);
 

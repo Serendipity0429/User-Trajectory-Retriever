@@ -344,6 +344,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     }
 
     if (info.menuItemId === "add-as-evidence-text" && info.selectionText) {
+        printDebug("background", "Marking textual evidence...");
         chrome.scripting.executeScript({
             target: { tabId: tab.id },
             function: getSelectionDetails,
@@ -383,33 +384,17 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
             }
         });
     } else if (["add-as-evidence-image", "add-as-evidence-other"].includes(info.menuItemId)) {
+        printDebug("background", "Marking image / other evidence...");
         chrome.tabs.sendMessage(tab.id, { command: 'get-element-details' }, { frameId: info.frameId }, async (details) => {
             if (chrome.runtime.lastError) {
                 console.error("Error sending message:", chrome.runtime.lastError.message);
                 return;
             }
+            printDebug("background", "Evidence details:", details);
 
             if (details) {
                 try {
                     const config = getConfig();
-
-                    // If it's an image, fetch and encode it
-                    if (details.tagName === 'IMG' && details.attributes.src) {
-                        try {
-                            const response = await fetch(details.attributes.src);
-                            const blob = await response.blob();
-                            const dataUrl = await new Promise(resolve => {
-                                const reader = new FileReader();
-                                reader.onloadend = () => resolve(reader.result);
-                                reader.readAsDataURL(blob);
-                            });
-                            details.attributes.imageData = dataUrl; // Add base64 image data
-                        } catch (e) {
-                            console.error("Could not fetch image for evidence:", e);
-                            // Decide if you want to proceed without the image data or show an error
-                        }
-                    }
-
                     await makeApiRequest(() => _post(config.urls.add_justification, {
                         task_id: task_id,
                         url: tab.url,

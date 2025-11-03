@@ -19,59 +19,69 @@
 
             <div id="control-panel" class="content" hidden>
                 <h2>Control Panel</h2>
-                <div class="function-groups-container">
-                    <div class="function-group-row">
-                        <div class="function-group">
-                            <h3>Server Settings</h3>
-                            <div class="warning-msg" style="display: flex;">
-                                <i class="fas fa-exclamation-triangle"></i>
-                                <p>Ask admin before change!</p>
-                            </div>
-                            <div class="form-group server-choice-btn" data-server-type="local">
-                                <label for="local-server-address"><i class="fas fa-server"></i></label>
-                                <input type="text" id="local-server-address" placeholder="Local Server Address">
-                            </div>
-                            <div class="form-group server-choice-btn" data-server-type="remote">
-                                <label for="remote-server-address"><i class="fas fa-globe"></i></label>
-                                <input type="text" id="remote-server-address" placeholder="Remote Server Address">
-                            </div>
-                        </div>
-                        <div class="function-group">
-                            <h3>Message Box Settings</h3>
-                            <div class="concat-layout">
-                                <div class="form-group">
-                                    <label><i class="fas fa-expand-arrows-alt"></i></label>
-                                    <div class="size-settings">
-                                        <div class="size-btn" data-size="small">Small</div>
-                                        <div class="size-btn" data-size="medium">Medium</div>
-                                        <div class="size-btn" data-size="large">Large</div>
-                                    </div>
-                                </div>
-                                <div class="form-group">
-                                    <label><i class="fas fa-th"></i></label>
-                                    <div class="position-grid">
-                                        <div class="grid-cell" data-position="top-left"></div>
-                                        <div class="grid-cell" data-position="top-center"></div>
-                                        <div class="grid-cell" data-position="top-right"></div>
-                                        <div class="grid-cell" data-position="middle-left"></div>
-                                        <div class="grid-cell" data-position="middle-center"></div>
-                                        <div class="grid-cell" data-position="middle-right"></div>
-                                        <div class="grid-cell" data-position="bottom-left"></div>
-                                        <div class="grid-cell" data-position="bottom-center"></div>
-                                        <div class="grid-cell" data-position="bottom-right"></div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+                <div class="settings-container">
+                    <div class="settings-menu">
+                        <div class="menu-item active" data-target="server-settings"><i class="fas fa-server"></i> Server</div>
+                        <div class="menu-item" data-target="message-box-settings"><i class="fas fa-comment-alt"></i> Message Box</div>
+                        <div class="menu-item" data-target="appearance-settings"><i class="fas fa-paint-brush"></i> Appearance</div>
                     </div>
-                    <div class="function-group full-width-group">
-                        <h3>Popup Scale Settings</h3>
-                        <div class="form-group">
-                            <label for="popup-scale-slider"><i class="fas fa-text-height"></i></label>
-                            <div class="scale-slider-container">
-                                <span>50%</span>
-                                <input type="range" id="popup-scale-slider" min="0.5" max="1.5" step="0.01" value="1">
-                                <span>150%</span>
+                    <div class="settings-content">
+                        <div id="server-settings" class="settings-pane active">
+                            <div class="function-group">
+                                <div class="warning-msg" style="display: flex;">
+                                    <i class="fas fa-exclamation-triangle"></i>
+                                    <p>Ask admin before change!</p>
+                                </div>
+                                <div class="form-group server-choice-btn" data-server-type="local">
+                                    <label for="local-server-address"><i class="fas fa-server"></i></label>
+                                    <input type="text" id="local-server-address" placeholder="Local Server Address">
+                                </div>
+                                <div class="form-group server-choice-btn" data-server-type="remote">
+                                    <label for="remote-server-address"><i class="fas fa-globe"></i></label>
+                                    <input type="text" id="remote-server-address" placeholder="Remote Server Address">
+                                </div>
+                            </div>
+                        </div>
+                        <div id="message-box-settings" class="settings-pane">
+                            <div class="function-group">
+                                <div class="concat-layout">
+                                    <div class="form-group">
+                                        <label><i class="fas fa-expand-arrows-alt"></i></label>
+                                        <div class="size-settings">
+                                            <div class="size-btn" data-size="small">Small</div>
+                                            <div class="size-btn" data-size="medium">Medium</div>
+                                            <div class="size-btn" data-size="large">Large</div>
+                                        </div>
+                                    </div>
+                                    <div class="form-group">
+                                        <label><i class="fas fa-th"></i></label>
+                                        <div class="position-grid">
+                                            <div class="grid-cell" data-position="top-left"></div>
+                                            <div class="grid-cell" data-position="top-center"></div>
+                                            <div class="grid-cell" data-position="top-right"></div>
+                                            <div class="grid-cell" data-position="middle-left"></div>
+                                            <div class="grid-cell" data-position="middle-center"></div>
+                                            <div class="grid-cell" data-position="middle-right"></div>
+                                            <div class="grid-cell" data-position="bottom-left"></div>
+                                            <div class="grid-cell" data-position="bottom-center"></div>
+                                            <div class="grid-cell" data-position="bottom-right"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="appearance-settings" class="settings-pane">
+                            <div class="function-group">
+                                <div class="form-group">
+                                    <label for="popup-scale-selector"><i class="fas fa-search-plus"></i></label>
+                                    <div id="popup-scale-selector" class="scale-selector">
+                                        <div class="scale-option" data-scale="0.8">80%</div>
+                                        <div class="scale-option" data-scale="0.9">90%</div>
+                                        <div class="scale-option active" data-scale="1">100%</div>
+                                        <div class="scale-option" data-scale="1.1">110%</div>
+                                        <div class="scale-option" data-scale="1.2">120%</div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>

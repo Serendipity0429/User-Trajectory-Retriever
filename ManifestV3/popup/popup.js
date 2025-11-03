@@ -378,19 +378,42 @@ async function handleCancelTask() {
     const cancelSettingsBtn = document.getElementById('cancel-settings-btn');
     const loginContent = document.getElementById('login');
     const loggedInContent = document.getElementById('logged');
+    const header = document.querySelector('.header');
     const localServerAddress = document.getElementById('local-server-address');
     const remoteServerAddress = document.getElementById('remote-server-address');
     const restoreDefaultsBtn = document.getElementById('restore-defaults-btn');
     const positionGrid = document.querySelector('.position-grid');
     const serverChoiceBtns = document.querySelectorAll('.server-choice-btn');
-    const popupScaleSlider = document.getElementById('popup-scale-slider');
+    const scaleSelector = document.getElementById('popup-scale-selector');
+    const menuItems = document.querySelectorAll('.menu-item');
+    const settingsPanes = document.querySelectorAll('.settings-pane');
     let originalSettings = {};
 
     await loadSettings();
 
-    popupScaleSlider.addEventListener('input', (event) => {
-        const scaleValue = event.target.value;
-        document.body.style.transform = `scale(${scaleValue})`;
+    scaleSelector.addEventListener('click', (event) => {
+        if (event.target.classList.contains('scale-option')) {
+            scaleSelector.querySelectorAll('.scale-option').forEach(option => option.classList.remove('active'));
+            event.target.classList.add('active');
+            const scaleValue = event.target.dataset.scale;
+            document.body.style.zoom = scaleValue;
+        }
+    });
+
+    menuItems.forEach(item => {
+        item.addEventListener('click', () => {
+            menuItems.forEach(i => i.classList.remove('active'));
+            item.classList.add('active');
+
+            const targetId = item.dataset.target;
+            settingsPanes.forEach(pane => {
+                if (pane.id === targetId) {
+                    pane.classList.add('active');
+                } else {
+                    pane.classList.remove('active');
+                }
+            });
+        });
     });
 
     serverChoiceBtns.forEach(btn => {
@@ -406,7 +429,7 @@ async function handleCancelTask() {
         const remoteAddress = remoteServerAddress.value;
         const messageBoxSize = document.querySelector('.size-btn.active').dataset.size;
         const selectedPosition = positionGrid.querySelector('.grid-cell.selected').dataset.position;
-        const popupScale = parseFloat(popupScaleSlider.value);
+        const popupScale = parseFloat(scaleSelector.querySelector('.scale-option.active').dataset.scale);
         
         await new Promise((resolve) => {
             chrome.storage.local.set({
@@ -443,8 +466,13 @@ async function handleCancelTask() {
             }
         });
 
-        popupScaleSlider.value = settings.popupScale;
-        document.body.style.transform = `scale(${settings.popupScale})`;
+        scaleSelector.querySelectorAll('.scale-option').forEach(option => {
+            option.classList.remove('active');
+            if (parseFloat(option.dataset.scale) === settings.popupScale) {
+                option.classList.add('active');
+            }
+        });
+        document.body.style.zoom = settings.popupScale;
     }
 
     async function loadSettings() {
@@ -470,10 +498,17 @@ async function handleCancelTask() {
         loginContent.style.display = 'none';
         loggedInContent.style.display = 'none';
         controlPanel.style.display = 'block';
+        header.style.display = 'none';
+
+        // Activate the first tab by default
+        menuItems.forEach(i => i.classList.remove('active'));
+        settingsPanes.forEach(p => p.classList.remove('active'));
+        menuItems[0].classList.add('active');
+        settingsPanes[0].classList.add('active');
     
         const { logged_in } = await _get_local(['logged_in']);
-        const serverSettingsGroup = document.querySelector('.function-group');
-        const warningMsg = serverSettingsGroup.querySelector('.warning-msg');
+        const serverSettingsPane = document.getElementById('server-settings');
+        const warningMsg = serverSettingsPane.querySelector('.warning-msg');
     
         if (logged_in) {
             // Disable server settings
@@ -504,6 +539,7 @@ async function handleCancelTask() {
     async function closeControlPanel() {
         document.body.classList.remove('control-panel-active');
         controlPanel.style.display = 'none';
+        header.style.display = 'block';
         const { logged_in } = await _get_local(['logged_in']);
         if (logged_in) {
             loggedInContent.style.display = 'block';
@@ -519,7 +555,7 @@ async function handleCancelTask() {
             remoteServerAddress: remoteServerAddress.value,
             messageBoxSize: document.querySelector('.size-btn.active').dataset.size,
             messageBoxPosition: positionGrid.querySelector('.grid-cell.selected').dataset.position,
-            popupScale: parseFloat(popupScaleSlider.value)
+            popupScale: parseFloat(scaleSelector.querySelector('.scale-option.active').dataset.scale)
         };
 
         const hasChanged = JSON.stringify(currentSettings) !== JSON.stringify(originalSettings);
@@ -554,7 +590,7 @@ async function handleCancelTask() {
         if (confirmed) {
             const defaultConfig = {
                 serverType: 'local',
-                localServerAddress: 'http://127.0.0.1:8000',
+                localServerAddress: 'http://12.0.0.1:8000',
                 remoteServerAddress: 'http://101.6.41.59:32904',
                 messageBoxSize: 'medium',
                 messageBoxPosition: 'top-right',
@@ -564,23 +600,13 @@ async function handleCancelTask() {
             const { logged_in } = await _get_local(['logged_in']);
         
             if (logged_in) {
-                // If logged in, only restore message box settings UI
-                document.querySelectorAll('.size-btn').forEach(btn => {
-                    btn.classList.remove('active');
-                    if (btn.dataset.size === defaultConfig.messageBoxSize) {
-                        btn.classList.add('active');
-                    }
-                });
-                positionGrid.querySelectorAll('.grid-cell').forEach(cell => {
-                    cell.classList.remove('selected');
-                    if (cell.dataset.position === defaultConfig.messageBoxPosition) {
-                        cell.classList.add('selected');
-                    }
-                });
-            } else {
-                // If not logged in, restore all settings UI
-                applySettingsToPanel(defaultConfig);
+                // If logged in, only restore message box and appearance settings
+                defaultConfig.serverType = originalSettings.serverType;
+                defaultConfig.localServerAddress = originalSettings.localServerAddress;
+                defaultConfig.remoteServerAddress = originalSettings.remoteServerAddress;
             }
+            
+            applySettingsToPanel(defaultConfig);
         
             await saveSettings();
             sendMessageToContentScript({ 
@@ -588,16 +614,7 @@ async function handleCancelTask() {
                 position: defaultConfig.messageBoxPosition 
             });
 
-            // Update originalSettings to prevent "unsaved changes" prompt
-            const newSettings = {
-                serverType: document.querySelector('.server-choice-btn.active').dataset.serverType,
-                localServerAddress: localServerAddress.value,
-                remoteServerAddress: remoteServerAddress.value,
-                messageBoxSize: document.querySelector('.size-btn.active').dataset.size,
-                messageBoxPosition: positionGrid.querySelector('.grid-cell.selected').dataset.position,
-                popupScale: parseFloat(popupScaleSlider.value)
-            };
-            originalSettings = { ...newSettings };
+            originalSettings = { ...defaultConfig };
         
             const infoMsgContainer = document.getElementById('info-msg-container');
             const infoMsgText = document.getElementById('info-msg-text');
@@ -616,7 +633,7 @@ async function handleCancelTask() {
             remoteServerAddress: remoteServerAddress.value,
             messageBoxSize: document.querySelector('.size-btn.active').dataset.size,
             messageBoxPosition: positionGrid.querySelector('.grid-cell.selected').dataset.position,
-            popupScale: parseFloat(popupScaleSlider.value)
+            popupScale: parseFloat(scaleSelector.querySelector('.scale-option.active').dataset.scale)
         };
 
         const hasChanged = JSON.stringify(currentSettings) !== JSON.stringify(originalSettings);

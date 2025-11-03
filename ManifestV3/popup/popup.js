@@ -390,9 +390,44 @@ async function handleCancelTask() {
     const settingsPanes = document.querySelectorAll('.settings-pane');
     const colorThemeSelector = document.getElementById('color-theme-selector');
     const customColorPicker = document.getElementById('custom-color-picker');
+    const themeToggle = document.getElementById('theme-toggle');
     let originalSettings = {};
 
+    const themes = {
+        'tsinghua-purple': '#671372',
+        'klein-blue': '#002FA7',
+        'renmin-red': '#ad0b2a',
+        'prussian-blue': '#003153',
+        'forest-green': '#1d3124',
+        'dark-gray': '#2f2f2f',
+        'dark-brown': '#5d3000'
+    };
+    const darkThemes = {
+        'tsinghua-purple': '#d7bde2', // Lighter Purple
+        'klein-blue': '#a9cce3',    // Lighter Blue
+        'renmin-red': '#f5b7b1',    // Lighter Red
+        'prussian-blue': '#aed6f1', // Even Lighter Blue
+        'forest-green': '#a9dfbf', // Lighter Green
+        'dark-gray': '#e5e7e9',   // Lighter Gray
+        'dark-brown': '#f8c471'    // Lighter Orange/Brown
+    };
+
     await loadSettings();
+
+    function applyCurrentTheme() {
+        const isDarkMode = themeToggle.checked;
+        document.body.classList.toggle('dark-mode', isDarkMode);
+        updatePaletteSwatches(isDarkMode);
+
+        const activeColorOption = colorThemeSelector.querySelector('.color-option.active');
+        const theme = activeColorOption ? activeColorOption.dataset.color : 'custom';
+        const customColor = customColorPicker.value;
+        applyTheme(theme, customColor);
+    }
+
+    themeToggle.addEventListener('change', () => {
+        applyCurrentTheme();
+    });
 
     scaleSelector.addEventListener('click', (event) => {
         if (event.target.classList.contains('scale-option')) {
@@ -414,21 +449,27 @@ async function handleCancelTask() {
 
     customColorPicker.addEventListener('input', (event) => {
         const color = event.target.value;
-        applyColors(color);
+        const isDarkMode = themeToggle.checked;
+        const finalColor = isDarkMode ? shadeColor(color, 50) : color; // Increased lightness
+        applyColors(finalColor);
         colorThemeSelector.querySelectorAll('.color-option').forEach(option => option.classList.remove('active'));
     });
 
+    function updatePaletteSwatches(isDarkMode) {
+        const palette = isDarkMode ? darkThemes : themes;
+        colorThemeSelector.querySelectorAll('.color-option').forEach(option => {
+            const colorName = option.dataset.color;
+            if (palette[colorName]) {
+                option.style.backgroundColor = palette[colorName];
+            }
+        });
+    }
+
     function applyTheme(theme, customColor) {
-        const themes = {
-            'tsinghua-purple': '#671372',
-            'klein-blue': '#002FA7',
-            'renmin-red': '#ad0b2a',
-            'prussian-blue': '#003153',
-            'forest-green': '#1d3124',
-            'dark-gray': '#2f2f2f',
-            'dark-brown': '#5d3000'
-        };
-        const color = themes[theme] || customColor || themes['tsinghua-purple'];
+        const isDarkMode = themeToggle.checked;
+        const selectedThemes = isDarkMode ? darkThemes : themes;
+        const color = selectedThemes[theme] || (isDarkMode ? shadeColor(customColor, 50) : customColor) || selectedThemes['tsinghua-purple'];
+        
         applyColors(color);
     }
 
@@ -464,7 +505,8 @@ async function handleCancelTask() {
                 messageBoxPosition: positionGrid.querySelector('.grid-cell.selected').dataset.position,
                 popupScale: parseFloat(scaleSelector.querySelector('.scale-option.active').dataset.scale),
                 colorTheme,
-                customColor
+                customColor,
+                darkMode: themeToggle.checked
             }, resolve);
         });
     }
@@ -494,12 +536,15 @@ async function handleCancelTask() {
         });
         
         customColorPicker.value = settings.customColor;
-        applyTheme(settings.colorTheme, settings.customColor);
+        
+        themeToggle.checked = settings.darkMode;
+        applyCurrentTheme();
+        updatePaletteSwatches(settings.darkMode);
     }
 
     async function loadSettings() {
         const result = await new Promise((resolve) => {
-            chrome.storage.local.get(['serverType', 'localServerAddress', 'remoteServerAddress', 'messageBoxSize', 'messageBoxPosition', 'popupScale', 'colorTheme', 'customColor'], resolve);
+            chrome.storage.local.get(['serverType', 'localServerAddress', 'remoteServerAddress', 'messageBoxSize', 'messageBoxPosition', 'popupScale', 'colorTheme', 'customColor', 'darkMode'], resolve);
         });
 
         originalSettings = {
@@ -510,7 +555,8 @@ async function handleCancelTask() {
             messageBoxPosition: result.messageBoxPosition || 'top-right',
             popupScale: result.popupScale || 1,
             colorTheme: result.colorTheme || 'tsinghua-purple',
-            customColor: result.customColor || '#671372'
+            customColor: result.customColor || '#671372',
+            darkMode: result.darkMode || false
         };
 
         applySettingsToPanel(originalSettings);
@@ -592,7 +638,8 @@ async function handleCancelTask() {
             messageBoxPosition: positionGrid.querySelector('.grid-cell.selected').dataset.position,
             popupScale: parseFloat(scaleSelector.querySelector('.scale-option.active').dataset.scale),
             colorTheme: activeColorOption ? activeColorOption.dataset.color : 'custom',
-            customColor: customColorPicker.value
+            customColor: customColorPicker.value,
+            darkMode: themeToggle.checked
         };
 
         const hasChanged = JSON.stringify(currentSettings) !== JSON.stringify(originalSettings);
@@ -633,7 +680,8 @@ async function handleCancelTask() {
                 messageBoxPosition: 'top-right',
                 popupScale: 1,
                 colorTheme: 'tsinghua-purple',
-                customColor: '#671372'
+                customColor: '#671372',
+                darkMode: false
             };
         
             const { logged_in } = await _get_local(['logged_in']);
@@ -675,7 +723,8 @@ async function handleCancelTask() {
             messageBoxPosition: positionGrid.querySelector('.grid-cell.selected').dataset.position,
             popupScale: parseFloat(scaleSelector.querySelector('.scale-option.active').dataset.scale),
             colorTheme: activeColorOption ? activeColorOption.dataset.color : 'custom',
-            customColor: customColorPicker.value
+            customColor: customColorPicker.value,
+            darkMode: themeToggle.checked
         };
 
         const hasChanged = JSON.stringify(currentSettings) !== JSON.stringify(originalSettings);

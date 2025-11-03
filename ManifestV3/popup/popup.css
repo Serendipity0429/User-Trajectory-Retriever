@@ -74,10 +74,6 @@ h1 {
     flex-direction: column;
 }
 
-#login {
-    gap: 10px;
-}
-
 .form-group {
     display: flex;
     align-items: center;
@@ -174,9 +170,9 @@ h1 {
 }
 
 
-#signupBtn, #homeBtnLoggedOut, #homeBtnLoggedIn {
+/* #signupBtn, #homeBtnLoggedOut, #homeBtnLoggedIn { 
     background-color: #808080; /* Grey */
-}
+/* } */
 
 #pendingAnnotationBtn {
     background-color: #f39c12; /* Orange */
@@ -666,4 +662,165 @@ h1 {
     display: flex;
     align-items: center;
     gap: 10px;
+}
+
+/* Theme Switcher */
+.theme-switcher {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.theme-label {
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 50px;
+    height: 24px;
+}
+
+.switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    transition: .4s;
+    border-radius: 24px;
+}
+
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: .4s;
+    border-radius: 50%;
+}
+
+input:checked + .slider {
+    background-color: var(--primary-color);
+}
+
+input:checked + .slider:before {
+    transform: translateX(26px);
+}
+
+/* Dark Mode */
+body.dark-mode {
+    --secondary-color: #3A3A3A; /* A lighter gray for containers */
+    --danger-color: #e74c3c; /* Alizarin */
+    --light-gray: #2f2f2f; /* A more neutral dark gray */
+    --dark-gray: #ecf0f1; /* Clouds */
+    --white: #3A3A3A; /* Same as secondary for consistency */
+    --danger-color-hover: #c0392b; /* Pomegranate */
+    --danger-text-color: #ecf0f1;
+}
+
+body.dark-mode .form-group,
+body.dark-mode .info-item,
+body.dark-mode .modal-content,
+body.dark-mode .concat-layout .form-group {
+    background-color: var(--secondary-color);
+    color: var(--dark-gray);
+}
+
+body.dark-mode .remember-me{
+    background-color: inherit;
+}
+
+body.dark-mode h1,
+body.dark-mode .form-group i,
+body.dark-mode #togglePassword,
+body.dark-mode .info-value,
+body.dark-mode .modal-header i,
+body.dark-mode .control-panel-btn,
+body.dark-mode #control-panel h2,
+body.dark-mode .menu-item i,
+body.dark-mode .concat-layout .form-group h4,
+body.dark-mode #username_text_logged {
+    color: var(--primary-color);
+}
+
+body.dark-mode .header p,
+body.dark-mode .modal-content p {
+    color: #bdc3c7; /* Silver */
+}
+
+body.dark-mode .menu-item.active {
+    color: var(--dark-gray); /* Use light text color */
+}
+
+body.dark-mode .menu-item.active i {
+    color: var(--dark-gray); /* Use light text color */
+}
+
+body.dark-mode .settings-container {
+    background-color: var(--light-gray); /* Match body background */
+}
+
+body.dark-mode .settings-menu {
+    background-color: var(--secondary-color); /* Match container background */
+}
+
+body.dark-mode .menu-item:hover {
+    background-color: #404040; /* A bit lighter than menu bg */
+}
+
+body.dark-mode .server-choice-btn:not(.active) {
+    background-color: var(--secondary-color);
+}
+
+body.dark-mode .server-choice-btn:not(.active) input,
+body.dark-mode .server-choice-btn:not(.active) i {
+    color: #bdc3c7;
+}
+
+body.dark-mode .grid-cell {
+    background-color: #404040;
+    border-color: var(--light-gray);
+}
+
+body.dark-mode .grid-cell:hover {
+    background-color: #555555;
+}
+
+body.dark-mode .grid-cell.selected {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+}
+
+body.dark-mode input[type="text"],
+body.dark-mode input[type="password"] {
+    background-color: var(--secondary-color);
+    color: var(--dark-gray);
+    font-family: 'Noto Sans SC', sans-serif;
+}
+
+body.dark-mode .btn-secondary {
+    background-color: #7f8c8d; /* Lighter gray for dark mode */
+    color: #ecf0f1;
+}
+
+body.dark-mode .btn-secondary:not(:disabled):hover {
+    background-color: #95a5a6; /* Even lighter on hover */
+}
+
+body.dark-mode .server-choice-btn:not(.active) input[type="text"] {
+    background-color: inherit;
 }

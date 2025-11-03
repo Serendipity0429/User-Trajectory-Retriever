@@ -270,7 +270,7 @@ async function initialize() {
 
         if (!_is_server_page(_content_vars.url_now)) {
             const { is_recording_paused } = await new Promise((resolve) => {
-                chrome.storage.local.get('is_recording_paused', (result) => {
+                chrome.storage.session.get('is_recording_paused', (result) => {
                     resolve(result);
                 });
             });

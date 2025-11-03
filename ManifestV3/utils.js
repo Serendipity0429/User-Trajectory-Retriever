@@ -33,11 +33,11 @@ async function refreshToken() {
     isRefreshing = true;
     const config = getConfig();
 
-    const { refresh_token } = await _get_local('refresh_token');
+    const { refresh_token } = await _get_session('refresh_token');
     if (!refresh_token) {
         printDebug("utils", "Refresh token not found. Forcing logout.");
         // Force logout if refresh token is missing
-        await _remove_local(['access_token', 'refresh_token', 'username', 'logged_in']);
+        await _remove_session(['access_token', 'refresh_token', 'username', 'logged_in']);
         chrome.runtime.sendMessage({ command: "alter_logging_status", log_status: false });
         chrome.action.setBadgeText({ text: '' });
         
@@ -58,13 +58,13 @@ async function refreshToken() {
         if (response.ok) {
             const data = await response.json();
             const new_access_token = data.access;
-            await _set_local({ 'access_token': new_access_token });
+            await _set_session({ 'access_token': new_access_token });
             printDebug("utils", "Token refreshed successfully.");
             processQueue(null, new_access_token);
             return new_access_token;
         } else {
             console.error("Failed to refresh token. Status:", response.status);
-            await _remove_local(['access_token', 'refresh_token', 'username', 'logged_in']);
+            await _remove_session(['access_token', 'refresh_token', 'username', 'logged_in']);
             chrome.runtime.sendMessage({ command: "alter_logging_status", log_status: false });
             chrome.action.setBadgeText({ text: '' });
             processQueue(new Error("Refresh token is invalid"), null);
@@ -86,7 +86,7 @@ async function _request(method, url, data = {}, content_type = 'form', response_
     let attempt = 0;
     while (attempt < MAX_RETRIES) {
         try {
-            const { access_token } = await _get_local('access_token');
+            const { access_token } = await _get_session('access_token');
             let headers = {};
             let body;
             let request_url = url;
@@ -186,6 +186,18 @@ async function _set_local(kv_pairs) {
 
 async function _remove_local(key) {
     return chrome.storage.local.remove(key);
+}
+
+async function _get_session(key) {
+    return chrome.storage.session.get(key);
+}
+
+async function _set_session(kv_pairs) {
+    return chrome.storage.session.set(kv_pairs);
+}
+
+async function _remove_session(key) {
+    return chrome.storage.session.remove(key);
 }
 
 // --- Helpers ---

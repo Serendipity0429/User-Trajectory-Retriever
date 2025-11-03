@@ -30,9 +30,9 @@
                 </div>
                 <div class="settings-container">
                     <div class="settings-menu">
-                        <div class="menu-item" data-target="message-box-settings"><i class="fas fa-comment-alt"></i> Message Box</div>
+                        <div class="menu-item active" data-target="message-box-settings"><i class="fas fa-comment-alt"></i> Message Box</div>
                         <div class="menu-item" data-target="appearance-settings"><i class="fas fa-paint-brush"></i> Appearance</div>
-                        <div class="menu-item active" data-target="server-settings"><i class="fas fa-server"></i> Server</div>
+                        <div class="menu-item" data-target="server-settings"><i class="fas fa-server"></i> Server</div>
                     </div>
                     <div class="settings-content">
                         <div id="server-settings" class="settings-pane active">
@@ -89,6 +89,22 @@
                                         <div class="scale-option active" data-scale="1">100%</div>
                                         <div class="scale-option" data-scale="1.1">110%</div>
                                         <div class="scale-option" data-scale="1.2">120%</div>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label for="color-theme-selector"><i class="fas fa-palette"></i></label>
+                                    <div id="color-theme-selector" class="color-palette">
+                                        <div class="color-option" data-color="tsinghua-purple" style="background-color: #671372;"></div>
+                                        <div class="color-option" data-color="klein-blue" style="background-color: #002FA7;"></div>
+                                        <div class="color-option" data-color="renmin-red" style="background-color: #ad0b2a;"></div>
+                                        <div class="color-option" data-color="prussian-blue" style="background-color: #003153;"></div>
+                                        <div class="color-option" data-color="forest-green" style="background-color: #1d3124;"></div>
+                                        <div class="color-option" data-color="dark-gray" style="background-color: #2f2f2f;"></div>
+                                        <div class="color-option" data-color="dark-brown" style="background-color: #5d3000;"></div>
+                                        <div class="custom-color-wrapper">
+                                            <input type="color" id="custom-color-picker" class="custom-color-picker">
+                                            <i class="fas fa-plus custom-color-icon"></i>
+                                        </div>
                                     </div>
                                 </div>
                             </div>

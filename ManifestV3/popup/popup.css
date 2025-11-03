@@ -3,7 +3,7 @@
 :root {
     --primary-color: #671372; /* Tsinghua Purple */
     --secondary-color: #f4f4f4;
-    --danger-color: #e74c3c;
+    --danger-color: #ad0b2a;
     --light-gray: #f8f9fa; /* Lighter gray background */
     --dark-gray: #34495e;
     --white: #ffffff;
@@ -94,7 +94,7 @@ h1 {
 
 .form-group i {
     color: var(--primary-color);
-    margin-right: 5px;
+    margin-right: 10px;
 }
 
 #login .form-group i {
@@ -603,6 +603,53 @@ h1 {
 .scale-option.active {
     background-color: var(--primary-color);
     color: var(--white);
+}
+
+.color-palette {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.color-option {
+    width: 25px;
+    height: 25px;
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: border-color 0.3s;
+}
+
+.color-option.active {
+    border-color: var(--primary-color);
+}
+
+.custom-color-wrapper {
+    position: relative;
+    width: 25px;
+    height: 25px;
+    border-radius: 50%;
+    border: 2px dashed var(--primary-color);
+    cursor: pointer;
+}
+
+.custom-color-picker {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    cursor: pointer;
+}
+
+.custom-color-icon {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: var(--primary-color);
+    font-size: 12px;
 }
 
 .concat-layout .form-group h4 {

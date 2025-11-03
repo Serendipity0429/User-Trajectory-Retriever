@@ -2,7 +2,7 @@
 // This script runs in the background and handles communication between content scripts and the server
 
 // Import config variables and utility functions
-importScripts('./config.js', './utils.js');
+importScripts('./utils.js', './config.js');
 
 // --- Constants ---
 const TASK_STORAGE_KEY = 'current_task_id';
@@ -31,21 +31,21 @@ let isConnected = true;
 // --- State Management ---
 
 async function getCurrentTask() {
-    const result = await _get_local(TASK_STORAGE_KEY);
+    const result = await _get_session(TASK_STORAGE_KEY);
     return result[TASK_STORAGE_KEY] || -1;
 }
 
 async function setCurrentTask(task_id) {
     if (task_id === -1) {
-        await _remove_local(TASK_INFO_KEY);
+        await _remove_session(TASK_INFO_KEY);
     }
-    return await _set_local({ [TASK_STORAGE_KEY]: task_id });
+    return await _set_session({ [TASK_STORAGE_KEY]: task_id });
 }
 
 // SECURITY: Avoid storing passwords in local storage.
 // The 'password' field has been removed.
 async function getUserInfo() {
-    const { username, access_token, refresh_token, logged_in } = await _get_local(['username', 'access_token', 'refresh_token', 'logged_in']);
+    const { username, access_token, refresh_token, logged_in } = await _get_session(['username', 'access_token', 'refresh_token', 'logged_in']);
     printDebug("background", `User Info - Username: ${username}, Access Token: ${access_token ? 'Set' : 'Not Set'}, Refresh Token: ${refresh_token ? 'Set' : 'Not Set'}, Logged In: ${logged_in}`);
     return { username, access_token, refresh_token, logged_in };
 }
@@ -107,7 +107,7 @@ async function getTaskInfo(task_id) {
         const config = getConfig();
         const response = await makeApiRequest(() => _get(`${config.urls.get_task_info}?task_id=${task_id}`));
         if (response && response.question) {
-            await _set_local({ [TASK_INFO_KEY]: response });
+            await _set_session({ [TASK_INFO_KEY]: response });
         }
     } catch (error) {
         console.error("Error getting task info:", error.message);
@@ -128,7 +128,7 @@ async function hasPendingAnnotation() {
 
 async function checkActiveTaskID() {
     printDebug("background", "Checking active task ID...");
-    const { logged_in } = await _get_local('logged_in');
+    const { logged_in } = await _get_session('logged_in');
     if (!logged_in) {
         await setCurrentTask(-1);
         return -1;
@@ -173,7 +173,7 @@ async function checkActiveTaskID() {
         if (error.message === "Authentication failed.") {
             await setCurrentTask(-1); // Clear current task on auth error
             // Force logout if authentication fails
-            await _remove_local(['access_token', 'refresh_token', 'username', 'logged_in']);
+            await _remove_session(['access_token', 'refresh_token', 'username', 'logged_in']);
             chrome.runtime.sendMessage({ command: "alter_logging_status", log_status: false });
             chrome.action.setBadgeText({ text: '' });
         }
@@ -229,7 +229,6 @@ async function flush() {
         }
 
         if (keys_to_remove.length > 0) {
-            // TODO: Implement more robust error handling for failed sends.
             await Promise.all(promises);
             await _remove_local(keys_to_remove);
             printDebug("background", `Flushed ${keys_to_remove.length} items from local storage.`);
@@ -430,7 +429,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         const config = getConfig();
         switch (message.command) {
             case MSG_GET_POPUP_DATA:
-                const { logged_in } = await _get_local(['logged_in']);
+                const { logged_in } = await _get_session(['logged_in']);
                 if (!logged_in) {
                     sendResponse({ log_status: false });
                     return;
@@ -439,10 +438,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 const task_id = await checkActiveTaskID();
                 let task_info = null;
                 if (task_id > 0) {
-                    task_info = await _get_local(TASK_INFO_KEY);
+                    task_info = await _get_session(TASK_INFO_KEY);
                     if (!task_info) {
                         await getTaskInfo(task_id);
-                        task_info = await _get_local(TASK_INFO_KEY);
+                        task_info = await _get_session(TASK_INFO_KEY);
                     }
                 }
             
@@ -450,15 +449,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 try {
                     const pending_response = await _get(config.urls.check_pending_annotations);
                     if (pending_response && pending_response.pending) {
-                        await _set_local({ is_recording_paused: true });
+                        await _set_session({ is_recording_paused: true });
                         pending_url = pending_response.url;
                     } else {
-                        await _set_local({ is_recording_paused: false });
+                        await _set_session({ is_recording_paused: false });
                         broadcastToTabs({ command: 'remove_message_box', id: 'server-pending-annotation-message' });
                     }
                 } catch (error) {
                     console.error("Error checking pending annotations:", error);
-                    await _set_local({ is_recording_paused: false });
+                    await _set_session({ is_recording_paused: false });
                     broadcastToTabs({ command: 'remove_message_box', id: 'server-pending-annotation-message' });
                 }
             
@@ -472,14 +471,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 break;
 
             case MSG_CHECK_LOGGING_STATUS:
-                const { logged_in: is_logged_in } = await _get_local(['logged_in']);
+                const { logged_in: is_logged_in } = await _get_session(['logged_in']);
                 response = { log_status: is_logged_in };
                 sendResponse(response);
                 break;
 
             case MSG_ALTER_LOGGING_STATUS:
                 if (message.log_status !== undefined) {
-                    await _set_local({ logged_in: message.log_status });
+                    await _set_session({ logged_in: message.log_status });
                     sendResponse("Logging status updated");
                 }
                 else {
@@ -506,7 +505,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     return;
                 }
 
-                const { username } = await _get_local(['username']);
+                const { username } = await _get_session(['username']);
 
                 const msg_json = JSON.stringify(message);
                 const data_to_compress = new TextEncoder().encode(msg_json);
@@ -529,14 +528,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 break;
             
             case MSG_GET_TASK_INFO:
-                let { [TASK_INFO_KEY]: task_info_data } = await _get_local(TASK_INFO_KEY);
+                let { [TASK_INFO_KEY]: task_info_data } = await _get_session(TASK_INFO_KEY);
                 if (!task_info_data) {
                     const task_id_info = await getCurrentTask();
                     if (task_id_info !== -1) {
                         try {
                             const response_task_info = await _get(`${config.urls.get_task_info}?task_id=${task_id_info}`);
                             if (response_task_info) {
-                                await _set_local({ [TASK_INFO_KEY]: response_task_info });
+                                await _set_session({ [TASK_INFO_KEY]: response_task_info });
                                 task_info_data = response_task_info;
                             }
                         } catch (error) {

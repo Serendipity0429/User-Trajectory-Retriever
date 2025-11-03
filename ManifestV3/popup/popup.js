@@ -120,7 +120,7 @@ function displayActiveTask(task_id, task_info) {
 }
 
 async function showUserTab(task_id, task_info) {
-    const { username } = await _get_local(['username']);
+    const { username } = await _get_session(['username']);
     document.getElementById('username_text_logged').textContent = "User: " + username;
     document.getElementById('submitAnswerBtn').style.display = 'none';
     printDebug("popup", "Switched to user tab for user:", username);    
@@ -205,7 +205,7 @@ async function getJustifications(task_id) {
 }
 
 async function openTaskWindow(path, is_new_window = false) {
-    const { access_token } = await _get_local(['access_token']);
+    const { access_token } = await _get_session(['access_token']);
     if (!access_token) {
         showAlert("Authentication failed. Please log out and log in again.");
         return;
@@ -244,7 +244,7 @@ async function handleLoginAttempt() {
         const config = getConfig();
         const login_response = await _post(config.urls.token_login, credentials, 'form');
         if (login_response?.access && login_response?.refresh) {
-            await _set_local({
+            await _set_session({
                 'username': username,
                 'access_token': login_response.access,
                 'refresh_token': login_response.refresh,
@@ -301,7 +301,7 @@ async function handleLogout() {
             }
         });
     }
-    await _remove_local(['username', 'access_token', 'refresh_token', 'logged_in']);
+    await _remove_session(['username', 'access_token', 'refresh_token', 'logged_in']);
     await sendMessageFromPopup({ command: "alter_logging_status", log_status: false });
     chrome.action.setBadgeText({ text: '' });
     showLoginTab();
@@ -451,7 +451,7 @@ async function handleCancelTask() {
         const color = event.target.value;
         const isDarkMode = themeToggle.checked;
         const finalColor = isDarkMode ? shadeColor(color, 50) : color; // Increased lightness
-        applyColors(finalColor);
+        applyColors(finalColor, isDarkMode);
         colorThemeSelector.querySelectorAll('.color-option').forEach(option => option.classList.remove('active'));
     });
 
@@ -470,7 +470,7 @@ async function handleCancelTask() {
         const selectedThemes = isDarkMode ? darkThemes : themes;
         const color = selectedThemes[theme] || (isDarkMode ? shadeColor(customColor, 50) : customColor) || selectedThemes['tsinghua-purple'];
         
-        applyColors(color);
+        applyColors(color, isDarkMode);
     }
 
     menuItems.forEach(item => {
@@ -586,7 +586,7 @@ async function handleCancelTask() {
             settingsPanes[0]?.classList.add('active');
         }
     
-        const { logged_in } = await _get_local(['logged_in']);
+        const { logged_in } = await _get_session(['logged_in']);
         const serverSettingsPane = document.getElementById('server-settings');
         const warningMsg = serverSettingsPane.querySelector('.warning-msg');
     
@@ -620,7 +620,7 @@ async function handleCancelTask() {
         document.body.classList.remove('control-panel-active');
         controlPanel.style.display = 'none';
         header.style.display = 'block';
-        const { logged_in } = await _get_local(['logged_in']);
+        const { logged_in } = await _get_session(['logged_in']);
         if (logged_in) {
             loggedInContent.style.display = 'block';
         } else {
@@ -684,7 +684,7 @@ async function handleCancelTask() {
                 darkMode: false
             };
         
-            const { logged_in } = await _get_local(['logged_in']);
+            const { logged_in } = await _get_session(['logged_in']);
         
             if (logged_in) {
                 // If logged in, only restore message box and appearance settings

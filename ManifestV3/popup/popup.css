@@ -1,4 +1,6 @@
-@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap');
+
+
+@import url('https://fonts.googleapis.cn/css2?family=Roboto:wght@400;500;700&display=swap');
 
 :root {
     --primary-color: #671372; /* Tsinghua Purple */
@@ -763,7 +765,7 @@ body.dark-mode .modal-content p {
 }
 
 body.dark-mode .menu-item.active {
-    color: var(--dark-gray); /* Use light text color */
+    color: var(--white); /* Use dark text color for contrast */
 }
 
 body.dark-mode .menu-item.active i {
@@ -779,7 +781,11 @@ body.dark-mode .settings-menu {
 }
 
 body.dark-mode .menu-item:hover {
-    background-color: #404040; /* A bit lighter than menu bg */
+    background-color: #555555; /* A bit lighter than menu bg */
+}
+
+body.dark-mode .menu-item.active:hover {
+    background-color: #520f5b; /* Slightly darker purple */
 }
 
 body.dark-mode .server-choice-btn:not(.active) {

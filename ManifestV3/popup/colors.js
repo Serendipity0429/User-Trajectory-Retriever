@@ -46,7 +46,7 @@ function colorDistance(hex1, hex2) {
 }
 
 // Function to generate and apply the color palette
-function applyColors(mainColor) {
+function applyColors(mainColor, isDarkMode) {
     const originalRed = '#ad0b2a';
     const elegantBlue = '#005f73';
     let dangerColor;
@@ -67,10 +67,10 @@ function applyColors(mainColor) {
         '--danger-color': dangerColor,
         '--danger-color-hover': shadeColor(dangerColor, -10),
         '--danger-text-color': dangerTextColor,
-        '--secondary-color': '#f4f4f4',
-        '--light-gray': '#f8f9fa',
-        '--dark-gray': '#34495e',
-        '--white': '#ffffff',
+        '--secondary-color': isDarkMode ? '#3A3A3A' : '#f4f4f4',
+        '--light-gray': isDarkMode ? '#2f2f2f' : '#f8f9fa',
+        '--dark-gray': isDarkMode ? '#ecf0f1' : '#34495e',
+        '--white': isDarkMode ? '#3A3A3A' : '#ffffff',
     };
 
     const root = document.documentElement;

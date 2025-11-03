@@ -154,7 +154,7 @@ The THU-IR Annotation Platform Team
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Password Reset</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap');
+        @import url('https://fonts.googleapis.cn/css2?family=Roboto:wght@400;700&display=swap');
         body {{
             font-family: 'Roboto', Arial, sans-serif;
             background-color: #f4f4f4;

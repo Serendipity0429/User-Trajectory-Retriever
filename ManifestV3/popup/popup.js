@@ -414,7 +414,7 @@ async function handleCancelTask() {
 
     customColorPicker.addEventListener('input', (event) => {
         const color = event.target.value;
-        document.documentElement.style.setProperty('--primary-color', color);
+        applyColors(color);
         colorThemeSelector.querySelectorAll('.color-option').forEach(option => option.classList.remove('active'));
     });
 
@@ -429,7 +429,7 @@ async function handleCancelTask() {
             'dark-brown': '#5d3000'
         };
         const color = themes[theme] || customColor || themes['tsinghua-purple'];
-        document.documentElement.style.setProperty('--primary-color', color);
+        applyColors(color);
     }
 
     menuItems.forEach(item => {
@@ -627,7 +627,7 @@ async function handleCancelTask() {
         if (confirmed) {
             const defaultConfig = {
                 serverType: 'local',
-                localServerAddress: 'http://12.0.0.1:8000',
+                localServerAddress: 'http://127.0.0.1:8000',
                 remoteServerAddress: 'http://101.6.41.59:32904',
                 messageBoxSize: 'medium',
                 messageBoxPosition: 'top-right',

@@ -372,7 +372,8 @@ async function handleCancelTask() {
     await initializeConfig(); // Wait for config to be loaded
 
     // --- Control Panel Logic ---
-    const controlPanelBtn = document.getElementById('control-panel-btn');
+    const controlPanelOpenBtn = document.getElementById('control-panel-open-btn');
+    const controlPanelCloseBtn = document.getElementById('control-panel-close-btn');
     const controlPanel = document.getElementById('control-panel');
     const saveSettingsBtn = document.getElementById('save-settings-btn');
     const cancelSettingsBtn = document.getElementById('cancel-settings-btn');
@@ -649,11 +650,15 @@ async function handleCancelTask() {
         }
     }
 
-    controlPanelBtn.addEventListener('click', async () => {
+    controlPanelOpenBtn.addEventListener('click', async () => {
+        if (controlPanel.style.display !== 'block') { // If control panel is open
+            await openControlPanel();
+        }
+    });
+
+    controlPanelCloseBtn.addEventListener('click', async () => {
         if (controlPanel.style.display === 'block') { // If control panel is open
             await handleCloseControlPanel();
-        } else { // If control panel is closed
-            await openControlPanel();
         }
     });
 

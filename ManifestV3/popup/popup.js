@@ -388,6 +388,8 @@ async function handleCancelTask() {
     const scaleSelector = document.getElementById('popup-scale-selector');
     const menuItems = document.querySelectorAll('.menu-item');
     const settingsPanes = document.querySelectorAll('.settings-pane');
+    const colorThemeSelector = document.getElementById('color-theme-selector');
+    const customColorPicker = document.getElementById('custom-color-picker');
     let originalSettings = {};
 
     await loadSettings();
@@ -401,18 +403,42 @@ async function handleCancelTask() {
         }
     });
 
+    colorThemeSelector.addEventListener('click', (event) => {
+        if (event.target.classList.contains('color-option')) {
+            colorThemeSelector.querySelectorAll('.color-option').forEach(option => option.classList.remove('active'));
+            event.target.classList.add('active');
+            const theme = event.target.dataset.color;
+            applyTheme(theme);
+        }
+    });
+
+    customColorPicker.addEventListener('input', (event) => {
+        const color = event.target.value;
+        document.documentElement.style.setProperty('--primary-color', color);
+        colorThemeSelector.querySelectorAll('.color-option').forEach(option => option.classList.remove('active'));
+    });
+
+    function applyTheme(theme, customColor) {
+        const themes = {
+            'tsinghua-purple': '#671372',
+            'klein-blue': '#002FA7',
+            'renmin-red': '#ad0b2a',
+            'prussian-blue': '#003153',
+            'forest-green': '#1d3124',
+            'dark-gray': '#2f2f2f',
+            'dark-brown': '#5d3000'
+        };
+        const color = themes[theme] || customColor || themes['tsinghua-purple'];
+        document.documentElement.style.setProperty('--primary-color', color);
+    }
+
     menuItems.forEach(item => {
         item.addEventListener('click', () => {
             menuItems.forEach(i => i.classList.remove('active'));
             item.classList.add('active');
-
             const targetId = item.dataset.target;
             settingsPanes.forEach(pane => {
-                if (pane.id === targetId) {
-                    pane.classList.add('active');
-                } else {
-                    pane.classList.remove('active');
-                }
+                pane.classList.toggle('active', pane.id === targetId);
             });
         });
     });
@@ -425,60 +451,55 @@ async function handleCancelTask() {
     });
 
     async function saveSettings() {
-        const serverType = document.querySelector('.server-choice-btn.active').dataset.serverType;
-        const localAddress = localServerAddress.value;
-        const remoteAddress = remoteServerAddress.value;
-        const messageBoxSize = document.querySelector('.size-btn.active').dataset.size;
-        const selectedPosition = positionGrid.querySelector('.grid-cell.selected').dataset.position;
-        const popupScale = parseFloat(scaleSelector.querySelector('.scale-option.active').dataset.scale);
-        
+        const activeColorOption = colorThemeSelector.querySelector('.color-option.active');
+        const colorTheme = activeColorOption ? activeColorOption.dataset.color : 'custom';
+        const customColor = customColorPicker.value;
+
         await new Promise((resolve) => {
             chrome.storage.local.set({
-                serverType: serverType,
-                localServerAddress: localAddress,
-                remoteServerAddress: remoteAddress,
-                messageBoxSize: messageBoxSize,
-                messageBoxPosition: selectedPosition,
-                popupScale: popupScale
+                serverType: document.querySelector('.server-choice-btn.active').dataset.serverType,
+                localServerAddress: localServerAddress.value,
+                remoteServerAddress: remoteServerAddress.value,
+                messageBoxSize: document.querySelector('.size-btn.active').dataset.size,
+                messageBoxPosition: positionGrid.querySelector('.grid-cell.selected').dataset.position,
+                popupScale: parseFloat(scaleSelector.querySelector('.scale-option.active').dataset.scale),
+                colorTheme,
+                customColor
             }, resolve);
         });
     }
 
     function applySettingsToPanel(settings) {
         document.querySelectorAll('.server-choice-btn').forEach(btn => {
-            btn.classList.remove('active');
-            if (btn.dataset.serverType === settings.serverType) {
-                btn.classList.add('active');
-            }
+            btn.classList.toggle('active', btn.dataset.serverType === settings.serverType);
         });
         localServerAddress.value = settings.localServerAddress;
         remoteServerAddress.value = settings.remoteServerAddress;
+        
         document.querySelectorAll('.size-btn').forEach(btn => {
-            btn.classList.remove('active');
-            if (btn.dataset.size === settings.messageBoxSize) {
-                btn.classList.add('active');
-            }
+            btn.classList.toggle('active', btn.dataset.size === settings.messageBoxSize);
         });
         
         positionGrid.querySelectorAll('.grid-cell').forEach(cell => {
-            cell.classList.remove('selected');
-            if (cell.dataset.position === settings.messageBoxPosition) {
-                cell.classList.add('selected');
-            }
+            cell.classList.toggle('selected', cell.dataset.position === settings.messageBoxPosition);
         });
 
         scaleSelector.querySelectorAll('.scale-option').forEach(option => {
-            option.classList.remove('active');
-            if (parseFloat(option.dataset.scale) === settings.popupScale) {
-                option.classList.add('active');
-            }
+            option.classList.toggle('active', parseFloat(option.dataset.scale) === settings.popupScale);
         });
         document.body.style.zoom = settings.popupScale;
+
+        colorThemeSelector.querySelectorAll('.color-option').forEach(option => {
+            option.classList.toggle('active', option.dataset.color === settings.colorTheme);
+        });
+        
+        customColorPicker.value = settings.customColor;
+        applyTheme(settings.colorTheme, settings.customColor);
     }
 
     async function loadSettings() {
         const result = await new Promise((resolve) => {
-            chrome.storage.local.get(['serverType', 'localServerAddress', 'remoteServerAddress', 'messageBoxSize', 'messageBoxPosition', 'popupScale'], resolve);
+            chrome.storage.local.get(['serverType', 'localServerAddress', 'remoteServerAddress', 'messageBoxSize', 'messageBoxPosition', 'popupScale', 'colorTheme', 'customColor'], resolve);
         });
 
         originalSettings = {
@@ -487,7 +508,9 @@ async function handleCancelTask() {
             remoteServerAddress: result.remoteServerAddress || '',
             messageBoxSize: result.messageBoxSize || 'medium',
             messageBoxPosition: result.messageBoxPosition || 'top-right',
-            popupScale: result.popupScale || 1
+            popupScale: result.popupScale || 1,
+            colorTheme: result.colorTheme || 'tsinghua-purple',
+            customColor: result.customColor || '#671372'
         };
 
         applySettingsToPanel(originalSettings);
@@ -501,11 +524,21 @@ async function handleCancelTask() {
         controlPanel.style.display = 'block';
         header.style.display = 'none';
 
-        // Activate the first tab by default
+        // Activate the "Message Box" tab by default
         menuItems.forEach(i => i.classList.remove('active'));
         settingsPanes.forEach(p => p.classList.remove('active'));
-        menuItems[0].classList.add('active');
-        settingsPanes[0].classList.add('active');
+
+        const defaultMenuItem = document.querySelector('.menu-item[data-target="message-box-settings"]');
+        const defaultPane = document.getElementById('message-box-settings');
+        
+        if (defaultMenuItem && defaultPane) {
+            defaultMenuItem.classList.add('active');
+            defaultPane.classList.add('active');
+        } else {
+            // Fallback to the first tab if the default is not found
+            menuItems[0]?.classList.add('active');
+            settingsPanes[0]?.classList.add('active');
+        }
     
         const { logged_in } = await _get_local(['logged_in']);
         const serverSettingsPane = document.getElementById('server-settings');
@@ -550,13 +583,16 @@ async function handleCancelTask() {
     }
 
     saveSettingsBtn.addEventListener('click', async () => {
+        const activeColorOption = colorThemeSelector.querySelector('.color-option.active');
         const currentSettings = {
             serverType: document.querySelector('.server-choice-btn.active').dataset.serverType,
             localServerAddress: localServerAddress.value,
             remoteServerAddress: remoteServerAddress.value,
             messageBoxSize: document.querySelector('.size-btn.active').dataset.size,
             messageBoxPosition: positionGrid.querySelector('.grid-cell.selected').dataset.position,
-            popupScale: parseFloat(scaleSelector.querySelector('.scale-option.active').dataset.scale)
+            popupScale: parseFloat(scaleSelector.querySelector('.scale-option.active').dataset.scale),
+            colorTheme: activeColorOption ? activeColorOption.dataset.color : 'custom',
+            customColor: customColorPicker.value
         };
 
         const hasChanged = JSON.stringify(currentSettings) !== JSON.stringify(originalSettings);
@@ -595,7 +631,9 @@ async function handleCancelTask() {
                 remoteServerAddress: 'http://101.6.41.59:32904',
                 messageBoxSize: 'medium',
                 messageBoxPosition: 'top-right',
-                popupScale: 1
+                popupScale: 1,
+                colorTheme: 'tsinghua-purple',
+                customColor: '#671372'
             };
         
             const { logged_in } = await _get_local(['logged_in']);
@@ -628,13 +666,16 @@ async function handleCancelTask() {
     });
 
     async function handleCloseControlPanel() {
+        const activeColorOption = colorThemeSelector.querySelector('.color-option.active');
         const currentSettings = {
             serverType: document.querySelector('.server-choice-btn.active').dataset.serverType,
             localServerAddress: localServerAddress.value,
             remoteServerAddress: remoteServerAddress.value,
             messageBoxSize: document.querySelector('.size-btn.active').dataset.size,
             messageBoxPosition: positionGrid.querySelector('.grid-cell.selected').dataset.position,
-            popupScale: parseFloat(scaleSelector.querySelector('.scale-option.active').dataset.scale)
+            popupScale: parseFloat(scaleSelector.querySelector('.scale-option.active').dataset.scale),
+            colorTheme: activeColorOption ? activeColorOption.dataset.color : 'custom',
+            customColor: customColorPicker.value
         };
 
         const hasChanged = JSON.stringify(currentSettings) !== JSON.stringify(originalSettings);

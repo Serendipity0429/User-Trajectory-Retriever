@@ -40,6 +40,7 @@ def clean_project():
     dirs_to_remove = [
         WORK_DIR / "task_manager" / "migrations",
         WORK_DIR / "user_system" / "migrations",
+        WORK_DIR / "discussion" / "migrations",
         WORK_DIR / "media",
     ]
     
@@ -99,6 +100,7 @@ def main():
     print("--- Running database migrations ---")
     run_manage_py_command("makemigrations", "task_manager")
     run_manage_py_command("makemigrations", "user_system")
+    run_manage_py_command("makemigrations", "discussion")
     run_manage_py_command("makemigrations")
     run_manage_py_command("migrate")
     print("--- Migrations complete ---")

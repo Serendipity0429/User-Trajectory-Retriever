@@ -52,3 +52,16 @@
 p strong {
     font-weight: bold;
 }
+
+.form-floating > .form-control {
+  padding: 1rem 0.75rem;
+}
+
+.form-floating > .form-control:focus,
+.form-floating > .form-control:not(:placeholder-shown),
+.form-floating > .form-select {
+    padding-top: 1.625rem;
+    padding-bottom: 0.625rem;
+    line-height: 1.5;
+    height: calc(3.75rem + calc(var(--bs-border-width) * 2));
+}

@@ -15,6 +15,13 @@ The system is composed of two main parts:
 - **Task Management:** Researchers can create and manage tasks for users to complete.
 - **User Management:** A complete user system for authentication and profile management.
 - **Data Annotation:** An interface for researchers to annotate key events or behaviors within a user's session.
+- **Discussion Forum:** A platform for users to ask questions, share insights, and engage in discussions related to their research and tasks.
+
+## Recent Updates
+
+- **Discussion Forum:** A new discussion forum has been added to the platform, allowing users to interact with each other, ask questions, and share their findings.
+- **UI Enhancements:** The user interface has been updated for a more modern look and feel, including the addition of a dark mode.
+- **Performance Improvements:** The rrweb player is now lazy-loaded, improving the initial page load time.
 
 ## System Architecture
 
@@ -96,6 +103,9 @@ The extension is located in the `ManifestV3/` directory.
 .
 ├── ManifestV3/       # Source code for the Chrome browser extension
 ├── Platform/         # Source code for the Django web platform
+│   ├── discussion/   # Discussion forum app
+│   ├── task_manager/ # Task management app
+│   └── user_system/  # User management app
 ├── requirements.txt  # Python dependencies for the platform
 └── README.md         # This file
 ```

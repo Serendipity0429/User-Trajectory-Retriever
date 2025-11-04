@@ -1,0 +1,163 @@
+{% extends 'base.html' %}
+{% load discussion_extras %}
+
+{% block content %}
+<div class="container discussion-page">
+    <div class="d-flex justify-content-between align-items-center">
+        <h1 class="mt-4">Discussion Forum</h1>
+        <button id="refresh-btn" class="btn btn-outline-secondary" onclick="location.reload();">
+            Refresh <i class="bi bi-arrow-clockwise"></i>
+        </button>
+    </div>
+
+    <div class="card my-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            Bulletin
+            {% if user.is_staff %}
+                <a href="{% url 'manage_bulletin' %}" class="btn btn-outline-secondary btn-sm">Manage Announcements</a>
+            {% endif %}
+        </div>
+        <div class="card-body">
+            {% for bulletin in pinned_bulletins %}
+                {% with category_class=bulletin.get_category_display %}
+                <div class="alert alert-light" role="alert">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            {% if bulletin.pinned %}<i class="bi bi-pin-angle-fill"></i>{% endif %}
+                            <span class="badge {% if category_class == 'Warning' %}bg-danger{% elif category_class == 'Important' %}bg-dark{% elif category_class == 'System Update' %}bg-primary{% else %}bg-success{% endif %} me-2">{{ bulletin.get_category_display }}</span>
+                            <a href="{% url 'bulletin_detail' bulletin.pk %}" class="text-decoration-none text-dark">{{ bulletin.title }}</a>
+                        </h5>
+                        <small class="text-muted">{{ bulletin.created_at|date:"Y-m-d" }}</small>
+                    </div>
+                </div>
+                {% endwith %}
+            {% endfor %}
+            {% for bulletin in bulletins %}
+                {% with category_class=bulletin.get_category_display %}
+                <div class="alert alert-light" role="alert">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            {% if bulletin.pinned %}<i class="bi bi-pin-angle-fill"></i>{% endif %}
+                            <span class="badge {% if category_class == 'Warning' %}bg-danger{% elif category_class == 'Important' %}bg-dark{% elif category_class == 'System Update' %}bg-primary{% else %}bg-success{% endif %} me-2">{{ bulletin.get_category_display }}</span>
+                            <a href="{% url 'bulletin_detail' bulletin.pk %}" class="text-decoration-none text-dark">{{ bulletin.title }}</a>
+                        </h5>
+                        <small class="text-muted">{{ bulletin.created_at|date:"Y-m-d" }}</small>
+                    </div>
+                </div>
+                {% endwith %}
+            {% empty %}
+                <p>No announcements.</p>
+            {% endfor %}
+
+            <nav aria-label="Bulletin page navigation">
+                <ul class="pagination justify-content-center mt-4">
+                    {% if bulletins.has_previous %}
+                        <li class="page-item"><a class="page-link" href="?bpage=1">&laquo; First</a></li>
+                        <li class="page-item"><a class="page-link" href="?bpage={{ bulletins.previous_page_number }}">Previous</a></li>
+                    {% endif %}
+
+                    {% for i in bulletin_page_range %}
+                        {% if bulletins.number == i %}
+                            <li class="page-item active" aria-current="page"><span class="page-link">{{ i }}</span></li>
+                        {% else %}
+                            <li class="page-item"><a class="page-link" href="?bpage={{ i }}">{{ i }}</a></li>
+                        {% endif %}
+                    {% endfor %}
+
+                    {% if bulletins.has_next %}
+                        <li class="page-item"><a class="page-link" href="?bpage={{ bulletins.next_page_number }}">Next</a></li>
+                        <li class="page-item"><a class="page-link" href="?bpage={{ bulletins.paginator.num_pages }}">Last &raquo;</a></li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </div>
+    </div>
+
+    <div class="card my-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <div class="d-flex align-items-center">
+                <h5 class="mb-0">Discussions</h5>
+            </div>
+            <div class="category-filters">
+                <a href="{% url 'discussion_home' %}" class="btn btn-sm {% if not request.GET.category %}btn-primary{% else %}btn-outline-primary{% endif %}">All</a>
+                {% for category in categories %}
+                    {% with btn_class=category|category_btn_class %}
+                        <a href="?category={{ category }}" data-btn-class="{{ btn_class }}" class="btn btn-sm {% if request.GET.category == category %}{{ btn_class }}{% else %}{{ btn_class|to_outline_btn }}{% endif %}">{{ category }}</a>
+                    {% endwith %}
+                {% endfor %}
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <a href="{% url 'create_post' %}" class="btn btn-primary">Create New Post</a>
+                <form action="{% url 'discussion_home' %}" method="get" class="d-flex flex-grow-1 ms-3">
+                    <div class="input-group">
+                        <input type="search" class="form-control" placeholder="Search discussions..." aria-label="Search" name="q" value="{{ request.GET.q | default:'' }}">
+                        <button class="btn btn-outline-primary" type="submit"><i class="bi bi-search"></i></button>
+                    </div>
+                </form>
+            </div>
+
+            <div id="post-list-container">
+                {% include '_post_list.html' %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+$(document).ready(function() {
+    function fetchPosts(url) {
+        $.ajax({
+            url: url,
+            type: 'GET',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            success: function(data) {
+                $('#post-list-container').html(data);
+                window.history.pushState({path:url},'',url);
+            }
+        });
+    }
+
+    $('.category-filters').on('click', 'a', function(e) {
+        e.preventDefault();
+        
+        var $clickedLink = $(this);
+
+        // Reset all buttons to outline
+        $('.category-filters a').each(function() {
+            var $link = $(this);
+            var btnClass = $link.data('btn-class');
+            if (btnClass) {
+                $link.removeClass(btnClass).addClass(btnClass.replace('btn-', 'btn-outline-'));
+            } else {
+                // This is the "All" button
+                $link.removeClass('btn-primary').addClass('btn-outline-primary');
+            }
+        });
+
+        // Activate the clicked button
+        var clickedBtnClass = $clickedLink.data('btn-class');
+        if (clickedBtnClass) {
+            $clickedLink.removeClass(clickedBtnClass.replace('btn-', 'btn-outline-')).addClass(clickedBtnClass);
+        } else {
+            // This is the "All" button
+            $clickedLink.removeClass('btn-outline-primary').addClass('btn-primary');
+        }
+
+        var url = $(this).attr('href');
+        fetchPosts(url);
+    });
+
+    $('#post-list-container').on('click', '.pagination a', function(e) {
+        e.preventDefault();
+        var url = $(this).attr('href');
+        fetchPosts(url);
+    });
+});
+</script>
+{% endblock %}

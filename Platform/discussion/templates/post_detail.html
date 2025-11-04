@@ -1,0 +1,65 @@
+{% extends 'base.html' %}
+{% load discussion_extras %}
+
+{% block content %}
+<div class="container discussion-page">
+    <a href="{% url 'discussion_home' %}" class="btn btn-outline-secondary mt-3 mb-3">&laquo; Back to Forum</a>
+    <div class="card my-4">
+        <div class="card-body">
+            <h1 class="card-title">{{ post.title }}</h1>
+            <h6 class="card-subtitle mb-2 text-muted">By {{ post.author.username }} in <span class="badge {{ post.get_category_display|category_color_class }}">{{ post.get_category_display }}</span> on {{ post.created_at }}</h6>
+            <p class="mb-1">
+                {% for label in post.labels.all %}
+                    <span class="badge discussion-label">#{{ label }}</span>
+                {% endfor %}
+            </p>
+            <p class="card-text mt-3">{{ post.content|safe }}</p>
+            {% for attachment in post.attachments.all %}
+                <a href="{{ attachment.file.url }}" target="_blank">{{ attachment.file.name }}</a><br>
+            {% endfor %}
+<div class="post-actions">
+    {% if user == post.author or user.is_staff %}
+        <a href="{% url 'edit_post' post.pk %}" class="btn btn-primary">Edit</a>
+        <a href="{% url 'delete_post' post.pk %}" class="btn btn-danger">Delete</a>
+    {% endif %}
+</div>
+        </div>
+    </div>
+
+    <hr>
+
+    <h3>Comments</h3>
+    {% for comment in post.comments.all %}
+        <div class="card mb-3">
+            <div class="card-body">
+                <p class="card-text">{{ comment.content|safe }}</p>
+                <footer class="blockquote-footer">By {{ comment.author.username }} on {{ comment.created_at }}</footer>
+            </div>
+        </div>
+    {% empty %}
+        <p>No comments yet.</p>
+    {% endfor %}
+
+    <hr>
+
+    <h3>Add a comment</h3>
+    <form method="post" novalidate>
+        {% csrf_token %}
+        <div class="mb-3">
+            <textarea name="{{ form.content.name }}" class="form-control {% if form.content.errors %}is-invalid{% endif %}" id="{{ form.content.id_for_label }}" rows="5">{{ form.content.value|default_if_none:'' }}</textarea>
+            {% if form.content.errors %}
+                <div class="invalid-feedback d-block">
+                    {{ form.content.errors.as_text }}
+                </div>
+            {% endif %}
+        </div>
+        <button type="submit" class="btn btn-primary">Submit</button>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+new EasyMDE({element: document.getElementById("{{ form.content.auto_id }}"), spellChecker: false});
+</script>
+{% endblock %}

@@ -84,7 +84,7 @@ accordions.forEach(function(collapseEl) {
                     .finally(() => {
                         if (parentContainer) parentContainer.classList.add('bg-light');
                     });
-            }, index * 200); // 200ms delay between each request
+            }, index * 100); // 200ms delay between each request
         });
     });
 });

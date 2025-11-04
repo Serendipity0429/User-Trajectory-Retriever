@@ -773,7 +773,17 @@ button.remove-source:hover {
 .status-cancelled { color: #f0ad4e; }
 
 
+
+
+
 .font-size-large #sidebarCollapse .sidebar-toggle-text,
+
+
 .font-size-large .page-settings-text-button .page-settings-text {
+
+
     display: none !important;
+
+
 }
+

@@ -366,14 +366,6 @@
         });
         $('#preTaskCheck').change(() => $('#preTaskCheck').removeClass('is-invalid'));
 
-        window.addEventListener('beforeunload', function (e) {
-            if (!is_submitted) {
-                const data = new FormData();
-                data.append('annotation_id', '{{ annotation_id }}');
-                navigator.sendBeacon('/task/stop_annotation/', data);
-            }
-        });
-
         // Show/hide question in header based on scroll
         const headerQuestion = $('.question-in-header');
         const originalQuestion = $('#original-question-container');
@@ -405,4 +397,5 @@
         $(window).resize(alignHeaderQuestion);
     });
 </script>
+{% include "_stop_annotation_script.html" %}
 {% endblock %}

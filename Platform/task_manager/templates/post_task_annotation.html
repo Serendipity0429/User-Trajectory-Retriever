@@ -13,55 +13,68 @@
             </div>
 
             <!-- Trajectories -->
-            <div class="accordion mb-4" id="trajectoriesAccordion">
-                {% for trial in trials %}
+            <div class="accordion mb-4" id="parentTrajectoriesAccordion">
                 <div class="accordion-item">
-                    <h2 class="accordion-header" id="headingTrial{{ trial.num_trial }}">
-                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseTrial{{ trial.num_trial }}" aria-expanded="false" aria-controls="collapseTrial{{ trial.num_trial }}">
-                            <i class="bi bi-signpost-split-fill me-2"></i> <strong>View Trajectories for Trial {{ trial.num_trial }}</strong>&nbsp;(Click to expand)
+                    <h2 class="accordion-header" id="headingParentTrajectories">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseParentTrajectories" aria-expanded="false" aria-controls="collapseParentTrajectories">
+                            <i class="bi bi-signpost-split-fill me-2"></i> <strong>View Trajectories</strong>&nbsp;(Click to expand)
                         </button>
                     </h2>
-                    <div id="collapseTrial{{ trial.num_trial }}" class="accordion-collapse collapse" aria-labelledby="headingTrial{{ trial.num_trial }}" data-bs-parent="#trajectoriesAccordion">
+                    <div id="collapseParentTrajectories" class="accordion-collapse collapse" aria-labelledby="headingParentTrajectories" data-bs-parent="#parentTrajectoriesAccordion">
                         <div class="accordion-body">
-                            {% for webpage in trial.webpages %}
-                            <div class="d-flex flex-column align-items-center mb-5 p-4 border rounded shadow-sm bg-light">
-                                <p class="h5"><a href="{{ webpage.url }}" target="_blank">{{ webpage.title }}</a></p>
-                                <div class="rrweb-player-wrapper" id="rrweb-player-{{ webpage.id }}" style="margin-top: 20px;"></div>
-                                <script>
-                                    (function() {
-                                        var target = document.getElementById('rrweb-player-{{ webpage.id }}');
-                                        var events = {{ webpage.rrweb_record|safe }};
-                                        
-                                        if (!Array.isArray(events) || events.length === 0) {
-                                            return;
-                                        }
+                            <div class="accordion" id="trajectoriesAccordion">
+                                {% for trial in trials %}
+                                <div class="accordion-item">
+                                    <h2 class="accordion-header" id="headingTrial{{ trial.num_trial }}">
+                                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseTrial{{ trial.num_trial }}" aria-expanded="false" aria-controls="collapseTrial{{ trial.num_trial }}">
+                                            <i class="bi bi-signpost-split-fill me-2"></i> <strong>Trial {{ trial.num_trial }}</strong>
+                                        </button>
+                                    </h2>
+                                    <div id="collapseTrial{{ trial.num_trial }}" class="accordion-collapse collapse" aria-labelledby="headingTrial{{ trial.num_trial }}" data-bs-parent="#trajectoriesAccordion">
+                                        <div class="accordion-body">
+                                            {% for webpage in trial.webpages %}
+                                            <div class="d-flex flex-column align-items-center mb-5 p-4 border rounded shadow-sm bg-light">
+                                                <p class="h5"><a href="{{ webpage.url }}" target="_blank">{{ webpage.title }}</a></p>
+                                                <div class="rrweb-player-wrapper" id="rrweb-player-{{ webpage.id }}" style="margin-top: 20px;"></div>
+                                                <script>
+                                                    (function() {
+                                                        var target = document.getElementById('rrweb-player-{{ webpage.id }}');
+                                                        var events = {{ webpage.rrweb_record|safe }};
+                                                        
+                                                        if (!Array.isArray(events) || events.length === 0) {
+                                                            return;
+                                                        }
 
-                                        var accordionWidth = document.querySelector('.col-lg-10').clientWidth;
-                                        var containerWidth = 0.8 * accordionWidth;
-                                        var screenRatio = window.innerHeight / window.innerWidth;
-                                        var calculatedHeight = containerWidth * screenRatio;
+                                                        var accordionWidth = document.querySelector('.col-lg-10').clientWidth;
+                                                        var containerWidth = 0.8 * accordionWidth;
+                                                        var screenRatio = window.innerHeight / window.innerWidth;
+                                                        var calculatedHeight = containerWidth * screenRatio;
 
-                                        new rrwebPlayer({
-                                            target: target,
-                                            props: {
-                                                events: events,
-                                                autoPlay: false,
-                                                width: containerWidth,
-                                                height: calculatedHeight,
-                                                UNSAFE_replayCanvas: true,
-                                            },
-                                        });
-                                    })();
-                                </script>
+                                                        new rrwebPlayer({
+                                                            target: target,
+                                                            props: {
+                                                                events: events,
+                                                                autoPlay: false,
+                                                                width: containerWidth,
+                                                                height: calculatedHeight,
+                                                                UNSAFE_replayCanvas: true,
+                                                            },
+                                                        });
+                                                    })();
+                                                </script>
+                                            </div>
+                                            {% endfor %}
+                                            {% if not trial.webpages %}
+                                            <p>No trajectories recorded for this trial.</p>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
                             </div>
-                            {% endfor %}
-                            {% if not trial.webpages %}
-                            <p>No trajectories recorded for this trial.</p>
-                            {% endif %}
                         </div>
                     </div>
                 </div>
-                {% endfor %}
             </div>
 
             <!-- Annotation Form -->
@@ -372,14 +385,6 @@
             $('input[name="strategy_shift_other"]').removeClass('is-invalid');
         });
         $('input[name="strategy_shift_other"]').on('input', () => $('input[name="strategy_shift_other"]').removeClass('is-invalid'));
-
-        window.addEventListener('beforeunload', function (e) {
-            if (!is_submitted) {
-                const data = new FormData();
-                data.append('annotation_id', '{{ annotation_id }}');
-                navigator.sendBeacon('/task/stop_annotation/', data);
-            }
-        });
     });
 
     var trajectoriesCollapse = document.getElementById('collapseTrajectories');
@@ -389,4 +394,5 @@
         });
     }
 </script>
+{% include "_stop_annotation_script.html" %}
 {% endblock %}

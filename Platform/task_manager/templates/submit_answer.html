@@ -707,9 +707,17 @@ document.addEventListener('DOMContentLoaded', function() {
 
     window.addEventListener('beforeunload', function() {
         if (!is_submitted) {
-            const data = new FormData();
-            data.append('annotation_id', '{{ annotation_id }}');
-            navigator.sendBeacon('/task/stop_annotation/', data);
+            const data = { annotation_id: '{{ annotation_id }}' };
+            const headers = {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            };
+            fetch('/task/stop_annotation/', {
+                method: 'POST',
+                headers: headers,
+                body: JSON.stringify(data),
+                keepalive: true
+            });
         }
     });
 

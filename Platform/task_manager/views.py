@@ -58,7 +58,6 @@ from django.contrib.auth import login
 logger = logging.getLogger(__name__)
 
 
-@csrf_exempt
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def stop_annotation_api(request):
@@ -620,17 +619,11 @@ def cancel_annotation(request, task_id, end_timestamp):
                 belong_task_trial=trial, is_redirected=False, during_annotation=False
             ).order_by('start_timestamp')
 
-        # Determine the start timestamp for the current trial
-        start_timestamp = task.start_timestamp
-        if trials:
-            last_trial = trials[-1]
-            start_timestamp = last_trial.end_timestamp
-
         # Fetch webpages for the current (uncompleted) trial
         current_webpages = Webpage.objects.filter(
-            belong_task=task, 
-            start_timestamp__gte=start_timestamp,
-            is_redirected=False, 
+            belong_task=task,
+            belong_task_trial__isnull=True,
+            is_redirected=False,
             during_annotation=False
         ).order_by('start_timestamp')
 
@@ -958,7 +951,6 @@ def add_justification(request):
         return JsonResponse({"status": "error", "message": "An internal error occurred."}, status=500)
 
 
-@csrf_exempt
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def update_justification_status(request, justification_id):

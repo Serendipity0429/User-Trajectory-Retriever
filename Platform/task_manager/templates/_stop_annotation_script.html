@@ -1,0 +1,37 @@
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    let is_submitted = false;
+
+    // Find the primary submit button to track submission status
+    const submitBtn = document.querySelector('.btn-submit, .btn-primary[type="submit"], #query-btn');
+    if (submitBtn) {
+        submitBtn.addEventListener('click', function() {
+            is_submitted = true;
+        });
+    }
+
+    // Find any form and listen for submit event
+    const form = document.querySelector('form');
+    if(form){
+        form.addEventListener('submit', function() {
+            is_submitted = true;
+        });
+    }
+    
+    window.addEventListener('beforeunload', function() {
+        if (!is_submitted) {
+            const data = { annotation_id: '{{ annotation_id }}' };
+            const headers = {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            };
+            fetch('/task/stop_annotation/', {
+                method: 'POST',
+                headers: headers,
+                body: JSON.stringify(data),
+                keepalive: true
+            });
+        }
+    });
+});
+</script>

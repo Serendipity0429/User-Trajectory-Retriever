@@ -25,7 +25,7 @@
                         <h5 class="mb-0">
                             {% if bulletin.pinned %}<i class="bi bi-pin-angle-fill"></i>{% endif %}
                             <span class="badge {% if category_class == 'Warning' %}bg-danger{% elif category_class == 'Important' %}bg-dark{% elif category_class == 'System Update' %}bg-primary{% else %}bg-success{% endif %} me-2">{{ bulletin.get_category_display }}</span>
-                            <a href="{% url 'bulletin_detail' bulletin.pk %}" class="text-decoration-none text-dark">{{ bulletin.title }}</a>
+                            <a href="{% url 'bulletin_detail' bulletin.pk %}" class="text-decoration-none text-dark fw-bold">{{ bulletin.title }}</a>
                         </h5>
                         <small class="text-muted">{{ bulletin.created_at|date:"Y-m-d" }}</small>
                     </div>
@@ -39,7 +39,7 @@
                         <h5 class="mb-0">
                             {% if bulletin.pinned %}<i class="bi bi-pin-angle-fill"></i>{% endif %}
                             <span class="badge {% if category_class == 'Warning' %}bg-danger{% elif category_class == 'Important' %}bg-dark{% elif category_class == 'System Update' %}bg-primary{% else %}bg-success{% endif %} me-2">{{ bulletin.get_category_display }}</span>
-                            <a href="{% url 'bulletin_detail' bulletin.pk %}" class="text-decoration-none text-dark">{{ bulletin.title }}</a>
+                            <a href="{% url 'bulletin_detail' bulletin.pk %}" class="text-decoration-none text-dark fw-bold">{{ bulletin.title }}</a>
                         </h5>
                         <small class="text-muted">{{ bulletin.created_at|date:"Y-m-d" }}</small>
                     </div>
@@ -128,24 +128,28 @@ $(document).ready(function() {
         
         var $clickedLink = $(this);
 
-        // Reset all buttons to outline
+        // Reset all buttons to their inactive (outline) state.
         $('.category-filters a').each(function() {
             var $link = $(this);
             var btnClass = $link.data('btn-class');
+            
             if (btnClass) {
-                $link.removeClass(btnClass).addClass(btnClass.replace('btn-', 'btn-outline-'));
+                // This is a category button. Remove both solid and outline, then add outline.
+                var outlineClass = btnClass.replace('btn-', 'btn-outline-');
+                $link.removeClass(btnClass).addClass(outlineClass);
             } else {
-                // This is the "All" button
+                // This is the "All" button.
                 $link.removeClass('btn-primary').addClass('btn-outline-primary');
             }
         });
 
-        // Activate the clicked button
+        // Activate the clicked button.
         var clickedBtnClass = $clickedLink.data('btn-class');
         if (clickedBtnClass) {
-            $clickedLink.removeClass(clickedBtnClass.replace('btn-', 'btn-outline-')).addClass(clickedBtnClass);
+            var outlineClass = clickedBtnClass.replace('btn-', 'btn-outline-');
+            $clickedLink.removeClass(outlineClass).addClass(clickedBtnClass);
         } else {
-            // This is the "All" button
+            // This is the "All" button.
             $clickedLink.removeClass('btn-outline-primary').addClass('btn-primary');
         }
 

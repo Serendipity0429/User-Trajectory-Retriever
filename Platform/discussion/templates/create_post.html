@@ -3,6 +3,7 @@
 
 {% block content %}
 <div class="container discussion-page">
+    <a href="{% url 'discussion_home' %}" class="btn btn-outline-secondary mt-3 mb-3">&laquo; Back to Forum</a>
     <h1 class="mb-4">Create a New Post</h1>
 
     {% if form.non_field_errors %}

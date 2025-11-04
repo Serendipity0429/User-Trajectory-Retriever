@@ -58,6 +58,16 @@
 document.addEventListener('DOMContentLoaded', function() {
     const togglePassword = document.querySelector('#togglePassword');
     const password = document.querySelector('#id_password');
+    const username = document.querySelector('#id_username');
+
+    if (username && password) {
+        username.addEventListener('keydown', function(event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                password.focus();
+            }
+        });
+    }
 
     togglePassword.addEventListener('click', function (e) {
         // toggle the type attribute

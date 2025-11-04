@@ -49,7 +49,7 @@
                     <div class="accordion mb-4" id="trajectoriesAccordion">
                         <div class="accordion-item">
                             <h2 class="accordion-header" id="headingOne">
-                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseTrajectories" aria-expanded="false" aria-controls="collapseTrajectories">
+                                <button id="view-trajectories-btn" class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseTrajectories" aria-expanded="false" aria-controls="collapseTrajectories" disabled>
                                     <i class="bi bi-signpost-split-fill me-2"></i> <strong>View Trajectories</strong>&nbsp;(Click to expand)
                                 </button>
                             </h2>
@@ -58,35 +58,7 @@
                                     {% for webpage in webpages %}
                                     <div class="d-flex flex-column align-items-center mb-5 p-4 border rounded shadow-sm bg-light">
                                         <p class="h5"><a href="{{ webpage.url }}" target="_blank">{{ webpage.title }}</a></p>
-                                        <div class="rrweb-player-wrapper" id="rrweb-player-{{ webpage.id }}" style="margin-top: 20px;"></div>
-                                        <script>
-                                            (function() {
-                                                var target = document.getElementById('rrweb-player-{{ webpage.id }}');
-                                                var events = {{ webpage.rrweb_record|safe_json_string }};
-                                                
-                                                if (!Array.isArray(events) || events.length === 0) {
-                                                    return;
-                                                }
-
-                                                // Get screen width and height ratio
-                                                var screenRatio = window.innerHeight / window.innerWidth;
-
-                                                var accordionWidth = document.querySelector('#card-body').clientWidth;
-                                                var containerWidth = 0.8 * accordionWidth;
-                                                var calculatedHeight = containerWidth * screenRatio;
-
-                                                new rrwebPlayer({
-                                                    target: target,
-                                                    props: {
-                                                        events: events,
-                                                        autoPlay: false,
-                                                        width: containerWidth,
-                                                        height: calculatedHeight,
-                                                        UNSAFE_replayCanvas: true,
-                                                    },
-                                                });
-                                            })();
-                                        </script>
+                                        <div class="rrweb-player-wrapper" id="rrweb-player-{{ webpage.id }}" data-webpage-id="{{ webpage.id }}" style="margin-top: 20px;"></div>
                                     </div>
                                     {% endfor %}
                                     <div class="text-center mt-3">
@@ -575,10 +547,19 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     justificationContainer.addEventListener('change', function(e) {
-        if (e.target.type === 'radio' && e.target.name.startsWith('relevance_')) {
+        if (e.target.type === 'radio' && (e.target.name.startsWith('relevance_') || e.target.name.startsWith('credibility_'))) {
             const justificationItem = e.target.closest('.justification-item');
             if (justificationItem) {
-                justificationItem.classList.remove('is-invalid');
+                const relevanceSelection = justificationItem.querySelector(`input[name^="relevance_"]:checked`);
+                const credibilitySelection = justificationItem.querySelector(`input[name^="credibility_"]:checked`);
+                
+                if (relevanceSelection && credibilitySelection) {
+                    justificationItem.classList.remove('is-invalid');
+                    const feedback = justificationItem.querySelector('.invalid-feedback');
+                    if (feedback) {
+                        feedback.remove();
+                    }
+                }
             }
         }
     });
@@ -588,6 +569,7 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('query-btn').addEventListener('click', function() {
         // Reset validation states
         document.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid'));
+        document.querySelectorAll('.justification-item .invalid-feedback').forEach(el => el.remove());
 
         let isValid = true;
 
@@ -628,16 +610,26 @@ document.addEventListener('DOMContentLoaded', function() {
         annotatableJustifications.forEach(item => {
             const justificationId = item.dataset.id;
             const relevanceSelection = item.querySelector(`input[name="relevance_${justificationId}"]:checked`);
-            if (!relevanceSelection) {
-                item.classList.add('is-invalid');
-                item.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                isValid = false;
-            }
             const credibilitySelection = item.querySelector(`input[name="credibility_${justificationId}"]:checked`);
-            if (!credibilitySelection) {
+            
+            if (!relevanceSelection || !credibilitySelection) {
                 item.classList.add('is-invalid');
                 item.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 isValid = false;
+
+                // Add feedback message
+                const feedback = document.createElement('div');
+                feedback.className = 'invalid-feedback d-block'; // d-block to make it visible
+                let message = '';
+                if (!relevanceSelection && !credibilitySelection) {
+                    message = 'Please select both relevance and credibility.';
+                } else if (!relevanceSelection) {
+                    message = 'Please select a relevance level.';
+                } else {
+                    message = 'Please select a credibility level.';
+                }
+                feedback.textContent = message;
+                item.appendChild(feedback);
             }
         });
 
@@ -741,4 +733,5 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 </script>
+<script src="{% static 'js/rrweb_player_loader.js' %}"></script>
 {% endblock %}

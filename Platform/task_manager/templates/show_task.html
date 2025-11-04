@@ -138,7 +138,7 @@
                                 <div class="accordion mb-3" id="accordion-trial-{{ trial.num_trial }}">
                                     <div class="accordion-item">
                                         <h2 class="accordion-header" id="heading-trial-{{ trial.num_trial }}">
-                                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-trial-{{ trial.num_trial }}" aria-expanded="false" aria-controls="collapse-trial-{{ trial.num_trial }}">
+                                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-trial-{{ trial.num_trial }}" aria-expanded="false" aria-controls="collapse-trial-{{ trial.num_trial }}" disabled>
                                                 <i class="bi bi-display me-2"></i> <strong>Session Replay</strong>&nbsp;(Click to expand)
                                             </button>
                                         </h2>
@@ -147,7 +147,7 @@
                                                 {% for webpage in trial.webpages %}
                                                 <div class="d-flex flex-column align-items-center mb-5 p-4 border rounded shadow-sm bg-light">
                                                     <p class="h5"><a href="{{ webpage.url }}" target="_blank">{{ webpage.title }}</a></p>
-                                                    <div class="rrweb-player-wrapper" id="rrweb-player-trial{{trial.num_trial}}-{{ webpage.id }}" data-events="{{ webpage.rrweb_record|safe_json_string_json_string }}"></div>
+                                                    <div class="rrweb-player-wrapper" id="rrweb-player-trial{{trial.num_trial}}-{{ webpage.id }}" data-webpage-id="{{ webpage.id }}"></div>
 
                                                 </div>
                                                 {% empty %}
@@ -289,6 +289,7 @@
 {% endblock %}
 
 {% block scripts %}
+{% load static %}
 <script>
     $(function () {
         var answerList = $('#answer-list');
@@ -315,42 +316,7 @@
             $(this).hide();
             showAllButton.show();
         });
-
-        // Add event listener to all session replay accordions
-        document.querySelectorAll('[id^="collapse-trial-"]').forEach(function(collapseEl) {
-            collapseEl.addEventListener('shown.bs.collapse', function () {
-                var playerWrappers = collapseEl.querySelectorAll('.rrweb-player-wrapper');
-                playerWrappers.forEach(function(wrapper) {
-                    if (wrapper.childElementCount > 0) {
-                        // Player already initialized
-                        return;
-                    }
-
-                    var events = JSON.parse(wrapper.dataset.events);
-                    if (!Array.isArray(events) || events.length === 0) {
-                        return;
-                    }
-
-                    var container = wrapper.closest('.card-body');
-                    if (container) {
-                        var containerWidth = container.clientWidth * 0.8;
-                        var screenRatio = window.innerHeight / window.innerWidth;
-                        var calculatedHeight = containerWidth * screenRatio;
-
-                        new rrwebPlayer({
-                            target: wrapper,
-                            props: {
-                                events: events,
-                                autoPlay: false,
-                                width: containerWidth,
-                                height: calculatedHeight,
-                                UNSAFE_replayCanvas: true,
-                            },
-                        });
-                    }
-                });
-            });
-        });
     });
 </script>
+<script src="{% static 'js/rrweb_player_loader.js' %}"></script>
 {% endblock %}

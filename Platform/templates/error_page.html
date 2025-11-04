@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Page Not Found{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card text-center shadow-lg">
+                <div class="card-body">
+                    <i class="bi bi-exclamation-triangle-fill text-danger" style="font-size: 5rem; margin-bottom: 1rem;"></i>
+                    <h1 class="card-title">Oops! Something went wrong.</h1>
+                    <p class="card-text text-muted">
+                        We can't seem to find the page you're looking for. It might have been removed, had its name changed, or is temporarily unavailable.
+                    </p>
+                    <a href="/" class="btn btn-primary-custom">
+                        <i class="bi bi-house-door-fill"></i> Go to Homepage
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

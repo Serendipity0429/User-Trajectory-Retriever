@@ -132,7 +132,7 @@ def data(request):
 # Pre-Task Annotation Fetcher
 @api_view(["GET", "POST"])
 @permission_classes([IsAuthenticated])
-def pre_task_annotation(request, timestamp):
+def pre_task_annotation(request):
     print_debug("function pre_task_annotation")
     user = request.user
 
@@ -146,7 +146,6 @@ def pre_task_annotation(request, timestamp):
         task = Task()
         task.user = user
         task.active = True
-        task.start_timestamp = timezone.make_aware(datetime.fromtimestamp(timestamp / 1000))
         entry_id = int(request.POST.get("entry_id"))
         entry = TaskDatasetEntry.objects.filter(id=entry_id).first()
         if entry is None:
@@ -216,7 +215,6 @@ def pre_task_annotation(request, timestamp):
             "pre_task_annotation.html",
             {
                 "cur_user": user,
-                "task_timestamp": timestamp,
                 "question": entry.question,
                 "entry_id": entry.id,
                 "annotation_id": annotation_id,
@@ -632,7 +630,7 @@ def tool_use(request):
 
 @permission_classes([IsAuthenticated])
 @wait_until_data_stored
-def cancel_annotation(request, task_id, end_timestamp):
+def cancel_annotation(request, task_id):
     print_debug("function cancel_annotation")
     user = request.user
     task = Task.objects.filter(id=task_id, user=user).first()
@@ -676,7 +674,7 @@ def cancel_annotation(request, task_id, end_timestamp):
             }
             return render(request, "status_page.html", context)
 
-        task.end_timestamp = timezone.make_aware(datetime.fromtimestamp(end_timestamp / 1000))
+        task.end_timestamp = timezone.now()
         # NOTICE: Give user change to reconsider cancellation
         # So only after the form is submitted, the task is marked as cancelled  
 
@@ -842,7 +840,7 @@ def reflection_annotation(request, task_trial_id):
 
 @permission_classes([IsAuthenticated])
 @wait_until_data_stored
-def submit_answer(request, task_id, timestamp):
+def submit_answer(request, task_id):
     print_debug("function submit_answer")
     user = request.user
 
@@ -893,7 +891,7 @@ def submit_answer(request, task_id, timestamp):
 
             task_trial.answer = answer
             task_trial.start_timestamp = start_timestamp
-            task_trial.end_timestamp = timezone.make_aware(datetime.fromtimestamp(timestamp / 1000))
+            task_trial.end_timestamp = timezone.now()
             task_trial.confidence = confidence
             task_trial.answer_formulation_method = answer_formulation_method
 
@@ -901,16 +899,14 @@ def submit_answer(request, task_id, timestamp):
             task_trial.is_correct = is_correct
 
             if is_correct:
-                task.end_timestamp = timezone.make_aware(
-                    datetime.fromtimestamp(timestamp / 1000)
-                )
+                task.end_timestamp = timezone.now()
 
             task_trial.save()
 
             task.num_trial = current_trial_num
             task.save()
 
-            end_datetime = timezone.make_aware(datetime.fromtimestamp(timestamp / 1000))
+            end_datetime = timezone.now()
             all_webpages = Webpage.objects.filter(
                 belong_task=task, start_timestamp__gte=start_timestamp
             )
@@ -982,14 +978,12 @@ def submit_answer(request, task_id, timestamp):
             if last_task_trial:
                 start_timestamp = last_task_trial.end_timestamp
 
-        end_datetime = timezone.make_aware(datetime.fromtimestamp(timestamp / 1000))
-        all_webpages = Webpage.objects.filter(
-            belong_task=task, start_timestamp__gte=start_timestamp
-        )
-        webpages = all_webpages.filter(
-            start_timestamp__lte=end_datetime, is_redirected=False, during_annotation=False
-        )
-        webpages = sorted(webpages, key=lambda item: item.start_timestamp)
+        webpages = Webpage.objects.filter(
+            belong_task=task,
+            belong_task_trial__isnull=True,
+            is_redirected=False,
+            during_annotation=False
+        ).order_by('start_timestamp')
 
         annotation_id = start_annotating(request, "submit_answer")
         return render(

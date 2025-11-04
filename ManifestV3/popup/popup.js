@@ -319,7 +319,7 @@ async function handleStartTask() {
         const is_confirmed = await showConfirm("Do you want to start a task?");
         if (is_confirmed) {
             const timestamp = Date.now();
-            openTaskWindow(`/task/pre_task_annotation/${timestamp}/`);
+            openTaskWindow(`/task/pre_task_annotation/`);
         }
     }
     document.getElementById('startTaskBtn').disabled = false;
@@ -342,7 +342,7 @@ async function handleEndTask() {
                 if (tabs[0]) {
                     chrome.tabs.sendMessage(tabs[0].id, { type: "msg_from_popup", update_webpage_info: true }, () => {
                         const timestamp = Date.now();
-                        openTaskWindow(`/task/submit_answer/${current_task_id}/${timestamp}/`);
+                        openTaskWindow(`/task/submit_answer/${current_task_id}/`);
                     });
                 }
             }
@@ -362,7 +362,7 @@ async function handleCancelTask() {
         const is_confirmed = await showConfirm("Do you want to cancel the task?");
         if (is_confirmed) {
             const timestamp = Date.now();
-            openTaskWindow(`/task/cancel_annotation/${current_task_id}/${timestamp}/`, false);
+            openTaskWindow(`/task/cancel_annotation/${current_task_id}/`, false);
         }
     }
 }

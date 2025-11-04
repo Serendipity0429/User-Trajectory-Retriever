@@ -17,7 +17,7 @@ urlpatterns = [
     path('stop_annotation/', views.stop_annotation_api, name='stop_annotation'), # Stop annotation API
     path('auth_redirect/', views.auth_redirect, name='auth_redirect'), # Auth redirect  
     
-    path('pre_task_annotation/<int:timestamp>/', views.pre_task_annotation, name='pre_task_annotation'), # Preliminary task annotation
+    path('pre_task_annotation/', views.pre_task_annotation, name='pre_task_annotation'), # Preliminary task annotation
     path(
         "reflection_annotation/<int:task_trial_id>/",
         views.reflection_annotation,
@@ -25,8 +25,8 @@ urlpatterns = [
     ),
     path('post_task_annotation/<int:task_id>/', views.post_task_annotation, name='post_task_annotation'), # Post task annotation
     path('show_task/<int:task_id>/', views.show_task, name='show_task'), # Show task
-    path('submit_answer/<int:task_id>/<int:timestamp>/', views.submit_answer, name='submit_answer'), # Submit answer
-    path('cancel_annotation/<int:task_id>/<int:end_timestamp>/', views.cancel_annotation, name='cancel_annotation'), # Cancel annotation
+    path('submit_answer/<int:task_id>/', views.submit_answer, name='submit_answer'), # Submit answer
+    path('cancel_annotation/<int:task_id>/', views.cancel_annotation, name='cancel_annotation'), # Cancel annotation
     path('remove_task/<int:task_id>/', views.remove_task, name='remove_task'), # Remove task
 
     # Justification URLs

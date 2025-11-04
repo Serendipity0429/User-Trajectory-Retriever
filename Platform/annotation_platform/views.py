@@ -1,10 +1,4 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
+from django.shortcuts import render
 
-from django.http import HttpResponseRedirect
-
-
-def index(request):
-    return HttpResponseRedirect('/task/home/')
-
-
+def custom_error_view(request, exception=None):
+    return render(request, 'error_page.html', status=404)

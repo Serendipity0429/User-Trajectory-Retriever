@@ -37,6 +37,9 @@ LOGIN_URL = '/user/login/'
 
 # Application definition
 
+# Add this line to specify the root URL configuration
+ROOT_URLCONF = 'annotation_platform.urls'
+
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -53,6 +56,7 @@ AUTH_USER_MODEL = "user_system.User"
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -66,8 +70,6 @@ SECURE_CONTENT_SECURITY_POLICY = {
     'default-src': ["'self'"],
     'font-src': ["'self'", '*'],
 }
-
-ROOT_URLCONF = 'annotation_platform.urls'
 
 TEMPLATES = [
     {
@@ -121,6 +123,10 @@ STATIC_URL = 'static/'
 STATICFILES_DIRS = [
     os.path.join(BASE_DIR, "static"),
 ]
+
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 # DATA_UPLOAD_MAX_MEMORY_SIZE = None # No limit
 DATA_UPLOAD_MAX_MEMORY_SIZE = None # No limit

@@ -1,0 +1,39 @@
+{% extends 'base.html' %}
+{% load discussion_extras %}
+
+{% block content %}
+<div class="container discussion-page">
+    <a href="{% url 'discussion_home' %}" class="btn btn-outline-secondary mt-3 mb-3">&laquo; Back to Forum</a>
+    <div class="card my-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h1 class="mb-0">{{ bulletin.title }}</h1>
+            {% if user.is_staff %}
+            <div>
+                <a href="{% url 'edit_bulletin' bulletin.pk %}" class="btn btn-primary btn-sm">Edit</a>
+                <a href="{% url 'delete_bulletin' bulletin.pk %}" class="btn btn-danger btn-sm">Delete</a>
+            </div>
+            {% endif %}
+        </div>
+        <div class="card-body">
+            <h6 class="card-subtitle mb-2 text-muted">
+                <span class="badge {{ bulletin.get_category_display|category_color_class }}">{{ bulletin.get_category_display }}</span>
+                Posted on {{ bulletin.created_at }}
+            </h6>
+            <hr>
+            <p class="card-text mt-3">{{ bulletin.content|safe }}</p>
+            
+            {% if bulletin.attachments.all %}
+                <hr>
+                <h5 class="mt-4">Attachments</h5>
+                <div class="list-group">
+                    {% for attachment in bulletin.attachments.all %}
+                        <a href="{{ attachment.file.url }}" class="list-group-item list-group-item-action" target="_blank">
+                            <i class="bi bi-file-earmark-arrow-down me-2"></i>{{ attachment.file|filename }}
+                        </a>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

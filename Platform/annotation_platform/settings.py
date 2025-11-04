@@ -50,6 +50,7 @@ INSTALLED_APPS = [
     'corsheaders',
     'task_manager',
     'user_system.apps.UserSystemConfig',
+    'discussion',
 ]
 
 AUTH_USER_MODEL = "user_system.User"

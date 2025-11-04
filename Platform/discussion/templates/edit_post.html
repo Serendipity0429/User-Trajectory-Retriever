@@ -1,0 +1,288 @@
+{% extends 'base.html' %}
+{% load discussion_extras %}
+
+{% block content %}
+<div class="container discussion-page">
+    <h1 class="mt-4">Edit Post</h1>
+
+    {% if form.non_field_errors %}
+        <div class="alert alert-danger">
+            {% for error in form.non_field_errors %}
+                <p class="mb-0">{{ error }}</p>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-danger">{{ message }}</div>
+        {% endfor %}
+    {% endif %}
+
+    <form method="post" enctype="multipart/form-data" novalidate>
+        {% csrf_token %}
+        
+        <div class="form-floating mb-3">
+            <input type="text" name="{{ form.title.name }}" class="form-control {% if form.title.errors %}is-invalid{% endif %}" id="{{ form.title.id_for_label }}" value="{{ form.title.value|default_if_none:'' }}">
+            <label for="{{ form.title.id_for_label }}">Title</label>
+            {% if form.title.errors %}
+                <div class="invalid-feedback">
+                    {{ form.title.errors.as_text }}
+                </div>
+            {% endif %}
+        </div>
+
+        <div class="mb-3">
+            <label for="{{ form.content.id_for_label }}" class="form-label">Content</label>
+            <textarea name="{{ form.content.name }}" class="form-control {% if form.content.errors %}is-invalid{% endif %}" id="{{ form.content.id_for_label }}" rows="10">{{ form.content.value|default_if_none:'' }}</textarea>
+            {% if form.content.errors %}
+                <div class="invalid-feedback d-block">
+                    {{ form.content.errors.as_text }}
+                </div>
+            {% endif %}
+        </div>
+
+        <div class="mb-3">
+            <h5 class="mb-2"><i class="bi bi-folder-fill me-2"></i>Category</h5>
+            <div class="input-group">
+                <select name="{{ form.category.name }}" class="form-select {% if form.category.errors %}is-invalid{% endif %}" id="{{ form.category.id_for_label }}">
+                    {% for value, text in form.fields.category.choices %}
+                        <option value="{{ value }}" data-color-class="{{ text|category_color_class }}" {% if form.category.value|stringformat:"s" == value|stringformat:"s" %}selected{% endif %}>
+                            {{ text }}
+                        </option>
+                    {% endfor %}
+                </select>
+                <span class="input-group-text"><span class="badge bg-secondary" id="category-badge">&nbsp;</span></span>
+            </div>
+            {% if form.category.errors %}
+                <div class="invalid-feedback">
+                    {{ form.category.errors.as_text }}
+                </div>
+            {% endif %}
+        </div>
+
+        <div class="mb-3">
+            <h5 class="mb-2"><i class="bi bi-tags-fill me-2"></i>Labels</h5>
+            <input type="text" id="label-input" class="form-control" placeholder="Type a label and press Enter">
+            <div id="labels-container" class="mt-2"></div>
+            <input type="hidden" name="{{ form.labels.name }}" id="{{ form.labels.id_for_label }}" value="{{ form.labels.value|default_if_none:'' }}">
+            {% if form.labels.errors %}
+                <div class="invalid-feedback d-block">
+                    {{ form.labels.errors.as_text }}
+                </div>
+            {% endif %}
+        </div>
+
+        <div class="mb-3">
+            <h5 class="mb-2"><i class="bi bi-paperclip"></i> Attachments</h5>
+            <div class="attachment-container p-3 border rounded bg-light {% if form.attachments.errors %}is-invalid{% endif %}">
+                <button type="button" id="add-attachment-btn" class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-plus-circle"></i> Add Files
+                </button>
+                <div id="attachment-list" class="mt-2"></div>
+            </div>
+            {% if form.attachments.errors %}
+                <div class="invalid-feedback d-block">
+                    {{ form.attachments.errors.as_text }}
+                </div>
+            {% endif %}
+            <div style="display: none;">
+                <input type="file" name="{{ form.attachments.name }}" id="{{ form.attachments.id_for_label }}" multiple>
+            </div>
+        </div>
+        
+        <div class="d-flex justify-content-between align-items-center mt-4">
+            <div>
+                {% if form.pinned %}
+                <div class="form-check form-switch">
+                    <input type="checkbox" name="{{ form.pinned.name }}" class="form-check-input {% if form.pinned.errors %}is-invalid{% endif %}" id="{{ form.pinned.id_for_label }}" {% if form.pinned.value %}checked{% endif %}>
+                    <label class="form-check-label" for="{{ form.pinned.id_for_label }}">Pin to top</label>
+                    {% if form.pinned.errors %}
+                        <div class="invalid-feedback">
+                            {{ form.pinned.errors.as_text }}
+                        </div>
+                    {% endif %}
+                </div>
+                {% endif %}
+            </div>
+            <div>
+                <button type="submit" class="btn btn-primary me-2">Save Changes</button>
+                <a href="javascript:history.back()" class="btn btn-secondary">Cancel</a>
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+new EasyMDE({element: document.getElementById("{{ form.content.auto_id }}"), spellChecker: false});
+
+$(function() {
+    const categorySelect = document.getElementById("{{ form.category.id_for_label }}");
+    const categoryBadge = document.getElementById("category-badge");
+
+    function setBadgeColor() {
+        const selectedOption = categorySelect.options[categorySelect.selectedIndex];
+        const colorClass = selectedOption.dataset.colorClass;
+        
+        categoryBadge.className = 'badge ' + colorClass;
+        categoryBadge.textContent = selectedOption.text;
+    }
+
+    categorySelect.addEventListener('change', setBadgeColor);
+    setBadgeColor(); // Set initial color
+
+    // Label handling
+    const labelsContainer = document.getElementById('labels-container');
+    const labelInput = document.getElementById('label-input');
+    const hiddenLabels = document.getElementById('{{ form.labels.id_for_label }}');
+
+    function updateHiddenLabels() {
+        const labels = Array.from(labelsContainer.querySelectorAll('.discussion-label')).map(el => el.textContent.substring(1));
+        hiddenLabels.value = labels.join(', ');
+    }
+
+    function createLabel(text) {
+        const label = document.createElement('span');
+        label.className = 'badge discussion-label me-1';
+        label.textContent = `#${text}`;
+        
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'btn-close btn-close-white ms-1';
+        removeBtn.setAttribute('aria-label', 'Remove');
+        removeBtn.onclick = () => {
+            label.remove();
+            updateHiddenLabels();
+        };
+        
+        label.appendChild(removeBtn);
+        labelsContainer.appendChild(label);
+    }
+
+    // Initial labels
+    if (hiddenLabels.value) {
+        hiddenLabels.value.split(',').forEach(label => {
+            if (label.trim()) {
+                createLabel(label.trim());
+            }
+        });
+    }
+
+    labelInput.addEventListener('keydown', function(event) {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            const labelText = labelInput.value.trim();
+            const existingLabels = Array.from(labelsContainer.querySelectorAll('.discussion-label')).map(el => el.textContent.substring(1).toLowerCase());
+            if (labelText && !existingLabels.includes(labelText.toLowerCase())) {
+                createLabel(labelText);
+                updateHiddenLabels();
+                labelInput.value = '';
+            }
+        }
+    });
+
+    $(labelInput).autocomplete({
+        source: "{% url 'label_autocomplete' %}",
+        minLength: 1,
+        select: function(event, ui) {
+            event.preventDefault();
+            createLabel(ui.item.value);
+            updateHiddenLabels();
+            labelInput.value = '';
+        }
+    });
+
+    // Attachment handling
+    const fileInput = document.getElementById("{{ form.attachments.id_for_label }}");
+    const addAttachmentBtn = document.getElementById("add-attachment-btn");
+    const attachmentList = document.getElementById("attachment-list");
+    const dataTransfer = new DataTransfer();
+
+    addAttachmentBtn.addEventListener("click", () => {
+        fileInput.click();
+    });
+
+    fileInput.addEventListener("change", () => {
+        for (const file of fileInput.files) {
+            dataTransfer.items.add(file);
+            const listItem = document.createElement("div");
+            listItem.classList.add("attachment-item");
+            const iconClass = getIconForFile(file.name);
+            listItem.innerHTML = `
+                <span><i class="${iconClass} me-2"></i>${file.name}</span>
+                <div class="btn-group btn-group-sm" role="group">
+                    <button type="button" class="btn btn-outline-secondary view-attachment">View</button>
+                    <button type="button" class="btn btn-outline-danger remove-attachment">Remove</button>
+                </div>
+            `;
+            attachmentList.appendChild(listItem);
+
+            listItem.querySelector(".remove-attachment").addEventListener("click", () => {
+                removeFile(file);
+                listItem.remove();
+            });
+
+            listItem.querySelector(".view-attachment").addEventListener("click", () => {
+                previewFile(file);
+            });
+        }
+        fileInput.files = dataTransfer.files;
+    });
+
+    function getIconForFile(filename) {
+        const extension = filename.split('.').pop().toLowerCase();
+        switch (extension) {
+            case 'pdf':
+                return 'bi bi-file-earmark-pdf-fill';
+            case 'doc':
+            case 'docx':
+                return 'bi bi-file-earmark-word-fill';
+            case 'xls':
+            case 'xlsx':
+                return 'bi bi-file-earmark-excel-fill';
+            case 'ppt':
+            case 'pptx':
+                return 'bi bi-file-earmark-ppt-fill';
+            case 'zip':
+            case 'rar':
+                return 'bi bi-file-earmark-zip-fill';
+            case 'jpg':
+            case 'jpeg':
+            case 'png':
+            case 'gif':
+                return 'bi bi-file-earmark-image-fill';
+            default:
+                return 'bi bi-file-earmark-fill';
+        }
+    }
+
+    function removeFile(fileToRemove) {
+        const newFiles = new DataTransfer();
+        for (const file of dataTransfer.files) {
+            if (file !== fileToRemove) {
+                newFiles.items.add(file);
+            }
+        }
+        dataTransfer.clearData();
+        for (const file of newFiles.files) {
+            dataTransfer.items.add(file);
+        }
+        fileInput.files = dataTransfer.files;
+    }
+
+    function previewFile(file) {
+        const fileURL = URL.createObjectURL(file);
+        if (file.type.startsWith("image/")) {
+            const previewImage = document.getElementById("previewImage");
+            previewImage.src = fileURL;
+            const modal = new bootstrap.Modal(document.getElementById('imagePreviewModal'));
+            modal.show();
+        } else {
+            window.open(fileURL, "_blank");
+        }
+    }
+});
+</script>
+{% endblock %}

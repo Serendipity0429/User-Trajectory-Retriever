@@ -7,6 +7,7 @@ from django.utils import timezone
 from django.db import transaction
 from django.shortcuts import render
 from django.core.files.base import ContentFile
+from django.contrib.auth.decorators import login_required
 import base64
 import uuid
 import json
@@ -378,9 +379,6 @@ def initialize(request):
     if tasks.first() is not None:
         return HttpResponse(tasks.first().id)
     return HttpResponse(-1)
-
-
-from django.contrib.auth.decorators import login_required
 
 @login_required
 @permission_classes([IsAuthenticated])

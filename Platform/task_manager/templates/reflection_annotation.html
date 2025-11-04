@@ -317,14 +317,7 @@ $(function () {
     $('input[name="future_plan_other"]').on('input', () => $('input[name="future_plan_other"]').removeClass('is-invalid'));
     $('input[name="estimated_time"]').change(() => $('input[name="estimated_time"]').closest('.btn-group').removeClass('is-invalid'));
     $('input[name="adjusted_difficulty"]').change(() => $('input[name="adjusted_difficulty"]').closest('.btn-group').removeClass('is-invalid'));
-
-    window.addEventListener('beforeunload', function (e) {
-        if (!is_submitted) {
-            const data = new FormData();
-            data.append('annotation_id', '{{ annotation_id }}');
-            navigator.sendBeacon('/task/stop_annotation/', data);
-        }
-    });
 });
 </script>
+{% include "_stop_annotation_script.html" %}
 {% endblock %}

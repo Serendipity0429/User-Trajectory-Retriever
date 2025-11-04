@@ -44,7 +44,7 @@ def admin_page(request):
         users_list = User.objects.filter(
             Q(username__icontains=user_search_query) |
             Q(email__icontains=user_search_query) |
-            Q(name__icontains=user_search_query)
+            Q(profile__name__icontains=user_search_query)
         ).order_by(user_order)
     else:
         users_list = User.objects.all().order_by(user_order)
@@ -252,16 +252,17 @@ def signup(request):
                 password=form.cleaned_data['password'],
                 email=form.cleaned_data['email']
             )
-            user.name = form.cleaned_data['name']
-            user.gender = form.cleaned_data['gender']
-            user.age = form.cleaned_data['age']
-            user.phone = form.cleaned_data['phone']
-            user.occupation = form.cleaned_data['occupation']
-            user.education = form.cleaned_data['education']
-            user.field_of_expertise = form.cleaned_data['field_of_expertise']
-            user.llm_frequency = form.cleaned_data['llm_frequency']
-            user.llm_history = form.cleaned_data['llm_history']
-            user.save()
+            profile = user.profile
+            profile.name = form.cleaned_data['name']
+            profile.gender = form.cleaned_data['gender']
+            profile.age = form.cleaned_data['age']
+            profile.phone = form.cleaned_data['phone']
+            profile.occupation = form.cleaned_data['occupation']
+            profile.education = form.cleaned_data['education']
+            profile.field_of_expertise = form.cleaned_data['field_of_expertise']
+            profile.llm_frequency = form.cleaned_data['llm_frequency']
+            profile.llm_history = form.cleaned_data['llm_history']
+            profile.save()
             return HttpResponseRedirect(reverse('user_system:login'))
         else:
             # Store form data and errors in session, then redirect
@@ -321,12 +322,12 @@ def view_user_info(request, user_id):
 @login_required
 def edit_info(request):
     if request.method == 'POST':
-        form = EditInfoForm(request.POST, instance=request.user)
+        form = EditInfoForm(request.POST, instance=request.user.profile)
         if form.is_valid():
             form.save()
             return HttpResponseRedirect(reverse('user_system:info'))
     else:
-        form = EditInfoForm(instance=request.user)
+        form = EditInfoForm(instance=request.user.profile)
 
     return render(
         request,

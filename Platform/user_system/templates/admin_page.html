@@ -221,7 +221,7 @@
                                 <th scope="row">{{ forloop.counter }}</th>
                                 <td>{{ user.username }}</td>
                                 <td>{{ user.email }}</td>
-                                <td>{{ user.name }}</td>
+                                <td>{{ user.profile.name }}</td>
                                 <td>
                                     {% if user.is_primary_superuser %}
                                         <span class="badge bg-primary">Primary</span>

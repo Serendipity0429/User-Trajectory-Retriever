@@ -15,21 +15,23 @@ class Command(BaseCommand):
             self.stdout.write(f"User {username} already exists, skipping creation.")
             return
         
-        user = User()
-        user.username = username
-        user.set_password(password)
-        user.name = "Test User"
-        user.gender = "O"
-        user.email = "test@nowhere.com"
-        user.age = 25
-        user.phone = "1234567890"
-        user.occupation = "engineer"
-        user.education = "master"
-        user.field_of_expertise = "Computer Science"
-        user.llm_frequency = "frequently"
-        user.llm_history = "long"
-        user.is_staff = False
-        user.is_superuser = False
-        user.save()
+        user = User.objects.create_user(
+            username=username,
+            password=password,
+            email="test@nowhere.com"
+        )
+        
+        profile = user.profile
+        profile.name = "Test User"
+        profile.gender = "O"
+        profile.age = 25
+        profile.phone = "1234567890"
+        profile.occupation = "engineer"
+        profile.education = "master"
+        profile.field_of_expertise = "Computer Science"
+        profile.llm_frequency = "frequently"
+        profile.llm_history = "long"
+        profile.save()
+
         self.stdout.write(self.style.SUCCESS(f"User {username} created successfully with password '{password}'."))
 

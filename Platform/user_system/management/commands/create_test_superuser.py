@@ -25,20 +25,21 @@ class Command(BaseCommand):
 
         user = User.objects.create_superuser(username=username, email=email, password=password)
         
-        user.name = "Admin User"
-        user.gender = "O"
-        user.age = 30
-        user.phone = "0987654321"
-        user.occupation = "administrator"
-        user.education = "phd"
-        user.field_of_expertise = "System Administration"
-        user.llm_frequency = "frequently"
-        user.llm_history = "very long"
+        profile = user.profile
+        profile.name = "Admin User"
+        profile.gender = "O"
+        profile.age = 30
+        profile.phone = "0987654321"
+        profile.occupation = "other"
+        profile.education = "phd"
+        profile.field_of_expertise = "System Administration"
+        profile.llm_frequency = "frequently"
+        profile.llm_history = "very long"
+        profile.save()
         
         if is_primary:
             user.is_primary_superuser = True
-        
-        user.save()
+            user.save()
 
         self.stdout.write(self.style.SUCCESS(f"Superuser '{username}' created successfully."))
         if is_primary:

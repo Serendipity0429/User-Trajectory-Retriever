@@ -25,9 +25,10 @@ class Command(BaseCommand):
                 defaults={'email': email}
             )
             if not created and not user.email:
-                user.name = email.split('@')[0]
+                user.profile.name = email.split('@')[0]
                 user.email = email
                 user.save()
+                user.profile.save()
             
             self.stdout.write(self.style.SUCCESS(f'Successfully found or created user with email: {email}'))
             

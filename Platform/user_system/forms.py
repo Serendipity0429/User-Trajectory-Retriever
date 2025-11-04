@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 from django import forms
-from .models import User
+from .models import User, Profile
 
 
 from django.contrib.auth.forms import AuthenticationForm
@@ -53,15 +53,15 @@ class UserCreationForm(AuthUserCreationForm):
         fields = ('username',)
 
     name = forms.CharField(max_length=50)
-    gender = forms.ChoiceField(choices=User.GENDER_CHOICES)
+    gender = forms.ChoiceField(choices=Profile.GENDER_CHOICES)
     age = forms.IntegerField()
     phone = forms.CharField(max_length=50)
     email = forms.EmailField()
-    occupation = forms.ChoiceField(choices=User.OCCUPATION_CHOICES)
-    education = forms.ChoiceField(choices=User.EDUCATION_CHOICES)
+    occupation = forms.ChoiceField(choices=Profile.OCCUPATION_CHOICES)
+    education = forms.ChoiceField(choices=Profile.EDUCATION_CHOICES)
     field_of_expertise = forms.CharField(max_length=100)
-    llm_frequency = forms.ChoiceField(choices=User.LLM_FREQUENCY_CHOICES)
-    llm_history = forms.ChoiceField(choices=User.LLM_HISTORY_CHOICES)
+    llm_frequency = forms.ChoiceField(choices=Profile.LLM_FREQUENCY_CHOICES)
+    llm_history = forms.ChoiceField(choices=Profile.LLM_HISTORY_CHOICES)
 
 
 class SignupForm(forms.Form):
@@ -112,7 +112,7 @@ class SignupForm(forms.Form):
     )
     gender = forms.ChoiceField(
         required=True,
-        choices=User.GENDER_CHOICES,
+        choices=Profile.GENDER_CHOICES,
         label=u'Gender',
         widget=forms.Select(
             attrs={
@@ -152,7 +152,7 @@ class SignupForm(forms.Form):
     )
     occupation = forms.ChoiceField(
         required=True,
-        choices=User.OCCUPATION_CHOICES,
+        choices=Profile.OCCUPATION_CHOICES,
         label=u'Occupation',
         widget=forms.Select(
             attrs={
@@ -162,7 +162,7 @@ class SignupForm(forms.Form):
     )
     education = forms.ChoiceField(
         required=True,
-        choices=User.EDUCATION_CHOICES,
+        choices=Profile.EDUCATION_CHOICES,
         label=u'Education Level',
         widget=forms.Select(
             attrs={
@@ -182,7 +182,7 @@ class SignupForm(forms.Form):
     )
     llm_frequency = forms.ChoiceField(
         required=True,
-        choices=User.LLM_FREQUENCY_CHOICES,
+        choices=Profile.LLM_FREQUENCY_CHOICES,
         label=u'How often do you use large language models (LLMs)?',
         help_text=u'This helps us understand your experience with LLMs.',
         widget=forms.Select(
@@ -193,7 +193,7 @@ class SignupForm(forms.Form):
     )
     llm_history = forms.ChoiceField(
         required=True,
-        choices=User.LLM_HISTORY_CHOICES,
+        choices=Profile.LLM_HISTORY_CHOICES,
         label=u'How long have you been using large language models(LLMs)?',
         help_text=u'This helps us understand your experience with LLMs.',
         widget=forms.Select(
@@ -221,14 +221,13 @@ class SignupForm(forms.Form):
 
 class EditInfoForm(forms.ModelForm):
     class Meta:
-        model = User
-        fields = ['name', 'gender', 'age', 'phone', 'email', 'occupation', 'education', 'field_of_expertise', 'llm_frequency', 'llm_history']
+        model = Profile
+        fields = ['name', 'gender', 'age', 'phone', 'occupation', 'education', 'field_of_expertise', 'llm_frequency', 'llm_history']
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Name'}),
             'gender': forms.Select(attrs={'class': 'form-select'}),
             'age': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'Age'}),
             'phone': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Phone'}),
-            'email': forms.EmailInput(attrs={'class': 'form-control', 'placeholder': 'Email'}),
             'occupation': forms.Select(attrs={'class': 'form-select'}),
             'education': forms.Select(attrs={'class': 'form-select'}),
             'field_of_expertise': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Field of Expertise'}),

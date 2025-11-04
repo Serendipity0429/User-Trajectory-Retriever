@@ -23,3 +23,10 @@ def mul(value, arg):
 @register.filter(is_safe=True)
 def jsonify(obj):
     return mark_safe(json.dumps(obj))
+
+@register.filter(is_safe=True)
+def safe_json_string(s):
+    """
+    Escapes `</script>` in a string to make it safe for embedding in a `<script>` tag.
+    """
+    return mark_safe(s.replace('</script>', '<\\/script>'))

@@ -62,7 +62,7 @@
                                         <script>
                                             (function() {
                                                 var target = document.getElementById('rrweb-player-{{ webpage.id }}');
-                                                var events = {{ webpage.rrweb_record|safe }};
+                                                var events = {{ webpage.rrweb_record|safe_json_string }};
                                                 
                                                 if (!Array.isArray(events) || events.length === 0) {
                                                     return;

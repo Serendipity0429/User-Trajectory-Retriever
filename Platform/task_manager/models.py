@@ -203,20 +203,3 @@ class EventAnnotation(models.Model):
     remarks = models.CharField(max_length=1000)  # remarks of the event
 
 
-# Annotation of certain moments during the task trial
-class MomentAnnotation(models.Model):
-    belong_task_trial = models.ForeignKey(
-        TaskTrial,
-        on_delete=models.CASCADE
-    )
-    # We can link it to a specific webpage visit if needed, or just the trial
-    # belong_webpage = models.ForeignKey(Webpage, on_delete=models.CASCADE, null=True)
-
-    timestamp = models.FloatField()  # The timestamp (in seconds) within the rrweb replay
-    
-    # Structured annotation fields we discussed
-    sub_goal = models.TextField(null=True)
-    action_rationale = models.TextField(null=True)
-    hypothesis = models.TextField(null=True)
-    confidence = models.IntegerField(null=True)  # 1-5 rating
-    reflection = models.TextField(null=True) # "Looking back, was this a good step?"

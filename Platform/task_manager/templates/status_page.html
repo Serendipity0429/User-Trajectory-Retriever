@@ -1,0 +1,50 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card shadow-sm text-center border-0">
+                <div class="card-body p-5">
+                    {% if alert_type == 'success' %}
+                        <i class="bi bi-check-circle-fill text-success" style="font-size: 4rem;"></i>
+                    {% elif alert_type == 'warning' %}
+                        <i class="bi bi-exclamation-triangle-fill text-warning" style="font-size: 4rem;"></i>
+                    {% else %}
+                        <i class="bi bi-info-circle-fill text-info" style="font-size: 4rem;"></i>
+                    {% endif %}
+                    
+                    <h2 class="card-title mt-4">{{ title }}</h2>
+                    <p class="card-text text-muted fs-5">{{ message }}</p>
+                    
+                    <hr class="my-4">
+                    
+                    <p class="mb-4">You will be redirected to the homepage in <strong id="countdown">10</strong> seconds.</p>
+                    
+                    <a href="{% url 'task_manager:home' %}" class="btn btn-primary">
+                        <i class="bi bi-house-door-fill me-2"></i>Go to Homepage Now
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    (function() {
+        var countdownElement = document.getElementById('countdown');
+        var seconds = 10;
+        countdownElement.textContent = seconds;
+
+        var countdownInterval = setInterval(function() {
+            seconds--;
+            countdownElement.textContent = seconds;
+            if (seconds <= 0) {
+                clearInterval(countdownInterval);
+                window.location.href = "{% url 'task_manager:home' %}";
+            }
+        }, 1000);
+    })();
+</script>
+{% endblock %}
+

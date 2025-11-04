@@ -33,4 +33,5 @@ urlpatterns = [
     path('justification/add/', views.add_justification, name='add_justification'),
     path('justification/update/<int:justification_id>/', views.update_justification_status, name='update_justification_status'),
     path('justification/get/<int:task_id>/', views.get_justifications, name='get_justifications'),
+    path('status_page/', views.status_page, name='status_page'),
 ]

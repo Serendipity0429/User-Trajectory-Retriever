@@ -1161,3 +1161,35 @@ def status_page(request):
         'alert_type': alert_type,
     }
     return render(request, "status_page.html", context)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def get_rrweb_record(request, webpage_id):
+    """
+    API endpoint to fetch the rrweb_record for a specific webpage.
+    """
+    user = request.user
+    try:
+        # Using select_related for efficiency
+        webpage = Webpage.objects.select_related('belong_task__user').get(id=webpage_id)
+        task_user = webpage.belong_task.user
+        
+        # Security check: ensure the user owns the task or is a superuser
+        if task_user != user and not user.is_superuser:
+            return JsonResponse({"status": "error", "message": "Permission denied."}, status=403)
+            
+        # The rrweb_record might be stored as a JSON string within the JSONField.
+        # We need to parse it to ensure JsonResponse sends a proper JSON array.
+        record_data = webpage.rrweb_record
+        if isinstance(record_data, str):
+            record_data = json.loads(record_data)
+
+        return JsonResponse(record_data, safe=False)
+    except Webpage.DoesNotExist:
+        return JsonResponse({"status": "error", "message": "Webpage not found."}, status=404)
+    except json.JSONDecodeError:
+        return JsonResponse({"status": "error", "message": "Failed to parse recording data."}, status=500)
+    except Exception as e:
+        logger.error(f"Error fetching rrweb record for webpage {webpage_id}: {e}")
+        return JsonResponse({"status": "error", "message": "An internal error occurred."}, status=500)

@@ -34,4 +34,7 @@ urlpatterns = [
     path('justification/update/<int:justification_id>/', views.update_justification_status, name='update_justification_status'),
     path('justification/get/<int:task_id>/', views.get_justifications, name='get_justifications'),
     path('status_page/', views.status_page, name='status_page'),
+
+    # API for dynamic data loading
+    path('api/get_rrweb_record/<int:webpage_id>/', views.get_rrweb_record, name='get_rrweb_record'),
 ]

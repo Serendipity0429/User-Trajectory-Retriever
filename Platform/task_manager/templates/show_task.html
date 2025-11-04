@@ -147,7 +147,7 @@
                                                 {% for webpage in trial.webpages %}
                                                 <div class="d-flex flex-column align-items-center mb-5 p-4 border rounded shadow-sm bg-light">
                                                     <p class="h5"><a href="{{ webpage.url }}" target="_blank">{{ webpage.title }}</a></p>
-                                                    <div class="rrweb-player-wrapper" id="rrweb-player-trial{{trial.num_trial}}-{{ webpage.id }}" data-events="{{ webpage.rrweb_record|safe }}"></div>
+                                                    <div class="rrweb-player-wrapper" id="rrweb-player-trial{{trial.num_trial}}-{{ webpage.id }}" data-events="{{ webpage.rrweb_record|safe_json_string_json_string }}"></div>
 
                                                 </div>
                                                 {% empty %}

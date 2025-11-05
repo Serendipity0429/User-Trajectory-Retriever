@@ -25,7 +25,11 @@
                         <h5 class="mb-0">
                             {% if bulletin.pinned %}<i class="bi bi-pin-angle-fill"></i>{% endif %}
                             <span class="badge {% if category_class == 'Warning' %}bg-danger{% elif category_class == 'Important' %}bg-dark{% elif category_class == 'System Update' %}bg-primary{% else %}bg-success{% endif %} me-2">{{ bulletin.get_category_display }}</span>
+<<<<<<< HEAD
                             <a href="{% url 'bulletin_detail' bulletin.pk %}" class="text-decoration-none text-dark fw-bold">{{ bulletin.title }}</a>
+=======
+                            <a href="{% url 'bulletin_detail' bulletin.pk %}" class="text-decoration-none text-dark">{{ bulletin.title }}</a>
+>>>>>>> d6e91c7 (feat: Add discussion forum and update documentation)
                         </h5>
                         <small class="text-muted">{{ bulletin.created_at|date:"Y-m-d" }}</small>
                     </div>
@@ -39,7 +43,11 @@
                         <h5 class="mb-0">
                             {% if bulletin.pinned %}<i class="bi bi-pin-angle-fill"></i>{% endif %}
                             <span class="badge {% if category_class == 'Warning' %}bg-danger{% elif category_class == 'Important' %}bg-dark{% elif category_class == 'System Update' %}bg-primary{% else %}bg-success{% endif %} me-2">{{ bulletin.get_category_display }}</span>
+<<<<<<< HEAD
                             <a href="{% url 'bulletin_detail' bulletin.pk %}" class="text-decoration-none text-dark fw-bold">{{ bulletin.title }}</a>
+=======
+                            <a href="{% url 'bulletin_detail' bulletin.pk %}" class="text-decoration-none text-dark">{{ bulletin.title }}</a>
+>>>>>>> d6e91c7 (feat: Add discussion forum and update documentation)
                         </h5>
                         <small class="text-muted">{{ bulletin.created_at|date:"Y-m-d" }}</small>
                     </div>
@@ -128,6 +136,7 @@ $(document).ready(function() {
         
         var $clickedLink = $(this);
 
+<<<<<<< HEAD
         // Reset all buttons to their inactive (outline) state.
         $('.category-filters a').each(function() {
             var $link = $(this);
@@ -139,10 +148,21 @@ $(document).ready(function() {
                 $link.removeClass(btnClass).addClass(outlineClass);
             } else {
                 // This is the "All" button.
+=======
+        // Reset all buttons to outline
+        $('.category-filters a').each(function() {
+            var $link = $(this);
+            var btnClass = $link.data('btn-class');
+            if (btnClass) {
+                $link.removeClass(btnClass).addClass(btnClass.replace('btn-', 'btn-outline-'));
+            } else {
+                // This is the "All" button
+>>>>>>> d6e91c7 (feat: Add discussion forum and update documentation)
                 $link.removeClass('btn-primary').addClass('btn-outline-primary');
             }
         });
 
+<<<<<<< HEAD
         // Activate the clicked button.
         var clickedBtnClass = $clickedLink.data('btn-class');
         if (clickedBtnClass) {
@@ -150,6 +170,14 @@ $(document).ready(function() {
             $clickedLink.removeClass(outlineClass).addClass(clickedBtnClass);
         } else {
             // This is the "All" button.
+=======
+        // Activate the clicked button
+        var clickedBtnClass = $clickedLink.data('btn-class');
+        if (clickedBtnClass) {
+            $clickedLink.removeClass(clickedBtnClass.replace('btn-', 'btn-outline-')).addClass(clickedBtnClass);
+        } else {
+            // This is the "All" button
+>>>>>>> d6e91c7 (feat: Add discussion forum and update documentation)
             $clickedLink.removeClass('btn-outline-primary').addClass('btn-primary');
         }
 

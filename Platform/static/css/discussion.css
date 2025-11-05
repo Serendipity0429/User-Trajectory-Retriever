@@ -255,7 +255,11 @@ textarea.form-control {
 }
 .btn-warning-custom {
     background-color: #ed6c02; /* Amber */
+<<<<<<< HEAD
     color: white !important;
+=======
+    color: white;
+>>>>>>> d6e91c7 (feat: Add discussion forum and update documentation)
     border-color: #ed6c02;
 }
 .btn-warning-custom:hover {
@@ -265,7 +269,11 @@ textarea.form-control {
 }
 .btn-important-custom {
     background-color: #B00020; /* Red */
+<<<<<<< HEAD
     color: white !important;
+=======
+    color: white;
+>>>>>>> d6e91c7 (feat: Add discussion forum and update documentation)
     border-color: #B00020;
 }
 .btn-important-custom:hover {
@@ -275,7 +283,11 @@ textarea.form-control {
 }
 .btn-update-custom {
     background-color: #0288d1; /* Blue */
+<<<<<<< HEAD
     color: white !important;
+=======
+    color: white;
+>>>>>>> d6e91c7 (feat: Add discussion forum and update documentation)
     border-color: #0288d1;
 }
 .btn-update-custom:hover {
@@ -285,7 +297,11 @@ textarea.form-control {
 }
 .btn-general-custom {
     background-color: #333333; /* Dark Gray */
+<<<<<<< HEAD
     color: white !important;
+=======
+    color: white;
+>>>>>>> d6e91c7 (feat: Add discussion forum and update documentation)
     border-color: #333333;
 }
 .btn-general-custom:hover {
@@ -295,7 +311,11 @@ textarea.form-control {
 }
 .btn-support-custom {
     background-color: #005F60; /* Dark Teal */
+<<<<<<< HEAD
     color: white !important;
+=======
+    color: white;
+>>>>>>> d6e91c7 (feat: Add discussion forum and update documentation)
     border-color: #005F60;
 }
 .btn-support-custom:hover {
@@ -305,7 +325,11 @@ textarea.form-control {
 }
 .btn-feedback-custom {
     background-color: #6A008A; /* Dark Purple */
+<<<<<<< HEAD
     color: white !important;
+=======
+    color: white;
+>>>>>>> d6e91c7 (feat: Add discussion forum and update documentation)
     border-color: #6A008A;
 }
 .btn-feedback-custom:hover {
@@ -315,7 +339,11 @@ textarea.form-control {
 }
 .btn-maintenance-custom {
     background-color: #CC5500; /* Dark Orange */
+<<<<<<< HEAD
     color: white !important;
+=======
+    color: white;
+>>>>>>> d6e91c7 (feat: Add discussion forum and update documentation)
     border-color: #CC5500;
 }
 .btn-maintenance-custom:hover {
@@ -325,7 +353,11 @@ textarea.form-control {
 }
 .btn-event-custom {
     background-color: #673AB7; /* Deep Purple */
+<<<<<<< HEAD
     color: white !important;
+=======
+    color: white;
+>>>>>>> d6e91c7 (feat: Add discussion forum and update documentation)
     border-color: #673AB7;
 }
 .btn-event-custom:hover {
@@ -335,7 +367,11 @@ textarea.form-control {
 }
 .btn-issues-custom {
     background-color: #D32F2F; /* Dark Red */
+<<<<<<< HEAD
     color: white !important;
+=======
+    color: white;
+>>>>>>> d6e91c7 (feat: Add discussion forum and update documentation)
     border-color: #D32F2F;
 }
 .btn-issues-custom:hover {

@@ -142,11 +142,15 @@ def create_post(request):
 
 @staff_member_required
 def manage_bulletin(request):
+<<<<<<< HEAD
     bulletin_list = Bulletin.objects.all().order_by('-created_at')
     paginator = Paginator(bulletin_list, 10) # Show 10 bulletins per page.
     page_number = request.GET.get('page')
     bulletins = paginator.get_page(page_number)
 
+=======
+    bulletins = Bulletin.objects.all().order_by('-created_at')
+>>>>>>> d6e91c7 (feat: Add discussion forum and update documentation)
     if request.method == 'POST':
         form = BulletinForm(request.POST, request.FILES)
         files = request.FILES.getlist('attachments')

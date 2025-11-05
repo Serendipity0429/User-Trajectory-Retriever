@@ -772,8 +772,21 @@ button.remove-source:hover {
 .status-wrong { color: #F44336; }
 .status-cancelled { color: #f0ad4e; }
 
+<<<<<<< HEAD
+=======
+
+
+
+
+>>>>>>> d6e91c7 (feat: Add discussion forum and update documentation)
 .font-size-large #sidebarCollapse .sidebar-toggle-text,
+
+
 .font-size-large .page-settings-text-button .page-settings-text {
+
+
     display: none !important;
+
+
 }
 

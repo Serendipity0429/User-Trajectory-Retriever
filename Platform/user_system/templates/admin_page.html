@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load query_string_tags %}
 
 {% block title %}Admin Page - User Management{% endblock %}
 
@@ -375,12 +376,12 @@
                                 <ul class="pagination justify-content-center">
                                     {% if tasks.has_previous %}
                                         <li class="page-item">
-                                            <a class="page-link" href="?task_page=1&{{ request.GET.urlencode|cut:'&task_page='|cut:tasks.previous_page_number }}" aria-label="First">
+                                            <a class="page-link" href="?{% url_replace task_page=1 %}" aria-label="First">
                                                 <span aria-hidden="true">&laquo;&laquo;</span>
                                             </a>
                                         </li>
                                         <li class="page-item">
-                                            <a class="page-link" href="?task_page={{ tasks.previous_page_number }}&{{ request.GET.urlencode|cut:'&task_page='|cut:tasks.previous_page_number }}" aria-label="Previous">
+                                            <a class="page-link" href="?{% url_replace task_page=tasks.previous_page_number %}" aria-label="Previous">
                                                 <span aria-hidden="true">&laquo;</span>
                                             </a>
                                         </li>
@@ -389,19 +390,19 @@
                                     {% for num in tasks.paginator.page_range %}
                                         {% if tasks.number == num %}
                                             <li class="page-item active"><a class="page-link" href="#">{{ num }}</a></li>
-                                        {% elif num > tasks.number|add:'-3' and num < tasks.number|add:'3' %}
-                                            <li class="page-item"><a class="page-link" href="?task_page={{ num }}&{{ request.GET.urlencode|cut:'&task_page='|cut:num }}">{{ num }}</a></li>
+                                        {% elif num > tasks.number|add:"-3" and num < tasks.number|add:"3" %}
+                                            <li class="page-item"><a class="page-link" href="?{% url_replace task_page=num %}">{{ num }}</a></li>
                                         {% endif %}
                                     {% endfor %}
                 
                                     {% if tasks.has_next %}
                                         <li class="page-item">
-                                            <a class="page-link" href="?task_page={{ tasks.next_page_number }}&{{ request.GET.urlencode|cut:'&task_page='|cut:tasks.next_page_number }}" aria-label="Next">
+                                            <a class="page-link" href="?{% url_replace task_page=tasks.next_page_number %}" aria-label="Next">
                                                 <span aria-hidden="true">&raquo;</span>
                                             </a>
                                         </li>
                                         <li class="page-item">
-                                            <a class="page-link" href="?task_page={{ tasks.paginator.num_pages }}&{{ request.GET.urlencode|cut:'&task_page='|cut:tasks.paginator.num_pages }}" aria-label="Last">
+                                            <a class="page-link" href="?{% url_replace task_page=tasks.paginator.num_pages %}" aria-label="Last">
                                                 <span aria-hidden="true">&raquo;&raquo;</span>
                                             </a>
                                         </li>

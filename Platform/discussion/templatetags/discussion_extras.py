@@ -50,3 +50,20 @@ def category_btn_class(category):
 @register.filter
 def to_outline_btn(btn_class):
     return btn_class.replace('btn-', 'btn-outline-')
+
+@register.filter
+def get_icon_for_file(filename):
+    extension = str(filename).split('.')[-1].lower()
+    if extension in ['pdf']:
+        return 'bi bi-file-earmark-pdf-fill'
+    if extension in ['doc', 'docx']:
+        return 'bi bi-file-earmark-word-fill'
+    if extension in ['xls', 'xlsx']:
+        return 'bi bi-file-earmark-excel-fill'
+    if extension in ['ppt', 'pptx']:
+        return 'bi bi-file-earmark-ppt-fill'
+    if extension in ['zip', 'rar']:
+        return 'bi bi-file-earmark-zip-fill'
+    if extension in ['jpg', 'jpeg', 'png', 'gif']:
+        return 'bi bi-file-earmark-image-fill'
+    return 'bi bi-file-earmark-fill'

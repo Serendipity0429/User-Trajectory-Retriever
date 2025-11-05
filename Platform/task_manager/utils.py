@@ -233,6 +233,8 @@ def check_answer(entry, user_answer):
     entry_answers = [ans.strip().lower() for ans in entry_answers]
 
     is_correct = all(any(user_ans == entry_ans for entry_ans in entry_answers) for user_ans in user_answers)
+    
+    
 
     return is_correct
 

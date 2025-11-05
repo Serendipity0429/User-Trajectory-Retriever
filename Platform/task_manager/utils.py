@@ -8,6 +8,8 @@ from django.conf import settings
 import logging
 from datetime import datetime
 from django.utils import timezone
+import re
+from dateutil.parser import parse as parse_date, ParserError
 
 from .models import Task, Webpage, TaskDataset
 
@@ -211,7 +213,30 @@ def wait_until_data_stored(func):
         
         return func(*args, **kwargs)
     return wrapper
-    
+
+
+def _normalize(text):
+    try:
+        # First, try to parse the text as a date.
+        # The `fuzzy=True` flag helps ignore surrounding text like "in season two".
+        # We will extract only the date part if it's found.
+        # A simple check to avoid parsing purely numeric strings like "2" as a date.
+        if not text.isdigit() and len(text) > 3:
+            dt = parse_date(text, fuzzy=True) # Strict Parsing
+            # Standardize the date format. Using day is important for specific dates.
+            return dt.strftime('%Y %m %d')
+    except (ParserError, ValueError):
+        # If it's not a date, or if there's an error, fall back to original normalization.
+        pass
+
+    text = text.lower()
+    # Eliminate punctuation except periods (since periods in numbers is important e.g. 397 and 3.97)
+    text = re.sub(r'[^\w\s.]', '', text) 
+    # Remove the ending period
+    text = re.sub(r'\.$', '', text)
+    # Normalize whitespace
+    text = ' '.join(text.split())
+    return text
 
 def check_answer(entry, user_answer):
     try:
@@ -219,24 +244,21 @@ def check_answer(entry, user_answer):
     except json.JSONDecodeError:
         logger.error(f"Error decoding JSON: {entry.answer}")
         return False
-    
+
     print_debug("Question:", entry.question)
     print_debug("User Answer:", user_answer)
-    print_debug("Correct Answer:", entry_answers)
+    print_debug("Correct Answer List:", entry_answers)
 
-    if isinstance(entry_answers, list):
-        entry_answers = [str(ans) for ans in entry_answers]
-    if isinstance(entry_answers, str):
-        entry_answers = [entry_answers]
+    normalized_user_answer = _normalize(user_answer)
+    print_debug(f"Normalized User Answer: '{normalized_user_answer}'")
 
-    user_answers = [ans.strip().lower() for ans in user_answer.split(';')]
-    entry_answers = [ans.strip().lower() for ans in entry_answers]
-
-    is_correct = all(any(user_ans == entry_ans for entry_ans in entry_answers) for user_ans in user_answers)
-    
-    
-
-    return is_correct
+    for answer in entry_answers:
+        normalized_correct_answer = _normalize(answer)
+        print_debug(f"Comparing with normalized correct answer: '{normalized_correct_answer}'")
+        if normalized_user_answer == normalized_correct_answer:
+            return True
+        
+    return False
 
 
 def close_window():

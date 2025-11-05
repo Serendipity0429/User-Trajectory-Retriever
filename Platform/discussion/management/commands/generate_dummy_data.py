@@ -3,6 +3,7 @@ import string
 from django.core.management.base import BaseCommand
 from django.contrib.auth import get_user_model
 from discussion.models import Bulletin, Post
+import markdown
 
 User = get_user_model()
 
@@ -32,22 +33,24 @@ class Command(BaseCommand):
 
         for _ in range(num_bulletins):
             bulletin_title = '[DUMMY] ' + ' '.join(generate_random_string(random.randint(5, 10)).capitalize() for i in range(3))
-            bulletin_content = ' '.join(generate_random_string(random.randint(5, 15)) for i in range(20))
+            raw_content = ' '.join(generate_random_string(random.randint(5, 15)) for i in range(20))
             bulletin_category = random.choice(bulletin_categories)
             Bulletin.objects.create(
                 title=bulletin_title,
-                content=bulletin_content,
+                raw_content=raw_content,
+                content=markdown.markdown(raw_content),
                 category=bulletin_category
             )
             self.stdout.write(self.style.SUCCESS(f'Successfully created bulletin: "{bulletin_title}"'))
 
         for _ in range(num_posts):
             post_title = '[DUMMY] ' + ' '.join(generate_random_string(random.randint(5, 10)).capitalize() for i in range(4))
-            post_content = ' '.join(generate_random_string(random.randint(5, 15)) for i in range(50))
+            raw_content = ' '.join(generate_random_string(random.randint(5, 15)) for i in range(50))
             post_category = random.choice(post_categories)
             Post.objects.create(
                 title=post_title,
-                content=post_content,
+                raw_content=raw_content,
+                content=markdown.markdown(raw_content),
                 author=test_user,
                 category=post_category
             )

@@ -40,7 +40,7 @@
 
                 <div class="mb-3">
                     <label for="{{ form.content.id_for_label }}" class="form-label">Content</label>
-                    <textarea name="{{ form.content.name }}" class="form-control {% if form.content.errors %}is-invalid{% endif %}" id="{{ form.content.id_for_label }}" rows="10">{{ form.content.value|default_if_none:'' }}</textarea>
+                    <textarea name="{{ form.content.name }}" class="form-control {% if form.content.errors %}is-invalid{% endif %}" id="{{ form.content.id_for_label }}" rows="10"></textarea>
                     {% if form.content.errors %}
                         <div class="invalid-feedback d-block">
                             {{ form.content.errors.as_text }}
@@ -146,7 +146,11 @@
 
 {% block scripts %}
 <script>
-new EasyMDE({element: document.getElementById("{{ form.content.auto_id }}"), spellChecker: false});
+const easyMDE = new EasyMDE({
+    element: document.getElementById("{{ form.content.auto_id }}"),
+    spellChecker: false,
+    initialValue: `{{ form.content.value|default_if_none:""|escapejs }}`
+});
 
 $(function() {
     const categorySelect = document.getElementById("{{ form.category.id_for_label }}");

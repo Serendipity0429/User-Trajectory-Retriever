@@ -2,11 +2,17 @@
 
 // --- Default Configuration ---
 const defaultConfig = {
-    serverType: 'local', // 'local' or 'remote'
+    serverType: 'remote', // 'local' or 'remote'
     localServerAddress: 'http://127.0.0.1:8000',
     remoteServerAddress: 'http://101.6.41.59:32904',
     isPassiveMode: true,
     cancelTrialThreshold: 10,
+    messageBoxSize: 'medium',
+    messageBoxPosition: 'top-right',
+    popupScale: 1,
+    colorTheme: 'tsinghua-purple',
+    customColor: '#671372',
+    darkMode: false
 };
 
 // --- Global Config Variable ---

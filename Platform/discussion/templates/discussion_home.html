@@ -45,7 +45,7 @@
                             <span class="badge {{ bulletin.get_category_display|category_color_class }} me-2">{{ bulletin.get_category_display }}</span>
                             <a href="{% url 'bulletin_detail' bulletin.pk %}" class="text-decoration-none text-dark fw-bold">{{ bulletin.title }}</a>
                         </h5>
-                        <small class="text-muted">{{ bulletin.created_at|date:"Y-m-d" }}</small>
+                        <small class="text-muted">{{ bulletin.updated_at|date:"Y-m-d" }} {% if bulletin|was_updated %}(edited){% endif %}</small>
                     </div>
                 </div>
             {% endfor %}
@@ -57,7 +57,7 @@
                             <span class="badge {{ bulletin.get_category_display|category_color_class }} me-2">{{ bulletin.get_category_display }}</span>
                             <a href="{% url 'bulletin_detail' bulletin.pk %}" class="text-decoration-none text-dark fw-bold">{{ bulletin.title }}</a>
                         </h5>
-                        <small class="text-muted">{{ bulletin.created_at|date:"Y-m-d" }}</small>
+                        <small class="text-muted">{{ bulletin.updated_at|date:"Y-m-d" }} {% if bulletin|was_updated %}(edited){% endif %}</small>
                     </div>
                 </div>
             {% endfor %}

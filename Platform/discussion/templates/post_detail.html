@@ -9,7 +9,7 @@
             <h1 class="card-title">{{ post.title }}</h1>
 <div class="d-flex align-items-center mb-2">
     <img src="{{ post.author.profile.icon.url }}" alt="{{ post.author.username }}" class="rounded-circle me-2" width="40" height="40">
-    <h6 class="card-subtitle text-muted">By {{ post.author.username }} in <span class="badge {{ post.get_category_display|category_color_class }}">{{ post.get_category_display }}</span> on {{ post.created_at }}</h6>
+    <h6 class="card-subtitle text-muted">By {{ post.author.username }} in <span class="badge {{ post.get_category_display|category_color_class }}">{{ post.get_category_display }}</span> on {{ post.created_at }} {% if post|was_updated %}(Last edited: {{ post.updated_at }}){% endif %}</h6>
 </div>
             <p class="mb-1">
                 {% for label in post.labels.all %}
@@ -62,7 +62,7 @@
                 <p class="card-text">{{ comment.content|safe }}</p>
                 <div class="d-flex align-items-center">
                     <img src="{{ comment.author.profile.icon.url }}" alt="{{ comment.author.username }}" class="rounded-circle me-2" width="30" height="30">
-                    <small class="text-muted">By {{ comment.author.username }} on {{ comment.created_at }}</small>
+                    <small class="text-muted">By {{ comment.author.username }} on {{ comment.created_at }} {% if comment|was_updated %}(edited){% endif %}</small>
                 </div>
             </div>
         </div>

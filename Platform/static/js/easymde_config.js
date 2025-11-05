@@ -7,7 +7,8 @@ function initializeEasyMDE(config) {
         initialValue: initialValue || '',
         uploadImage: true,
         imageMaxSize: 2 * 1024 * 1024, // 2MB
-        imageAccept: "image/jpeg, image/png, image/gif",
+        imageAccept: "image/jpeg, image/png, image/gif, image/webp, image/tiff, image/bmp, image/svg+xml",
+        sideBySideFullscreen: false,
         imageUploadFunction: (file, onSuccess, onError) => {
             const formData = new FormData();
             formData.append("image", file);

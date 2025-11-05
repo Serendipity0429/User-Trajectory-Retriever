@@ -35,6 +35,7 @@ from .models import (
     TaskTrial,
     ReflectionAnnotation,
     Justification,
+    UserTaskProgress,
 )
 from .mappings import *
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
@@ -173,6 +174,12 @@ def pre_task_annotation(request):
         pre_annotation.expected_source_other = request.POST.get("expected_source_other")
         pre_annotation.save()
 
+        # Update user progress
+        progress, created = UserTaskProgress.objects.get_or_create(user=user, dataset=entry.belong_dataset)
+        if entry.id > progress.highest_entry_id:
+            progress.highest_entry_id = entry.id
+            progress.save()
+
         stop_annotating(request)
 
         return close_window()
@@ -195,16 +202,32 @@ def pre_task_annotation(request):
                 'alert_type': 'danger',
             }
             return render(request, "status_page.html", context)
+        
+        # Get user's progress
+        progress, created = UserTaskProgress.objects.get_or_create(user=user, dataset=dataset)
+        last_entry_id = progress.highest_entry_id
+
+        # Find the next task for the user
         entry = (
-            TaskDatasetEntry.objects.filter(belong_dataset=dataset)
-            .order_by("num_associated_tasks")
+            TaskDatasetEntry.objects.filter(belong_dataset=dataset, id__gt=last_entry_id)
+            .order_by("id")
             .first()
         )
+
         if entry is None:
+            # This could mean either the dataset is empty, or the user has completed all tasks.
+            if not TaskDatasetEntry.objects.filter(belong_dataset=dataset).exists():
+                message = f"No entry found in dataset id={dataset.id}"
+                title = 'Not Found'
+                alert_type = 'danger'
+            else:
+                message = "You have completed all available tasks. Thank you!"
+                title = 'All Tasks Completed'
+                alert_type = 'success'
             context = {
-                'title': 'Not Found',
-                'message': f"No entry found in dataset id={dataset.id}",
-                'alert_type': 'danger',
+                'title': title,
+                'message': message,
+                'alert_type': alert_type,
             }
             return render(request, "status_page.html", context)
         print_debug(f"[Question] {entry.question}")

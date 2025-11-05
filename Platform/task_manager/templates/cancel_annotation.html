@@ -17,7 +17,7 @@
                 <div class="accordion mb-4" id="parentTrajectoriesAccordion">
                     <div class="accordion-item">
                         <h2 class="accordion-header" id="headingParentTrajectories">
-                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseParentTrajectories" aria-expanded="false" aria-controls="collapseParentTrajectories" disabled>
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseParentTrajectories" aria-expanded="false" aria-controls="collapseParentTrajectories">
                                 <i class="bi bi-signpost-split-fill me-2"></i> <strong>View Trajectories</strong>&nbsp;(Click to expand)
                             </button>
                         </h2>
@@ -45,6 +45,11 @@
                                         </div>
                                     </div>
                                     {% endfor %}
+                                </div>
+                                <div class="text-center mt-3">
+                                    <button class="btn btn-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#collapseParentTrajectories" aria-expanded="false" aria-controls="collapseParentTrajectories">
+                                        Fold
+                                    </button>
                                 </div>
                             </div>
                         </div>

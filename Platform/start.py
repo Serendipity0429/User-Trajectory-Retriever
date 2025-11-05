@@ -41,7 +41,6 @@ def clean_project():
         WORK_DIR / "task_manager" / "migrations",
         WORK_DIR / "user_system" / "migrations",
         WORK_DIR / "discussion" / "migrations",
-        WORK_DIR / "media",
     ]
     
     # Files to remove
@@ -58,6 +57,17 @@ def clean_project():
         if f.exists() and f.is_file():
             print(f"Removing file: {f}")
             f.unlink()
+            
+    # Remove media files
+    media_dir = WORK_DIR / "media"
+    dirs_to_remove = [
+        media_dir / "attachments",
+    ]
+    for d in dirs_to_remove:
+        if d.exists() and d.is_dir():
+            print(f"Removing directory: {d}")
+            shutil.rmtree(d)
+    
     print("--- Cleaning complete ---")
 
 
@@ -71,9 +81,9 @@ def setup_development_data():
     
     # Create test users
     print("Creating test users...")
-    run_manage_py_command("create_test_user", "test", "thuirthuir")
-    run_manage_py_command("create_test_user", "test1", "thuirthuir")
-    run_manage_py_command("create_test_user", "test2", "thuirthuir")
+    run_manage_py_command("create_test_user", "test", "thuirtest")
+    run_manage_py_command("create_test_user", "test1", "thuirtest1")
+    run_manage_py_command("create_test_user", "test2", "thuirtest2")
     
     # Create a superuser
     print("Creating test superuser...")

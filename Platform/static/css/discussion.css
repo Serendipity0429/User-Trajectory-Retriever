@@ -364,3 +364,8 @@ textarea.form-control {
 .discussion-page h3 {
     margin-top: 2.5rem;
 }
+
+.EasyMDEContainer .fullscreen,
+.EasyMDEContainer .CodeMirror-fullscreen {
+    z-index: 1051; /* Bootstrap's navbar is 1030, modals are 1050 */
+}

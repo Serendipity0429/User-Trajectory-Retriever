@@ -38,6 +38,9 @@ class PostForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         user = kwargs.pop('user', None)
         super(PostForm, self).__init__(*args, **kwargs)
+        if self.instance and self.instance.pk:
+            self.initial['content'] = self.instance.raw_content
+            
         if not user or not user.is_staff:
             self.fields.pop('pinned', None)
 
@@ -60,3 +63,8 @@ class BulletinForm(forms.ModelForm):
             'category': forms.Select(attrs={'class': 'form-select'}),
             'pinned': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
+
+    def __init__(self, *args, **kwargs):
+        super(BulletinForm, self).__init__(*args, **kwargs)
+        if self.instance and self.instance.pk:
+            self.initial['content'] = self.instance.raw_content

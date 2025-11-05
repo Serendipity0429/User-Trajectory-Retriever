@@ -8,6 +8,20 @@ from .forms import PostForm, CommentForm, BulletinForm
 from django.contrib.admin.views.decorators import staff_member_required
 import markdown
 from django.contrib import messages
+from django.views.decorators.csrf import csrf_exempt
+from django.core.files.storage import FileSystemStorage
+from django.conf import settings
+import os
+
+@login_required
+def upload_image(request):
+    if request.method == 'POST' and request.FILES.get('image'):
+        image = request.FILES['image']
+        fs = FileSystemStorage()
+        filename = fs.save(image.name, image)
+        image_url = fs.url(filename)
+        return JsonResponse({'url': image_url})
+    return JsonResponse({'error': 'Invalid request'}, status=400)
 
 @login_required
 def label_autocomplete(request):

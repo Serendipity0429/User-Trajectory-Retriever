@@ -18,13 +18,29 @@
             </p>
             <p class="card-text mt-3">{{ post.content|safe }}</p>
             {% if post.attachments.all %}
+                {% with videos=post.attachments.all|videos %}
+                {% if videos %}
+                <hr>
+                <h5 class="mt-4">Videos</h5>
+                {% for attachment in videos %}
+                <div class="video-player-container mb-3">
+                    <video controls class="w-100 rounded">
+                        <source src="{{ attachment.file.url }}" type="video/mp4">
+                        Your browser does not support the video tag.
+                    </video>
+                </div>
+                {% endfor %}
+                {% endif %}
+                {% endwith %}
                 <hr>
                 <h5 class="mt-4">Attachments</h5>
                 <div class="list-group">
                     {% for attachment in post.attachments.all %}
+                        {% if not attachment.file.name|is_video %}
                         <a href="{{ attachment.file.url }}" class="list-group-item list-group-item-action" target="_blank">
                             <i class="bi bi-file-earmark-arrow-down me-2"></i>{{ attachment.file|filename }}
                         </a>
+                        {% endif %}
                     {% endfor %}
                 </div>
             {% endif %}
@@ -74,6 +90,10 @@
 
 {% block scripts %}
 <script>
-new EasyMDE({element: document.getElementById("{{ form.content.auto_id }}"), spellChecker: false});
+initializeEasyMDE({
+    elementId: "{{ form.content.auto_id }}",
+    csrfToken: "{{ csrf_token }}",
+    uploadUrl: "{% url 'upload_image' %}"
+});
 </script>
 {% endblock %}

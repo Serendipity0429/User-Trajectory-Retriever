@@ -146,10 +146,11 @@
 
 {% block scripts %}
 <script>
-const easyMDE = new EasyMDE({
-    element: document.getElementById("{{ form.content.auto_id }}"),
-    spellChecker: false,
-    initialValue: `{{ form.content.value|default_if_none:""|escapejs }}`
+const easyMDE = initializeEasyMDE({
+    elementId: "{{ form.content.auto_id }}",
+    initialValue: `{{ form.content.value|default_if_none:""|escapejs }}`,
+    csrfToken: "{{ csrf_token }}",
+    uploadUrl: "{% url 'upload_image' %}"
 });
 
 $(function() {

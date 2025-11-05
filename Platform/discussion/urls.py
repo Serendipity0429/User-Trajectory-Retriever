@@ -12,4 +12,5 @@ urlpatterns = [
     path('bulletin/<int:pk>/delete/', views.delete_bulletin, name='delete_bulletin'),
     path('bulletin/<int:pk>/', views.bulletin_detail, name='bulletin_detail'),
     path('labels/autocomplete/', views.label_autocomplete, name='label_autocomplete'),
+    path('upload_image/', views.upload_image, name='upload_image'),
 ]

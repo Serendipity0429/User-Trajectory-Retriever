@@ -217,12 +217,8 @@ def wait_until_data_stored(func):
 
 def _normalize(text):
     try:
-        # First, try to parse the text as a date.
-        # The `fuzzy=True` flag helps ignore surrounding text like "in season two".
-        # We will extract only the date part if it's found.
-        # A simple check to avoid parsing purely numeric strings like "2" as a date.
         if not text.isdigit() and len(text) > 3:
-            dt = parse_date(text, fuzzy=True) # Strict Parsing
+            dt = parse_date(text, fuzzy=False) # Strict Parsing
             # Standardize the date format. Using day is important for specific dates.
             return dt.strftime('%Y %m %d')
     except (ParserError, ValueError):

@@ -276,13 +276,49 @@ def edit_post(request, pk):
     return render(request, 'edit_post.html', {'form': form})
 
 @login_required
+
 def delete_post(request, pk):
+
     post = get_object_or_404(Post, pk=pk)
+
     if request.user != post.author and not request.user.is_staff:
+
         messages.error(request, "You are not authorized to delete this post.")
+
         return redirect('post_detail', pk=pk)
+
     if request.method == 'POST':
+
         post.delete()
+
         messages.success(request, "Post deleted successfully.")
+
         return redirect('discussion_home')
+
     return render(request, 'confirm_delete.html', {'object': post})
+
+
+
+@login_required
+
+def delete_comment(request, pk):
+
+    comment = get_object_or_404(Comment, pk=pk)
+
+    post_pk = comment.post.pk
+
+    if request.user != comment.author and not request.user.is_staff:
+
+        messages.error(request, "You are not authorized to delete this comment.")
+
+        return redirect('post_detail', pk=post_pk)
+
+    if request.method == 'POST':
+
+        comment.delete()
+
+        messages.success(request, "Comment deleted successfully.")
+
+        return redirect('post_detail', pk=post_pk)
+
+    return render(request, 'confirm_delete.html', {'object': comment})

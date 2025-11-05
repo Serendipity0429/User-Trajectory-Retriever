@@ -83,7 +83,7 @@
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <div class="form-floating">
-                                    <input type="email" name="email" class="form-control {% if form.email.errors %}is-invalid{% endif %}" id="id_email" placeholder="Email" value="{{ form.email.value|default_if_none:'' }}">
+                                    {{ form.email }}
                                     <label for="id_email"><i class="bi bi-envelope-fill me-2"></i>Email</label>
                                     {% if form.email.errors %}
                                         <div class="invalid-feedback">

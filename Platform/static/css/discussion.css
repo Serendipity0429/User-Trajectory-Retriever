@@ -138,39 +138,39 @@ textarea.form-control {
 }
 .badge-warning-custom {
     background-color: #ed6c02; /* Amber */
-    color: white;
+    color: white !important;
 }
 .badge-important-custom {
     background-color: #B00020; /* Red */
-    color: white;
+    color: white !important;
 }
 .badge-update-custom {
     background-color: #0288d1; /* Blue */
-    color: white;
+    color: white !important;
 }
 .badge-general-custom {
     background-color: #333333; /* Dark Gray */
-    color: white;
+    color: white !important;
 }
 .badge-support-custom {
     background-color: #005F60; /* Dark Teal */
-    color: white;
+    color: white !important;
 }
 .badge-feedback-custom {
     background-color: #6A008A; /* Dark Purple */
-    color: white;
+    color: white !important;
 }
 .badge-maintenance-custom {
     background-color: #CC5500; /* Dark Orange */
-    color: white;
+    color: white !important;
 }
 .badge-event-custom {
     background-color: #673AB7; /* Deep Purple */
-    color: white;
+    color: white !important;
 }
 .badge-issues-custom {
     background-color: #D32F2F; /* Dark Red */
-    color: white;
+    color: white !important;
 }
 .btn-outline-warning-custom {
     color: #ed6c02;
@@ -261,7 +261,7 @@ textarea.form-control {
 .btn-warning-custom:hover {
     background-color: #d46102;
     border-color: #d46102;
-    color: white;
+    color: white !important;
 }
 .btn-important-custom {
     background-color: #B00020; /* Red */
@@ -271,7 +271,7 @@ textarea.form-control {
 .btn-important-custom:hover {
     background-color: #9a001c;
     border-color: #9a001c;
-    color: white;
+    color: white !important;
 }
 .btn-update-custom {
     background-color: #0288d1; /* Blue */
@@ -281,7 +281,7 @@ textarea.form-control {
 .btn-update-custom:hover {
     background-color: #0278b8;
     border-color: #0278b8;
-    color: white;
+    color: white !important;
 }
 .btn-general-custom {
     background-color: #333333; /* Dark Gray */
@@ -291,7 +291,7 @@ textarea.form-control {
 .btn-general-custom:hover {
     background-color: #262626;
     border-color: #262626;
-    color: white;
+    color: white !important;
 }
 .btn-support-custom {
     background-color: #005F60; /* Dark Teal */
@@ -301,7 +301,7 @@ textarea.form-control {
 .btn-support-custom:hover {
     background-color: #004c4d;
     border-color: #004c4d;
-    color: white;
+    color: white !important;
 }
 .btn-feedback-custom {
     background-color: #6A008A; /* Dark Purple */
@@ -311,7 +311,7 @@ textarea.form-control {
 .btn-feedback-custom:hover {
     background-color: #580073;
     border-color: #580073;
-    color: white;
+    color: white !important;
 }
 .btn-maintenance-custom {
     background-color: #CC5500; /* Dark Orange */
@@ -321,7 +321,7 @@ textarea.form-control {
 .btn-maintenance-custom:hover {
     background-color: #b34a00;
     border-color: #b34a00;
-    color: white;
+    color: white !important;
 }
 .btn-event-custom {
     background-color: #673AB7; /* Deep Purple */
@@ -331,7 +331,7 @@ textarea.form-control {
 .btn-event-custom:hover {
     background-color: #5a32a1;
     border-color: #5a32a1;
-    color: white;
+    color: white !important;
 }
 .btn-issues-custom {
     background-color: #D32F2F; /* Dark Red */
@@ -341,5 +341,26 @@ textarea.form-control {
 .btn-issues-custom:hover {
     background-color: #b92929;
     border-color: #b92929;
-    color: white;
+    color: white !important;
+}
+
+.post-actions {
+    text-align: right;
+}
+
+/* post_detail.html and bulletin_detail.html improvements */
+.discussion-page .card.my-4 .card-body {
+    padding: 1.5rem;
+}
+
+.discussion-page .card.my-4 .card-header {
+    padding: 1rem 1.5rem;
+}
+
+.post-actions {
+    margin-top: 1.5rem;
+}
+
+.discussion-page h3 {
+    margin-top: 2.5rem;
 }

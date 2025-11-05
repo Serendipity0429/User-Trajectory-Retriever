@@ -5,7 +5,7 @@
 <div class="container discussion-page">
     <a href="{% url 'discussion_home' %}" class="btn btn-outline-secondary mt-3 mb-3">&laquo; Back to Forum</a>
     <div class="card my-4">
-        <div class="card-header d-flex justify-content-between align-items-center">
+        <div class="card-header d-flex justify-content-between align-items-center p-3">
             <h1 class="mb-0">{{ bulletin.title }}</h1>
             {% if user.is_staff %}
             <div>
@@ -14,8 +14,8 @@
             </div>
             {% endif %}
         </div>
-        <div class="card-body">
-            <h6 class="card-subtitle mb-2 text-muted">
+        <div class="card-body p-4">
+            <h6 class="card-subtitle mb-2 mt-4 text-muted">
                 <span class="badge {{ bulletin.get_category_display|category_color_class }}">{{ bulletin.get_category_display }}</span>
                 Posted on {{ bulletin.created_at }}
             </h6>

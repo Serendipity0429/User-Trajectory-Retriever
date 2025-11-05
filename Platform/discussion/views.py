@@ -178,7 +178,7 @@ def edit_bulletin(request, pk):
                 Attachment.objects.create(bulletin=bulletin, file=f)
             return redirect('manage_bulletin')
     else:
-        form = BulletinForm(instance=bulletin, initial={'content': bulletin.raw_content})
+        form = BulletinForm(instance=bulletin)
     return render(request, 'edit_bulletin.html', {'form': form})
 
 @staff_member_required
@@ -216,7 +216,7 @@ def edit_post(request, pk):
                 Attachment.objects.create(post=post, file=f)
             return redirect('post_detail', pk=post.pk)
     else:
-        form = PostForm(instance=post, initial={'content': post.raw_content}, user=request.user)
+        form = PostForm(instance=post, user=request.user)
     return render(request, 'edit_post.html', {'form': form})
 
 @login_required

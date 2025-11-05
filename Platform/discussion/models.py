@@ -1,6 +1,13 @@
 from django.db import models
 from user_system.models import User
 
+def get_attachment_upload_path(instance, filename):
+    if instance.post:
+        return f'attachments/post_{instance.post.pk}/{filename}'
+    elif instance.bulletin:
+        return f'attachments/bulletin_{instance.bulletin.pk}/{filename}'
+    return f'attachments/misc/{filename}'
+
 class Bulletin(models.Model):
     BULLETIN_CATEGORIES = [
         ('General', 'General'),
@@ -52,7 +59,7 @@ class Comment(models.Model):
 class Attachment(models.Model):
     post = models.ForeignKey(Post, related_name='attachments', on_delete=models.CASCADE, null=True, blank=True)
     bulletin = models.ForeignKey(Bulletin, related_name='attachments', on_delete=models.CASCADE, null=True, blank=True)
-    file = models.FileField(upload_to='attachments/')
+    file = models.FileField(upload_to=get_attachment_upload_path)
 
     def __str__(self):
         return self.file.name

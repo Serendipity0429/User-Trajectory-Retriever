@@ -17,9 +17,9 @@ import os
 def upload_image(request):
     if request.method == 'POST' and request.FILES.get('image'):
         image = request.FILES['image']
-        fs = FileSystemStorage()
+        fs = FileSystemStorage(location=os.path.join(settings.MEDIA_ROOT, 'easymde_uploads'))
         filename = fs.save(image.name, image)
-        image_url = fs.url(filename)
+        image_url = os.path.join(settings.MEDIA_URL, 'easymde_uploads', filename)
         return JsonResponse({'url': image_url})
     return JsonResponse({'error': 'Invalid request'}, status=400)
 
@@ -132,6 +132,12 @@ def create_post(request):
     if request.method == 'POST':
         form = PostForm(request.POST, request.FILES, user=request.user)
         files = request.FILES.getlist('attachments')
+        
+        # Check for duplicate filenames
+        filenames = [f.name for f in files]
+        if len(filenames) != len(set(filenames)):
+            messages.error(request, "Duplicate filenames are not allowed.")
+            return render(request, 'create_post.html', {'form': form})
 
         if form.is_valid():
             post = form.save(commit=False)
@@ -164,6 +170,12 @@ def manage_bulletin(request):
         form = BulletinForm(request.POST, request.FILES)
         files = request.FILES.getlist('attachments')
 
+        # Check for duplicate filenames
+        filenames = [f.name for f in files]
+        if len(filenames) != len(set(filenames)):
+            messages.error(request, "Duplicate filenames are not allowed.")
+            return render(request, 'manage_bulletin.html', {'form': form, 'bulletins': bulletins})
+
         if form.is_valid():
             bulletin = form.save(commit=False)
             bulletin.raw_content = form.cleaned_data['content']
@@ -182,6 +194,18 @@ def edit_bulletin(request, pk):
     if request.method == 'POST':
         form = BulletinForm(request.POST, request.FILES, instance=bulletin)
         files = request.FILES.getlist('attachments')
+        
+        # Check for duplicate filenames
+        existing_filenames = [os.path.basename(a.file.name) for a in bulletin.attachments.all()]
+        new_filenames = [f.name for f in files]
+        if len(new_filenames) != len(set(new_filenames)) or any(f in existing_filenames for f in new_filenames):
+            messages.error(request, "Duplicate filenames are not allowed.")
+            return render(request, 'edit_bulletin.html', {'form': form})
+
+        remove_attachments_ids = request.POST.get('remove_attachments', '')
+        if remove_attachments_ids:
+            attachment_ids = [int(id) for id in remove_attachments_ids.split(',') if id.isdigit()]
+            Attachment.objects.filter(id__in=attachment_ids, bulletin=bulletin).delete()
 
         if form.is_valid():
             bulletin = form.save(commit=False)
@@ -212,6 +236,18 @@ def edit_post(request, pk):
     if request.method == 'POST':
         form = PostForm(request.POST, request.FILES, instance=post, user=request.user)
         files = request.FILES.getlist('attachments')
+        
+        # Check for duplicate filenames
+        existing_filenames = [os.path.basename(a.file.name) for a in post.attachments.all()]
+        new_filenames = [f.name for f in files]
+        if len(new_filenames) != len(set(new_filenames)) or any(f in existing_filenames for f in new_filenames):
+            messages.error(request, "Duplicate filenames are not allowed.")
+            return render(request, 'edit_post.html', {'form': form})
+
+        remove_attachments_ids = request.POST.get('remove_attachments', '')
+        if remove_attachments_ids:
+            attachment_ids = [int(id) for id in remove_attachments_ids.split(',') if id.isdigit()]
+            Attachment.objects.filter(id__in=attachment_ids, post=post).delete()
 
         if form.is_valid():
             post = form.save(commit=False)

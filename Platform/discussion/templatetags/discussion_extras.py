@@ -52,6 +52,12 @@ def to_outline_btn(btn_class):
     return btn_class.replace('btn-', 'btn-outline-')
 
 @register.filter
+def was_updated(obj):
+    if not hasattr(obj, 'updated_at') or not hasattr(obj, 'created_at'):
+        return False
+    return (obj.updated_at - obj.created_at).total_seconds() > 1
+
+@register.filter
 def get_icon_for_file(filename):
     extension = str(filename).split('.')[-1].lower()
     if extension in ['pdf']:

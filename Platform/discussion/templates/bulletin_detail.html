@@ -17,7 +17,7 @@
         <div class="card-body p-4">
                         <h6 class="card-subtitle mb-2 text-muted">
                 <span class="badge {{ bulletin.get_category_display|category_color_class }}">{{ bulletin.get_category_display }}</span>
-                Posted on {{ bulletin.created_at }}
+                Posted on {{ bulletin.created_at }} {% if bulletin|was_updated %}(Last edited: {{ bulletin.updated_at }}){% endif %}
             </h6>
             <hr>
             <p class="card-text mt-3">{{ bulletin.content|safe }}</p>

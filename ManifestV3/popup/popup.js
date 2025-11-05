@@ -543,22 +543,12 @@ async function handleCancelTask() {
     }
 
     async function loadSettings() {
-        const result = await new Promise((resolve) => {
+        const defaultConfig = await sendMessageFromPopup({ command: "get_default_config" });
+        const storedSettings = await new Promise((resolve) => {
             chrome.storage.local.get(['serverType', 'localServerAddress', 'remoteServerAddress', 'messageBoxSize', 'messageBoxPosition', 'popupScale', 'colorTheme', 'customColor', 'darkMode'], resolve);
         });
 
-        originalSettings = {
-            serverType: result.serverType || 'local',
-            localServerAddress: result.localServerAddress || '',
-            remoteServerAddress: result.remoteServerAddress || '',
-            messageBoxSize: result.messageBoxSize || 'medium',
-            messageBoxPosition: result.messageBoxPosition || 'top-right',
-            popupScale: result.popupScale || 1,
-            colorTheme: result.colorTheme || 'tsinghua-purple',
-            customColor: result.customColor || '#671372',
-            darkMode: result.darkMode || false
-        };
-
+        originalSettings = { ...defaultConfig, ...storedSettings };
         applySettingsToPanel(originalSettings);
     }
 
@@ -672,17 +662,7 @@ async function handleCancelTask() {
     restoreDefaultsBtn.addEventListener('click', async () => {
         const confirmed = await showConfirm("Are you sure you want to restore all settings to their default values?");
         if (confirmed) {
-            const defaultConfig = {
-                serverType: 'local',
-                localServerAddress: 'http://127.0.0.1:8000',
-                remoteServerAddress: 'http://101.6.41.59:32904',
-                messageBoxSize: 'medium',
-                messageBoxPosition: 'top-right',
-                popupScale: 1,
-                colorTheme: 'tsinghua-purple',
-                customColor: '#671372',
-                darkMode: false
-            };
+            const defaultConfig = await sendMessageFromPopup({ command: "get_default_config" });
         
             const { logged_in } = await _get_session(['logged_in']);
         

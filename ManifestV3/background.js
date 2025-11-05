@@ -574,6 +574,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     sendResponse({});
                 }
                 break;
+            
+            case 'get_default_config':
+                sendResponse(defaultConfig);
+                break;
 
         }
     })();

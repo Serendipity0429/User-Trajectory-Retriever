@@ -8,6 +8,20 @@ def filename(value):
     return os.path.basename(value.name)
 
 @register.filter
+def is_video(filename):
+    video_extensions = ['.mp4', '.webm', '.ogg']
+    return any(filename.lower().endswith(ext) for ext in video_extensions)
+
+@register.filter
+def videos(attachments):
+    return [a for a in attachments if is_video(a.file.name)]
+
+@register.filter
+def is_image(filename):
+    image_extensions = ['.jpg', '.jpeg', '.png', '.gif']
+    return any(filename.lower().endswith(ext) for ext in image_extensions)
+
+@register.filter
 def category_color_class(category):
     return {
         'Warning': 'badge-warning-custom',

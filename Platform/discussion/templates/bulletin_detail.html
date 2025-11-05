@@ -23,13 +23,29 @@
             <p class="card-text mt-3">{{ bulletin.content|safe }}</p>
             
             {% if bulletin.attachments.all %}
+                {% with videos=bulletin.attachments.all|videos %}
+                {% if videos %}
+                <hr>
+                <h5 class="mt-4">Videos</h5>
+                {% for attachment in videos %}
+                <div class="video-player-container mb-3">
+                    <video controls class="w-100 rounded">
+                        <source src="{{ attachment.file.url }}" type="video/mp4">
+                        Your browser does not support the video tag.
+                    </video>
+                </div>
+                {% endfor %}
+                {% endif %}
+                {% endwith %}
                 <hr>
                 <h5 class="mt-4">Attachments</h5>
                 <div class="list-group">
                     {% for attachment in bulletin.attachments.all %}
+                        {% if not attachment.file.name|is_video %}
                         <a href="{{ attachment.file.url }}" class="list-group-item list-group-item-action" target="_blank">
                             <i class="bi bi-file-earmark-arrow-down me-2"></i>{{ attachment.file|filename }}
                         </a>
+                        {% endif %}
                     {% endfor %}
                 </div>
             {% endif %}

@@ -28,3 +28,4 @@ wheel==0.45.1
 python-decouple==3.8
 whitenoise
 markdown
+python-dateutil

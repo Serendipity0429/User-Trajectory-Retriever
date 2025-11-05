@@ -195,17 +195,20 @@ def edit_bulletin(request, pk):
         form = BulletinForm(request.POST, request.FILES, instance=bulletin)
         files = request.FILES.getlist('attachments')
         
-        # Check for duplicate filenames
-        existing_filenames = [os.path.basename(a.file.name) for a in bulletin.attachments.all()]
+        remove_attachments_ids = request.POST.get('remove_attachments', '')
+        attachment_ids_to_remove = [int(id) for id in remove_attachments_ids.split(',') if id.isdigit()]
+
+        # Check for duplicate filenames against attachments that are not being removed.
+        existing_attachments = bulletin.attachments.exclude(id__in=attachment_ids_to_remove)
+        existing_filenames = [os.path.basename(a.file.name) for a in existing_attachments]
         new_filenames = [f.name for f in files]
+        
         if len(new_filenames) != len(set(new_filenames)) or any(f in existing_filenames for f in new_filenames):
             messages.error(request, "Duplicate filenames are not allowed.")
             return render(request, 'edit_bulletin.html', {'form': form})
 
-        remove_attachments_ids = request.POST.get('remove_attachments', '')
-        if remove_attachments_ids:
-            attachment_ids = [int(id) for id in remove_attachments_ids.split(',') if id.isdigit()]
-            Attachment.objects.filter(id__in=attachment_ids, bulletin=bulletin).delete()
+        if attachment_ids_to_remove:
+            Attachment.objects.filter(id__in=attachment_ids_to_remove, bulletin=bulletin).delete()
 
         if form.is_valid():
             bulletin = form.save(commit=False)
@@ -237,17 +240,20 @@ def edit_post(request, pk):
         form = PostForm(request.POST, request.FILES, instance=post, user=request.user)
         files = request.FILES.getlist('attachments')
         
-        # Check for duplicate filenames
-        existing_filenames = [os.path.basename(a.file.name) for a in post.attachments.all()]
+        remove_attachments_ids = request.POST.get('remove_attachments', '')
+        attachment_ids_to_remove = [int(id) for id in remove_attachments_ids.split(',') if id.isdigit()]
+
+        # Check for duplicate filenames against attachments that are not being removed.
+        existing_attachments = post.attachments.exclude(id__in=attachment_ids_to_remove)
+        existing_filenames = [os.path.basename(a.file.name) for a in existing_attachments]
         new_filenames = [f.name for f in files]
+
         if len(new_filenames) != len(set(new_filenames)) or any(f in existing_filenames for f in new_filenames):
             messages.error(request, "Duplicate filenames are not allowed.")
             return render(request, 'edit_post.html', {'form': form})
 
-        remove_attachments_ids = request.POST.get('remove_attachments', '')
-        if remove_attachments_ids:
-            attachment_ids = [int(id) for id in remove_attachments_ids.split(',') if id.isdigit()]
-            Attachment.objects.filter(id__in=attachment_ids, post=post).delete()
+        if attachment_ids_to_remove:
+            Attachment.objects.filter(id__in=attachment_ids_to_remove, post=post).delete()
 
         if form.is_valid():
             post = form.save(commit=False)

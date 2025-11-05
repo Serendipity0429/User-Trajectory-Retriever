@@ -53,6 +53,15 @@ INSTALLED_APPS = [
     'discussion',
 ]
 
+from django.contrib.messages import constants as messages
+MESSAGE_TAGS = {
+    messages.DEBUG: 'alert-info',
+    messages.INFO: 'alert-info',
+    messages.SUCCESS: 'alert-success',
+    messages.WARNING: 'alert-warning',
+    messages.ERROR: 'alert-danger',
+}
+
 AUTH_USER_MODEL = "user_system.User"
 
 MIDDLEWARE = [

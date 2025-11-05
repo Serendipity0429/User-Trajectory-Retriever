@@ -13,12 +13,6 @@
         </div>
     {% endif %}
 
-    {% if messages %}
-        {% for message in messages %}
-            <div class="alert alert-danger">{{ message }}</div>
-        {% endfor %}
-    {% endif %}
-
     <form method="post" enctype="multipart/form-data" novalidate>
         {% csrf_token %}
         
@@ -140,6 +134,18 @@ $(function() {
     const addAttachmentBtn = document.getElementById("add-attachment-btn");
     const attachmentList = document.getElementById("attachment-list");
     const dataTransfer = new DataTransfer();
+    const removeAttachmentsInput = document.getElementById("remove_attachments_input");
+    let attachmentsToRemove = [];
+
+    document.querySelectorAll(".remove-existing-attachment").forEach(button => {
+        button.addEventListener("click", () => {
+            const attachmentItem = button.closest(".existing-attachment");
+            const attachmentId = attachmentItem.dataset.attachmentId;
+            attachmentsToRemove.push(attachmentId);
+            removeAttachmentsInput.value = attachmentsToRemove.join(',');
+            attachmentItem.style.display = 'none';
+        });
+    });
 
     addAttachmentBtn.addEventListener("click", () => {
         fileInput.click();
@@ -150,8 +156,9 @@ $(function() {
             dataTransfer.items.add(file);
             const listItem = document.createElement("div");
             listItem.classList.add("attachment-item");
+            const iconClass = getIconForFile(file.name);
             listItem.innerHTML = `
-                <span>${file.name}</span>
+                <span><i class="${iconClass} me-2"></i>${file.name}</span>
                 <div class="btn-group btn-group-sm" role="group">
                     <button type="button" class="btn btn-outline-secondary view-attachment">View</button>
                     <button type="button" class="btn btn-outline-danger remove-attachment">Remove</button>
@@ -170,6 +177,33 @@ $(function() {
         }
         fileInput.files = dataTransfer.files;
     });
+
+    function getIconForFile(filename) {
+        const extension = filename.split('.').pop().toLowerCase();
+        switch (extension) {
+            case 'pdf':
+                return 'bi bi-file-earmark-pdf-fill';
+            case 'doc':
+            case 'docx':
+                return 'bi bi-file-earmark-word-fill';
+            case 'xls':
+            case 'xlsx':
+                return 'bi bi-file-earmark-excel-fill';
+            case 'ppt':
+            case 'pptx':
+                return 'bi bi-file-earmark-ppt-fill';
+            case 'zip':
+            case 'rar':
+                return 'bi bi-file-earmark-zip-fill';
+            case 'jpg':
+            case 'jpeg':
+            case 'png':
+            case 'gif':
+                return 'bi bi-file-earmark-image-fill';
+            default:
+                return 'bi bi-file-earmark-fill';
+        }
+    }
 
     function removeFile(fileToRemove) {
         const newFiles = new DataTransfer();

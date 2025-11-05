@@ -213,6 +213,20 @@
                 $('#sidebarCollapse').trigger('click');
             });
 
+            // Listener for when an alert is about to be closed
+            $(document).on('close.bs.alert', '.alert', function() {
+                var $alert = $(this);
+                var $messageCard = $alert.closest('.message-card');
+
+                // Check if this is the last alert in the card
+                if ($messageCard.length && $messageCard.find('.alert').length === 1) {
+                    // When the alert's fade out transition ends, remove the whole card
+                    $alert.on('transitionend', function () {
+                        $messageCard.remove();
+                    });
+                }
+            });
+
             // Dark Mode Switcher
             const darkModeSwitch = document.getElementById('darkModeSwitch');
             const rootElement = document.documentElement;

@@ -10,6 +10,25 @@
         </button>
     </div>
 
+    {% if messages %}
+    <div class="card my-4 message-card">
+        <div class="card-header">
+            Messages
+        </div>
+        <div class="card-body">
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-dismissible fade show shadow-sm" role="alert">
+                    <div class="d-flex align-items-center">
+                        <i class="bi {% if message.tags == 'success' %}bi-check-circle-fill{% elif message.tags == 'danger' or message.tags == 'error' %}bi-x-circle-fill{% elif message.tags == 'warning' %}bi-exclamation-triangle-fill{% else %}bi-info-circle-fill{% endif %} me-2"></i>
+                        <span>{{ message }}</span>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
     <div class="card my-4">
         <div class="card-header d-flex justify-content-between align-items-center">
             Bulletin
@@ -19,32 +38,28 @@
         </div>
         <div class="card-body">
             {% for bulletin in pinned_bulletins %}
-                {% with category_class=bulletin.get_category_display %}
                 <div class="alert alert-light" role="alert">
                     <div class="d-flex justify-content-between align-items-center">
                         <h5 class="mb-0">
                             {% if bulletin.pinned %}<i class="bi bi-pin-angle-fill"></i>{% endif %}
-                            <span class="badge {% if category_class == 'Warning' %}bg-danger{% elif category_class == 'Important' %}bg-dark{% elif category_class == 'System Update' %}bg-primary{% else %}bg-success{% endif %} me-2">{{ bulletin.get_category_display }}</span>
+                            <span class="badge {{ bulletin.get_category_display|category_color_class }} me-2">{{ bulletin.get_category_display }}</span>
                             <a href="{% url 'bulletin_detail' bulletin.pk %}" class="text-decoration-none text-dark fw-bold">{{ bulletin.title }}</a>
                         </h5>
                         <small class="text-muted">{{ bulletin.created_at|date:"Y-m-d" }}</small>
                     </div>
                 </div>
-                {% endwith %}
             {% endfor %}
             {% for bulletin in bulletins %}
-                {% with category_class=bulletin.get_category_display %}
                 <div class="alert alert-light" role="alert">
                     <div class="d-flex justify-content-between align-items-center">
                         <h5 class="mb-0">
                             {% if bulletin.pinned %}<i class="bi bi-pin-angle-fill"></i>{% endif %}
-                            <span class="badge {% if category_class == 'Warning' %}bg-danger{% elif category_class == 'Important' %}bg-dark{% elif category_class == 'System Update' %}bg-primary{% else %}bg-success{% endif %} me-2">{{ bulletin.get_category_display }}</span>
+                            <span class="badge {{ bulletin.get_category_display|category_color_class }} me-2">{{ bulletin.get_category_display }}</span>
                             <a href="{% url 'bulletin_detail' bulletin.pk %}" class="text-decoration-none text-dark fw-bold">{{ bulletin.title }}</a>
                         </h5>
                         <small class="text-muted">{{ bulletin.created_at|date:"Y-m-d" }}</small>
                     </div>
                 </div>
-                {% endwith %}
             {% endfor %}
 
             {% if not bulletins and not pinned_bulletins %}

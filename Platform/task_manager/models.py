@@ -203,3 +203,24 @@ class EventAnnotation(models.Model):
     remarks = models.CharField(max_length=1000)  # remarks of the event
 
 
+# User's progress in the task
+class UserTaskProgress(models.Model):
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='task_progress'
+    )
+    dataset = models.ForeignKey(
+        TaskDataset,
+        on_delete=models.CASCADE,
+        related_name='user_progress'
+    )
+    highest_entry_id = models.IntegerField(default=0)
+
+    class Meta:
+        unique_together = ('user', 'dataset')
+
+    def __str__(self):
+        return f"{self.user.username}'s progress on {self.dataset.name}: entry {self.highest_entry_id}"
+
+

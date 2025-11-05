@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 This script automates the setup and execution of a Django development server.
 
@@ -56,9 +57,9 @@ def print_success(message: str) -> None:
     """Prints a success message."""
     print(f"{Colors.OKGREEN}{message}{Colors.ENDC}")
 
-def print_warning(message: str) -> None:
+def print_warning(message: str, end="\n") -> None:
     """Prints a warning message."""
-    print(f"{Colors.WARNING}{message}{Colors.ENDC}")
+    print(f"{Colors.WARNING}{message}{Colors.ENDC}", end=end)
 
 def print_info(message: str) -> None:
     """Prints an informational message."""

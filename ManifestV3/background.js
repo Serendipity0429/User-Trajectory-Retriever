@@ -262,17 +262,17 @@ async function clearLocalStorage() {
 function createContextMenu() {
     chrome.contextMenus.create({
         id: "add-as-evidence-text",
-        title: "Add as Evidence (Text)",
+        title: "Mark Evidence (Text)",
         contexts: ["selection"]
     });
     chrome.contextMenus.create({
         id: "add-as-evidence-image",
-        title: "Add as Evidence (Image)",
+        title: "Mark Evidence (Image)",
         contexts: ["image"]
     });
     chrome.contextMenus.create({
         id: "add-as-evidence-other",
-        title: "Add as Evidence (Other)",
+        title: "Mark Evidence (Other)",
         contexts: ["video", "audio", "page"]
     });
 }

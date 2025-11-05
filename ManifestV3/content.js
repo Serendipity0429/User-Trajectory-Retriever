@@ -90,6 +90,7 @@ async function displayQuestionBox(question) {
     const innerHTML = `
         <h5 style="font-size: 1.2em; margin-bottom: 0.5em; margin-top: 0;"><strong>Task Question</strong></h5>
         <p style="font-size: 1.0em; margin-bottom: 0; margin-top:0;">${question}</p>
+        <p style="font-size: 0.9em; font-style: italic; margin-top: 10px; color: #555;">Use the right-click menu to mark evidence.</p>
         <div id="evidence-count-container" style="margin-top: 10px; font-size: 0.9em; color: #58595a;">
             Evidence Collected: <span id="evidence-count">0</span>
         </div>

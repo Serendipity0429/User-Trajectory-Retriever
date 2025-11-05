@@ -322,12 +322,14 @@ def view_user_info(request, user_id):
 @login_required
 def edit_info(request):
     if request.method == 'POST':
-        form = EditInfoForm(request.POST, instance=request.user.profile)
+        form = EditInfoForm(request.POST, request.FILES, instance=request.user.profile)
         if form.is_valid():
+            request.user.email = form.cleaned_data['email']
+            request.user.save()
             form.save()
             return HttpResponseRedirect(reverse('user_system:info'))
     else:
-        form = EditInfoForm(instance=request.user.profile)
+        form = EditInfoForm(instance=request.user.profile, initial={'email': request.user.email})
 
     return render(
         request,

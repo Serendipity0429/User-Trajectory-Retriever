@@ -220,9 +220,16 @@ class SignupForm(forms.Form):
 
 
 class EditInfoForm(forms.ModelForm):
+    email = forms.EmailField(
+        widget=forms.EmailInput(attrs={'class': 'form-control', 'placeholder': 'Email'})
+    )
+    icon = forms.ImageField(
+        required=False,
+        widget=forms.FileInput(attrs={'class': 'form-control'})
+    )
     class Meta:
         model = Profile
-        fields = ['name', 'gender', 'age', 'phone', 'occupation', 'education', 'field_of_expertise', 'llm_frequency', 'llm_history']
+        fields = ['name', 'gender', 'age', 'phone', 'occupation', 'education', 'field_of_expertise', 'llm_frequency', 'llm_history', 'icon']
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Name'}),
             'gender': forms.Select(attrs={'class': 'form-select'}),

@@ -12,7 +12,7 @@
                 <div class="card-body p-5">
                     <div class="row align-items-center mb-5">
                         <div class="col-md-4 text-center">
-                            <img src="https://cdn.jsdelivr.net/npm/bootstrap-icons/icons/person-circle.svg" alt="User Avatar" class="img-fluid rounded-circle mb-3" style="width: 150px; height: 150px; object-fit: cover;">
+                            <img src="{{ cur_user.profile.icon.url }}" alt="User Avatar" class="img-fluid rounded-circle mb-3" style="width: 150px; height: 150px; object-fit: cover;">
                             <h4>{{ cur_user.profile.name|default:"Not Provided" }}</h4>
                             <p class="text-muted">{{ cur_user.profile.occupation|capfirst|default:"Not Provided" }}</p>
                         </div>
@@ -57,7 +57,7 @@
                         <div class="col-md-6">
                             <div class="card bg-light border-0 text-center h-100">
                                 <div class="card-body">
-                                    <h6 class="card-subtitle mb-2 text-muted">Frequency</h6>
+                                    <h6 class="card-subtitle mb-2 mt-4 text-muted">Frequency</h6>
                                     <p class="card-text fs-5">{{ cur_user.profile.get_llm_frequency_display|capfirst|default:"Not Provided" }}</p>
                                 </div>
                             </div>
@@ -65,7 +65,7 @@
                         <div class="col-md-6">
                             <div class="card bg-light border-0 text-center h-100">
                                 <div class="card-body">
-                                    <h6 class="card-subtitle mb-2 text-muted">History</h6>
+                                    <h6 class="card-subtitle mb-2 mt-4 text-muted">History</h6>
                                     <p class="card-text fs-5">{{ cur_user.profile.get_llm_history_display|capfirst|default:"Not Provided" }}</p>
                                 </div>
                             </div>

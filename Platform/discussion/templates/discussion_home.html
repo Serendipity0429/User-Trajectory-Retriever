@@ -18,8 +18,6 @@
             {% endif %}
         </div>
         <div class="card-body">
-                            <a href="{% url 'bulletin_detail' bulletin.pk %}" class="text-decoration-none text-dark fw-bold">{{ bulletin.title }}</a>
-            {% endfor %}
             {% for bulletin in bulletins %}
                 {% with category_class=bulletin.get_category_display %}
                 <div class="alert alert-light" role="alert">

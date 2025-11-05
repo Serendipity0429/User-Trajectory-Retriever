@@ -7,16 +7,24 @@
     <div class="card my-4">
         <div class="card-body">
             <h1 class="card-title">{{ post.title }}</h1>
-            <h6 class="card-subtitle mb-2 text-muted">By {{ post.author.username }} in <span class="badge {{ post.get_category_display|category_color_class }}">{{ post.get_category_display }}</span> on {{ post.created_at }}</h6>
+            <h6 class="card-subtitle mb-2 mt-4 text-muted">By {{ post.author.username }} in <span class="badge {{ post.get_category_display|category_color_class }}">{{ post.get_category_display }}</span> on {{ post.created_at }}</h6>
             <p class="mb-1">
                 {% for label in post.labels.all %}
                     <span class="badge discussion-label">#{{ label }}</span>
                 {% endfor %}
             </p>
             <p class="card-text mt-3">{{ post.content|safe }}</p>
-            {% for attachment in post.attachments.all %}
-                <a href="{{ attachment.file.url }}" target="_blank">{{ attachment.file.name }}</a><br>
-            {% endfor %}
+            {% if post.attachments.all %}
+                <hr>
+                <h5 class="mt-1">Attachments</h5>
+                <div class="list-group">
+                    {% for attachment in post.attachments.all %}
+                        <a href="{{ attachment.file.url }}" class="list-group-item list-group-item-action" target="_blank">
+                            <i class="bi bi-file-earmark-arrow-down me-2"></i>{{ attachment.file|filename }}
+                        </a>
+                    {% endfor %}
+                </div>
+            {% endif %}
 <div class="post-actions">
     {% if user == post.author or user.is_staff %}
         <a href="{% url 'edit_post' post.pk %}" class="btn btn-primary">Edit</a>

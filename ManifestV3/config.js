@@ -24,7 +24,8 @@ async function initializeConfig() {
     if (configInitialized) return; // Prevent re-initialization
     configInitialized = true;
 
-    const IS_DEV = !('update_url' in chrome.runtime.getManifest());
+    // const IS_DEV = !('update_url' in chrome.runtime.getManifest()); // TODO: enable this manually
+    const IS_DEV = true; // For development purposes, set to true
 
     const _get_local_config = (keys) => new Promise(resolve => chrome.storage.local.get(keys, resolve));
     const _set_local_config = (kv_pairs) => new Promise(resolve => chrome.storage.local.set(kv_pairs, resolve));

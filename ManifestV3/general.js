@@ -6,7 +6,21 @@
 
     await initializeConfig();
 
-    if (!_content_vars.is_task_active && !getConfig().is_dev) {
+    const taskStatusResponse = await new Promise((resolve) => {
+        chrome.runtime.sendMessage({ type: "msg_from_popup", command: "get_active_task" }, (response) => {
+            if (chrome.runtime.lastError) {
+                console.error("Error getting task status in general.js:", chrome.runtime.lastError.message);
+                resolve(null);
+                return;
+            }
+            resolve(response);
+        });
+    });
+
+    const is_task_active = taskStatusResponse ? taskStatusResponse.is_task_active : false;
+
+    if (!is_task_active) {
+        // NOTICE: Since general.js is loaded before content.js, this return will cause content.js to not load as well.
         printDebug("general", "No active task, script is disabled");
         return;
     }
@@ -318,10 +332,6 @@
 
             const target = event.target;
             if (!target || !target.tagName || target.closest('.annotation-overlay, .freeze-overlay')) {
-                return;
-            }
-
-            if (!_content_vars.is_task_active && !getConfig().is_dev) {
                 return;
             }
 

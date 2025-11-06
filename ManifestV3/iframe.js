@@ -27,7 +27,7 @@ async function initializeInIframe() {
         });
 
         if (!task_response || !task_response.is_task_active) {
-            printDebug("iframe", "No active task. Exiting iframe script.");
+            // printDebug("iframe", "No active task. Exiting iframe script.");
             return;
         }
 

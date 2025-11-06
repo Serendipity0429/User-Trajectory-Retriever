@@ -18,6 +18,7 @@ from django.db.models import Q
 from django.core.paginator import Paginator
 from django.utils import timezone
 from datetime import timedelta
+from django.contrib import messages
 
 def is_superuser(user):
     return user.is_superuser
@@ -229,6 +230,7 @@ def login(request):
     if request.method == 'POST' and form.is_valid():
         user = form.get_user()
         auth_login(request, user)  # user_logged_in signal will be triggered here
+        messages.success(request, 'Successfully logged in.')
         return redirect_to_prev_page(request, reverse('task_manager:home'))
     elif request.method == 'POST':
         error_message = "Invalid username or password."

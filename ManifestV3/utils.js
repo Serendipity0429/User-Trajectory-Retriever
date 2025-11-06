@@ -250,6 +250,30 @@ function _is_extension_page(url) {
     return url.startsWith(chrome.runtime.getURL(''));
 }
 
+function getCssSelector(el) {
+    if (!(el instanceof Element)) return;
+    const path = [];
+    while (el.nodeType === Node.ELEMENT_NODE) {
+        let selector = el.nodeName.toLowerCase();
+        if (el.id) {
+            selector += '#' + el.id;
+            path.unshift(selector);
+            break;
+        } else {
+            let sib = el, nth = 1;
+            while (sib = sib.previousElementSibling) {
+                if (sib.nodeName.toLowerCase() == selector)
+                   nth++;
+            }
+            if (nth != 1)
+                selector += ":nth-of-type("+nth+")";
+        }
+        path.unshift(selector);
+        el = el.parentNode;
+    }
+    return path.join(" > ");
+}
+
 function broadcastToTabs(message) {
     chrome.tabs.query({}, (tabs) => {
         for (let tab of tabs) {
@@ -387,46 +411,4 @@ function removeMessageBox(id) {
         box.style.opacity = '0';
         setTimeout(() => { box.remove(); }, 500);
     }
-}
-
-function uint8ArrayToBase64(bytes) {
-  // Using a smaller chunk size is generally safer and performs well.
-  // 32768 is a common choice.
-  const CHUNK_SIZE = 0x8000;
-  let binary = '';
-  const len = bytes.length;
-
-  for (let i = 0; i < len; i += CHUNK_SIZE) {
-    // Get a chunk of the Uint8Array
-    const chunk = bytes.subarray(i, i + CHUNK_SIZE);
-
-    // This is the most efficient way to convert a small chunk to a binary string
-    binary += String.fromCharCode.apply(null, chunk);
-  }
-
-  // The final binary string is then encoded to Base64
-  return btoa(binary);
-}
-
-function isJSONString(str) {
-    try {
-        JSON.parse(str);
-        return true;
-    } catch (e) {
-        return false;
-    }
-}
-
-function _time_now() {
-    return Date.now();
-}
-
-function _is_server_page(url) {
-    const config = getConfig();
-    if (!config || !url) return false;
-    return url.startsWith(config.urls.base);
-}
-
-function _is_extension_page(url) {
-    return url.startsWith(chrome.runtime.getURL(''));
 }

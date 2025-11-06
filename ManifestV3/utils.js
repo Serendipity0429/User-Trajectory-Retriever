@@ -32,50 +32,56 @@ async function refreshToken() {
 
     isRefreshing = true;
     const config = getConfig();
+    const MAX_RETRIES = config.max_retries || 3;
+    let attempt = 0;
 
-    const { refresh_token } = await _get_session('refresh_token');
-    if (!refresh_token) {
-        printDebug("utils", "Refresh token not found. Forcing logout.");
-        // Force logout if refresh token is missing
-        await _remove_session(['access_token', 'refresh_token', 'username', 'logged_in']);
-        chrome.runtime.sendMessage({ command: "alter_logging_status", log_status: false });
-        chrome.action.setBadgeText({ text: '' });
-        
-        isRefreshing = false;
-        processQueue(new Error("No refresh token available"), null);
-        return null;
-    }
-
-    try {
-        const response = await fetch(config.urls.token_refresh, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-            },
-            body: new URLSearchParams({ 'refresh': refresh_token }),
-        });
-
-        if (response.ok) {
-            const data = await response.json();
-            const new_access_token = data.access;
-            await _set_session({ 'access_token': new_access_token });
-            printDebug("utils", "Token refreshed successfully.");
-            processQueue(null, new_access_token);
-            return new_access_token;
-        } else {
-            console.error("Failed to refresh token. Status:", response.status);
+    while (attempt < MAX_RETRIES) {
+        const { refresh_token } = await _get_session('refresh_token');
+        if (!refresh_token) {
+            printDebug("utils", "Refresh token not found. Forcing logout.");
             await _remove_session(['access_token', 'refresh_token', 'username', 'logged_in']);
             chrome.runtime.sendMessage({ command: "alter_logging_status", log_status: false });
             chrome.action.setBadgeText({ text: '' });
-            processQueue(new Error("Refresh token is invalid"), null);
+            
+            isRefreshing = false;
+            processQueue(new Error("No refresh token available"), null);
             return null;
         }
-    } catch (error) {
-        console.error("Error during token refresh:", error);
-        processQueue(error, null);
-        return null;
-    } finally {
-        isRefreshing = false;
+
+        try {
+            const response = await fetch(config.urls.token_refresh, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: new URLSearchParams({ 'refresh': refresh_token }),
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                const new_access_token = data.access;
+                await _set_session({ 'access_token': new_access_token });
+                printDebug("utils", "Token refreshed successfully.");
+                processQueue(null, new_access_token);
+                isRefreshing = false;
+                return new_access_token;
+            } else {
+                throw new Error(`Failed to refresh token. Status: ${response.status}`);
+            }
+        } catch (error) {
+            console.error(`Error during token refresh (attempt ${attempt + 1}):`, error);
+            attempt++;
+            if (attempt >= MAX_RETRIES) {
+                console.error("Max retries reached. Forcing logout.");
+                await _remove_session(['access_token', 'refresh_token', 'username', 'logged_in']);
+                chrome.runtime.sendMessage({ command: "alter_logging_status", log_status: false });
+                chrome.action.setBadgeText({ text: '' });
+                processQueue(new Error("Refresh token is invalid"), null);
+                isRefreshing = false;
+                return null;
+            }
+            await new Promise(resolve => setTimeout(resolve, 500)); // Wait before retrying
+        }
     }
 }
 

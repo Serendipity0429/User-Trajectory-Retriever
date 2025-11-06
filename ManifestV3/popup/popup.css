@@ -33,6 +33,7 @@ body.control-panel-active {
 
 .container {
     padding: 15px; /* Reduced padding for a more compact look */
+    position: relative;
 }
 
 .header {
@@ -56,6 +57,16 @@ body.control-panel-active {
 .header p {
     font-size: 17px;
     color: #6c757d;
+}
+
+#server-status-icon {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    font-size: 18px;
+    color: var(--primary-color);
+    cursor: help;
+    z-index: 10;
 }
 
 .logo {

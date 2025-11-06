@@ -2,8 +2,24 @@
 // Note: The 'contextmenu' event listener has been moved to content.js.
 // This was done to resolve a conflict and consolidate the logic for capturing
 // the right-clicked element and bypassing website restrictions in one place.
-(function() {
+(async function() {
     'use strict';
+
+    const taskStatusResponse = await new Promise((resolve) => {
+        chrome.runtime.sendMessage({ command: "get_active_task" }, (response) => {
+            if (chrome.runtime.lastError) {
+                resolve(null);
+                return;
+            }
+            resolve(response);
+        });
+    });
+
+    const is_task_active = taskStatusResponse ? taskStatusResponse.is_task_active : false;
+
+    if (!is_task_active) {
+        return;
+    }
 
     const allowSelection = (e) => {
         e.stopImmediatePropagation();

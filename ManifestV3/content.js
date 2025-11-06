@@ -5,6 +5,9 @@
 
 let lastRightClickedElement;
 document.addEventListener('contextmenu', function(event) {
+    if (!_content_vars.is_task_active) {
+        return;
+    }
     lastRightClickedElement = event.composedPath?.()[0] || event.target;
     // This is necessary to bypass website restrictions that prevent the context menu.
     // It consolidates the logic that was previously conflicting in bypass.js.

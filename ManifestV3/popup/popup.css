@@ -260,6 +260,25 @@ h1 {
     background-color: #5a6268;
 }
 
+.btn-outline {
+    background-color: transparent;
+    border: 1px solid var(--primary-color);
+    color: var(--primary-color);
+}
+
+.btn-outline:hover {
+    background-color: var(--primary-color);
+    color: var(--white);
+}
+
+.btn-test {
+    padding: 8px;
+    width: 32px; /* Fixed width */
+    height: 32px; /* Fixed height */
+    font-size: 14px;
+    flex-shrink: 0;
+}
+
 .error-msg, .warning-msg, .info-msg {
     padding: 10px;
     border-radius: 5px;
@@ -499,6 +518,17 @@ h1 {
     display: block;
 }
 
+.server-setting-row {
+    display: flex;
+    align-items: center;
+    width: 90%;
+    gap: 10px;
+}
+
+.server-setting-row .server-choice-btn {
+    width: 100%;
+}
+
 .button-group-settings {
     margin-top: 15px;
 }
@@ -507,7 +537,6 @@ h1 {
     cursor: pointer;
     transition: all 0.3s ease;
     border: 2px solid transparent;
-    width: 90%;
 }
 
 .server-choice-btn.active {

@@ -6,6 +6,11 @@
 
     await initializeConfig();
 
+    if (!_content_vars.is_task_active && !getConfig().is_dev) {
+        printDebug("general", "No active task, script is disabled");
+        return;
+    }
+
     const ANNOTATION_MODAL_STYLE = `
         :root { --primary-purple: #6A1B9A; --secondary-purple: #9C27B0; --light-purple: #E1BEE7; }
         .annotation-wrapper { position: fixed; }

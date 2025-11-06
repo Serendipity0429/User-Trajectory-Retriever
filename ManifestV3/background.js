@@ -288,6 +288,13 @@ chrome.runtime.onInstalled.addListener(() => {
 });
 
 function getSelectionDetails() {
+    // Helper to parse rgb() color string
+    function parseRgb(rgb) {
+        if (!rgb || !rgb.includes('rgb')) return [255, 255, 255]; // Default to white if color is transparent or invalid
+        const result = /rgb\((\d+),\s*(\d+),\s*(\d+)\)/.exec(rgb);
+        return result ? [parseInt(result[1]), parseInt(result[2]), parseInt(result[3])] : [255, 255, 255];
+    }
+
     const selection = window.getSelection();
     if (selection.rangeCount > 0) {
         const range = selection.getRangeAt(0);
@@ -298,6 +305,56 @@ function getSelectionDetails() {
         }
         
         const selector = getCssSelector(container);
+
+        if (text.trim().length > 0 && !range.collapsed) {
+            try {
+                const computedStyle = window.getComputedStyle(container);
+                const backgroundColorRgb = parseRgb(computedStyle.backgroundColor);
+                const textColorRgb = parseRgb(computedStyle.color);
+                const backgroundColorHex = rgbToHex(...backgroundColorRgb);
+                const textColorHex = rgbToHex(...textColorRgb);
+
+                const highlightPalette = [
+                    '#FFFF88', // Light Yellow
+                    '#A0E8A0', // Light Green
+                    '#90EE90', // Pale Green
+                    '#ADD8E6', // Light Blue
+                    '#FFA07A', // Light Salmon
+                    '#FFDDC1'  // Light Apricot
+                ];
+
+                let bestColor = highlightPalette[0];
+                let maxMinDistance = 0;
+
+                for (const color of highlightPalette) {
+                    const distToBg = colorDistance(color, backgroundColorHex);
+                    const distToText = colorDistance(color, textColorHex);
+                    const minDistance = Math.min(distToBg, distToText);
+
+                    if (minDistance > maxMinDistance) {
+                        maxMinDistance = minDistance;
+                        bestColor = color;
+                    }
+                }
+
+                const span = document.createElement('span');
+                span.className = 'evidence-highlight'; 
+                span.style.backgroundColor = bestColor;
+                span.style.color = 'inherit';
+
+                range.surroundContents(span);
+            } catch (e) {
+                console.warn('Could not highlight text selection.', e);
+                try {
+                    const span = document.createElement('span');
+                    span.className = 'evidence-highlight';
+                    range.surroundContents(span);
+                } catch (e2) {
+                    console.error('Fallback highlighting also failed.', e2);
+                }
+            }
+        }
+
         return { text, selector };
     }
     return null;

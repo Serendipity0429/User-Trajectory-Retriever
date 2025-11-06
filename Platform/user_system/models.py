@@ -87,6 +87,5 @@ class Profile(models.Model):
     llm_frequency = models.CharField(max_length=50, choices=LLM_FREQUENCY_CHOICES, blank=True)
     llm_history = models.CharField(max_length=50, choices=LLM_HISTORY_CHOICES, blank=True)
 
-
     def __str__(self):
         return f'{self.user.username} Profile'

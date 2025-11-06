@@ -6,7 +6,7 @@ const defaultConfig = {
     localServerAddress: 'http://127.0.0.1:8000',
     remoteServerAddress: 'http://101.6.41.59:32904',
     isPassiveMode: true,
-    cancelTrialThreshold: 10,
+    cancelTrialThreshold: 999, // TODO: temporarily banned cancellation feature, restore this in the formal study
     messageBoxSize: 'medium',
     messageBoxPosition: 'top-right',
     popupScale: 1,
@@ -24,8 +24,9 @@ async function initializeConfig() {
     if (configInitialized) return; // Prevent re-initialization
     configInitialized = true;
 
-    // const IS_DEV = !('update_url' in chrome.runtime.getManifest()); // TODO: enable this manually
-    const IS_DEV = true; // For development purposes, set to true
+    // NOTICE: manually switch the development mode
+    const IS_DEV = false; // For production use, set to false
+    // const IS_DEV = true; // For development purposes, set to true
 
     const _get_local_config = (keys) => new Promise(resolve => chrome.storage.local.get(keys, resolve));
     const _set_local_config = (kv_pairs) => new Promise(resolve => chrome.storage.local.set(kv_pairs, resolve));

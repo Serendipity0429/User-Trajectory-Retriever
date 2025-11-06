@@ -295,15 +295,17 @@ def logout(request):
     return HttpResponseRedirect(reverse('user_system:login'))
 
 
+from django.views.decorators.http import require_POST
+from rest_framework_simplejwt.tokens import RefreshToken
+from .forms import EditInfoForm, ForgetPasswordForm, ResetPasswordForm
+from .utils import send_reset_password_email
+
+def health_check(request):
+    return JsonResponse({'status': 'ok'})
+
 @login_required
 def info(request):
-    return render(
-        request,
-        'info.html',
-        {
-            'cur_user': request.user,
-        }
-        )
+    user = request.user
 
 
 @login_required

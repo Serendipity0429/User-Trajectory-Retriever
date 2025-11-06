@@ -44,7 +44,7 @@ async function initializeConfig() {
 
     const URLS = {
         base: URL_BASE,
-        check: `${URL_BASE}/user/check/`,
+        health_check: `${URL_BASE}/user/health_check/`,
         login: `${URL_BASE}/user/login/`,
         token_login: `${URL_BASE}/user/token_login/`,
         token_refresh: `${URL_BASE}/user/token/refresh/`,
@@ -114,7 +114,7 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
             const URL_BASE = config.is_remote ? config.remoteServerAddress : config.localServerAddress;
             
             config.urls.base = URL_BASE;
-            config.urls.check = `${URL_BASE}/user/check/`;
+            config.urls.health_check = `${URL_BASE}/user/health_check/`;
             config.urls.login = `${URL_BASE}/user/login/`;
             config.urls.token_login = `${URL_BASE}/user/token_login/`;
             config.urls.token_refresh = `${URL_BASE}/user/token/refresh/`;

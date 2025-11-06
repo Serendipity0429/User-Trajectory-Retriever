@@ -14,6 +14,7 @@ from . import views
 app_name = 'user_system'
 
 urlpatterns = [
+    path('health_check/', views.health_check, name='health_check'),
     path('login/', views.login, name='login'),
     path('token_login/', views.token_login, name='token_login'),
     path('logout/', views.logout, name='logout'),

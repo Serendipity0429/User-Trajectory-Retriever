@@ -170,6 +170,39 @@ function updateServerStatusIcon(serverType) {
     }
 }
 
+function applyColors(mainColor, isDarkMode) {
+    const originalRed = '#ad0b2a';
+    const elegantBlue = '#005f73';
+    let dangerColor;
+
+    // If the main color is too close to red, switch to the elegant blue.
+    if (colorDistance(mainColor, originalRed) < 100) {
+        dangerColor = elegantBlue;
+    } else {
+        dangerColor = originalRed;
+    }
+    
+    const dangerTextColor = getContrastingTextColor(dangerColor);
+
+    const colors = {
+        '--primary-color': mainColor,
+        '--primary-color-hover': shadeColor(mainColor, -10), // 10% darker
+        '--primary-color-active': shadeColor(mainColor, -20), // 20% darker
+        '--danger-color': dangerColor,
+        '--danger-color-hover': shadeColor(dangerColor, -10),
+        '--danger-text-color': dangerTextColor,
+        '--secondary-color': isDarkMode ? '#3A3A3A' : '#f4f4f4',
+        '--light-gray': isDarkMode ? '#2f2f2f' : '#f8f9fa',
+        '--dark-gray': isDarkMode ? '#ecf0f1' : '#34495e',
+        '--white': isDarkMode ? '#3A3A3A' : '#ffffff',
+    };
+
+    const root = document.documentElement;
+    for (const [key, value] of Object.entries(colors)) {
+        root.style.setProperty(key, value);
+    }
+}
+
 // --- API CALLS ---
 
 async function sendMessageFromPopup(message) {
@@ -380,6 +413,35 @@ async function handleCancelTask() {
     }
 }
 
+async function testConnection(serverType) {
+    const address = serverType === 'local' 
+        ? document.getElementById('local-server-address').value
+        : document.getElementById('remote-server-address').value;
+
+    if (!address) {
+        showAlert(`Please enter a ${serverType} server address.`);
+        return;
+    }
+
+    const btn = document.getElementById(`test-${serverType}-server-btn`);
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+
+    try {
+        const response = await fetch(`${address}/user/health_check/`);
+        if (response.ok) {
+            showAlert(`Successfully connected to the ${serverType} server!`, "Connection Successful");
+        } else {
+            showAlert(`Could not connect to the ${serverType} server. Status: ${response.status}`, "Connection Failed");
+        }
+    } catch (error) {
+        showAlert(`An error occurred while trying to connect to the ${serverType} server. Please check the address and your network connection.`, "Connection Error");
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-plug"></i>';
+    }
+}
+
 // --- INITIALIZATION ---
 (async function initialize() {
     await initializeConfig(); // Wait for config to be loaded
@@ -404,6 +466,8 @@ async function handleCancelTask() {
     const colorThemeSelector = document.getElementById('color-theme-selector');
     const customColorPicker = document.getElementById('custom-color-picker');
     const themeToggle = document.getElementById('theme-toggle');
+    const testLocalServerBtn = document.getElementById('test-local-server-btn');
+    const testRemoteServerBtn = document.getElementById('test-remote-server-btn');
     let originalSettings = {};
 
     const themes = {
@@ -426,6 +490,10 @@ async function handleCancelTask() {
     };
 
     await loadSettings();
+
+
+    testLocalServerBtn.addEventListener('click', () => testConnection('local'));
+    testRemoteServerBtn.addEventListener('click', () => testConnection('remote'));
 
     function applyCurrentTheme() {
         const isDarkMode = themeToggle.checked;

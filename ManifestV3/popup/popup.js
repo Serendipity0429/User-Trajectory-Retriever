@@ -157,6 +157,19 @@ function switchTaskButtonStatus(task_status, trial_num = 0) {
     cancelTaskBtn.disabled = !is_active;
 }
 
+function updateServerStatusIcon(serverType) {
+    const icon = document.getElementById('server-status-icon');
+    if (!icon) return;
+
+    if (serverType === 'local') {
+        icon.className = 'fas fa-server';
+        icon.title = 'Local Mode';
+    } else {
+        icon.className = 'fas fa-globe';
+        icon.title = 'Remote Mode';
+    }
+}
+
 // --- API CALLS ---
 
 async function sendMessageFromPopup(message) {
@@ -540,6 +553,7 @@ async function handleCancelTask() {
         themeToggle.checked = settings.darkMode;
         applyCurrentTheme();
         updatePaletteSwatches(settings.darkMode);
+        updateServerStatusIcon(settings.serverType);
     }
 
     async function loadSettings() {
@@ -641,6 +655,7 @@ async function handleCancelTask() {
                 position: currentSettings.messageBoxPosition 
             });
             originalSettings = { ...currentSettings }; // Update original settings to reflect saved state
+            updateServerStatusIcon(currentSettings.serverType);
             const infoMsgContainer = document.getElementById('info-msg-container');
             const infoMsgText = document.getElementById('info-msg-text');
             infoMsgText.textContent = 'Saved!';
@@ -680,6 +695,7 @@ async function handleCancelTask() {
                 size: defaultConfig.messageBoxSize, 
                 position: defaultConfig.messageBoxPosition 
             });
+            updateServerStatusIcon(defaultConfig.serverType);
 
             originalSettings = { ...defaultConfig };
         

@@ -70,7 +70,7 @@ async function initializeConfig() {
         is_passive_mode: defaultConfig.isPassiveMode,
         urls: URLS,
         version: chrome.runtime.getManifest().version,
-        max_retries: 1,
+        max_retries: 3,
         cancel_trial_threshold: defaultConfig.cancelTrialThreshold,
     };
 }

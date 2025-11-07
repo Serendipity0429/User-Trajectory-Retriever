@@ -12,13 +12,18 @@ from django.urls import reverse
 import logging
 import json
 from django.views.decorators.csrf import csrf_exempt
-from django.contrib.auth import login as auth_login, logout as auth_logout
+from django.contrib.auth import login as auth_login, logout as auth_logout, get_user_model
 from django.contrib.auth.decorators import login_required, user_passes_test
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db.models import Q
+from django.templatetags.static import static
 from django.core.paginator import Paginator
 from django.utils import timezone
 from datetime import timedelta
 from django.contrib import messages
+from django.views import View
+
+USER_SEARCH_RESULT_LIMIT = 8
 
 def is_superuser(user):
     return user.is_superuser
@@ -212,14 +217,40 @@ def toggle_superuser(request, user_id):
     return JsonResponse({'status': 'error'}, status=400)
 
 
+from django.core.signing import Signer, BadSignature
+from django.views.decorators.http import require_POST
+
+# ... (other imports)
+
 @login_required
 @user_passes_test(is_superuser)
 def login_as_user(request, user_id):
     if request.method == 'POST':
         user_to_login = get_object_or_404(User, id=user_id)
         if not user_to_login.is_primary_superuser and request.user.id != user_to_login.id:
+            signer = Signer()
+            request.session['original_user_token'] = signer.sign(request.user.id)
             auth_login(request, user_to_login)
             return HttpResponseRedirect(reverse('task_manager:home'))
+    return HttpResponseRedirect(reverse('user_system:admin_page'))
+
+
+@login_required
+@require_POST
+def return_to_admin(request):
+    signed_token = request.session.get('original_user_token')
+    if signed_token:
+        signer = Signer()
+        try:
+            admin_id = signer.unsign(signed_token)
+            admin_user = get_object_or_404(User, id=admin_id)
+            auth_login(request, admin_user)
+            del request.session['original_user_token']
+        except (BadSignature, User.DoesNotExist):
+            # If the signature is bad or user doesn't exist,
+            # just clear the token and redirect.
+            if 'original_user_token' in request.session:
+                del request.session['original_user_token']
     return HttpResponseRedirect(reverse('user_system:admin_page'))
 
 
@@ -307,7 +338,13 @@ def health_check(request):
 
 @login_required
 def info(request):
-    user = request.user
+    return render(
+        request,
+        'info.html',
+        {
+            'cur_user': request.user,
+        }
+    )
 
 
 @login_required
@@ -451,4 +488,32 @@ def reset_password(request, token_str):
             'error_message': error_message,
             'user': token.user,
         }
-        )
+    )
+
+
+
+
+
+class UserSearchView(LoginRequiredMixin, View):
+    def get(self, request):
+        term = request.GET.get('term', '')
+        User = get_user_model()
+        users = User.objects.filter(
+            Q(username__icontains=term) | Q(profile__name__icontains=term)
+        ).exclude(pk=request.user.pk).select_related('profile')[:USER_SEARCH_RESULT_LIMIT]
+        
+        results = []
+        for user in users:
+            # Use default static image if icon is not set
+            image_url = user.profile.icon.url if user.profile.icon else static('img/default.jpg')
+            
+            results.append({
+                'id': user.id,
+                'label': user.username, # Keep for accessibility
+                'value': user.username,
+                'name': user.profile.name or user.username,
+                'username': user.username,
+                'image_url': image_url
+            })
+        return JsonResponse(results, safe=False)
+

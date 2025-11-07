@@ -6,4 +6,5 @@ class DiscussionConfig(AppConfig):
     name = 'discussion'
 
     def ready(self):
-        pass
+        import discussion.signals
+

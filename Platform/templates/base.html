@@ -1,4 +1,5 @@
 {% load static %}
+{% load msg_system_extras %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -90,9 +91,22 @@
                 <li>
                     <a href="{% url 'discussion_home' %}"><i class="bi bi-chat-dots-fill"></i> Discussion</a>
                 </li>
+                <li>
+                    <a href="{% url 'msg_system:message_list' %}"><i class="bi bi-envelope-fill"></i> Messages {% unread_message_count %}</a>
+                </li>
                 {% if user.is_superuser %}
                 <li>
                     <a href="{% url 'user_system:admin_page' %}"><i class="bi bi-person-badge-fill"></i> Admin Page</a>
+                </li>
+                {% endif %}
+                {% if request.session.original_user_token %}
+                <li>
+                    <form action="{% url 'user_system:return_to_admin' %}" method="post" class="d-inline">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-link text-decoration-none ps-0" style="color: var(--bs-link-color);">
+                            <i class="bi bi-box-arrow-in-left"></i> Return to Admin
+                        </button>
+                    </form>
                 </li>
                 {% endif %}
                 {% if user.is_authenticated %}
@@ -110,16 +124,6 @@
         <div id="sidebar-backdrop"></div>
         <!-- Page Content -->
         <div id="content">
-            {% if messages %}
-                <div class="message-card">
-                    {% for message in messages %}
-                        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
-                            {{ message }}
-                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                        </div>
-                    {% endfor %}
-                </div>
-            {% endif %}
             <header class="sticky-top">
                 <nav class="navbar navbar-light bg-light custom-navbar">
                     <div class="container-fluid">
@@ -134,10 +138,20 @@
                                 {% block navbar_extra %}{% endblock %}
                             </div>
                             <div class="d-flex align-items-center">
+                                <div class="dropdown me-2">
+                                    <button type="button" id="messageDropdown" class="btn btn-light" data-bs-toggle="dropdown" aria-expanded="false">
+                                        <i class="bi bi-envelope-fill"></i> {% unread_message_count %}
+                                    </button>
+                                    <div class="dropdown-menu dropdown-menu-end" aria-labelledby="messageDropdown">
+                                        <div id="message-popover-content">
+                                            {% message_popover %}
+                                        </div>
+                                        <a class="dropdown-item text-center" href="{% url 'msg_system:message_list' %}">View All Messages</a>
+                                    </div>
+                                </div>
                                 <div class="dropdown">
-                                    <button type="button" id="pageSettingsDropdown" class="page-settings-text-button" data-bs-toggle="dropdown" aria-expanded="false">
-                                        <span class="page-settings-text me-2">Page Settings</span>
-                                        <i class="bi bi-chevron-down"></i>
+                                    <button type="button" id="pageSettingsDropdown" class="btn btn-light" data-bs-toggle="dropdown" aria-expanded="false">
+                                        <i class="bi bi-gear-fill"></i>
                                     </button>
                                     <div class="dropdown-menu dropdown-menu-end page-settings-dropdown-menu" aria-labelledby="pageSettingsDropdown">
                                         <div class="px-3 py-1">
@@ -508,6 +522,36 @@
                 });
                 pageSettingsDropdown.addEventListener('hide.bs.dropdown', function () {
                     this.querySelector('i').classList.replace('bi-chevron-up', 'bi-chevron-down');
+                });
+            }
+
+            // Message Dropdown Hover
+            const messageDropdown = document.getElementById('messageDropdown');
+            if(messageDropdown) {
+                const dropdownMenu = messageDropdown.nextElementSibling;
+                let timeout;
+
+                messageDropdown.addEventListener('mouseenter', function () {
+                    clearTimeout(timeout);
+                    new bootstrap.Dropdown(messageDropdown).show();
+                });
+
+                messageDropdown.addEventListener('mouseleave', function () {
+                    timeout = setTimeout(() => {
+                        if (!dropdownMenu.matches(':hover')) {
+                            new bootstrap.Dropdown(messageDropdown).hide();
+                        }
+                    }, 200);
+                });
+
+                dropdownMenu.addEventListener('mouseleave', function () {
+                    timeout = setTimeout(() => {
+                        new bootstrap.Dropdown(messageDropdown).hide();
+                    }, 200);
+                });
+
+                dropdownMenu.addEventListener('mouseenter', function () {
+                    clearTimeout(timeout);
                 });
             }
         });

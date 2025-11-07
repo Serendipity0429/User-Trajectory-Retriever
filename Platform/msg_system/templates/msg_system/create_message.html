@@ -1,0 +1,278 @@
+{% extends 'base.html' %}
+
+{% block css %}
+<style>
+    /* Autocomplete Dropdown Styling */
+    .ui-autocomplete {
+        z-index: 1050; /* Ensure it's above other elements */
+        background-color: #fff;
+        border: 1px solid rgba(0,0,0,.15);
+        border-radius: .25rem;
+        box-shadow: 0 .5rem 1rem rgba(0,0,0,.175);
+        padding: .5rem;
+        list-style: none;
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        gap: 8px;
+    }
+    .ui-menu-item {
+        padding: 0;
+        cursor: pointer;
+        border-radius: .25rem;
+    }
+    .ui-menu-item-wrapper:hover, .ui-menu-item-wrapper.ui-state-active {
+        background-color: #e9ecef;
+        color: #000;
+        border-radius: .25rem;
+    }
+    .ui-menu-item-no-results {
+        grid-column: 1 / -1; /* Span all columns */
+        text-align: center;
+        pointer-events: none; /* Not selectable */
+    }
+
+    .recipient-token-area {
+        /* Mimic .form-control */
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        width: 100%;
+        padding: .375rem .75rem;
+        font-size: 1rem;
+        font-weight: 400;
+        line-height: 1.5;
+        color: #212529;
+        background-color: #fff;
+        background-clip: padding-box;
+        border: 1px solid #ced4da;
+        -webkit-appearance: none;
+        -moz-appearance: none;
+        appearance: none;
+        border-radius: .25rem;
+        transition: border-color .15s ease-in-out,box-shadow .15s ease-in-out;
+        gap: 5px;
+    }
+    .recipient-token-area:focus-within {
+        color: #212529;
+        background-color: #fff;
+        border-color: #86b7fe;
+        outline: 0;
+        box-shadow: 0 0 0 0.25rem rgb(13 110 253 / 25%);
+    }
+    .recipient-token-area.is-invalid {
+        border-color: #dc3545;
+    }
+    #recipient-input {
+        border: none;
+        outline: none;
+        flex-grow: 1;
+        min-width: 150px;
+        background-color: transparent;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1 class="mt-4">Create Message</h1>
+
+    {% if form.non_field_errors %}
+        <div class="alert alert-danger alert-dismissible fade show mt-3" role="alert">
+            {% for error in form.non_field_errors %}
+                <p class="mb-0">{{ error }}</p>
+            {% endfor %}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    {% endif %}
+
+    <form method="post" novalidate class="mt-4">
+        {% csrf_token %}
+        {{ form.recipients }}
+        
+        <div class="mb-3" id="recipients-container">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <label for="recipient-input" class="form-label mb-0">Recipients</label>
+                <div class="form-check form-switch">
+                    <input type="checkbox" name="{{ form.send_to_all.name }}" class="form-check-input" id="{{ form.send_to_all.id_for_label }}" {% if form.send_to_all.value %}checked{% endif %}>
+                    <label class="form-check-label" for="{{ form.send_to_all.id_for_label }}">Send to all users</label>
+                </div>
+            </div>
+            <div class="recipient-token-area {% if form.recipients.errors %}is-invalid{% endif %}" id="recipient-token-area">
+                <input type="text" id="recipient-input" placeholder="Type a username...">
+            </div>
+            {% if form.recipients.errors %}
+                <div class="invalid-feedback d-block">
+                    {{ form.recipients.errors.as_text }}
+                </div>
+            {% endif %}
+        </div>
+
+        <div class="form-floating mb-3">
+            <input type="text" name="{{ form.subject.name }}" class="form-control {% if form.subject.errors %}is-invalid{% endif %}" id="{{ form.subject.id_for_label }}" value="{{ form.subject.value|default_if_none:'' }}">
+            <label for="{{ form.subject.id_for_label }}">Subject</label>
+            {% if form.subject.errors %}
+                <div class="invalid-feedback">
+                    {{ form.subject.errors.as_text }}
+                </div>
+            {% endif %}
+        </div>
+
+        <div class="mb-3">
+            <label for="{{ form.body.id_for_label }}" class="form-label">Body</label>
+            <textarea name="{{ form.body.name }}" class="form-control {% if form.body.errors %}is-invalid{% endif %}" id="{{ form.body.id_for_label }}" rows="10">{{ form.body.value|default_if_none:'' }}</textarea>
+            {% if form.body.errors %}
+                <div class="invalid-feedback d-block">
+                    {{ form.body.errors.as_text }}
+                </div>
+            {% endif %}
+        </div>
+
+        <div class="mb-3">
+            <label for="{{ form.level.id_for_label }}" class="form-label">Level</label>
+            <select name="{{ form.level.name }}" class="form-select {% if form.level.errors %}is-invalid{% endif %}" id="{{ form.level.id_for_label }}">
+                 {% for value, text in form.fields.level.choices %}
+                    <option value="{{ value }}" {% if form.level.value|stringformat:"s" == value|stringformat:"s" %}selected{% endif %}>
+                        {{ text }}
+                    </option>
+                {% endfor %}
+            </select>
+            {% if form.level.errors %}
+                <div class="invalid-feedback d-block">
+                    {{ form.level.errors.as_text }}
+                </div>
+            {% endif %}
+        </div>
+        
+        <div class="d-flex justify-content-between align-items-center mt-4">
+            <div class="form-check form-switch">
+                <input type="checkbox" name="{{ form.is_pinned.name }}" class="form-check-input" id="{{ form.is_pinned.id_for_label }}" {% if form.is_pinned.value %}checked{% endif %}>
+                <label class="form-check-label" for="{{ form.is_pinned.id_for_label }}">Pin this message</label>
+            </div>
+            <div>
+                <button type="submit" class="btn btn-primary">Send Message</button>
+                <a href="javascript:history.back()" class="btn btn-secondary ms-2">Cancel</a>
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+$(function() {
+    const sendToAllCheckbox = $('#{{ form.send_to_all.id_for_label }}');
+    const recipientsContainer = $('#recipients-container');
+    const recipientInput = $('#recipient-input');
+    const hiddenRecipients = $('input[name="{{ form.recipients.name }}"]');
+    const tokenArea = $('#recipient-token-area');
+    let recipientIds = [];
+
+    function updateHiddenInput() {
+        hiddenRecipients.val(recipientIds.join(','));
+    }
+
+    function addToken(label, value) {
+        if (recipientIds.includes(value.toString())) return; // Prevent duplicates
+
+        recipientIds.push(value.toString());
+        updateHiddenInput();
+
+        const token = $('<span class="badge bg-light text-dark border recipient-token"></span>').text(label);
+        const removeBtn = $('<button type="button" class="btn-close" aria-label="Remove"></button>').on('click', function() {
+            const index = recipientIds.indexOf(value.toString());
+            if (index > -1) {
+                recipientIds.splice(index, 1);
+            }
+            updateHiddenInput();
+            token.remove();
+        });
+        token.append(removeBtn);
+        token.insertBefore(recipientInput);
+    }
+
+    // Pre-populate tokens if the form is re-rendered with errors
+    const initialRecipientIds = hiddenRecipients.val();
+    if (initialRecipientIds) {
+        // This part requires a way to get usernames from IDs if you want to show tokens on error.
+        // For now, we'll just keep the IDs in the hidden field. A more advanced solution
+        // would be an AJAX call to fetch usernames for the initial IDs.
+    }
+
+    recipientInput.autocomplete({
+        source: "{% url 'user_system:user_search' %}",
+        minLength: 2,
+        response: function(event, ui) {
+            if (!ui.content.length) {
+                ui.content.push({
+                    no_results: true,
+                    label: 'No users found.'
+                });
+            }
+        },
+        select: function(event, ui) {
+            if (ui.item.no_results) {
+                return false;
+            }
+            event.preventDefault();
+            addToken(ui.item.label, ui.item.id);
+            $(this).val('');
+            return false; // Prevent the value from being inserted into the input
+        },
+        open: function() {
+            // Set the width of the autocomplete menu to match the token area
+            $(this).autocomplete('widget').css('width', tokenArea.outerWidth() + 'px');
+        }
+    });
+
+    // Adjust width on window resize
+    $(window).on('resize', function() {
+        if (recipientInput.autocomplete('widget').is(':visible')) {
+            recipientInput.autocomplete('widget').css('width', tokenArea.outerWidth() + 'px');
+        }
+    });
+
+    // Custom rendering for autocomplete items
+    recipientInput.data('ui-autocomplete')._renderItem = function(ul, item) {
+        if (item.no_results) {
+            const message = $('<div>').addClass('text-center p-2 text-muted').text(item.label);
+            return $('<li>').addClass('ui-menu-item-no-results').append(message).appendTo(ul);
+        }
+
+        const listItem = $('<li>')
+            .addClass('ui-menu-item')
+            .appendTo(ul);
+        
+        const itemWrapper = $('<div>')
+            .addClass('ui-menu-item-wrapper d-flex flex-column align-items-center p-2')
+            .appendTo(listItem);
+
+        const img = $('<img>')
+            .attr('src', item.image_url)
+            .addClass('rounded-circle mb-1')
+            .css({width: '48px', height: '48px', objectFit: 'cover'});
+
+        const name = $('<strong>').addClass('text-truncate d-block w-100 text-center').text(item.name);
+        const username = $('<small>').addClass('text-muted text-truncate d-block w-100 text-center').text('@' + item.username);
+
+        itemWrapper.append(img).append(name).append(username);
+
+        return listItem;
+    };
+
+    tokenArea.on('click', function() {
+        recipientInput.focus();
+    });
+
+    function toggleRecipientsField() {
+        if (sendToAllCheckbox.is(':checked')) {
+            recipientsContainer.find('.recipient-token-area').hide();
+        } else {
+            recipientsContainer.find('.recipient-token-area').show();
+        }
+    }
+
+    sendToAllCheckbox.on('change', toggleRecipientsField);
+    toggleRecipientsField();
+});
+</script>
+{% endblock %}

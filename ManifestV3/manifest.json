@@ -1,6 +1,6 @@
 {
   "name": "Alpha-UTRT: THUIR User Trajectory Retriever Toolkit",
-  "version": "2.0",
+  "version": "3.0",
   "manifest_version": 3,
   "description": "A simple chrome extension to collect user behaviors of certain tasks",
   "icons": {

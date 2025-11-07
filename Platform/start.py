@@ -1,35 +1,17 @@
-#!/usr/bin/env python3
-"""
-This script automates the setup and execution of a Django development server.
-
-It provides functionalities for:
-- Cleaning the project by removing migration files, the database, and media assets.
-- Running database migrations.
-- Setting up development data, including loading datasets and creating test users.
-- Starting the Django development server with optional remote access.
-
-Features:
-- A `--debug` mode that performs a complete project cleanup and sets up fresh 
-  development data.
-- User confirmation prompt when running in debug mode to prevent accidental 
-  data loss.
-- Clear, color-coded console output for better readability of script operations.
-
-Usage:
-- To start the server normally: `python start.py`
-- To start in debug mode for a clean environment: `python start.py --debug`
-"""
-
 import argparse
 import shutil
 import subprocess
 import sys
 from pathlib import Path
 from typing import List, Union
+from dotenv import load_dotenv
+import os
+load_dotenv()
+
 
 # --- Configuration ---
 # Set to True to run the server on 0.0.0.0:2904 for remote access.
-REMOTE: bool = False
+REMOTE: bool = os.getenv("REMOTE", "False").lower() in ("true", "1", "t")
 # --- End Configuration ---
 
 # --- Constants ---
@@ -138,7 +120,10 @@ def setup_development_data() -> None:
     
     # Create test users.
     print_info("Creating test users...")
-    users = {"test": "thuirtest", "test1": "thuirtest1", "test2": "thuirtest2"}
+    users = {"test": "thuirtest"}
+    test_user_num = 10
+    for i in range(test_user_num):
+        users[f"user{i}"] = f"thuiruser{i}"
     for username, password in users.items():
         run_manage_py_command("create_test_user", username, password)
     
@@ -167,6 +152,18 @@ def main() -> None:
         if input().strip().lower() != 'y':
             print_info("Aborting debug mode.")
             sys.exit(0)
+        
+        if REMOTE:
+            print_warning("Remote mode is not recommended in debug mode.")
+            print_warning("Switching to local mode for safety.")
+            print_warning("Are you sure you want to continue? (y/n): ", end="")
+            if input().strip().lower() != 'y':
+                print_info("Aborting debug mode.")
+                sys.exit(0)
+            print_warning("The LAST WARNING: Are you REALLY sure? (yes/no): ", end="")
+            if input() != 'yes':
+                print_info("Aborting debug mode.")
+                sys.exit(0)
         
         clean_project()
 

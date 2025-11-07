@@ -778,3 +778,27 @@ button.remove-source:hover {
     display: none !important;
 }
 
+/* Custom styles for message popover */
+.dropdown-menu[aria-labelledby="messageDropdown"] {
+    width: 350px;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.dropdown-menu[aria-labelledby="messageDropdown"] .dropdown-item {
+    white-space: normal; /* Allow text to wrap */
+}
+
+.dropdown-menu[aria-labelledby="messageDropdown"] .dropdown-item:hover {
+    background-color: #f8f9fa;
+}
+
+.dark-mode .dropdown-menu[aria-labelledby="messageDropdown"] .dropdown-item:hover {
+    background-color: #343a40;
+}
+
+/* Improve form label spacing */
+.form-label {
+    margin-bottom: 0.75rem !important;
+}
+

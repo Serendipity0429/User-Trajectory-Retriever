@@ -6,25 +6,6 @@
     <a href="{% url 'discussion_home' %}" class="btn btn-outline-secondary mt-3">&laquo; Back to Forum</a>
     <h1 class="mt-4">Manage Bulletin</h1>
 
-    {% if messages %}
-    <div class="card my-4 message-card">
-        <div class="card-header">
-            Messages
-        </div>
-        <div class="card-body">
-            {% for message in messages %}
-                <div class="alert alert-{{ message.tags }} alert-dismissible fade show shadow-sm" role="alert">
-                    <div class="d-flex align-items-center">
-                        <i class="bi {% if message.tags == 'success' %}bi-check-circle-fill{% elif message.tags == 'danger' or message.tags == 'error' %}bi-x-circle-fill{% elif message.tags == 'warning' %}bi-exclamation-triangle-fill{% else %}bi-info-circle-fill{% endif %} me-2"></i>
-                        <span>{{ message }}</span>
-                    </div>
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                </div>
-            {% endfor %}
-        </div>
-    </div>
-    {% endif %}
-
     <div class="card my-4">
         <div class="card-header">
             Create New Announcement

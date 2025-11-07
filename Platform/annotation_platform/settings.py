@@ -21,6 +21,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 # SECURITY WARNING: It is strongly recommended to load the secret key from an environment variable
 # instead of hardcoding it in the settings file. This prevents the key from being exposed in source control.
 SECRET_KEY = config('DJANGO_SECRET_KEY', default='s%45k1x(sst=dp92(kzve50jkhr*$)@#(2ly=w1q=_xr@y2(qp')
+ADMIN_USERNAME = config('ADMIN_USERNAME', default='admin')
 
 
 # SECURITY WARNING: Running a production server with DEBUG = True is a major security risk.
@@ -51,6 +52,7 @@ INSTALLED_APPS = [
     'task_manager',
     'user_system.apps.UserSystemConfig',
     'discussion',
+    'msg_system',
 ]
 
 from django.contrib.messages import constants as messages

@@ -12,6 +12,7 @@ urlpatterns = [
     path('user/', include('user_system.urls')),
     path('task/', include('task_manager.urls')),
     path('discussion/', include('discussion.urls')),
+    path('messages/', include('msg_system.urls')),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
 # This will serve static files in production

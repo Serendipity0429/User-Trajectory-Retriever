@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2>Sent Messages</h2>
+        <div>
+            <a href="{% url 'msg_system:message_list' %}" class="btn btn-outline-secondary">Inbox</a>
+            <a href="{% url 'msg_system:create_message' %}" class="btn btn-primary">New Message</a>
+        </div>
+    </div>
+
+    <div class="list-group">
+        {% for message in messages %}
+            <a href="{% url 'msg_system:message_detail' message.pk %}" class="list-group-item list-group-item-action flex-column align-items-start
+                {% if message.level == 'INFO' %}alert-info
+                {% elif message.level == 'WARNING' %}alert-warning
+                {% elif message.level == 'ERROR' %}alert-danger
+                {% endif %}">
+                <div class="d-flex w-100 justify-content-between">
+                    <h5 class="mb-1">{{ message.subject }}</h5>
+                    <small>{{ message.timestamp|timesince }} ago</small>
+                </div>
+                <p class="mb-1">
+                    To: 
+                    {% for recipient in message.recipients.all|slice:":5" %}
+                        <span class="badge bg-secondary">{{ recipient.username }}</span>
+                    {% endfor %}
+                    {% if message.recipients.all|length > 5 %}
+                        <span class="badge bg-light text-dark border">+{{ message.recipients.all|length|add:"-5" }} more</span>
+                    {% endif %}
+                </p>
+                <small>{{ message.body|truncatewords:20 }}</small>
+            </a>
+        {% empty %}
+            <div class="list-group-item">
+                <p class="mb-0">You have not sent any messages.</p>
+            </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

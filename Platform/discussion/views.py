@@ -12,6 +12,8 @@ from django.views.decorators.csrf import csrf_exempt
 from django.core.files.storage import FileSystemStorage
 from django.conf import settings
 import os
+from user_system.models import User
+from msg_system.models import Message
 
 @login_required
 def upload_image(request):
@@ -34,7 +36,7 @@ def label_autocomplete(request):
 @login_required
 def discussion_home(request):
     # Pinned bulletins are always shown
-    pinned_bulletins = Bulletin.objects.filter(pinned=True).order_by('-created_at')
+    pinned_bulletins = Bulletin.objects.filter(pinned=True).order_by('-updated_at')
     
     # Paginate the non-pinned bulletins
     bulletin_list = Bulletin.objects.filter(pinned=False).order_by('-created_at')
@@ -54,7 +56,7 @@ def discussion_home(request):
             start = max(1, end - 4)
         bulletin_page_range = range(start, end + 1)
 
-    pinned_posts = Post.objects.filter(pinned=True).order_by('-created_at')
+    pinned_posts = Post.objects.filter(pinned=True).order_by('-updated_at')
     posts_list = Post.objects.filter(pinned=False).order_by('-created_at')
     categories = Post.POST_CATEGORIES
 
@@ -136,7 +138,14 @@ def create_post(request):
         # Check for duplicate filenames
         filenames = [f.name for f in files]
         if len(filenames) != len(set(filenames)):
-            messages.error(request, "Duplicate filenames are not allowed.")
+            admin_user = User.objects.filter(is_superuser=True).first()
+            if admin_user:
+                Message.objects.create(
+                    sender=admin_user,
+                    recipient=request.user,
+                    subject="File Upload Error",
+                    body="Duplicate filenames are not allowed."
+                )
             return render(request, 'create_post.html', {'form': form})
 
         if form.is_valid():
@@ -173,7 +182,14 @@ def manage_bulletin(request):
         # Check for duplicate filenames
         filenames = [f.name for f in files]
         if len(filenames) != len(set(filenames)):
-            messages.error(request, "Duplicate filenames are not allowed.")
+            admin_user = User.objects.filter(is_superuser=True).first()
+            if admin_user:
+                Message.objects.create(
+                    sender=admin_user,
+                    recipient=request.user,
+                    subject="File Upload Error",
+                    body="Duplicate filenames are not allowed."
+                )
             return render(request, 'manage_bulletin.html', {'form': form, 'bulletins': bulletins})
 
         if form.is_valid():
@@ -204,7 +220,14 @@ def edit_bulletin(request, pk):
         new_filenames = [f.name for f in files]
         
         if len(new_filenames) != len(set(new_filenames)) or any(f in existing_filenames for f in new_filenames):
-            messages.error(request, "Duplicate filenames are not allowed.")
+            admin_user = User.objects.filter(is_superuser=True).first()
+            if admin_user:
+                Message.objects.create(
+                    sender=admin_user,
+                    recipient=request.user,
+                    subject="File Upload Error",
+                    body="Duplicate filenames are not allowed."
+                )
             return render(request, 'edit_bulletin.html', {'form': form})
 
         if attachment_ids_to_remove:
@@ -222,12 +245,22 @@ def edit_bulletin(request, pk):
         form = BulletinForm(instance=bulletin)
     return render(request, 'edit_bulletin.html', {'form': form})
 
+from msg_system.models import Message
+
 @staff_member_required
 def delete_bulletin(request, pk):
     bulletin = get_object_or_404(Bulletin, pk=pk)
     if request.method == 'POST':
+        bulletin_title = bulletin.title
         bulletin.delete()
-        messages.success(request, "Bulletin deleted successfully.")
+        admin_user = User.objects.filter(is_superuser=True).first()
+        if admin_user:
+            Message.objects.create(
+                sender=admin_user,
+                recipient=request.user,
+                subject="Bulletin Deleted",
+                body=f"The bulletin '{bulletin_title}' was deleted successfully."
+            )
         return redirect('manage_bulletin')
     return render(request, 'confirm_delete.html', {'object': bulletin})
 
@@ -249,7 +282,14 @@ def edit_post(request, pk):
         new_filenames = [f.name for f in files]
 
         if len(new_filenames) != len(set(new_filenames)) or any(f in existing_filenames for f in new_filenames):
-            messages.error(request, "Duplicate filenames are not allowed.")
+            admin_user = User.objects.filter(is_superuser=True).first()
+            if admin_user:
+                Message.objects.create(
+                    sender=admin_user,
+                    recipient=request.user,
+                    subject="File Upload Error",
+                    body="Duplicate filenames are not allowed."
+                )
             return render(request, 'edit_post.html', {'form': form})
 
         if attachment_ids_to_remove:
@@ -276,23 +316,30 @@ def edit_post(request, pk):
     return render(request, 'edit_post.html', {'form': form})
 
 @login_required
-
 def delete_post(request, pk):
-
     post = get_object_or_404(Post, pk=pk)
+    admin_user = User.objects.filter(is_superuser=True).first()
 
     if request.user != post.author and not request.user.is_staff:
-
-        messages.error(request, "You are not authorized to delete this post.")
-
+        if admin_user:
+            Message.objects.create(
+                sender=admin_user,
+                recipient=request.user,
+                subject="Unauthorized Action",
+                body="You are not authorized to delete this post."
+            )
         return redirect('post_detail', pk=pk)
 
     if request.method == 'POST':
-
+        post_title = post.title
         post.delete()
-
-        messages.success(request, "Post deleted successfully.")
-
+        if admin_user:
+            Message.objects.create(
+                sender=admin_user,
+                recipient=request.user,
+                subject="Post Deleted",
+                body=f"The post '{post_title}' was deleted successfully."
+            )
         return redirect('discussion_home')
 
     return render(request, 'confirm_delete.html', {'object': post})
@@ -300,25 +347,30 @@ def delete_post(request, pk):
 
 
 @login_required
-
 def delete_comment(request, pk):
-
     comment = get_object_or_404(Comment, pk=pk)
-
     post_pk = comment.post.pk
+    admin_user = User.objects.filter(is_superuser=True).first()
 
     if request.user != comment.author and not request.user.is_staff:
-
-        messages.error(request, "You are not authorized to delete this comment.")
-
+        if admin_user:
+            Message.objects.create(
+                sender=admin_user,
+                recipient=request.user,
+                subject="Unauthorized Action",
+                body="You are not authorized to delete this comment."
+            )
         return redirect('post_detail', pk=post_pk)
 
     if request.method == 'POST':
-
         comment.delete()
-
-        messages.success(request, "Comment deleted successfully.")
-
+        if admin_user:
+            Message.objects.create(
+                sender=admin_user,
+                recipient=request.user,
+                subject="Comment Deleted",
+                body="Your comment was deleted successfully."
+            )
         return redirect('post_detail', pk=post_pk)
 
     return render(request, 'confirm_delete.html', {'object': comment})

@@ -1,0 +1,26 @@
+<h6 class="dropdown-header">
+    <i class="bi bi-bell-fill me-2"></i> Notifications
+</h6>
+{% for message in messages %}
+    <a class="dropdown-item d-flex align-items-start" href="{% url 'msg_system:message_detail' message.pk %}">
+        <div class="flex-shrink-0 me-2 pt-1">
+            <i class="bi bi-info-circle-fill text-primary"></i>
+        </div>
+        <div class="flex-grow-1">
+            <p class="mb-0 fw-bold">
+                {% if message.is_pinned %}
+                    <i class="bi bi-pin-angle-fill me-2"></i>
+                {% endif %}
+                {{ message.subject|truncatechars:30 }}
+            </p>
+            <small class="text-muted">{{ message.timestamp|timesince }} ago</small>
+        </div>
+    </a>
+{% empty %}
+    <div class="px-3 py-2">
+        <p class="mb-0 text-center text-muted">No new messages.</p>
+    </div>
+{% endfor %}
+{% if messages %}
+<hr class="dropdown-divider">
+{% endif %}

@@ -3,7 +3,7 @@ from django.db.models import Q
 from django.http import JsonResponse
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, get_object_or_404, redirect
-from .models import Bulletin, Post, Comment, Attachment, Label
+from .models import Bulletin, Post, Comment, Attachment, Label, BulletinReadStatus
 from .forms import PostForm, CommentForm, BulletinForm
 from django.contrib.admin.views.decorators import staff_member_required
 import markdown
@@ -110,7 +110,25 @@ def discussion_home(request):
 @login_required
 def bulletin_detail(request, pk):
     bulletin = get_object_or_404(Bulletin, pk=pk)
-    return render(request, 'bulletin_detail.html', {'bulletin': bulletin})
+    if request.user.is_authenticated and not request.user.is_staff:
+        BulletinReadStatus.objects.get_or_create(bulletin=bulletin, user=request.user)
+    
+    read_count = BulletinReadStatus.objects.filter(bulletin=bulletin).count()
+    
+    return render(request, 'bulletin_detail.html', {'bulletin': bulletin, 'read_count': read_count})
+
+@staff_member_required
+def bulletin_read_status(request, pk):
+    bulletin = get_object_or_404(Bulletin, pk=pk)
+    
+    read_users = User.objects.filter(bulletinreadstatus__bulletin=bulletin)
+    unread_users = User.objects.exclude(id__in=read_users.values_list('id', flat=True)).exclude(is_superuser=True)
+
+    return render(request, 'bulletin_read_status.html', {
+        'bulletin': bulletin,
+        'read_users': read_users,
+        'unread_users': unread_users
+    })
 
 @login_required
 def post_detail(request, pk):

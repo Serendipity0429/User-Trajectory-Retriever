@@ -8,10 +8,10 @@
         <div class="card-header d-flex justify-content-between align-items-center p-3">
             <h1 class="mb-0">{{ bulletin.title }}</h1>
             {% if user.is_staff %}
-            <div>
-                <a href="{% url 'edit_bulletin' bulletin.pk %}" class="btn btn-primary btn-sm">Edit</a>
-                <a href="{% url 'delete_bulletin' bulletin.pk %}" class="btn btn-danger btn-sm">Delete</a>
-            </div>
+                <span>
+                    <a href="{% url 'edit_bulletin' bulletin.pk %}" class="btn btn-primary btn-sm">Edit</a>
+                    <a href="{% url 'delete_bulletin' bulletin.pk %}" class="btn btn-danger btn-sm">Delete</a>
+                </span>
             {% endif %}
         </div>
         <div class="card-body p-4">
@@ -50,6 +50,11 @@
                 </div>
             {% endif %}
         </div>
+        {% if user.is_staff %}
+        <div class="card-footer text-muted">
+            Read by {{ read_count }} users, <a href="{% url 'bulletin_read_status' bulletin.pk %}" style="text-decoration: underline;">click for detail.</a>
+        </div>
+        {% endif %}
     </div>
 </div>
 {% endblock %}

@@ -3,7 +3,7 @@ from django import forms
 from .models import Bulletin, Post
 
 class BulletinAdmin(admin.ModelAdmin):
-    list_display = ('title', 'category', 'created_at', 'pinned')
+    list_display = ('title', 'category', 'created_at', 'pinned', 'send_notification')
 
 class PostAdmin(admin.ModelAdmin):
     list_display = ('title', 'author', 'category', 'created_at', 'pinned')

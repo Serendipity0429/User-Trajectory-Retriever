@@ -22,6 +22,8 @@ from django.utils import timezone
 from datetime import timedelta
 from django.contrib import messages
 from django.views import View
+from django.core.signing import Signer, BadSignature
+from django.views.decorators.http import require_POST
 
 USER_SEARCH_RESULT_LIMIT = 8
 
@@ -217,20 +219,21 @@ def toggle_superuser(request, user_id):
     return JsonResponse({'status': 'error'}, status=400)
 
 
-from django.core.signing import Signer, BadSignature
-from django.views.decorators.http import require_POST
-
-# ... (other imports)
-
 @login_required
 @user_passes_test(is_superuser)
 def login_as_user(request, user_id):
     if request.method == 'POST':
         user_to_login = get_object_or_404(User, id=user_id)
         if not user_to_login.is_primary_superuser and request.user.id != user_to_login.id:
-            signer = Signer()
-            request.session['original_user_token'] = signer.sign(request.user.id)
+            original_admin_id = request.user.id
+            
+            # Log in as the new user first, as this may flush the session
             auth_login(request, user_to_login)
+            
+            # Now, set the token in the new session
+            signer = Signer()
+            request.session['original_user_token'] = signer.sign(original_admin_id)
+            
             return HttpResponseRedirect(reverse('task_manager:home'))
     return HttpResponseRedirect(reverse('user_system:admin_page'))
 
@@ -238,19 +241,17 @@ def login_as_user(request, user_id):
 @login_required
 @require_POST
 def return_to_admin(request):
-    signed_token = request.session.get('original_user_token')
+    signed_token = request.session.pop('original_user_token', None)
     if signed_token:
         signer = Signer()
         try:
             admin_id = signer.unsign(signed_token)
             admin_user = get_object_or_404(User, id=admin_id)
             auth_login(request, admin_user)
-            del request.session['original_user_token']
         except (BadSignature, User.DoesNotExist):
-            # If the signature is bad or user doesn't exist,
-            # just clear the token and redirect.
-            if 'original_user_token' in request.session:
-                del request.session['original_user_token']
+            # The invalid token has already been removed.
+            # We can simply redirect without any further action.
+            pass
     return HttpResponseRedirect(reverse('user_system:admin_page'))
 
 

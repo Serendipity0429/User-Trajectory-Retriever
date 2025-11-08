@@ -88,6 +88,20 @@ class MessageDetailView(LoginRequiredMixin, DetailView):
                 status.is_read = True
                 status.save()
             context['recipient_status'] = status
+        
+        # Build conversation thread
+        root = message
+        while root.parent:
+            root = root.parent
+        
+        conversation_messages = []
+        def collect_descendants(node, message_list):
+            message_list.append(node)
+            for child in node.replies.order_by('timestamp'):
+                collect_descendants(child, message_list)
+
+        collect_descendants(root, conversation_messages)
+        context['conversation_messages'] = conversation_messages
 
         return context
 
@@ -123,7 +137,8 @@ class ReplyMessageView(LoginRequiredMixin, View):
         if form.is_valid():
             reply = form.save(commit=False)
             reply.sender = request.user
+            reply.parent = original_message
             reply.save()
             MessageRecipient.objects.create(message=reply, user=original_message.sender)
-            return redirect('msg_system:message_list')
+            return redirect('msg_system:message_detail', pk=pk)
         return render(request, 'msg_system/reply_message.html', {'form': form, 'original_message': original_message})

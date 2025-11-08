@@ -7,54 +7,41 @@
     {% else %}
         <a href="{% url 'msg_system:message_list' %}" class="btn btn-outline-secondary mt-3 mb-3">&laquo; Back to Inbox</a>
     {% endif %}
-    <div class="card my-4">
+
+    <h1 class="my-4">{{ message.subject }}</h1>
+
+    {% for msg in conversation_messages %}
+    <div class="card mb-3
+        {% if msg.sender == request.user %}border-primary{% else %}border-secondary{% endif %}">
         <div class="card-header d-flex justify-content-between align-items-center p-3
-            {% if message.level == 'INFO' %}alert-info
-            {% elif message.level == 'WARNING' %}alert-warning
-            {% elif message.level == 'ERROR' %}alert-danger
-            {% elif message.level == 'IMPORTANT' %}alert-primary
+            {% if msg.level == 'INFO' %}alert-info
+            {% elif msg.level == 'WARNING' %}alert-warning
+            {% elif msg.level == 'ERROR' %}alert-danger
             {% endif %}">
-            <h1 class="mb-0">
-                {% if recipient_status.is_pinned %}
-                    <i class="bi bi-pin-angle-fill"></i>
-                {% endif %}
-                {{ message.subject }}
-            </h1>
-            {% if request.user != message.sender %}
             <div>
-                <a href="{% url 'msg_system:reply_message' message.pk %}" class="btn btn-primary btn-sm">Reply</a>
-                <form action="{% url 'msg_system:pin_message' message.pk %}" method="post" class="d-inline">
+                <strong>{{ msg.sender.username }}</strong>
+                <span class="text-muted"> | {{ msg.timestamp }}</span>
+            </div>
+            {% if forloop.last and request.user != msg.sender %}
+            <div>
+                <a href="{% url 'msg_system:reply_message' msg.pk %}" class="btn btn-primary btn-sm">Reply</a>
+                <form action="{% url 'msg_system:pin_message' msg.pk %}" method="post" class="d-inline">
                     {% csrf_token %}
                     <button type="submit" class="btn btn-secondary btn-sm">
-                        {% if recipient_status.is_pinned %}
-                            Unpin
-                        {% else %}
-                            Pin
-                        {% endif %}
+                        {% if recipient_status.is_pinned %}Unpin{% else %}Pin{% endif %}
                     </button>
                 </form>
-                <form action="{% url 'msg_system:delete_message' message.pk %}" method="post" class="d-inline">
+                <form action="{% url 'msg_system:delete_message' msg.pk %}" method="post" class="d-inline">
                     {% csrf_token %}
                     <button type="submit" class="btn btn-danger btn-sm">Delete</button>
                 </form>
             </div>
             {% endif %}
         </div>
-        <div class="card-body p-4">
-            <h6 class="card-subtitle mb-2 text-muted">
-                {% if request.user == message.sender %}
-                    To: 
-                    {% for recipient in message.recipients.all %}
-                        {{ recipient.username }}{% if not forloop.last %}, {% endif %}
-                    {% endfor %}
-                    | Sent on {{ message.timestamp }}
-                {% else %}
-                    From: {{ message.sender.username }} | Received on {{ message.timestamp }}
-                {% endif %}
-            </h6>
-            <hr>
-            <p class="card-text mt-3">{{ message.body|safe }}</p>
+        <div class="card-body">
+            {{ msg.body|safe }}
         </div>
     </div>
+    {% endfor %}
 </div>
 {% endblock %}

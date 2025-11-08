@@ -65,8 +65,8 @@ def admin_page(request):
     task_user_filter = request.GET.get('task_user', '')
     task_date_start_filter = request.GET.get('task_date_start', '')
     task_date_end_filter = request.GET.get('task_date_end', '')
-    task_sort_by = request.GET.get('task_sort_by', 'id')
-    task_sort_dir = request.GET.get('task_sort_dir', 'asc')
+    task_sort_by = request.GET.get('task_sort_by', 'start_timestamp')
+    task_sort_dir = request.GET.get('task_sort_dir', 'desc')
     if task_sort_dir not in ['asc', 'desc']:
         task_sort_dir = 'asc'
     task_order = f"{'-' if task_sort_dir == 'desc' else ''}{task_sort_by}"

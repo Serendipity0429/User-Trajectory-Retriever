@@ -101,12 +101,12 @@
                 {% endif %}
                 {% if request.session.original_user_token %}
                 <li>
-                    <form action="{% url 'user_system:return_to_admin' %}" method="post" class="d-inline">
+                    <form id="return-to-admin-form" action="{% url 'user_system:return_to_admin' %}" method="post" style="display: none;">
                         {% csrf_token %}
-                        <button type="submit" class="btn btn-link text-decoration-none ps-0" style="color: var(--bs-link-color);">
-                            <i class="bi bi-box-arrow-in-left"></i> Return to Admin
-                        </button>
                     </form>
+                    <a href="#" onclick="event.preventDefault(); document.getElementById('return-to-admin-form').submit();">
+                        <i class="bi bi-box-arrow-in-left"></i> Return to Admin
+                    </a>
                 </li>
                 {% endif %}
                 {% if user.is_authenticated %}

@@ -14,6 +14,7 @@ class Message(models.Model):
     body = models.TextField()
     level = models.CharField(max_length=10, choices=LEVEL_CHOICES, default='INFO')
     timestamp = models.DateTimeField(auto_now_add=True)
+    parent = models.ForeignKey('self', null=True, blank=True, on_delete=models.CASCADE, related_name='replies')
 
     def __str__(self):
         return f"From {self.sender}: {self.subject}"

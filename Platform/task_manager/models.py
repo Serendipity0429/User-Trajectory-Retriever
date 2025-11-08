@@ -224,3 +224,12 @@ class UserTaskProgress(models.Model):
         return f"{self.user.username}'s progress on {self.dataset.name}: entry {self.highest_entry_id}"
 
 
+class ExtensionVersion(models.Model):
+    version = models.CharField(max_length=20)  # e.g., "1.2.3"
+    update_link = models.URLField()
+    description = models.TextField()
+
+    def __str__(self):
+        return self.version
+
+

@@ -24,18 +24,18 @@ from django.contrib import messages
 from django.views import View
 from django.core.signing import Signer, BadSignature
 from django.views.decorators.http import require_POST
+from django.template.loader import render_to_string
+from task_manager.models import Task
+from task_manager.forms import ExtensionVersionForm
+from task_manager.models import ExtensionVersion
+from rest_framework_simplejwt.tokens import RefreshToken
+from .forms import EditInfoForm, ForgetPasswordForm, ResetPasswordForm
+from .utils import send_reset_password_email
 
 USER_SEARCH_RESULT_LIMIT = 8
 
 def is_superuser(user):
     return user.is_superuser
-
-from django.utils import timezone
-from datetime import timedelta
-
-from task_manager.models import Task
-
-from django.template.loader import render_to_string
 
 @login_required
 @user_passes_test(is_superuser)
@@ -328,12 +328,6 @@ def logout(request):
     auth_logout(request)
     return HttpResponseRedirect(reverse('user_system:login'))
 
-
-from django.views.decorators.http import require_POST
-from rest_framework_simplejwt.tokens import RefreshToken
-from .forms import EditInfoForm, ForgetPasswordForm, ResetPasswordForm
-from .utils import send_reset_password_email
-
 def health_check(request):
     return JsonResponse({'status': 'ok'})
 
@@ -437,12 +431,6 @@ def forget_password(request):
         )
 
 
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
-from task_manager.utils import get_pending_annotation
-
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
 def check_pending_annotations(request):
     """
     Checks if there are any pending annotations for the current user.
@@ -491,8 +479,34 @@ def reset_password(request, token_str):
         }
     )
 
+@login_required
+@user_passes_test(is_superuser)
+def manage_extension_versions(request):
+    if request.method == 'POST':
+        form = ExtensionVersionForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'New extension version added successfully.')
+            return HttpResponseRedirect(reverse('user_system:manage_extension_versions'))
+    else:
+        form = ExtensionVersionForm()
+
+    versions = ExtensionVersion.objects.all().order_by('-id')
+    return render(request, 'manage_extension_versions.html', {'form': form, 'versions': versions})
 
 
+@login_required
+@user_passes_test(is_superuser)
+@require_POST
+def revert_latest_extension_version(request):
+    latest_version = ExtensionVersion.objects.order_by('-id').first()
+    if latest_version:
+        version_number = latest_version.version
+        latest_version.delete()
+        messages.success(request, f'Successfully reverted version {version_number}.')
+    else:
+        messages.warning(request, 'No extension versions to revert.')
+    return HttpResponseRedirect(reverse('user_system:manage_extension_versions'))
 
 
 class UserSearchView(LoginRequiredMixin, View):

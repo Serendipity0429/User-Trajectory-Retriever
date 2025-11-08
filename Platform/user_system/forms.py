@@ -3,9 +3,7 @@
 
 from django import forms
 from .models import User, Profile
-
-
-from django.contrib.auth.forms import AuthenticationForm
+from django.contrib.auth.forms import AuthenticationForm, UserCreationForm as AuthUserCreationForm
 
 class CustomAuthenticationForm(AuthenticationForm):
     username = forms.CharField(
@@ -43,9 +41,6 @@ class LoginForm(forms.Form):
             }
         )
     )
-
-
-from django.contrib.auth.forms import UserCreationForm as AuthUserCreationForm
 
 class UserCreationForm(AuthUserCreationForm):
     class Meta(AuthUserCreationForm.Meta):

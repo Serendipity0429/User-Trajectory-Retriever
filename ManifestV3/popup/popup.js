@@ -53,7 +53,7 @@ function showConfirm(message, title = "Confirm") {
     });
 }
 
-function showFailMessage(message_type) {
+function showFailMessage(message_type, customMessage = '') {
     const errorMessages = {
         1: 'usernameError',
         2: 'passwordError',
@@ -70,7 +70,12 @@ function showFailMessage(message_type) {
     const errorId = errorMessages[message_type];
     if (errorId) {
         const el = document.getElementById(errorId);
-        if (el) el.style.display = 'flex';
+        if (el) {
+            if (customMessage && (errorId === 'requestError' || errorId === 'connectionError' || errorId === 'authError')) {
+                el.querySelector('p').textContent = customMessage;
+            }
+            el.style.display = 'flex';
+        }
     }
 }
 
@@ -120,11 +125,38 @@ function displayActiveTask(task_id, task_info) {
 }
 
 async function showUserTab(task_id, task_info) {
-    const { username } = await _get_session(['username']);
+    const { username, update_required, update_info } = await _get_session(['username', 'update_required', 'update_info']);
     document.getElementById('username_text_logged').textContent = "User: " + username;
-    document.getElementById('submitAnswerBtn').style.display = 'none';
-    printDebug("popup", "Switched to user tab for user:", username);    
-    displayActiveTask(task_id, task_info);
+    
+    const startTaskBtn = document.getElementById('startTaskBtn');
+    const submitAnswerBtn = document.getElementById('submitAnswerBtn');
+    const cancelBtn = document.getElementById('cancelAnnotationBtn');
+    const updateBtn = document.getElementById('updateBtn');
+
+    if (update_required) {
+        const activeTaskEl = document.getElementById('active_task');
+        activeTaskEl.textContent = "Update Required";
+        activeTaskEl.style.color = "#e13636";
+        document.getElementById('task_trial').textContent = "N/A";
+        
+        startTaskBtn.style.display = 'none';
+        submitAnswerBtn.style.display = 'none';
+        cancelBtn.style.display = 'none';
+        updateBtn.style.display = 'block';
+
+        updateBtn.onclick = () => {
+            window.open(update_info.update_link);
+        };
+
+        showAlert(`A new version (${update_info.latest_version}) is available. Please update to continue. <a href="${update_info.update_link}" target="_blank">Update Now</a>.`, "Update Required");
+    } else {
+        displayActiveTask(task_id, task_info);
+        startTaskBtn.style.display = 'block';
+        submitAnswerBtn.style.display = 'none';
+        cancelBtn.style.display = 'block';
+        updateBtn.style.display = 'none';
+    }
+    
     switchUiState(false);
 }
 
@@ -306,7 +338,7 @@ async function handleLoginAttempt() {
             chrome.action.setBadgeText({ text: '' });
             const error_code = login_response?.error_code ?? -1;
             const message_map = { 1: 1, 2: 2, 4: 4, default: 4 };
-            showFailMessage(message_map[error_code] || message_map.default);
+            showFailMessage(message_map[error_code] || message_map.default, login_response?.error);
             loginBtn.disabled = false;
             loginBtn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Login';
         }
@@ -314,7 +346,7 @@ async function handleLoginAttempt() {
         if (error.message === "Authentication failed.") {
             showFailMessage(4);
         } else {
-            showFailMessage(5);
+            showFailMessage(5, error.message);
         }
         loginBtn.disabled = false;
         loginBtn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Login';
@@ -339,6 +371,12 @@ async function handleFeedbackUnlogged() {
 
 
 async function handleLogout() {
+    if (active_task_id !== -1) {
+        const confirmed = await showConfirm("Are you sure to log out? If you are in the middle of a task, this might interrupt your workflow and make the data invalid.");
+        if (!confirmed) {
+            return;
+        }
+    }
     const tabs = await new Promise(resolve => chrome.tabs.query({ active: true, currentWindow: true }, resolve));
     if (tabs[0] && tabs[0].id) {
         chrome.tabs.sendMessage(tabs[0].id, { type: "msg_from_popup", update_webpage_info: true }, (response) => {
@@ -428,14 +466,16 @@ async function testConnection(serverType) {
     btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
 
     try {
-        const response = await fetch(`${address}/user/health_check/`);
-        if (response.ok) {
-            showAlert(`Successfully connected to the ${serverType} server!`, "Connection Successful");
-        } else {
-            showAlert(`Could not connect to the ${serverType} server. Status: ${response.status}`, "Connection Failed");
-        }
+        const response = await _get(`${address}/user/health_check/`, 'json');
+        // Assuming a successful health check returns a JSON response.
+        // The _get function will throw an error for non-ok responses that aren't JSON.
+        showAlert(`Successfully connected to the ${serverType} server!`, "Connection Successful");
     } catch (error) {
-        showAlert(`An error occurred while trying to connect to the ${serverType} server. Please check the address and your network connection.`, "Connection Error");
+        if (error.name === 'AbortError') {
+            showAlert(`Connection to the ${serverType} server timed out. Please check the server address and your network connection.`, "Connection Timed Out");
+        } else {
+            showAlert(`An error occurred while trying to connect to the ${serverType} server. Please check the address and your network connection.`, "Connection Error");
+        }
     } finally {
         btn.disabled = false;
         btn.innerHTML = '<i class="fas fa-plug"></i>';

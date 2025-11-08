@@ -3,6 +3,7 @@ from django.db.models import Q
 from django.http import JsonResponse
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, get_object_or_404, redirect
+from django.urls import reverse
 from .models import Bulletin, Post, Comment, Attachment, Label, BulletinReadStatus
 from .forms import PostForm, CommentForm, BulletinForm
 from django.contrib.admin.views.decorators import staff_member_required
@@ -14,6 +15,7 @@ from django.conf import settings
 import os
 from user_system.models import User
 from msg_system.models import Message
+from task_manager.models import ExtensionVersion
 
 @login_required
 def upload_image(request):
@@ -217,6 +219,14 @@ def manage_bulletin(request):
             bulletin.save()
             for f in files:
                 Attachment.objects.create(bulletin=bulletin, file=f)
+            
+            if form.cleaned_data.get('is_extension_update'):
+                ExtensionVersion.objects.create(
+                    version=form.cleaned_data['extension_version'],
+                    update_link=reverse('bulletin_detail', args=[bulletin.pk]),
+                    description=bulletin.raw_content
+                )
+
             return redirect('manage_bulletin')
     else:
         form = BulletinForm()
@@ -258,12 +268,18 @@ def edit_bulletin(request, pk):
             bulletin.save()
             for f in files:
                 Attachment.objects.create(bulletin=bulletin, file=f)
+            
+            if form.cleaned_data.get('is_extension_update'):
+                ExtensionVersion.objects.create(
+                    version=form.cleaned_data['extension_version'],
+                    update_link=reverse('bulletin_detail', args=[bulletin.pk]),
+                    description=bulletin.raw_content
+                )
+
             return redirect('manage_bulletin')
     else:
         form = BulletinForm(instance=bulletin)
     return render(request, 'edit_bulletin.html', {'form': form})
-
-from msg_system.models import Message
 
 @staff_member_required
 def delete_bulletin(request, pk):

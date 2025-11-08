@@ -13,7 +13,7 @@ class CreateMessageView(LoginRequiredMixin, UserPassesTestMixin, View):
 
     def get(self, request):
         form = MessageForm()
-        return render(request, 'msg_system/create_message.html', {'form': form})
+        return render(request, 'create_message.html', {'form': form})
 
     def post(self, request):
         form = MessageForm(request.POST)
@@ -38,11 +38,11 @@ class CreateMessageView(LoginRequiredMixin, UserPassesTestMixin, View):
                 )
             
             return redirect('msg_system:sent_message_list')
-        return render(request, 'msg_system/create_message.html', {'form': form})
+        return render(request, 'create_message.html', {'form': form})
 
 class SentMessageListView(LoginRequiredMixin, UserPassesTestMixin, ListView):
     model = Message
-    template_name = 'msg_system/sent_message_list.html'
+    template_name = 'sent_message_list.html'
     context_object_name = 'messages'
 
     def test_func(self):
@@ -53,7 +53,7 @@ class SentMessageListView(LoginRequiredMixin, UserPassesTestMixin, ListView):
 
 class MessageListView(LoginRequiredMixin, ListView):
     model = Message
-    template_name = 'msg_system/message_list.html'
+    template_name = 'message_list.html'
     context_object_name = 'messages'
 
     def get_queryset(self):
@@ -70,7 +70,7 @@ class MessageListView(LoginRequiredMixin, ListView):
 
 class MessageDetailView(LoginRequiredMixin, DetailView):
     model = Message
-    template_name = 'msg_system/message_detail.html'
+    template_name = 'message_detail.html'
     context_object_name = 'message'
 
     def get_queryset(self):
@@ -129,7 +129,7 @@ class ReplyMessageView(LoginRequiredMixin, View):
         form = ReplyMessageForm(initial={
             'subject': f"Re: {original_message.subject}",
         })
-        return render(request, 'msg_system/reply_message.html', {'form': form, 'original_message': original_message})
+        return render(request, 'reply_message.html', {'form': form, 'original_message': original_message})
 
     def post(self, request, pk):
         original_message = get_object_or_404(Message, pk=pk, recipients=request.user)
@@ -141,4 +141,4 @@ class ReplyMessageView(LoginRequiredMixin, View):
             reply.save()
             MessageRecipient.objects.create(message=reply, user=original_message.sender)
             return redirect('msg_system:message_detail', pk=pk)
-        return render(request, 'msg_system/reply_message.html', {'form': form, 'original_message': original_message})
+        return render(request, 'reply_message.html', {'form': form, 'original_message': original_message})

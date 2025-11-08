@@ -1,7 +1,7 @@
 function initializeEasyMDE(config) {
     const { elementId, initialValue, csrfToken, uploadUrl } = config;
 
-    return new EasyMDE({
+    const easyMDE = new EasyMDE({
         element: document.getElementById(elementId),
         spellChecker: false,
         initialValue: initialValue || '',
@@ -42,4 +42,8 @@ function initializeEasyMDE(config) {
             alert(`An error occurred: ${errorMessage}`);
         },
     });
+
+    easyMDE.toggleSideBySide();
+
+    return easyMDE;
 }

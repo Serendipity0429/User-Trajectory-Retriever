@@ -56,12 +56,13 @@ class BulletinForm(forms.ModelForm):
     attachments = MultipleFileField(required=False)
     class Meta:
         model = Bulletin
-        fields = ['title', 'content', 'category', 'pinned']
+        fields = ['title', 'content', 'category', 'pinned', 'send_notification']
         widgets = {
             'title': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Enter title'}),
             'content': forms.Textarea(attrs={'class': 'form-control', 'placeholder': 'Enter content', 'style': 'height: 150px'}),
             'category': forms.Select(attrs={'class': 'form-select'}),
             'pinned': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'send_notification': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
 
     def __init__(self, *args, **kwargs):

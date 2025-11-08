@@ -24,6 +24,7 @@ class Bulletin(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     pinned = models.BooleanField(default=False)
     category = models.CharField(max_length=50, choices=BULLETIN_CATEGORIES, default='General')
+    send_notification = models.BooleanField(default=True)
 
     def __str__(self):
         return self.title
@@ -74,3 +75,11 @@ class Label(models.Model):
 
     def __str__(self):
         return self.name
+
+class BulletinReadStatus(models.Model):
+    bulletin = models.ForeignKey(Bulletin, on_delete=models.CASCADE)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    read_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('bulletin', 'user')

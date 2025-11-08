@@ -11,6 +11,7 @@ from django.contrib.auth.decorators import login_required
 import base64
 import uuid
 import json
+from types import SimpleNamespace
 
 from .utils import (
     print_debug,
@@ -36,6 +37,7 @@ from .models import (
     ReflectionAnnotation,
     Justification,
     UserTaskProgress,
+    ExtensionVersion,
 )
 from .mappings import *
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
@@ -377,6 +379,19 @@ def active_task(request):
     # Return active tasks
     print_debug("active_task")
     user = request.user
+
+    # Version check
+    extension_version = request.data.get("extension_version")
+    latest_version = ExtensionVersion.objects.order_by('-id').first()
+
+    if latest_version and extension_version != latest_version.version:
+        return JsonResponse({
+            "update_required": True,
+            "latest_version": latest_version.version,
+            "update_link": latest_version.update_link,
+            "description": latest_version.description,
+        })
+
     task = Task.objects.filter(user=user, active=True).first()
     if task is None:
         return JsonResponse({"task_id": -1})
@@ -733,7 +748,6 @@ def cancel_annotation(request, task_id):
                 current_trial_obj.webpages = all_webpages
             else:
                 # Create a new pseudo-trial object if no placeholder exists
-                from types import SimpleNamespace
                 current_trial = SimpleNamespace(
                     num_trial=current_trial_num,
                     webpages=current_webpages

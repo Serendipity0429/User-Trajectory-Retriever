@@ -31,6 +31,8 @@ urlpatterns = [
     path('admin/toggle_superuser/<int:user_id>/', views.toggle_superuser, name='toggle_superuser'),
     path('admin/login_as_user/<int:user_id>/', views.login_as_user, name='login_as_user'),
     path('admin/return_to_admin/', views.return_to_admin, name='return_to_admin'),
+    path('admin/extension_versions/', views.manage_extension_versions, name='manage_extension_versions'),
+    path('admin/extension_versions/revert/', views.revert_latest_extension_version, name='revert_latest_extension_version'),
     path('check_pending_annotations/', views.check_pending_annotations, name='check_pending_annotations'),
     path('search/', views.UserSearchView.as_view(), name='user_search'),
 ]

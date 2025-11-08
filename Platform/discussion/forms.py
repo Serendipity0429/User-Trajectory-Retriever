@@ -1,5 +1,8 @@
 from django import forms
 from .models import Post, Comment, Bulletin, Label
+from task_manager.models import ExtensionVersion
+import re
+from packaging.version import parse as parse_version
 
 class MultipleFileInput(forms.ClearableFileInput):
     allow_multiple_selected = True
@@ -54,6 +57,9 @@ class CommentForm(forms.ModelForm):
 
 class BulletinForm(forms.ModelForm):
     attachments = MultipleFileField(required=False)
+    is_extension_update = forms.BooleanField(required=False, label="Chrome Extension Update", widget=forms.CheckboxInput(attrs={'class': 'form-check-input'}))
+    extension_version = forms.CharField(required=False, label="New Extension Version", widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'e.g., 3.1.1'}))
+
     class Meta:
         model = Bulletin
         fields = ['title', 'content', 'category', 'pinned', 'send_notification']
@@ -69,3 +75,31 @@ class BulletinForm(forms.ModelForm):
         super(BulletinForm, self).__init__(*args, **kwargs)
         if self.instance and self.instance.pk:
             self.initial['content'] = self.instance.raw_content
+
+    def clean_extension_version(self):
+        is_update = self.cleaned_data.get('is_extension_update')
+        version_str = self.cleaned_data.get('extension_version')
+
+        if not is_update:
+            return None
+
+        if not version_str:
+            raise forms.ValidationError("This field is required for an extension update.")
+
+        # Validate version format
+        if not re.match(r'^\d{1,5}(\.\d{1,5}){0,3}$', version_str):
+            raise forms.ValidationError("Invalid version format. Use 1-4 dot-separated integers (e.g., '3.1.1').")
+        
+        parts = [int(p) for p in version_str.split('.')]
+        if any(p > 65536 for p in parts):
+            raise forms.ValidationError("Each part of the version number cannot exceed 65536.")
+
+        # Validate monotonic increase
+        latest_version_obj = ExtensionVersion.objects.order_by('-id').first()
+        if latest_version_obj:
+            latest_version = parse_version(latest_version_obj.version)
+            new_version = parse_version(version_str)
+            if new_version <= latest_version:
+                raise forms.ValidationError(f"New version ({new_version}) must be greater than the latest version ({latest_version}).")
+
+        return version_str

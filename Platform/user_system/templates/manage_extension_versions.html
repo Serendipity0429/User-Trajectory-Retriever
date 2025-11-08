@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Page - Extension Management{% endblock %}
+
+{% block content %}
+<div class="container">
+    <a href="{% url 'user_system:admin_page' %}" class="btn btn-outline-secondary mt-3">&laquo; Back to Admin Dashboard</a>
+    <h1 class="mt-4">Extension Version Management</h1>
+    <p>Here you can manage the versions of the Chrome Extension.</p>
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-header">
+            <i class="bi bi-plus-circle-fill me-2"></i>
+            Add New Version
+        </div>
+        <div class="card-body">
+            <form method="post" novalidate>
+                {% csrf_token %}
+                
+                {% if form.non_field_errors %}
+                    <div class="alert alert-danger">
+                        {% for error in form.non_field_errors %}
+                            <p class="mb-0">{{ error }}</p>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+
+                <div class="mb-3">
+                    <label for="{{ form.version.id_for_label }}" class="form-label">Version</label>
+                    <input type="text" name="{{ form.version.name }}" class="form-control {% if form.version.errors %}is-invalid{% endif %}" id="{{ form.version.id_for_label }}" value="{{ form.version.value|default_if_none:'' }}">
+                    {% if form.version.errors %}
+                        <div class="invalid-feedback">
+                            {{ form.version.errors.as_text }}
+                        </div>
+                    {% endif %}
+                </div>
+
+                <div class="mb-3">
+                    <label for="{{ form.update_link.id_for_label }}" class="form-label">Update Link</label>
+                    <input type="url" name="{{ form.update_link.name }}" class="form-control {% if form.update_link.errors %}is-invalid{% endif %}" id="{{ form.update_link.id_for_label }}" value="{{ form.update_link.value|default_if_none:'' }}">
+                    {% if form.update_link.errors %}
+                        <div class="invalid-feedback">
+                            {{ form.update_link.errors.as_text }}
+                        </div>
+                    {% endif %}
+                </div>
+
+                <div class="mb-3">
+                    <label for="{{ form.description.id_for_label }}" class="form-label">Description</label>
+                    <textarea name="{{ form.description.name }}" class="form-control {% if form.description.errors %}is-invalid{% endif %}" id="{{ form.description.id_for_label }}" rows="3">{{ form.description.value|default_if_none:'' }}</textarea>
+                    {% if form.description.errors %}
+                        <div class="invalid-feedback">
+                            {{ form.description.errors.as_text }}
+                        </div>
+                    {% endif %}
+                </div>
+                
+                <button type="submit" class="btn btn-primary">Add Version</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span>
+                <i class="bi bi-list-ul me-2"></i>
+                Version History
+            </span>
+            <form action="{% url 'user_system:revert_latest_extension_version' %}" method="post" onsubmit="return confirm('Are you sure you want to revert the latest version?');" style="display: inline;">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-danger btn-sm" {% if not versions %}disabled{% endif %}>Revert Latest Update</button>
+            </form>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped table-hover">
+                    <thead class="table-dark">
+                        <tr>
+                            <th scope="col">Version</th>
+                            <th scope="col">Update Link</th>
+                            <th scope="col">Description</th>
+                            <th scope="col">Created At</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for version in versions %}
+                        <tr>
+                            <td>{{ version.version }}</td>
+                            <td><a href="{{ version.update_link }}" target="_blank">{{ version.update_link }}</a></td>
+                            <td>{{ version.description }}</td>
+                            <td>{{ version.id }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="4" class="text-center">No versions found.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

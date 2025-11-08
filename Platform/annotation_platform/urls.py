@@ -8,7 +8,7 @@ from django.contrib.staticfiles.urls import staticfiles_urlpatterns
 
 urlpatterns = [
     path('', RedirectView.as_view(url='/task/home/', permanent=True)),
-    path('admin/', admin.site.urls),
+    # path('admin/', admin.site.urls),
     path('user/', include('user_system.urls')),
     path('task/', include('task_manager.urls')),
     path('discussion/', include('discussion.urls')),

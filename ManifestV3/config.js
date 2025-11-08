@@ -12,7 +12,8 @@ const defaultConfig = {
     popupScale: 1,
     colorTheme: 'tsinghua-purple',
     customColor: '#671372',
-    darkMode: false
+    darkMode: false,
+    request_timeout: 5000, // 5 seconds
 };
 
 // --- Global Config Variable ---

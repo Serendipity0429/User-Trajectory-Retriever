@@ -85,10 +85,11 @@ async function refreshToken() {
     }
 }
 
-async function _request(method, url, data = {}, content_type = 'form', response_type = 'json')
+async function _request(method, url, data = {}, content_type = 'form', response_type = 'json', request_timeout = null)
 {
     const config = getConfig();
     const MAX_RETRIES = config.max_retries || 3;
+    const TIMEOUT = request_timeout || config.request_timeout || 5000; // Default to 5 seconds
     let attempt = 0;
     while (attempt < MAX_RETRIES) {
         try {
@@ -124,11 +125,17 @@ async function _request(method, url, data = {}, content_type = 'form', response_
                 headers["Authorization"] = `Bearer ${access_token}`;
             }
 
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), TIMEOUT);
+
             let response = await fetch(request_url, {
                 method: method.toUpperCase(),
                 headers,
                 body,
+                signal: controller.signal,
             });
+
+            clearTimeout(timeoutId);
 
             // Refresh token if unauthorized
             if (response.status === 401 && url !== config.urls.token_login) {
@@ -149,9 +156,13 @@ async function _request(method, url, data = {}, content_type = 'form', response_
                 case 'json':
                     try {
                         const json_response = await response.json();
+                        if (!response.ok) {
+                            throw new Error(json_response.error || `Server error: ${response.status}`);
+                        }
                         return json_response;
                     } catch (e) {
-                        throw new Error(`Server error: ${response.status}`);
+                        // If parsing fails or an error was thrown, re-throw it.
+                        throw e;
                     }
                 default:
                     if (!response.ok) {
@@ -161,6 +172,9 @@ async function _request(method, url, data = {}, content_type = 'form', response_
             }
         } catch (error) {
             attempt++;
+            if (error.name === 'AbortError') {
+                printDebug("utils", `Request timed out after ${TIMEOUT}ms: ${url}`);
+            }
             if (attempt >= MAX_RETRIES) {
                 printDebug("utils", `API request failed after ${MAX_RETRIES} attempts: ${url}`, error);
                 throw error;

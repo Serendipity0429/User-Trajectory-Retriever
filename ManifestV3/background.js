@@ -137,9 +137,31 @@ async function checkActiveTaskID() {
     try {
         const old_task_id = await getCurrentTask();
         const config = getConfig();
+        const extension_version = chrome.runtime.getManifest().version;
         
-        const response = await makeApiRequest(() => _post(config.urls.active_task));
+        const response = await makeApiRequest(() => _post(config.urls.active_task, { extension_version }));
         
+        if (response.update_required) {
+            broadcastToTabs({
+                command: 'display_message',
+                options: {
+                    id: 'extension-update-message',
+                    title: 'Extension Update Required',
+                    message: `A new version (${response.latest_version}) is available. Please update to continue. <a href="${response.update_link}" target="_blank" style="color: white; text-decoration: underline;">Update Now</a>.`,
+                    type: 'error',
+                    duration: 0 
+                }
+            });
+            await _set_session({ 'update_required': true, 'update_info': response });
+            await setCurrentTask(-1);
+            chrome.action.setBadgeText({ text: 'upd' });
+            chrome.action.setBadgeBackgroundColor({ color: '#eb1313ff' });
+            return -1;
+        } else {
+            await _remove_session(['update_required', 'update_info']);
+            broadcastToTabs({ command: 'remove_message_box', id: 'extension-update-message' });
+        }
+
         const data = response.task_id;
         const new_task_id = (data !== null && data !== undefined && !isNaN(data)) ? parseInt(data, 10) : -1;
 

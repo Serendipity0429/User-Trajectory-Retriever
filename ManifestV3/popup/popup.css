@@ -880,3 +880,12 @@ body.dark-mode .server-choice-btn:not(.active) input[type="text"] {
 body.dark-mode .btn:disabled {
     color: #444; /* Darker text for disabled buttons in dark mode */
 }
+
+.btn-update {
+    background-color: #002FA7;
+    color: white;
+}
+
+.btn-update:hover {
+    background-color: #002275;
+}

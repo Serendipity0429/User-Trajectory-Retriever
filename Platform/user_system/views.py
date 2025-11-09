@@ -25,9 +25,9 @@ from django.views import View
 from django.core.signing import Signer, BadSignature
 from django.views.decorators.http import require_POST
 from django.template.loader import render_to_string
-from task_manager.models import Task
+from task_manager.models import Task, ExtensionVersion
 from task_manager.forms import ExtensionVersionForm
-from task_manager.models import ExtensionVersion
+from task_manager.views import get_pending_annotation
 from rest_framework_simplejwt.tokens import RefreshToken
 from .forms import EditInfoForm, ForgetPasswordForm, ResetPasswordForm
 from .utils import send_reset_password_email

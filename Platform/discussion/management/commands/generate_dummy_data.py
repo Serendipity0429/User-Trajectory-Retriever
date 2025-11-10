@@ -11,6 +11,36 @@ def generate_random_string(length=10):
     letters = string.ascii_lowercase
     return ''.join(random.choice(letters) for i in range(length))
 
+def generate_markdown_text():
+    text = []
+    # Add a heading
+    text.append(f"# {' '.join(generate_random_string(random.randint(5, 10)).capitalize() for _ in range(random.randint(2, 4)))}")
+    text.append(f"## {' '.join(generate_random_string(random.randint(5, 10)).capitalize() for _ in range(random.randint(2, 4)))}")
+
+    # Add some paragraphs
+    for _ in range(random.randint(2, 4)):
+        paragraph = ' '.join(generate_random_string(random.randint(3, 12)) for _ in range(random.randint(20, 50)))
+        text.append(paragraph)
+
+    # Add a list
+    text.append("\n### A list of items")
+    for _ in range(random.randint(3, 6)):
+        text.append(f"* {generate_random_string(random.randint(5, 15))}")
+
+    # Add bold and italic text
+    text.append(f"\nThis is some **bold** and *italic* text.")
+    text.append(f"Another paragraph with `inline code`.")
+
+    # Add a link
+    text.append(f"Here is a link: [Google](https://www.google.com)")
+
+    # Add a code block
+    text.append("\n```python\nimport os\n\ndef hello():\n    print('Hello, World!')\n```")
+    
+    text.append("\n> This is a blockquote.")
+
+    return "\n\n".join(text)
+
 class Command(BaseCommand):
     help = 'Generates random bulletin and post data for testing.'
 
@@ -33,7 +63,7 @@ class Command(BaseCommand):
 
         for _ in range(num_bulletins):
             bulletin_title = '[DUMMY] ' + ' '.join(generate_random_string(random.randint(5, 10)).capitalize() for i in range(3))
-            raw_content = ' '.join(generate_random_string(random.randint(5, 15)) for i in range(20))
+            raw_content = generate_markdown_text()
             bulletin_category = random.choice(bulletin_categories)
             Bulletin.objects.create(
                 title=bulletin_title,
@@ -45,7 +75,7 @@ class Command(BaseCommand):
 
         for _ in range(num_posts):
             post_title = '[DUMMY] ' + ' '.join(generate_random_string(random.randint(5, 10)).capitalize() for i in range(4))
-            raw_content = ' '.join(generate_random_string(random.randint(5, 15)) for i in range(50))
+            raw_content = generate_markdown_text()
             post_category = random.choice(post_categories)
             Post.objects.create(
                 title=post_title,

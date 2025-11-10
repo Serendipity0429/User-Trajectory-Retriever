@@ -25,31 +25,25 @@ def is_image(filename):
 def category_color_class(category):
     return {
         'Warning': 'badge-warning-custom',
-        'Bugs & Issues': 'badge-warning-custom',
+        'Bugs & Issues': 'badge-issues-custom',
         'Important': 'badge-important-custom',
         'System Update': 'badge-update-custom',
-        'Technical Support': 'badge-support-custom',
         'Feedback & Suggestions': 'badge-feedback-custom',
-        'Maintenance': 'badge-maintenance-custom',
-        'Event': 'badge-event-custom',
     }.get(category, 'badge-general-custom')
 
 @register.filter
-def category_btn_class(category):
+def category_badge_class(category):
     return {
-        'Warning': 'btn-warning-custom',
-        'Bugs & Issues': 'btn-issues-custom',
-        'Important': 'btn-important-custom',
-        'System Update': 'btn-update-custom',
-        'Technical Support': 'btn-support-custom',
-        'Feedback & Suggestions': 'btn-feedback-custom',
-        'Maintenance': 'btn-maintenance-custom',
-        'Event': 'btn-event-custom',
-    }.get(category, 'btn-general-custom')
+        'Warning': 'badge-warning-custom',
+        'Bugs & Issues': 'badge-issues-custom',
+        'Important': 'badge-important-custom',
+        'System Update': 'badge-update-custom',
+        'Feedback & Suggestions': 'badge-feedback-custom',
+    }.get(category, 'badge-general-custom')
 
 @register.filter
-def to_outline_btn(btn_class):
-    return btn_class.replace('btn-', 'btn-outline-')
+def to_outline_badge(badge_class):
+    return badge_class.replace('badge-', 'badge-outline-')
 
 @register.filter
 def was_updated(obj):
@@ -72,4 +66,8 @@ def get_icon_for_file(filename):
         return 'bi bi-file-earmark-zip-fill'
     if extension in ['jpg', 'jpeg', 'png', 'gif']:
         return 'bi bi-file-earmark-image-fill'
+    if extension in ['mp3', 'wav', 'ogg']:
+        return 'bi bi-file-earmark-music-fill'
+    if extension in ['c', 'h', 'cpp', 'py', 'js', 'java']:
+        return 'bi bi-file-earmark-code-fill'
     return 'bi bi-file-earmark-fill'

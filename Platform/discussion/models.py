@@ -30,9 +30,7 @@ class Bulletin(models.Model):
     BULLETIN_CATEGORIES = [
         ('General', 'General'),
         ('System Update', 'System Update'),
-        ('Maintenance', 'Maintenance'),
         ('Important', 'Important'),
-        ('Event', 'Event'),
         ('Warning', 'Warning'),
     ]
     title = models.CharField(max_length=200)
@@ -50,7 +48,6 @@ class Bulletin(models.Model):
 class Post(models.Model):
     POST_CATEGORIES = [
         ('General', 'General'),
-        ('Technical Support', 'Technical Support'),
         ('Feedback & Suggestions', 'Feedback & Suggestions'),
         ('Bugs & Issues', 'Bugs & Issues'),
     ]

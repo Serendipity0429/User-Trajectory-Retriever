@@ -31,6 +31,7 @@ from task_manager.views import get_pending_annotation
 from rest_framework_simplejwt.tokens import RefreshToken
 from .forms import EditInfoForm, ForgetPasswordForm, ResetPasswordForm
 from .utils import send_reset_password_email
+from discussion.models import Bulletin, Post, Comment
 
 USER_SEARCH_RESULT_LIMIT = 8
 
@@ -112,6 +113,9 @@ def admin_page(request):
     completed_tasks = Task.objects.filter(cancelled=False, active=False).count()
     cancelled_tasks = Task.objects.filter(cancelled=True).count()
     active_tasks = Task.objects.filter(active=True).count()
+    total_bulletins = Bulletin.objects.count()
+    total_posts = Post.objects.count()
+    total_comments = Comment.objects.count()
 
     all_users = User.objects.all()
 
@@ -137,6 +141,9 @@ def admin_page(request):
             'completed_tasks': completed_tasks,
             'cancelled_tasks': cancelled_tasks,
             'active_tasks': active_tasks,
+            'total_bulletins': total_bulletins,
+            'total_posts': total_posts,
+            'total_comments': total_comments,
         }
     )
 

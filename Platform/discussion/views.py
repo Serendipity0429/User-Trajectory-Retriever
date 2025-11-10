@@ -415,6 +415,16 @@ def toggle_post_hidden(request, pk):
         post.save()
     return redirect('post_detail', pk=pk)
 
+@login_required
+def toggle_post_private(request, pk):
+    post = get_object_or_404(Post, pk=pk)
+    if request.user == post.author or request.user.is_staff:
+        if request.method == 'POST':
+            post.is_private = not post.is_private
+            post.save()
+    return redirect('post_detail', pk=pk)
+
+
 @staff_member_required
 def toggle_comment_hidden(request, pk):
     comment = get_object_or_404(Comment, pk=pk)

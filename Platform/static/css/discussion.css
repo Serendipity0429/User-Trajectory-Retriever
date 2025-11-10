@@ -136,211 +136,139 @@ textarea.form-control {
 .discussion-label {
     margin: 2px;
 }
+
+.badge-outline-warning-custom {
+    color: #ed6c02;
+    border-color: #ed6c02;
+}
+.badge-outline-warning-custom:hover {
+    color: #fff;
+    background-color: #ed6c02;
+    border-color: #ed6c02;
+}
+.badge-outline-important-custom {
+    color: #A0001C;
+    border-color: #A0001C;
+}
+.badge-outline-important-custom:hover {
+    color: #fff;
+    background-color: #A0001C;
+    border-color: #A0001C;
+}
+.badge-outline-update-custom {
+    color: #01579b;
+    border-color: #01579b;
+}
+.badge-outline-update-custom:hover {
+    color: #fff;
+    background-color: #01579b;
+    border-color: #01579b;
+}
+.badge-outline-general-custom {
+    color: #6c757d;
+    border-color: #6c757d;
+}
+.badge-outline-general-custom:hover {
+    color: #fff;
+    background-color: #6c757d;
+    border-color: #6c757d;
+}
+.badge-outline-support-custom {
+    color: #005F60;
+    border-color: #005F60;
+}
+.badge-outline-support-custom:hover {
+    color: #fff;
+    background-color: #005F60;
+    border-color: #005F60;
+}
+.badge-outline-feedback-custom {
+    color: #006064;
+    border-color: #006064;
+}
+.badge-outline-feedback-custom:hover {
+    color: #fff;
+    background-color: #006064;
+    border-color: #006064;
+}
+
+.badge-outline-issues-custom {
+    color: #E64A19;
+    border-color: #E64A19;
+}
+.badge-outline-issues-custom:hover {
+    color: #fff;
+    background-color: #E64A19;
+    border-color: #E64A19;
+}
 .badge-warning-custom {
     background-color: #ed6c02; /* Amber */
     color: white !important;
+    border-color: #ed6c02;
+}
+.badge-warning-custom:hover {
+    background-color: #d46102;
+    border-color: #d46102;
+    color: white !important;
 }
 .badge-important-custom {
-    background-color: #B00020; /* Red */
+    background-color: #A0001C; /* Red */
+    color: white !important;
+    border-color: #A0001C;
+}
+.badge-important-custom:hover {
+    background-color: #8E0018;
+    border-color: #8E0018;
     color: white !important;
 }
 .badge-update-custom {
-    background-color: #0288d1; /* Blue */
+    background-color: #01579b; /* Blue */
+    color: white !important;
+    border-color: #01579b;
+}
+.badge-update-custom:hover {
+    background-color: #00437a;
+    border-color: #00437a;
     color: white !important;
 }
 .badge-general-custom {
-    background-color: #333333; /* Dark Gray */
+    background-color: #6c757d; /* Dark Gray */
+    color: white !important;
+    border-color: #6c757d;
+}
+.badge-general-custom:hover {
+    background-color: #5a6268;
+    border-color: #5a6268;
     color: white !important;
 }
 .badge-support-custom {
     background-color: #005F60; /* Dark Teal */
     color: white !important;
-}
-.badge-feedback-custom {
-    background-color: #6A008A; /* Dark Purple */
-    color: white !important;
-}
-.badge-maintenance-custom {
-    background-color: #CC5500; /* Dark Orange */
-    color: white !important;
-}
-.badge-event-custom {
-    background-color: #673AB7; /* Deep Purple */
-    color: white !important;
-}
-.badge-issues-custom {
-    background-color: #D32F2F; /* Dark Red */
-    color: white !important;
-}
-.btn-outline-warning-custom {
-    color: #ed6c02;
-    border-color: #ed6c02;
-}
-.btn-outline-warning-custom:hover {
-    color: #fff;
-    background-color: #ed6c02;
-    border-color: #ed6c02;
-}
-.btn-outline-important-custom {
-    color: #B00020;
-    border-color: #B00020;
-}
-.btn-outline-important-custom:hover {
-    color: #fff;
-    background-color: #B00020;
-    border-color: #B00020;
-}
-.btn-outline-update-custom {
-    color: #0288d1;
-    border-color: #0288d1;
-}
-.btn-outline-update-custom:hover {
-    color: #fff;
-    background-color: #0288d1;
-    border-color: #0288d1;
-}
-.btn-outline-general-custom {
-    color: #333333;
-    border-color: #333333;
-}
-.btn-outline-general-custom:hover {
-    color: #fff;
-    background-color: #333333;
-    border-color: #333333;
-}
-.btn-outline-support-custom {
-    color: #005F60;
     border-color: #005F60;
 }
-.btn-outline-support-custom:hover {
-    color: #fff;
-    background-color: #005F60;
-    border-color: #005F60;
-}
-.btn-outline-feedback-custom {
-    color: #6A008A;
-    border-color: #6A008A;
-}
-.btn-outline-feedback-custom:hover {
-    color: #fff;
-    background-color: #6A008A;
-    border-color: #6A008A;
-}
-.btn-outline-maintenance-custom {
-    color: #CC5500;
-    border-color: #CC5500;
-}
-.btn-outline-maintenance-custom:hover {
-    color: #fff;
-    background-color: #CC5500;
-    border-color: #CC5500;
-}
-.btn-outline-event-custom {
-    color: #673AB7;
-    border-color: #673AB7;
-}
-.btn-outline-event-custom:hover {
-    color: #fff;
-    background-color: #673AB7;
-    border-color: #673AB7;
-}
-.btn-outline-issues-custom {
-    color: #D32F2F;
-    border-color: #D32F2F;
-}
-.btn-outline-issues-custom:hover {
-    color: #fff;
-    background-color: #D32F2F;
-    border-color: #D32F2F;
-}
-.btn-warning-custom {
-    background-color: #ed6c02; /* Amber */
-    color: white !important;
-    border-color: #ed6c02;
-}
-.btn-warning-custom:hover {
-    background-color: #d46102;
-    border-color: #d46102;
-    color: white !important;
-}
-.btn-important-custom {
-    background-color: #B00020; /* Red */
-    color: white !important;
-    border-color: #B00020;
-}
-.btn-important-custom:hover {
-    background-color: #9a001c;
-    border-color: #9a001c;
-    color: white !important;
-}
-.btn-update-custom {
-    background-color: #0288d1; /* Blue */
-    color: white !important;
-    border-color: #0288d1;
-}
-.btn-update-custom:hover {
-    background-color: #0278b8;
-    border-color: #0278b8;
-    color: white !important;
-}
-.btn-general-custom {
-    background-color: #333333; /* Dark Gray */
-    color: white !important;
-    border-color: #333333;
-}
-.btn-general-custom:hover {
-    background-color: #262626;
-    border-color: #262626;
-    color: white !important;
-}
-.btn-support-custom {
-    background-color: #005F60; /* Dark Teal */
-    color: white !important;
-    border-color: #005F60;
-}
-.btn-support-custom:hover {
+.badge-support-custom:hover {
     background-color: #004c4d;
     border-color: #004c4d;
     color: white !important;
 }
-.btn-feedback-custom {
-    background-color: #6A008A; /* Dark Purple */
+.badge-feedback-custom {
+    background-color: #006064; /* Cyan */
     color: white !important;
-    border-color: #6A008A;
+    border-color: #006064;
 }
-.btn-feedback-custom:hover {
-    background-color: #580073;
-    border-color: #580073;
-    color: white !important;
-}
-.btn-maintenance-custom {
-    background-color: #CC5500; /* Dark Orange */
-    color: white !important;
-    border-color: #CC5500;
-}
-.btn-maintenance-custom:hover {
-    background-color: #b34a00;
-    border-color: #b34a00;
+.badge-feedback-custom:hover {
+    background-color: #004c4d;
+    border-color: #004c4d;
     color: white !important;
 }
-.btn-event-custom {
-    background-color: #673AB7; /* Deep Purple */
+.badge-issues-custom {
+    background-color: #E64A19; /* Deep Orange */
     color: white !important;
-    border-color: #673AB7;
+    border-color: #E64A19;
 }
-.btn-event-custom:hover {
-    background-color: #5a32a1;
-    border-color: #5a32a1;
-    color: white !important;
-}
-.btn-issues-custom {
-    background-color: #D32F2F; /* Dark Red */
-    color: white !important;
-    border-color: #D32F2F;
-}
-.btn-issues-custom:hover {
-    background-color: #b92929;
-    border-color: #b92929;
+.badge-issues-custom:hover {
+    background-color: #BF360C;
+    border-color: #BF360C;
     color: white !important;
 }
 

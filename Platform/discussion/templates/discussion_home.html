@@ -79,8 +79,8 @@
             <div class="category-filters">
                 <a href="{% url 'discussion_home' %}" class="btn btn-sm {% if not request.GET.category %}btn-primary{% else %}btn-outline-primary{% endif %}">All</a>
                 {% for category in categories %}
-                    {% with btn_class=category|category_btn_class %}
-                        <a href="?category={{ category }}" data-btn-class="{{ btn_class }}" class="btn btn-sm {% if request.GET.category == category %}{{ btn_class }}{% else %}{{ btn_class|to_outline_btn }}{% endif %}">{{ category }}</a>
+                    {% with badge_class=category|category_badge_class %}
+                        <a href="?category={{ category }}" data-badge-class="{{ badge_class }}" class="btn btn-sm {% if request.GET.category == category %}{{ badge_class }}{% else %}{{ badge_class|to_outline_badge }}{% endif %}">{{ category }}</a>
                     {% endwith %}
                 {% endfor %}
             </div>
@@ -93,6 +93,7 @@
                     {% else %}
                         <button class="btn btn-primary" disabled data-bs-toggle="tooltip" title="You have reached your post limit for today.">Create New Post</button>
                     {% endif %}
+                    <a href="{% url 'discussion_home' %}" class="btn btn-outline-secondary {% if not request.GET.show %}active{% endif %}">All Posts</a>
                     <a href="?show=my_posts" class="btn btn-outline-secondary {% if request.GET.show == 'my_posts' %}active{% endif %}">My Posts</a>
                     {% if user.is_staff %}
                         <a href="?show=hidden" class="btn btn-outline-warning {% if request.GET.show == 'hidden' %}active{% endif %}">Hidden Posts</a>
@@ -140,12 +141,12 @@ $(document).ready(function() {
         // Reset all buttons to their inactive (outline) state.
         $('.category-filters a').each(function() {
             var $link = $(this);
-            var btnClass = $link.data('btn-class');
+            var badgeClass = $link.data('badge-class');
             
-            if (btnClass) {
-                // This is a category button. Remove both solid and outline, then add outline.
-                var outlineClass = btnClass.replace('btn-', 'btn-outline-');
-                $link.removeClass(btnClass).addClass(outlineClass);
+            if (badgeClass) {
+                // This is a category button.
+                var outlineClass = badgeClass.replace('badge-', 'badge-outline-');
+                $link.removeClass(badgeClass).addClass(outlineClass);
             } else {
                 // This is the "All" button.
                 $link.removeClass('btn-primary').addClass('btn-outline-primary');
@@ -153,10 +154,10 @@ $(document).ready(function() {
         });
 
         // Activate the clicked button.
-        var clickedBtnClass = $clickedLink.data('btn-class');
-        if (clickedBtnClass) {
-            var outlineClass = clickedBtnClass.replace('btn-', 'btn-outline-');
-            $clickedLink.removeClass(outlineClass).addClass(clickedBtnClass);
+        var clickedBadgeClass = $clickedLink.data('badge-class');
+        if (clickedBadgeClass) {
+            var outlineClass = clickedBadgeClass.replace('badge-', 'badge-outline-');
+            $clickedLink.removeClass(outlineClass).addClass(clickedBadgeClass);
         } else {
             // This is the "All" button.
             $clickedLink.removeClass('btn-outline-primary').addClass('btn-primary');

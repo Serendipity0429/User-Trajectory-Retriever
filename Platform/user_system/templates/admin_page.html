@@ -12,7 +12,7 @@
     <p>Welcome to the admin dashboard. Here you can manage users and other site settings.</p>
 
     <div class="row">
-        <div class="col-xl-6 col-lg-6">
+        <div class="col-xl-4 col-lg-6">
             <div class="card shadow-sm mb-4">
                 <div class="card-header" data-bs-toggle="collapse" href="#userStatisticsCollapse" role="button" aria-expanded="true" aria-controls="userStatisticsCollapse">
                     <i class="bi bi-person-badge me-2"></i>
@@ -21,55 +21,36 @@
                 <div class="collapse show" id="userStatisticsCollapse">
                     <div class="card-body">
                         <div class="row">
-                            <div class="col-md-4 mb-4">
-                                <div class="card border-left-primary shadow h-100 py-2">
-                                    <div class="card-body">
-                                        <div class="row no-gutters">
-                                            <div class="col mr-2">
-                                                <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
-                                                    Total Users</div>
-                                                <div class="h5 mb-0 font-weight-bold text-gray-800">{{ total_users }}</div>
-                                            </div>
-                                            <div class="col-auto">
-                                                <i class="fas fa-users fa-2x text-primary"></i>
-                                            </div>
-                                        </div>
+                            <div class="col-lg-12 mb-3">
+                                <div class="d-flex align-items-center bg-light p-3 rounded shadow-sm">
+                                    <div class="me-3">
+                                        <i class="fas fa-users fa-2x text-primary"></i>
+                                    </div>
+                                    <div>
+                                        <div class="text-uppercase text-primary small fw-bold">Total Users</div>
+                                        <div class="h4 mb-0 fw-bold">{{ total_users }}</div>
                                     </div>
                                 </div>
                             </div>
-                            <div class="col-md-4 mb-4">
-                                <div class="card border-left-success shadow h-100 py-2">
-                                    <div class="card-body">
-                                        <div class="row no-gutters">
-                                            <div class="col mr-2">
-                                                <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
-                                                    Superusers</div>
-                                                <div class="h5 mb-0 font-weight-bold text-gray-800">{{ superusers }}</div>
-                                            </div>
-                                            <div class="col-auto">
-                                                <i class="fas fa-user-shield fa-2x text-success"></i>
-                                            </div>
-                                        </div>
+                            <div class="col-lg-6 mb-3">
+                                <div class="d-flex align-items-center bg-light p-3 rounded shadow-sm">
+                                    <div class="me-3">
+                                        <i class="fas fa-user-shield fa-2x text-success"></i>
+                                    </div>
+                                    <div>
+                                        <div class="text-uppercase text-success small fw-bold">Superusers</div>
+                                        <div class="h4 mb-0 fw-bold">{{ superusers }}</div>
                                     </div>
                                 </div>
                             </div>
-                            <div class="col-md-4 mb-4">
-                                <div class="card border-left-info shadow h-100 py-2">
-                                    <div class="card-body">
-                                        <div class="row no-gutters">
-                                            <div class="col mr-2">
-                                                <div class="text-xs font-weight-bold text-info text-uppercase mb-1">Active Users(Last 30 Days)
-                                                </div>
-                                                <div class="row no-gutters align-items-center">
-                                                    <div class="col-auto">
-                                                        <div class="h5 mb-0 mr-3 font-weight-bold text-gray-800">{{ active_users }}</div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <div class="col-auto">
-                                                <i class="fas fa-user-clock fa-2x text-info"></i>
-                                            </div>
-                                        </div>
+                            <div class="col-lg-6 mb-3">
+                                <div class="d-flex align-items-center bg-light p-3 rounded shadow-sm">
+                                    <div class="me-3">
+                                        <i class="fas fa-user-clock fa-2x text-info"></i>
+                                    </div>
+                                    <div>
+                                        <div class="text-uppercase text-info small fw-bold">Active / 30D</div>
+                                        <div class="h4 mb-0 fw-bold">{{ active_users }}</div>
                                     </div>
                                 </div>
                             </div>
@@ -78,7 +59,7 @@
                 </div>
             </div>
         </div>
-        <div class="col-xl-6 col-lg-6">
+        <div class="col-xl-4 col-lg-6">
             <div class="card shadow-sm mb-4">
                 <div class="card-header" data-bs-toggle="collapse" href="#taskStatisticsCollapse" role="button" aria-expanded="true" aria-controls="taskStatisticsCollapse">
                     <i class="bi bi-card-checklist me-2"></i>
@@ -87,67 +68,94 @@
                 <div class="collapse show" id="taskStatisticsCollapse">
                     <div class="card-body">
                         <div class="row">
-                            <div class="col-md-6 mb-4">
-                                <div class="card border-left-primary shadow h-100 py-2">
-                                    <div class="card-body">
-                                        <div class="row no-gutters">
-                                            <div class="col mr-2">
-                                                <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
-                                                    Total Tasks</div>
-                                                <div class="h5 mb-0 font-weight-bold text-gray-800">{{ total_tasks }}</div>
-                                            </div>
-                                            <div class="col-auto">
-                                                <i class="fas fa-tasks fa-2x text-primary"></i>
-                                            </div>
-                                        </div>
+                            <div class="col-lg-6 mb-3">
+                                <div class="d-flex align-items-center bg-light p-3 rounded shadow-sm">
+                                    <div class="me-3">
+                                        <i class="fas fa-tasks fa-2x text-primary"></i>
+                                    </div>
+                                    <div>
+                                        <div class="text-uppercase text-primary small fw-bold">Total</div>
+                                        <div class="h4 mb-0 fw-bold">{{ total_tasks }}</div>
                                     </div>
                                 </div>
                             </div>
-                            <div class="col-md-6 mb-4">
-                                <div class="card border-left-success shadow h-100 py-2">
-                                    <div class="card-body">
-                                        <div class="row no-gutters">
-                                            <div class="col mr-2">
-                                                <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
-                                                    Completed Tasks</div>
-                                                <div class="h5 mb-0 font-weight-bold text-gray-800">{{ completed_tasks }}</div>
-                                            </div>
-                                            <div class="col-auto">
-                                                <i class="fas fa-check-circle fa-2x text-success"></i>
-                                            </div>
-                                        </div>
+                            <div class="col-lg-6 mb-3">
+                                <div class="d-flex align-items-center bg-light p-3 rounded shadow-sm">
+                                    <div class="me-3">
+                                        <i class="fas fa-check-circle fa-2x text-success"></i>
+                                    </div>
+                                    <div>
+                                        <div class="text-uppercase text-success small fw-bold">Completed</div>
+                                        <div class="h4 mb-0 fw-bold">{{ completed_tasks }}</div>
                                     </div>
                                 </div>
                             </div>
-                            <div class="col-md-6 mb-4">
-                                <div class="card border-left-danger shadow h-100 py-2">
-                                    <div class="card-body">
-                                        <div class="row no-gutters">
-                                            <div class="col mr-2">
-                                                <div class="text-xs font-weight-bold text-danger text-uppercase mb-1">
-                                                    Cancelled Tasks</div>
-                                                <div class="h5 mb-0 font-weight-bold text-gray-800">{{ cancelled_tasks }}</div>
-                                            </div>
-                                            <div class="col-auto">
-                                                <i class="fas fa-times-circle fa-2x text-danger"></i>
-                                            </div>
-                                        </div>
+                            <div class="col-lg-6 mb-3">
+                                <div class="d-flex align-items-center bg-light p-3 rounded shadow-sm">
+                                    <div class="me-3">
+                                        <i class="fas fa-times-circle fa-2x text-danger"></i>
+                                    </div>
+                                    <div>
+                                        <div class="text-uppercase text-danger small fw-bold">Cancelled</div>
+                                        <div class="h4 mb-0 fw-bold">{{ cancelled_tasks }}</div>
                                     </div>
                                 </div>
                             </div>
-                            <div class="col-md-6 mb-4">
-                                <div class="card border-left-warning shadow h-100 py-2">
-                                    <div class="card-body">
-                                        <div class="row no-gutters">
-                                            <div class="col mr-2">
-                                                <div class="text-xs font-w-bold text-warning text-uppercase mb-1">
-                                                    Active Tasks</div>
-                                                <div class="h5 mb-0 font-weight-bold text-gray-800">{{ active_tasks }}</div>
-                                            </div>
-                                            <div class="col-auto">
-                                                <i class="fas fa-spinner fa-2x text-warning"></i>
-                                            </div>
-                                        </div>
+                            <div class="col-lg-6 mb-3">
+                                <div class="d-flex align-items-center bg-light p-3 rounded shadow-sm">
+                                    <div class="me-3">
+                                        <i class="fas fa-spinner fa-2x text-warning"></i>
+                                    </div>
+                                    <div>
+                                        <div class="text-uppercase text-warning small fw-bold">Active</div>
+                                        <div class="h4 mb-0 fw-bold">{{ active_tasks }}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-4 col-lg-6">
+            <div class="card shadow-sm mb-4">
+                <div class="card-header" data-bs-toggle="collapse" href="#discussionStatisticsCollapse" role="button" aria-expanded="true" aria-controls="discussionStatisticsCollapse">
+                    <i class="bi bi-chat-dots me-2"></i>
+                    Discussion Statistics
+                </div>
+                <div class="collapse show" id="discussionStatisticsCollapse">
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-lg-12 mb-3">
+                                <div class="d-flex align-items-center bg-light p-3 rounded shadow-sm">
+                                    <div class="me-3">
+                                        <i class="fas fa-bullhorn fa-2x text-primary"></i>
+                                    </div>
+                                    <div>
+                                        <div class="text-uppercase text-primary small fw-bold">Bulletins</div>
+                                        <div class="h4 mb-0 fw-bold">{{ total_bulletins }}</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-lg-6 mb-3">
+                                <div class="d-flex align-items-center bg-light p-3 rounded shadow-sm">
+                                    <div class="me-3">
+                                        <i class="fas fa-comments fa-2x text-success"></i>
+                                    </div>
+                                    <div>
+                                        <div class="text-uppercase text-success small fw-bold">Posts</div>
+                                        <div class="h4 mb-0 fw-bold">{{ total_posts }}</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-lg-6 mb-3">
+                                <div class="d-flex align-items-center bg-light p-3 rounded shadow-sm">
+                                    <div class="me-3">
+                                        <i class="fas fa-comment-dots fa-2x text-info"></i>
+                                    </div>
+                                    <div>
+                                        <div class="text-uppercase text-info small fw-bold">Comments</div>
+                                        <div class="h4 mb-0 fw-bold">{{ total_comments }}</div>
                                     </div>
                                 </div>
                             </div>

@@ -64,8 +64,16 @@
                 {% if user.is_staff %}
                     <form action="{% url 'toggle_post_hidden' post.pk %}" method="post" class="d-inline">
                         {% csrf_token %}
-                        <button type="submit" class="btn {% if post.is_hidden %}btn-success{% else %}btn-warning{% endif %}">
+                        <button type="submit" class="btn {% if post.is_hidden %}btn-success{% else %}btn-warning text-white{% endif %}">
                             {% if post.is_hidden %}Show{% else %}Hide{% endif %} Post
+                        </button>
+                    </form>
+                {% endif %}
+                {% if user == post.author or user.is_staff %}
+                    <form action="{% url 'toggle_post_private' post.pk %}" method="post" class="d-inline">
+                        {% csrf_token %}
+                        <button type="submit" class="btn {% if post.is_private %}btn-success{% else %}btn-info text-white{% endif %}">
+                            {% if post.is_private %}Make Public{% else %}Make Private{% endif %}
                         </button>
                     </form>
                 {% endif %}

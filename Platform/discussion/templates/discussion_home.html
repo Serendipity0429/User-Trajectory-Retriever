@@ -96,6 +96,7 @@
                     <a href="?show=my_posts" class="btn btn-outline-secondary {% if request.GET.show == 'my_posts' %}active{% endif %}">My Posts</a>
                     {% if user.is_staff %}
                         <a href="?show=hidden" class="btn btn-outline-warning {% if request.GET.show == 'hidden' %}active{% endif %}">Hidden Posts</a>
+                        <a href="{% url 'discussion_settings' %}" class="btn btn-outline-secondary"><i class="bi bi-gear-fill"></i></a>
                     {% endif %}
                 </div>
                 <form action="{% url 'discussion_home' %}" method="get" class="d-flex flex-grow-1 ms-3">

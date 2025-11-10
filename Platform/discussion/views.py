@@ -4,8 +4,8 @@ from django.http import JsonResponse
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, get_object_or_404, redirect
 from django.urls import reverse
-from .models import Bulletin, Post, Comment, Attachment, Label, BulletinReadStatus
-from .forms import PostForm, CommentForm, BulletinForm
+from .models import Bulletin, Post, Comment, Attachment, Label, BulletinReadStatus, DiscussionSettings
+from .forms import PostForm, CommentForm, BulletinForm, DiscussionSettingsForm
 from django.contrib.admin.views.decorators import staff_member_required
 import markdown
 from django.contrib import messages
@@ -17,6 +17,19 @@ from user_system.models import User
 from msg_system.models import Message
 from task_manager.models import ExtensionVersion
 from msg_system.utils import send_system_message
+
+@staff_member_required
+def discussion_settings(request):
+    settings = DiscussionSettings.load()
+    if request.method == 'POST':
+        form = DiscussionSettingsForm(request.POST, instance=settings)
+        if form.is_valid():
+            form.save()
+            return redirect('discussion_settings')
+    else:
+        form = DiscussionSettingsForm(instance=settings)
+    return render(request, 'discussion_settings.html', {'form': form})
+
 
 @login_required
 def upload_image(request):
@@ -68,9 +81,10 @@ def discussion_home(request):
     if not request.user.is_staff:
         from django.utils import timezone
         from datetime import timedelta
+        settings = DiscussionSettings.load()
         one_day_ago = timezone.now() - timedelta(days=1)
         post_count_today = Post.objects.filter(author=request.user, created_at__gte=one_day_ago).count()
-        if post_count_today >= 5:
+        if post_count_today >= settings.post_limit_per_day:
             post_limit_reached = True
 
     # Filtering based on 'show' parameter

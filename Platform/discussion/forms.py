@@ -1,5 +1,5 @@
 from django import forms
-from .models import Post, Comment, Bulletin, Label
+from .models import Post, Comment, Bulletin, Label, DiscussionSettings
 from task_manager.models import ExtensionVersion
 import re
 from packaging.version import parse as parse_version
@@ -44,10 +44,10 @@ class PostForm(forms.ModelForm):
         super(PostForm, self).__init__(*args, **kwargs)
         if self.instance and self.instance.pk:
             self.initial['content'] = self.instance.raw_content
-            
+
         if not user or not user.is_staff:
             self.fields.pop('pinned', None)
-        
+
         if not user:
             self.fields.pop('is_private', None)
 
@@ -93,7 +93,7 @@ class BulletinForm(forms.ModelForm):
         # Validate version format
         if not re.match(r'^\d{1,5}(\.\d{1,5}){0,3}$', version_str):
             raise forms.ValidationError("Invalid version format. Use 1-4 dot-separated integers (e.g., '3.1.1').")
-        
+
         parts = [int(p) for p in version_str.split('.')]
         if any(p > 65536 for p in parts):
             raise forms.ValidationError("Each part of the version number cannot exceed 65536.")
@@ -107,3 +107,11 @@ class BulletinForm(forms.ModelForm):
                 raise forms.ValidationError(f"New version ({new_version}) must be greater than the latest version ({latest_version}).")
 
         return version_str
+
+class DiscussionSettingsForm(forms.ModelForm):
+    class Meta:
+        model = DiscussionSettings
+        fields = ['post_limit_per_day']
+        widgets = {
+            'post_limit_per_day': forms.NumberInput(attrs={'class': 'form-control'}),
+        }

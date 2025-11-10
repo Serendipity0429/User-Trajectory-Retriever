@@ -1,0 +1,22 @@
+{% extends 'base.html' %}
+
+{% block title %}Discussion Settings{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Discussion Settings</h2>
+    <div class="card">
+        <div class="card-body">
+            <form method="post">
+                {% csrf_token %}
+                <div class="mb-3">
+                    <label for="{{ form.post_limit_per_day.id_for_label }}" class="form-label">{{ form.post_limit_per_day.label }}</label>
+                    {{ form.post_limit_per_day }}
+                    <div class="form-text">{{ form.post_limit_per_day.help_text }}</div>
+                </div>
+                <button type="submit" class="btn btn-primary">Save Settings</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

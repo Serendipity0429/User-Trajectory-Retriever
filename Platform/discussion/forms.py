@@ -28,10 +28,11 @@ class PostForm(forms.ModelForm):
     )
     attachments = MultipleFileField(required=False)
     pinned = forms.BooleanField(required=False, widget=forms.CheckboxInput(attrs={'class': 'form-check-input'}))
+    is_private = forms.BooleanField(required=False, widget=forms.CheckboxInput(attrs={'class': 'form-check-input'}))
 
     class Meta:
         model = Post
-        fields = ['title', 'content', 'category', 'pinned']
+        fields = ['title', 'content', 'category', 'pinned', 'is_private']
         widgets = {
             'title': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Enter title'}),
             'content': forms.Textarea(attrs={'class': 'form-control', 'placeholder': 'Enter content', 'style': 'height: 200px'}),
@@ -46,6 +47,9 @@ class PostForm(forms.ModelForm):
             
         if not user or not user.is_staff:
             self.fields.pop('pinned', None)
+        
+        if not user:
+            self.fields.pop('is_private', None)
 
 class CommentForm(forms.ModelForm):
     class Meta:

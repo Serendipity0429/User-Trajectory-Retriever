@@ -96,15 +96,29 @@
             </div>
         </div>
         
-        <div class="d-flex justify-content-between align-items-center mt-4">
+        <div class="d-flex justify-content-between align-items-start mt-4">
             <div>
                 {% if form.pinned %}
-                <div class="form-check form-switch">
+                <div class="form-check form-switch d-inline-block me-3">
                     <input type="checkbox" name="{{ form.pinned.name }}" class="form-check-input {% if form.pinned.errors %}is-invalid{% endif %}" id="{{ form.pinned.id_for_label }}" {% if form.pinned.value %}checked{% endif %}>
                     <label class="form-check-label" for="{{ form.pinned.id_for_label }}">Pin to top</label>
                     {% if form.pinned.errors %}
                         <div class="invalid-feedback">
                             {{ form.pinned.errors.as_text }}
+                        </div>
+                    {% endif %}
+                </div>
+                {% endif %}
+                {% if form.is_private %}
+                <div class="form-check form-switch d-inline-block">
+                    <input type="checkbox" name="{{ form.is_private.name }}" class="form-check-input {% if form.is_private.errors %}is-invalid{% endif %}" id="{{ form.is_private.id_for_label }}" {% if form.is_private.value %}checked{% endif %}>
+                    <label class="form-check-label" for="{{ form.is_private.id_for_label }}">
+                        <i class="bi bi-shield-lock-fill"></i> Make Post Private
+                    </label>
+                    <small class="form-text text-muted d-block">Only you and administrators will be able to see this post.</small>
+                    {% if form.is_private.errors %}
+                        <div class="invalid-feedback">
+                            {{ form.is_private.errors.as_text }}
                         </div>
                     {% endif %}
                 </div>

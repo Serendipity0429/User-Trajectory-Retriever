@@ -5,6 +5,7 @@ from .models import Bulletin, Comment
 from msg_system.models import Message, MessageRecipient
 from user_system.models import User
 from django.db import connection
+from msg_system.utils import send_system_message
 
 @receiver(post_save, sender=Comment)
 def notify_post_author_on_new_comment(sender, instance, created, **kwargs):
@@ -14,17 +15,9 @@ def notify_post_author_on_new_comment(sender, instance, created, **kwargs):
         commenter = instance.author
 
         if author != commenter:
-            admin_user = User.objects.filter(is_superuser=True).first()
-            if admin_user:
-                subject = f"New comment on your post '{post.title}'"
-                body = f"{commenter.username} has commented on your post '{post.title}'."
-                
-                Message.objects.create(
-                    sender=admin_user,
-                    recipient=author,
-                    subject=subject,
-                    body=body
-                )
+            subject = f"New comment on your post '{post.title}'"
+            body = f"{commenter.username} has commented on your post '{post.title}'."
+            send_system_message(author, subject, body)
 
 @receiver(post_save, sender=Bulletin)
 def notify_users_on_new_bulletin(sender, instance, created, **kwargs):

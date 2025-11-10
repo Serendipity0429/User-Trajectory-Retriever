@@ -10,7 +10,6 @@ document.addEventListener('contextmenu', function(event) {
     }
     lastRightClickedElement = event.composedPath?.()[0] || event.target;
     // This is necessary to bypass website restrictions that prevent the context menu.
-    // It consolidates the logic that was previously conflicting in bypass.js.
     event.stopImmediatePropagation();
 }, true);
 

@@ -13,7 +13,7 @@ const defaultConfig = {
     colorTheme: 'tsinghua-purple',
     customColor: '#671372',
     darkMode: false,
-    request_timeout: 5000, // 5 seconds
+    request_timeout: 3000,
 };
 
 // --- Global Config Variable ---

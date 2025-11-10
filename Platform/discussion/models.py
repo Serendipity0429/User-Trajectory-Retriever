@@ -45,6 +45,8 @@ class Post(models.Model):
     category = models.CharField(max_length=50, choices=POST_CATEGORIES, default='General')
     labels = models.ManyToManyField('Label', blank=True)
     pinned = models.BooleanField(default=False)
+    is_private = models.BooleanField(default=False)
+    is_hidden = models.BooleanField(default=False)
 
     def __str__(self):
         return self.title
@@ -56,6 +58,7 @@ class Comment(models.Model):
     raw_content = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    is_hidden = models.BooleanField(default=False)
 
     def __str__(self):
         return f'Comment by {self.author} on {self.post}'

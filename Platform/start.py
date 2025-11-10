@@ -91,7 +91,7 @@ def clean_project() -> None:
         WORK_DIR / "discussion" / "migrations",
         WORK_DIR / "db.sqlite3",
         WORK_DIR / "media" / "attachments",
-        WORD_DIR / "media" / "evidence_images"
+        WORK_DIR / "media" / "evidence_images"
     ]
 
     for path in paths_to_remove:

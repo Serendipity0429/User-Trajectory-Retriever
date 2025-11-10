@@ -17,4 +17,5 @@ urlpatterns = [
     path('bulletin/<int:pk>/read_status/', views.bulletin_read_status, name='bulletin_read_status'),
     path('labels/autocomplete/', views.label_autocomplete, name='label_autocomplete'),
     path('upload_image/', views.upload_image, name='upload_image'),
+    path('settings/', views.discussion_settings, name='discussion_settings'),
 ]

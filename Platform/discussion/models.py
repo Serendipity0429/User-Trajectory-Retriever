@@ -1,5 +1,23 @@
 from django.db import models
 from user_system.models import User
+from django.core.exceptions import ValidationError
+
+
+class DiscussionSettings(models.Model):
+    post_limit_per_day = models.PositiveIntegerField(default=5, help_text="The maximum number of posts a non-staff user can create per day.")
+
+    def save(self, *args, **kwargs):
+        if not self.pk and DiscussionSettings.objects.exists():
+            raise ValidationError('There can be only one DiscussionSettings instance.')
+        return super(DiscussionSettings, self).save(*args, **kwargs)
+
+    @classmethod
+    def load(cls):
+        obj, created = cls.objects.get_or_create(pk=1)
+        return obj
+
+    def __str__(self):
+        return "Discussion Settings"
 
 def get_attachment_upload_path(instance, filename):
     if instance.post:

@@ -309,7 +309,7 @@ chrome.runtime.onInstalled.addListener(() => {
     _set_session({ is_recording_paused: false });
 });
 
-function getSelectionDetails() {
+function highlightSelection() {
     // Helper to parse rgb() color string
     function parseRgb(rgb) {
         if (!rgb || !rgb.includes('rgb')) return [255, 255, 255]; // Default to white if color is transparent or invalid
@@ -321,14 +321,12 @@ function getSelectionDetails() {
     if (selection.rangeCount > 0) {
         const range = selection.getRangeAt(0);
         const text = selection.toString();
-        let container = range.commonAncestorContainer;
-        if (container.nodeType !== Node.ELEMENT_NODE) {
-            container = container.parentElement;
-        }
-        
-        const selector = getCssSelector(container);
-
         if (text.trim().length > 0 && !range.collapsed) {
+            let container = range.commonAncestorContainer;
+            if (container.nodeType !== Node.ELEMENT_NODE) {
+                container = container.parentElement;
+            }
+            
             try {
                 const computedStyle = window.getComputedStyle(container);
                 const backgroundColorRgb = parseRgb(computedStyle.backgroundColor);
@@ -337,12 +335,12 @@ function getSelectionDetails() {
                 const textColorHex = rgbToHex(...textColorRgb);
 
                 const highlightPalette = [
-                    '#FFFF88', // Light Yellow
-                    '#A0E8A0', // Light Green
-                    '#90EE90', // Pale Green
-                    '#ADD8E6', // Light Blue
-                    '#FFA07A', // Light Salmon
-                    '#FFDDC1'  // Light Apricot
+                    '#FFFF8840', // Light Yellow
+                    '#A0E8A040', // Light Green
+                    '#90EE9040', // Pale Green
+                    '#ADD8E640', // Light Blue
+                    '#FFA07A40', // Light Salmon
+                    '#FFDDC140'  // Light Apricot
                 ];
 
                 let bestColor = highlightPalette[0];
@@ -376,6 +374,20 @@ function getSelectionDetails() {
                 }
             }
         }
+    }
+}
+
+function getSelectionDetails() {
+    const selection = window.getSelection();
+    if (selection.rangeCount > 0) {
+        const range = selection.getRangeAt(0);
+        const text = selection.toString();
+        let container = range.commonAncestorContainer;
+        if (container.nodeType !== Node.ELEMENT_NODE) {
+            container = container.parentElement;
+        }
+        
+        const selector = getCssSelector(container);
 
         return { text, selector };
     }
@@ -410,7 +422,12 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
             }
             
             const [details] = injectionResults;
-            if (details.result) {
+            if (details.result && details.result.text && details.result.text.trim().length > 0) {
+                chrome.scripting.executeScript({
+                    target: { tabId: tab.id },
+                    function: highlightSelection,
+                });
+
                 try {
                     const config = getConfig();
                     await makeApiRequest(() => _post(config.urls.add_justification, {

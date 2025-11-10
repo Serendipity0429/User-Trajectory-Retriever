@@ -16,6 +16,7 @@ import os
 from user_system.models import User
 from msg_system.models import Message
 from task_manager.models import ExtensionVersion
+from msg_system.utils import send_system_message
 
 @login_required
 def upload_image(request):
@@ -58,8 +59,36 @@ def discussion_home(request):
             start = max(1, end - 4)
         bulletin_page_range = range(start, end + 1)
 
+    # Base querysets
     pinned_posts = Post.objects.filter(pinned=True).order_by('-updated_at')
     posts_list = Post.objects.filter(pinned=False).order_by('-created_at')
+    
+    # Post creation limit for non-staff users
+    post_limit_reached = False
+    if not request.user.is_staff:
+        from django.utils import timezone
+        from datetime import timedelta
+        one_day_ago = timezone.now() - timedelta(days=1)
+        post_count_today = Post.objects.filter(author=request.user, created_at__gte=one_day_ago).count()
+        if post_count_today >= 5:
+            post_limit_reached = True
+
+    # Filtering based on 'show' parameter
+    show_filter = request.GET.get('show')
+    if show_filter == 'my_posts':
+        posts_list = posts_list.filter(author=request.user)
+        pinned_posts = pinned_posts.filter(author=request.user)
+    elif show_filter == 'hidden' and request.user.is_staff:
+        posts_list = posts_list.filter(is_hidden=True)
+        pinned_posts = pinned_posts.filter(is_hidden=True)
+    else:
+        # Default filtering
+        posts_list = posts_list.exclude(is_hidden=True)
+        pinned_posts = pinned_posts.exclude(is_hidden=True)
+        if not request.user.is_staff:
+            posts_list = posts_list.filter(Q(is_private=False) | Q(author=request.user))
+            pinned_posts = pinned_posts.filter(Q(is_private=False) | Q(author=request.user))
+
     categories = Post.POST_CATEGORIES
 
     category_filter = request.GET.get('category')
@@ -106,7 +135,8 @@ def discussion_home(request):
         'pinned_posts': pinned_posts,
         'posts': posts,
         'post_page_range': post_page_range,
-        'categories': [category[0] for category in categories]
+        'categories': [category[0] for category in categories],
+        'post_limit_reached': post_limit_reached,
     })
 
 @login_required
@@ -135,6 +165,17 @@ def bulletin_read_status(request, pk):
 @login_required
 def post_detail(request, pk):
     post = get_object_or_404(Post, pk=pk)
+    
+    # Authorization check
+    is_author = post.author == request.user
+    is_staff = request.user.is_staff
+
+    if post.is_hidden and not is_staff:
+        return redirect('discussion_home')
+    
+    if post.is_private and not is_author and not is_staff:
+        return redirect('discussion_home')
+
     if request.method == 'POST':
         form = CommentForm(request.POST)
         if form.is_valid():
@@ -158,14 +199,7 @@ def create_post(request):
         # Check for duplicate filenames
         filenames = [f.name for f in files]
         if len(filenames) != len(set(filenames)):
-            admin_user = User.objects.filter(is_superuser=True).first()
-            if admin_user:
-                Message.objects.create(
-                    sender=admin_user,
-                    recipient=request.user,
-                    subject="File Upload Error",
-                    body="Duplicate filenames are not allowed."
-                )
+            send_system_message(request.user, "File Upload Error", "Duplicate filenames are not allowed.")
             return render(request, 'create_post.html', {'form': form})
 
         if form.is_valid():
@@ -173,6 +207,8 @@ def create_post(request):
             post.author = request.user
             post.raw_content = form.cleaned_data['content']
             post.content = markdown.markdown(form.cleaned_data['content'])
+            if 'is_private' in form.cleaned_data:
+                post.is_private = form.cleaned_data['is_private']
             post.save()
 
             # Handle labels
@@ -202,14 +238,7 @@ def manage_bulletin(request):
         # Check for duplicate filenames
         filenames = [f.name for f in files]
         if len(filenames) != len(set(filenames)):
-            admin_user = User.objects.filter(is_superuser=True).first()
-            if admin_user:
-                Message.objects.create(
-                    sender=admin_user,
-                    recipient=request.user,
-                    subject="File Upload Error",
-                    body="Duplicate filenames are not allowed."
-                )
+            send_system_message(request.user, "File Upload Error", "Duplicate filenames are not allowed.")
             return render(request, 'manage_bulletin.html', {'form': form, 'bulletins': bulletins})
 
         if form.is_valid():
@@ -248,14 +277,7 @@ def edit_bulletin(request, pk):
         new_filenames = [f.name for f in files]
         
         if len(new_filenames) != len(set(new_filenames)) or any(f in existing_filenames for f in new_filenames):
-            admin_user = User.objects.filter(is_superuser=True).first()
-            if admin_user:
-                Message.objects.create(
-                    sender=admin_user,
-                    recipient=request.user,
-                    subject="File Upload Error",
-                    body="Duplicate filenames are not allowed."
-                )
+            send_system_message(request.user, "File Upload Error", "Duplicate filenames are not allowed.")
             return render(request, 'edit_bulletin.html', {'form': form})
 
         if attachment_ids_to_remove:
@@ -287,14 +309,7 @@ def delete_bulletin(request, pk):
     if request.method == 'POST':
         bulletin_title = bulletin.title
         bulletin.delete()
-        admin_user = User.objects.filter(is_superuser=True).first()
-        if admin_user:
-            Message.objects.create(
-                sender=admin_user,
-                recipient=request.user,
-                subject="Bulletin Deleted",
-                body=f"The bulletin '{bulletin_title}' was deleted successfully."
-            )
+        send_system_message(request.user, "Bulletin Deleted", f"The bulletin '{bulletin_title}' was deleted successfully.")
         return redirect('manage_bulletin')
     return render(request, 'confirm_delete.html', {'object': bulletin})
 
@@ -316,14 +331,7 @@ def edit_post(request, pk):
         new_filenames = [f.name for f in files]
 
         if len(new_filenames) != len(set(new_filenames)) or any(f in existing_filenames for f in new_filenames):
-            admin_user = User.objects.filter(is_superuser=True).first()
-            if admin_user:
-                Message.objects.create(
-                    sender=admin_user,
-                    recipient=request.user,
-                    subject="File Upload Error",
-                    body="Duplicate filenames are not allowed."
-                )
+            send_system_message(request.user, "File Upload Error", "Duplicate filenames are not allowed.")
             return render(request, 'edit_post.html', {'form': form})
 
         if attachment_ids_to_remove:
@@ -333,6 +341,8 @@ def edit_post(request, pk):
             post = form.save(commit=False)
             post.raw_content = form.cleaned_data['content']
             post.content = markdown.markdown(form.cleaned_data['content'])
+            if 'is_private' in form.cleaned_data:
+                post.is_private = form.cleaned_data['is_private']
             post.save()
 
             # Handle labels
@@ -352,28 +362,15 @@ def edit_post(request, pk):
 @login_required
 def delete_post(request, pk):
     post = get_object_or_404(Post, pk=pk)
-    admin_user = User.objects.filter(is_superuser=True).first()
 
     if request.user != post.author and not request.user.is_staff:
-        if admin_user:
-            Message.objects.create(
-                sender=admin_user,
-                recipient=request.user,
-                subject="Unauthorized Action",
-                body="You are not authorized to delete this post."
-            )
+        send_system_message(request.user, "Unauthorized Action", "You are not authorized to delete this post.")
         return redirect('post_detail', pk=pk)
 
     if request.method == 'POST':
         post_title = post.title
         post.delete()
-        if admin_user:
-            Message.objects.create(
-                sender=admin_user,
-                recipient=request.user,
-                subject="Post Deleted",
-                body=f"The post '{post_title}' was deleted successfully."
-            )
+        send_system_message(request.user, "Post Deleted", f"The post '{post_title}' was deleted successfully.")
         return redirect('discussion_home')
 
     return render(request, 'confirm_delete.html', {'object': post})
@@ -384,27 +381,30 @@ def delete_post(request, pk):
 def delete_comment(request, pk):
     comment = get_object_or_404(Comment, pk=pk)
     post_pk = comment.post.pk
-    admin_user = User.objects.filter(is_superuser=True).first()
 
     if request.user != comment.author and not request.user.is_staff:
-        if admin_user:
-            Message.objects.create(
-                sender=admin_user,
-                recipient=request.user,
-                subject="Unauthorized Action",
-                body="You are not authorized to delete this comment."
-            )
+        send_system_message(request.user, "Unauthorized Action", "You are not authorized to delete this comment.")
         return redirect('post_detail', pk=post_pk)
 
     if request.method == 'POST':
         comment.delete()
-        if admin_user:
-            Message.objects.create(
-                sender=admin_user,
-                recipient=request.user,
-                subject="Comment Deleted",
-                body="Your comment was deleted successfully."
-            )
+        send_system_message(request.user, "Comment Deleted", "Your comment was deleted successfully.")
         return redirect('post_detail', pk=post_pk)
 
     return render(request, 'confirm_delete.html', {'object': comment})
+
+@staff_member_required
+def toggle_post_hidden(request, pk):
+    post = get_object_or_404(Post, pk=pk)
+    if request.method == 'POST':
+        post.is_hidden = not post.is_hidden
+        post.save()
+    return redirect('post_detail', pk=pk)
+
+@staff_member_required
+def toggle_comment_hidden(request, pk):
+    comment = get_object_or_404(Comment, pk=pk)
+    if request.method == 'POST':
+        comment.is_hidden = not comment.is_hidden
+        comment.save()
+    return redirect('post_detail', pk=comment.post.pk)

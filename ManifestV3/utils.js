@@ -89,7 +89,7 @@ async function _request(method, url, data = {}, content_type = 'form', response_
 {
     const config = getConfig();
     const MAX_RETRIES = config.max_retries || 3;
-    const TIMEOUT = request_timeout || config.request_timeout || 5000; // Default to 5 seconds
+    const TIMEOUT = request_timeout || config.request_timeout || 3000;
     let attempt = 0;
     while (attempt < MAX_RETRIES) {
         try {

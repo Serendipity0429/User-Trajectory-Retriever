@@ -72,7 +72,7 @@ function showFailMessage(message_type, customMessage = '') {
         const el = document.getElementById(errorId);
         if (el) {
             if (customMessage && (errorId === 'requestError' || errorId === 'connectionError' || errorId === 'authError')) {
-                el.querySelector('p').textContent = customMessage;
+                el.querySelector('span').textContent = customMessage;
             }
             el.style.display = 'flex';
         }
@@ -151,9 +151,6 @@ async function showUserTab(task_id, task_info) {
         showAlert(`A new version (${update_info.latest_version}) is available. Please update to continue. <a href="${update_info.update_link}" target="_blank">Update Now</a>.`, "Update Required");
     } else {
         displayActiveTask(task_id, task_info);
-        startTaskBtn.style.display = 'block';
-        submitAnswerBtn.style.display = 'none';
-        cancelBtn.style.display = 'block';
         updateBtn.style.display = 'none';
     }
     
@@ -710,6 +707,7 @@ async function testConnection(serverType) {
             });
             localServerAddress.disabled = true;
             remoteServerAddress.disabled = true;
+            restoreDefaultsBtn.disabled = false;
     
             // Show a message
             warningMsg.innerHTML = '<i class="fas fa-exclamation-triangle"></i><p>Logout for modifications.</p>';
@@ -722,6 +720,7 @@ async function testConnection(serverType) {
             });
             localServerAddress.disabled = false;
             remoteServerAddress.disabled = false;
+            restoreDefaultsBtn.disabled = false;
     
             warningMsg.innerHTML = '<i class="fas fa-exclamation-triangle"></i><p>Ask admin before change!</p>';
             warningMsg.style.display = 'flex';
@@ -785,9 +784,12 @@ async function testConnection(serverType) {
     restoreDefaultsBtn.addEventListener('click', async () => {
         const confirmed = await showConfirm("Are you sure you want to restore all settings to their default values?");
         if (confirmed) {
-            const defaultConfig = await sendMessageFromPopup({ command: "get_default_config" });
-        
             const { logged_in } = await _get_session(['logged_in']);
+            if (logged_in) {
+                await showAlert("Server settings cannot be changed while logged in and will be preserved.", "Info");
+            }
+
+            const defaultConfig = await sendMessageFromPopup({ command: "get_default_config" });
         
             if (logged_in) {
                 // If logged in, only restore message box and appearance settings

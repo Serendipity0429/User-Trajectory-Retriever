@@ -56,6 +56,20 @@
         </div>
 
         <div class="mb-3">
+            <label for="{{ form.expiry_date.id_for_label }}" class="form-label">Expiry Date</label>
+            <div class="form-check mb-2">
+                <input type="checkbox" id="permanent-checkbox" class="form-check-input" {% if not form.instance.expiry_date %}checked{% endif %}>
+                <label class="form-check-label" for="permanent-checkbox">Permanent (No Expiry)</label>
+            </div>
+            <input type="datetime-local" name="{{ form.expiry_date.name }}" class="form-control {% if form.expiry_date.errors %}is-invalid{% endif %}" id="{{ form.expiry_date.id_for_label }}" value="{{ form.instance.expiry_date|date:'Y-m-d\TH:i' }}">
+            {% if form.expiry_date.errors %}
+                <div class="invalid-feedback">
+                    {{ form.expiry_date.errors.as_text }}
+                </div>
+            {% endif %}
+        </div>
+
+        <div class="mb-3">
             <h5 class="mb-2"><i class="bi bi-paperclip"></i> Attachments</h5>
             <input type="hidden" name="remove_attachments" id="remove_attachments_input" value="">
             <div class="attachment-container p-3 border rounded bg-light {% if form.attachments.errors %}is-invalid{% endif %}">
@@ -238,6 +252,25 @@ $(function() {
         } else {
             window.open(fileURL, "_blank");
         }
+    }
+
+    const expiryDateInput = document.getElementById("{{ form.expiry_date.id_for_label }}");
+    const permanentCheckbox = document.getElementById('permanent-checkbox');
+    
+    if (permanentCheckbox && expiryDateInput) {
+        function toggleExpiryDate() {
+            if (permanentCheckbox.checked) {
+                expiryDateInput.disabled = true;
+                expiryDateInput.value = '';
+            } else {
+                expiryDateInput.disabled = false;
+            }
+        }
+
+        permanentCheckbox.addEventListener('change', toggleExpiryDate);
+        
+        // Initial state
+        toggleExpiryDate();
     }
 });
 </script>

@@ -2,6 +2,57 @@
 {% load discussion_extras %}
 
 {% block content %}
+<style>
+    .btn-custom-hide {
+        background-color: #e7b624; /* Dark Orange */
+        color: white;
+    }
+    .btn-custom-hide:hover {
+        background-color: #c59507ff;
+        color: white;
+    }
+    .btn-custom-show {
+        background-color: #28a745; /* Success Green */
+        color: white;
+    }
+    .btn-custom-show:hover {
+        background-color: #218838;
+        color: white;
+    }
+    .btn-custom-private {
+        background-color: #008B8B; /* Dark Cyan */
+        color: white;
+    }
+    .btn-custom-private:hover {
+        background-color: #007A7A;
+        color: white;
+    }
+    .btn-custom-public {
+        background-color: #17a2b8; /* Info Cyan */
+        color: white;
+    }
+    .btn-custom-public:hover {
+        background-color: #138496;
+        color: white;
+    }
+    .btn-custom-close {
+        background-color: #e03030;
+        color: white;
+    }
+    .btn-custom-close:hover {
+        background-color: #a40716;
+        color: white;
+    }
+    .btn-custom-reopen {
+        background-color: #006400;
+        color: white;
+    }
+    .btn-custom-reopen:hover {
+        background-color: #005200;
+        color: white;
+    }
+
+</style>
 <div class="container discussion-page">
     <a href="{% url 'discussion_home' %}" class="btn btn-outline-secondary mt-3 mb-3">&laquo; Back to Forum</a>
     <div class="card my-4 {% if post.is_hidden %}border-warning{% elif post.is_private %}border-info{% endif %}">
@@ -16,6 +67,15 @@
                 {% if post.is_hidden %}
                     <span class="badge bg-warning" data-bs-toggle="tooltip" title="This post is hidden and not visible to regular users.">
                         <i class="bi bi-eye-slash-fill"></i> Hidden Post
+                    </span>
+                {% endif %}
+                {% if post.is_closed %}
+                    <span class="badge bg-danger" data-bs-toggle="tooltip" title="This post is closed.">
+                        <i class="bi bi-lock-fill"></i> Closed
+                    </span>
+                {% else %}
+                    <span class="badge bg-success" data-bs-toggle="tooltip" title="This post is open.">
+                        <i class="bi bi-unlock-fill"></i> Open
                     </span>
                 {% endif %}
             </h1>
@@ -56,7 +116,7 @@
                     {% endfor %}
                 </div>
             {% endif %}
-            <div class="post-actions mt-4">
+            <div class="post-actions mt-4 d-flex justify-content-end align-items-center" style="gap: 0.5rem;">
                 {% if user == post.author or user.is_staff %}
                     <a href="{% url 'edit_post' post.pk %}" class="btn btn-primary">Edit</a>
                     <a href="{% url 'delete_post' post.pk %}" class="btn btn-danger">Delete</a>
@@ -64,17 +124,29 @@
                 {% if user.is_staff %}
                     <form action="{% url 'toggle_post_hidden' post.pk %}" method="post" class="d-inline">
                         {% csrf_token %}
-                        <button type="submit" class="btn {% if post.is_hidden %}btn-success{% else %}btn-warning text-white{% endif %}">
-                            {% if post.is_hidden %}Show{% else %}Hide{% endif %} Post
+                        <button type="submit" class="btn {% if post.is_hidden %}btn-custom-show{% else %}btn-custom-hide{% endif %}">
+                            {% if post.is_hidden %}Show Post{% else %}Hide Post{% endif %}
                         </button>
                     </form>
                 {% endif %}
                 {% if user == post.author or user.is_staff %}
                     <form action="{% url 'toggle_post_private' post.pk %}" method="post" class="d-inline">
                         {% csrf_token %}
-                        <button type="submit" class="btn {% if post.is_private %}btn-success{% else %}btn-info text-white{% endif %}">
+                        <button type="submit" class="btn {% if post.is_private %}btn-custom-public{% else %}btn-custom-private{% endif %}">
                             {% if post.is_private %}Make Public{% else %}Make Private{% endif %}
                         </button>
+                    </form>
+                {% endif %}
+                {% if user == post.author or user.is_staff %}
+                    <form action="{% url 'toggle_post_closed' post.pk %}" method="post" class="d-inline">
+                        {% csrf_token %}
+                        {% if post.is_closed %}
+                            {% if user.is_staff %}
+                                <button type="submit" class="btn btn-custom-reopen">Reopen Post</button>
+                            {% endif %}
+                        {% else %}
+                            <button type="submit" class="btn btn-custom-close">Close Post</button>
+                        {% endif %}
                     </form>
                 {% endif %}
             </div>
@@ -124,14 +196,14 @@
     <form method="post" novalidate>
         {% csrf_token %}
         <div class="mb-3">
-            <textarea name="{{ form.content.name }}" class="form-control {% if form.content.errors %}is-invalid{% endif %}" id="{{ form.content.id_for_label }}" rows="5">{{ form.content.value|default_if_none:'' }}</textarea>
+            <textarea name="{{ form.content.name }}" class="form-control {% if form.content.errors %}is-invalid{% endif %}" id="{{ form.content.id_for_label }}" rows="5" {% if post.is_closed %}disabled{% endif %}>{{ form.content.value|default_if_none:'' }}</textarea>
             {% if form.content.errors %}
                 <div class="invalid-feedback d-block">
                     {{ form.content.errors.as_text }}
                 </div>
             {% endif %}
         </div>
-        <button type="submit" class="btn btn-primary">Submit</button>
+        <button type="submit" class="btn btn-primary" {% if post.is_closed %}disabled{% endif %}>Submit</button>
     </form>
 </div>
 {% endblock %}

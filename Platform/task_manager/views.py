@@ -410,10 +410,7 @@ def initialize(request):
     user = request.user
     # Delete all active tasks and relevant queries and pages
     tasks = Task.objects.filter(user=user, active=True)
-    # for task in tasks:
-    #     task.delete()
 
-    # TODO: Let users choose to continue the previous task or start a new task
     if tasks.first() is not None:
         return HttpResponse(tasks.first().id)
     return HttpResponse(-1)

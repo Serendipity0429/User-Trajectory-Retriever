@@ -41,6 +41,7 @@ class Bulletin(models.Model):
     pinned = models.BooleanField(default=False)
     category = models.CharField(max_length=50, choices=BULLETIN_CATEGORIES, default='General')
     send_notification = models.BooleanField(default=True)
+    expiry_date = models.DateTimeField(null=True, blank=True, help_text="The bulletin will be hidden after this date.")
 
     def __str__(self):
         return self.title
@@ -62,6 +63,7 @@ class Post(models.Model):
     pinned = models.BooleanField(default=False)
     is_private = models.BooleanField(default=False)
     is_hidden = models.BooleanField(default=False)
+    is_closed = models.BooleanField(default=False)
 
     def __str__(self):
         return self.title

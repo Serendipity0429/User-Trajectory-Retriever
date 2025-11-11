@@ -52,10 +52,20 @@ def label_autocomplete(request):
 @login_required
 def discussion_home(request):
     # Pinned bulletins are always shown
-    pinned_bulletins = Bulletin.objects.filter(pinned=True).order_by('-updated_at')
+    from django.utils import timezone
+    now = timezone.now()
+    
+    pinned_bulletins_query = Bulletin.objects.filter(pinned=True)
+    bulletin_list_query = Bulletin.objects.filter(pinned=False)
+
+    if not request.user.is_staff:
+        pinned_bulletins_query = pinned_bulletins_query.filter(Q(expiry_date__isnull=True) | Q(expiry_date__gt=now))
+        bulletin_list_query = bulletin_list_query.filter(Q(expiry_date__isnull=True) | Q(expiry_date__gt=now))
+
+    pinned_bulletins = pinned_bulletins_query.order_by('-updated_at')
+    bulletin_list = bulletin_list_query.order_by('-created_at')
     
     # Paginate the non-pinned bulletins
-    bulletin_list = Bulletin.objects.filter(pinned=False).order_by('-created_at')
     bulletin_paginator = Paginator(bulletin_list, 5)  # Show 5 bulletins per page
     bulletin_page_number = request.GET.get('bpage')
     bulletins = bulletin_paginator.get_page(bulletin_page_number)
@@ -92,6 +102,12 @@ def discussion_home(request):
     if show_filter == 'my_posts':
         posts_list = posts_list.filter(author=request.user)
         pinned_posts = pinned_posts.filter(author=request.user)
+    elif show_filter == 'open':
+        posts_list = posts_list.filter(is_closed=False)
+        pinned_posts = pinned_posts.filter(is_closed=False)
+    elif show_filter == 'closed':
+        posts_list = posts_list.filter(is_closed=True)
+        pinned_posts = pinned_posts.filter(is_closed=True)
     elif show_filter == 'hidden' and request.user.is_staff:
         posts_list = posts_list.filter(is_hidden=True)
         pinned_posts = pinned_posts.filter(is_hidden=True)
@@ -143,6 +159,7 @@ def discussion_home(request):
         })
 
     return render(request, 'discussion_home.html', {
+        'now': now,
         'pinned_bulletins': pinned_bulletins,
         'bulletins': bulletins,
         'bulletin_page_range': bulletin_page_range,
@@ -156,12 +173,17 @@ def discussion_home(request):
 @login_required
 def bulletin_detail(request, pk):
     bulletin = get_object_or_404(Bulletin, pk=pk)
+    from django.utils import timezone
+    now = timezone.now()
+    if bulletin.expiry_date and bulletin.expiry_date < now and not request.user.is_staff:
+        return redirect('discussion_home')
+
     if request.user.is_authenticated and not request.user.is_staff:
         BulletinReadStatus.objects.get_or_create(bulletin=bulletin, user=request.user)
     
     read_count = BulletinReadStatus.objects.filter(bulletin=bulletin).count()
     
-    return render(request, 'bulletin_detail.html', {'bulletin': bulletin, 'read_count': read_count})
+    return render(request, 'bulletin_detail.html', {'bulletin': bulletin, 'read_count': read_count, 'now': now})
 
 @staff_member_required
 def bulletin_read_status(request, pk):
@@ -241,6 +263,8 @@ def create_post(request):
 
 @staff_member_required
 def manage_bulletin(request):
+    from django.utils import timezone
+    now = timezone.now()
     bulletin_list = Bulletin.objects.all().order_by('-created_at')
     paginator = Paginator(bulletin_list, 10) # Show 10 bulletins per page.
     page_number = request.GET.get('page')
@@ -253,12 +277,16 @@ def manage_bulletin(request):
         filenames = [f.name for f in files]
         if len(filenames) != len(set(filenames)):
             send_system_message(request.user, "File Upload Error", "Duplicate filenames are not allowed.")
-            return render(request, 'manage_bulletin.html', {'form': form, 'bulletins': bulletins})
+            return render(request, 'manage_bulletin.html', {'form': form, 'bulletins': bulletins, 'now': now})
 
         if form.is_valid():
             bulletin = form.save(commit=False)
             bulletin.raw_content = form.cleaned_data['content']
             bulletin.content = markdown.markdown(form.cleaned_data['content'])
+            
+            if request.POST.get('permanent') == 'on':
+                bulletin.expiry_date = None
+            
             bulletin.save()
             for f in files:
                 Attachment.objects.create(bulletin=bulletin, file=f)
@@ -273,7 +301,7 @@ def manage_bulletin(request):
             return redirect('manage_bulletin')
     else:
         form = BulletinForm()
-    return render(request, 'manage_bulletin.html', {'form': form, 'bulletins': bulletins})
+    return render(request, 'manage_bulletin.html', {'form': form, 'bulletins': bulletins, 'now': now})
 
 @staff_member_required
 def edit_bulletin(request, pk):
@@ -301,6 +329,10 @@ def edit_bulletin(request, pk):
             bulletin = form.save(commit=False)
             bulletin.raw_content = form.cleaned_data['content']
             bulletin.content = markdown.markdown(form.cleaned_data['content'])
+            
+            if request.POST.get('permanent') == 'on':
+                bulletin.expiry_date = None
+            
             bulletin.save()
             for f in files:
                 Attachment.objects.create(bulletin=bulletin, file=f)
@@ -422,6 +454,24 @@ def toggle_post_private(request, pk):
         if request.method == 'POST':
             post.is_private = not post.is_private
             post.save()
+    return redirect('post_detail', pk=pk)
+
+
+@login_required
+def toggle_post_closed(request, pk):
+    post = get_object_or_404(Post, pk=pk)
+    
+    # Allow author or staff to close the post
+    if not post.is_closed and (request.user == post.author or request.user.is_staff):
+        if request.method == 'POST':
+            post.is_closed = True
+            post.save()
+    # Only allow staff to reopen the post
+    elif post.is_closed and request.user.is_staff:
+        if request.method == 'POST':
+            post.is_closed = False
+            post.save()
+            
     return redirect('post_detail', pk=pk)
 
 

@@ -66,13 +66,14 @@ class BulletinForm(forms.ModelForm):
 
     class Meta:
         model = Bulletin
-        fields = ['title', 'content', 'category', 'pinned', 'send_notification']
+        fields = ['title', 'content', 'category', 'pinned', 'send_notification', 'expiry_date']
         widgets = {
             'title': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Enter title'}),
             'content': forms.Textarea(attrs={'class': 'form-control', 'placeholder': 'Enter content', 'style': 'height: 150px'}),
             'category': forms.Select(attrs={'class': 'form-select'}),
             'pinned': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'send_notification': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'expiry_date': forms.DateTimeInput(attrs={'class': 'form-control', 'type': 'datetime-local'}),
         }
 
     def __init__(self, *args, **kwargs):

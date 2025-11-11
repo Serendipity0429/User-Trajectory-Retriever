@@ -4,7 +4,15 @@
     {% for post in pinned_posts %}
         <a href="{% url 'post_detail' post.pk %}" class="list-group-item list-group-item-action">
             <div class="d-flex w-100 justify-content-between">
-                <h5 class="mb-1"><i class="bi bi-pin-angle-fill"></i> {{ post.title }} {% if post.is_private %}<i class="bi bi-shield-lock-fill"></i>{% endif %}</h5>
+                <h5 class="mb-1">
+                    {% if post.is_closed %}
+                        <i class="bi bi-lock-fill text-danger"></i>
+                    {% else %}
+                        <i class="bi bi-envelope-open-fill text-success"></i>
+                    {% endif %}
+                    <i class="bi bi-pin-angle-fill"></i> {{ post.title }} 
+                    {% if post.is_private %}<i class="bi bi-shield-lock-fill"></i>{% endif %} 
+                </h5>
                 <small>{{ post.updated_at|timesince }} ago {% if post|was_updated %}(edited){% endif %}</small>
             </div>
             <p class="mb-1">By {{ post.author.username }} in <span class="badge {{ post.get_category_display|category_color_class }}">{{ post.get_category_display }}</span></p>
@@ -18,7 +26,15 @@
     {% for post in posts %}
         <a href="{% url 'post_detail' post.pk %}" class="list-group-item list-group-item-action">
             <div class="d-flex w-100 justify-content-between">
-                <h5 class="mb-1">{{ post.title }} {% if post.is_private %}<i class="bi bi-shield-lock-fill"></i>{% endif %}</h5>
+                <h5 class="mb-1">
+                    {% if post.is_closed %}
+                        <i class="bi bi-lock-fill text-danger"></i>
+                    {% else %}
+                        <i class="bi bi-envelope-open-fill text-success"></i>
+                    {% endif %}
+                    {{ post.title }} 
+                    {% if post.is_private %}<i class="bi bi-shield-lock-fill"></i>{% endif %} 
+                </h5>
                 <small>{{ post.updated_at|timesince }} ago {% if post|was_updated %}(edited){% endif %}</small>
             </div>
             <p class="mb-1">By {{ post.author.username }} in <span class="badge {{ post.get_category_display|category_color_class }}">{{ post.get_category_display }}</span></p>

@@ -18,6 +18,7 @@
                         <h6 class="card-subtitle mb-2 text-muted">
                 <span class="badge {{ bulletin.get_category_display|category_color_class }}">{{ bulletin.get_category_display }}</span>
                 Posted on {{ bulletin.created_at }} {% if bulletin|was_updated %}(Last edited: {{ bulletin.updated_at }}){% endif %}
+                {% if user.is_staff and bulletin.expiry_date and bulletin.expiry_date < now %}<span class="text-danger">(Expired)</span>{% endif %}
             </h6>
             <hr>
             <p class="card-text mt-3">{{ bulletin.content|safe }}</p>

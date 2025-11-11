@@ -78,6 +78,20 @@
                 </div>
 
                 <div class="mb-3">
+                    <label for="{{ form.expiry_date.id_for_label }}" class="form-label">Expiry Date</label>
+                    <div class="form-check mb-2">
+                        <input type="checkbox" id="permanent-checkbox" class="form-check-input">
+                        <label class="form-check-label" for="permanent-checkbox">Permanent (No Expiry)</label>
+                    </div>
+                    <input type="datetime-local" name="{{ form.expiry_date.name }}" class="form-control {% if form.expiry_date.errors %}is-invalid{% endif %}" id="{{ form.expiry_date.id_for_label }}" value="{{ form.expiry_date.value|default_if_none:''|date:'Y-m-d\TH:i' }}">
+                    {% if form.expiry_date.errors %}
+                        <div class="invalid-feedback">
+                            {{ form.expiry_date.errors.as_text }}
+                        </div>
+                    {% endif %}
+                </div>
+
+                <div class="mb-3">
                     <h5 class="mb-2"><i class="bi bi-paperclip"></i> Attachments</h5>
                     <div class="attachment-container p-3 border rounded bg-light {% if form.attachments.errors %}is-invalid{% endif %}">
                         <button type="button" id="add-attachment-btn" class="btn btn-primary">
@@ -135,11 +149,12 @@
                         <div>
                             <span class="fw-bold">{{ bulletin.title }}</span>
                             <span class="badge {{ bulletin.get_category_display|category_color_class }} ms-2">{{ bulletin.get_category_display }}</span>
+                            {% if bulletin.expiry_date and bulletin.expiry_date < now %}<span class="text-danger">(Expired)</span>{% endif %}
                         </div>
                         <div>
                             <a href="{% url 'edit_bulletin' bulletin.pk %}" class="btn btn-secondary btn-sm">Edit</a>
                             <a href="{% url 'delete_bulletin' bulletin.pk %}" class="btn btn-danger btn-sm">Delete</a>
-                            <a href="{% url 'bulletin_read_status' bulletin.pk %}" class="btn btn-info btn-sm">Read Status</a>
+                            <a href="{% url 'bulletin_read_status' bulletin.pk %}" class="btn btn-info btn-sm text-white">Read Status</a>
                         </div>
                     </li>
                 {% endfor %}
@@ -301,6 +316,27 @@ $(function() {
         } else {
             window.open(fileURL, "_blank");
         }
+    }
+});
+
+document.addEventListener('DOMContentLoaded', function() {
+    var expiryDateInput = document.getElementById("{{ form.expiry_date.id_for_label }}");
+    if (expiryDateInput) {
+        var now = new Date();
+        now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+        expiryDateInput.min = now.toISOString().slice(0,16);
+    }
+
+    const permanentCheckbox = document.getElementById('permanent-checkbox');
+    if (permanentCheckbox && expiryDateInput) {
+        permanentCheckbox.addEventListener('change', function() {
+            if (this.checked) {
+                expiryDateInput.disabled = true;
+                expiryDateInput.value = '';
+            } else {
+                expiryDateInput.disabled = false;
+            }
+        });
     }
 });
 </script>

@@ -173,36 +173,27 @@ textarea.form-control {
     background-color: #6c757d;
     border-color: #6c757d;
 }
-.badge-outline-support-custom {
-    color: #005F60;
-    border-color: #005F60;
-}
-.badge-outline-support-custom:hover {
-    color: #fff;
-    background-color: #005F60;
-    border-color: #005F60;
-}
 .badge-outline-feedback-custom {
-    color: #006064;
-    border-color: #006064;
+    color: #37229e;
+    border-color: #37229e;
 }
 .badge-outline-feedback-custom:hover {
     color: #fff;
-    background-color: #006064;
-    border-color: #006064;
+    background-color: #37229e;
+    border-color: #37229e;
 }
 
 .badge-outline-issues-custom {
-    color: #E64A19;
-    border-color: #E64A19;
+    color: #c5003e;
+    border-color: #c5003e;
 }
 .badge-outline-issues-custom:hover {
     color: #fff;
-    background-color: #E64A19;
-    border-color: #E64A19;
+    background-color: #c5003e;
+    border-color: #c5003e;
 }
 .badge-warning-custom {
-    background-color: #ed6c02; /* Amber */
+    background-color: #ed6c02;
     color: white !important;
     border-color: #ed6c02;
 }
@@ -212,7 +203,7 @@ textarea.form-control {
     color: white !important;
 }
 .badge-important-custom {
-    background-color: #A0001C; /* Red */
+    background-color: #A0001C;
     color: white !important;
     border-color: #A0001C;
 }
@@ -222,7 +213,7 @@ textarea.form-control {
     color: white !important;
 }
 .badge-update-custom {
-    background-color: #01579b; /* Blue */
+    background-color: #01579b;
     color: white !important;
     border-color: #01579b;
 }
@@ -232,7 +223,7 @@ textarea.form-control {
     color: white !important;
 }
 .badge-general-custom {
-    background-color: #6c757d; /* Dark Gray */
+    background-color: #6c757d;
     color: white !important;
     border-color: #6c757d;
 }
@@ -241,34 +232,24 @@ textarea.form-control {
     border-color: #5a6268;
     color: white !important;
 }
-.badge-support-custom {
-    background-color: #005F60; /* Dark Teal */
-    color: white !important;
-    border-color: #005F60;
-}
-.badge-support-custom:hover {
-    background-color: #004c4d;
-    border-color: #004c4d;
-    color: white !important;
-}
 .badge-feedback-custom {
-    background-color: #006064; /* Cyan */
+    background-color: #37229e;
     color: white !important;
-    border-color: #006064;
+    border-color: #37229e;
 }
 .badge-feedback-custom:hover {
-    background-color: #004c4d;
-    border-color: #004c4d;
+    background-color: #543ccf;
+    border-color: #543ccf;
     color: white !important;
 }
 .badge-issues-custom {
-    background-color: #E64A19; /* Deep Orange */
+    background-color: #c5003e;
     color: white !important;
-    border-color: #E64A19;
+    border-color: #c5003e;
 }
 .badge-issues-custom:hover {
-    background-color: #BF360C;
-    border-color: #BF360C;
+    background-color: #9a0434;
+    border-color: #9a0434;
     color: white !important;
 }
 

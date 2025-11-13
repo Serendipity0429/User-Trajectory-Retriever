@@ -184,6 +184,10 @@
             if (!(el instanceof Element)) return;
             const path = [];
             while (el.nodeType === Node.ELEMENT_NODE) {
+                if (el.classList.contains('evidence-highlight') && el.tagName.toLowerCase() === 'span') {
+                    el = el.parentNode;
+                    continue;
+                }
                 let selector = el.nodeName.toLowerCase();
                 if (el.id) {
                     selector += '#' + el.id;
@@ -343,7 +347,7 @@
         },
 
         initialize() {
-            if (_is_server_page(_content_vars.url_now)) return;
+            if (typeof _content_vars !== 'undefined' && _content_vars.url_now && _is_server_page(_content_vars.url_now)) return;
             
             document.addEventListener('click', (e) => this.handleEvent(e, 'click'), true);
 
@@ -361,7 +365,7 @@
             window.addEventListener('blur', (e) => this.passiveEventHandler(e, 'blur'), true);
             window.addEventListener('focus', (e) => this.passiveEventHandler(e, 'focus'), true);
 
-            printDebug("general", "Event tracker initialized with " + (this.is_passive_mode ? "passive" : "active") + " mode.");
+            printDebug("general", "Event tracker initialized with " + (getConfig().is_passive_mode ? "passive" : "active") + " mode.");
         }
     };
         // Defer initialization until the DOM is ready to avoid accessing null document.body

@@ -60,7 +60,7 @@ async function initializeConfig() {
         stop_annotation: `${URL_BASE}/task/stop_annotation/`,
         add_justification: `${URL_BASE}/task/justification/add/`,
         get_justifications: `${URL_BASE}/task/justification/get`,
-        check_pending_annotations: `${URL_BASE}/user/check_pending_annotations/`,
+        check_pending_annotations: `${URL_BASE}/task/check_pending_annotations/`,
         initial_page: "https://www.bing.com/",
     };
 
@@ -130,7 +130,7 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
             config.urls.stop_annotation = `${URL_BASE}/task/stop_annotation/`;
             config.urls.add_justification = `${URL_BASE}/task/justification/add/`;
             config.urls.get_justifications = `${URL_BASE}/task/justification/get`;
-            config.urls.check_pending_annotations = `${URL_BASE}/user/check_pending_annotations/`;
+            config.urls.check_pending_annotations = `${URL_BASE}/task/check_pending_annotations/`;
         }
     }
 });

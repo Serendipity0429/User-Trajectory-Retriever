@@ -16,6 +16,7 @@ urlpatterns = [
     path('tool_use/', views.tool_use, name='tool_use'), # Tool use
     path('stop_annotation/', views.stop_annotation_api, name='stop_annotation'), # Stop annotation API
     path('auth_redirect/', views.auth_redirect, name='auth_redirect'), # Auth redirect  
+    path('check_pending_annotations/', views.check_pending_annotations, name='check_pending_annotations'),
     
     path('pre_task_annotation/', views.pre_task_annotation, name='pre_task_annotation'), # Preliminary task annotation
     path(

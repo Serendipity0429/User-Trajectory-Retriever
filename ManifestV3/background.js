@@ -10,7 +10,6 @@ const TASK_INFO_KEY = 'current_task_info';
 
 const ALARM_CLEAR_STORAGE = 'clear_local_storage';
 const ALARM_CHECK_TASK = 'check_active_task';
-const ALARM_UPDATE_EVIDENCE_COUNT = 'update_evidence_count';
 
 const MSG_CHECK_LOGGING_STATUS = 'check_logging_status';
 const MSG_ALTER_LOGGING_STATUS = 'alter_logging_status';
@@ -305,7 +304,6 @@ chrome.runtime.onInstalled.addListener(() => {
     createContextMenu();
     chrome.alarms.create(ALARM_CLEAR_STORAGE, { periodInMinutes: 1 });
     chrome.alarms.create(ALARM_CHECK_TASK, { delayInMinutes: 1, periodInMinutes: 5 });
-    chrome.alarms.create(ALARM_UPDATE_EVIDENCE_COUNT, { delayInMinutes: 0.2, periodInMinutes: 0.2 });
     _set_session({ is_recording_paused: false });
 });
 
@@ -358,9 +356,9 @@ function highlightSelection() {
                 }
 
                 const span = document.createElement('span');
-                span.className = 'evidence-highlight'; 
-                span.style.backgroundColor = bestColor;
-                span.style.color = 'inherit';
+                span.className = 'evidence-highlight';
+                span.style.setProperty('background-color', bestColor, 'important');
+                span.style.setProperty('color', 'inherit', 'important');
 
                 range.surroundContents(span);
             } catch (e) {
@@ -445,6 +443,9 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
                     // Notify the content script to show a confirmation
                     chrome.tabs.sendMessage(tab.id, { command: "evidence-added-successfully", newCount: newCount });
 
+                    // Broadcast the new count to all tabs
+                    broadcastToTabs({ command: "update_evidence_count", count: newCount });
+
                     chrome.tabs.query({ url: `${config.urls.base}/task/submit_answer/*` }, (tabs) => {
                         if (tabs.length > 0) {
                             chrome.tabs.sendMessage(tabs[0].id, { command: "refresh_justifications" });
@@ -484,6 +485,9 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 
                     // Notify the content script to show a confirmation
                     chrome.tabs.sendMessage(tab.id, { command: "evidence-added-successfully", newCount: newCount });
+
+                    // Broadcast the new count to all tabs
+                    broadcastToTabs({ command: "update_evidence_count", count: newCount });
 
                     chrome.tabs.query({ url: `${config.urls.base}/task/submit_answer/*` }, (tabs) => {
                         if (tabs.length > 0) {
@@ -662,7 +666,6 @@ chrome.runtime.onStartup.addListener(async () => {
         await flush();
         chrome.alarms.create(ALARM_CLEAR_STORAGE, { periodInMinutes: 1 });
         chrome.alarms.create(ALARM_CHECK_TASK, { delayInMinutes: 1, periodInMinutes: 5 });
-        chrome.alarms.create(ALARM_UPDATE_EVIDENCE_COUNT, { delayInMinutes: 0.2, periodInMinutes: 0.2 });
     } catch (error) {
         console.error("Error during onStartup:", error);
     }
@@ -678,29 +681,6 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
         case ALARM_CHECK_TASK:
             printDebug("background", "Checking active task ID from alarm...");
             await checkActiveTaskID();
-            break;
-        case ALARM_UPDATE_EVIDENCE_COUNT:
-            printDebug("background", "Updating evidence count from alarm...");
-            const task_id = await getCurrentTask();
-            if (task_id !== -1) {
-                try {
-                    const response = await makeApiRequest(() => _get(`${config.urls.get_justifications}/${task_id}/`));
-                    if (response && response.justifications) {
-                        const newCount = response.justifications.length;
-                        chrome.tabs.query({}, (tabs) => {
-                            tabs.forEach(tab => {
-                                chrome.tabs.sendMessage(tab.id, { command: "update_evidence_count", count: newCount }, (response) => {
-                                    if (chrome.runtime.lastError) {
-                                        // Suppress the error message for tabs without the content script
-                                    }
-                                });
-                            });
-                        });
-                    }
-                } catch (error) {
-                    console.error("Error getting justifications for count:", error.message);
-                }
-            }
             break;
     }
 });

@@ -16,6 +16,8 @@ user_group_list = (
 class User(AbstractUser):
     login_num = models.IntegerField(default=0)
     is_primary_superuser = models.BooleanField(default=False)
+    extension_session_token = models.CharField(max_length=255, blank=True, null=True)
+    last_login_from = models.GenericIPAddressField(blank=True, null=True)
 
     # No need for custom manager, USERNAME_FIELD, or REQUIRED_FIELDS as AbstractUser provides sensible defaults.
     # 'username' is the default USERNAME_FIELD.

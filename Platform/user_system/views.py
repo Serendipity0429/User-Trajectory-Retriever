@@ -11,6 +11,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from django.urls import reverse
 import logging
 import json
+import uuid
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth import login as auth_login, logout as auth_logout, get_user_model
 from django.contrib.auth.decorators import login_required, user_passes_test
@@ -157,18 +158,36 @@ def token_login(request):
         print_debug(request.POST)
         username = request.POST.get('username')
         password = request.POST.get('password')
+        force_login = request.POST.get('force', 'false').lower() == 'true'
 
-        # Assuming 'authenticate' is a custom utility function you have defined in utils.py
-        # from .utils import authenticate
         error_code, user = authenticate(username, password)
 
         if error_code == 0 and user:
-            # Authentication successful, generate JWT token
-            print_debug(f'User {username} authenticated successfully for token login')
-            refresh = RefreshToken.for_user(user)
+            if user.extension_session_token and not force_login:
+                return JsonResponse({
+                    'status': 'already_logged_in',
+                    'last_login_from': user.last_login_from
+                })
+
+            # Generate a new session token
+            session_token = uuid.uuid4().hex
+            user.extension_session_token = session_token
+            
+            # Get user's IP address
+            x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+            if x_forwarded_for:
+                ip = x_forwarded_for.split(',')[0]
+            else:
+                ip = request.META.get('REMOTE_ADDR')
+            user.last_login_from = ip
+            
             user.login_num += 1
             user.last_login = now()
             user.save()
+
+            refresh = RefreshToken.for_user(user)
+            # Add session_token to the token payload
+            refresh['extension_session_token'] = session_token
 
             return JsonResponse({
                 'refresh': str(refresh),

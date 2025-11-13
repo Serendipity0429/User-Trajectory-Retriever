@@ -325,50 +325,81 @@ function highlightSelection() {
                 container = container.parentElement;
             }
             
-            try {
-                const computedStyle = window.getComputedStyle(container);
-                const backgroundColorRgb = parseRgb(computedStyle.backgroundColor);
-                const textColorRgb = parseRgb(computedStyle.color);
-                const backgroundColorHex = rgbToHex(...backgroundColorRgb);
-                const textColorHex = rgbToHex(...textColorRgb);
+            const computedStyle = window.getComputedStyle(container);
+            const backgroundColorRgb = parseRgb(computedStyle.backgroundColor);
+            const textColorRgb = parseRgb(computedStyle.color);
+            const backgroundColorHex = rgbToHex(...backgroundColorRgb);
+            const textColorHex = rgbToHex(...textColorRgb);
 
-                const highlightPalette = [
-                    '#FFFF8840', // Light Yellow
-                    '#A0E8A040', // Light Green
-                    '#90EE9040', // Pale Green
-                    '#ADD8E640', // Light Blue
-                    '#FFA07A40', // Light Salmon
-                    '#FFDDC140'  // Light Apricot
-                ];
+            const highlightPalette = [
+                '#FFFF8840', // Light Yellow
+                '#A0E8A040', // Light Green
+                '#90EE9040', // Pale Green
+                '#ADD8E640', // Light Blue
+                '#FFA07A40', // Light Salmon
+                '#FFDDC140'  // Light Apricot
+            ];
 
-                let bestColor = highlightPalette[0];
-                let maxMinDistance = 0;
+            let bestColor = highlightPalette[0];
+            let maxMinDistance = 0;
 
-                for (const color of highlightPalette) {
-                    const distToBg = colorDistance(color, backgroundColorHex);
-                    const distToText = colorDistance(color, textColorHex);
-                    const minDistance = Math.min(distToBg, distToText);
+            for (const color of highlightPalette) {
+                const distToBg = colorDistance(color, backgroundColorHex);
+                const distToText = colorDistance(color, textColorHex);
+                const minDistance = Math.min(distToBg, distToText);
 
-                    if (minDistance > maxMinDistance) {
-                        maxMinDistance = minDistance;
-                        bestColor = color;
-                    }
+                if (minDistance > maxMinDistance) {
+                    maxMinDistance = minDistance;
+                    bestColor = color;
                 }
-
+            }
+            
+            try {
                 const span = document.createElement('span');
                 span.className = 'evidence-highlight';
                 span.style.setProperty('background-color', bestColor, 'important');
                 span.style.setProperty('color', 'inherit', 'important');
-
                 range.surroundContents(span);
+                selection.removeAllRanges(); // Clear selection after highlighting
             } catch (e) {
-                console.warn('Could not highlight text selection.', e);
-                try {
-                    const span = document.createElement('span');
-                    span.className = 'evidence-highlight';
-                    range.surroundContents(span);
-                } catch (e2) {
-                    console.error('Fallback highlighting also failed.', e2);
+                if (e instanceof DOMException && e.name === 'InvalidStateError') {
+                    console.warn('surroundContents failed. Using TreeWalker fallback.', e);
+                    try {
+                        const freshRange = selection.getRangeAt(0);
+                        const walker = document.createTreeWalker(
+                            freshRange.commonAncestorContainer,
+                            NodeFilter.SHOW_TEXT,
+                            node => freshRange.intersectsNode(node) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT
+                        );
+
+                        const textNodes = [];
+                        while (walker.nextNode()) {
+                            textNodes.push(walker.currentNode);
+                        }
+
+                        for (const node of textNodes) {
+                            const nodeRange = document.createRange();
+                            const startOffset = (node === freshRange.startContainer) ? freshRange.startOffset : 0;
+                            const endOffset = (node === freshRange.endContainer) ? freshRange.endOffset : node.length;
+
+                            if (startOffset < endOffset) {
+                                nodeRange.setStart(node, startOffset);
+                                nodeRange.setEnd(node, endOffset);
+
+                                const span = document.createElement('span');
+                                span.className = 'evidence-highlight';
+                                span.style.setProperty('background-color', bestColor, 'important');
+                                span.style.setProperty('color', 'inherit', 'important');
+                                
+                                nodeRange.surroundContents(span);
+                            }
+                        }
+                        selection.removeAllRanges();
+                    } catch (e2) {
+                        console.error('Fallback highlighting with TreeWalker also failed.', e2);
+                    }
+                } else {
+                    console.error('Could not highlight text selection due to an unexpected error.', e);
                 }
             }
         }

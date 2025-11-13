@@ -7,13 +7,12 @@ from django.views.generic.base import RedirectView
 from django.contrib.staticfiles.urls import staticfiles_urlpatterns
 
 urlpatterns = [
-    path('', RedirectView.as_view(url='/task/home/', permanent=True)),
-    # path('admin/', admin.site.urls),
-    path('user/', include('user_system.urls')),
+    path('admin/', admin.site.urls),
     path('task/', include('task_manager.urls')),
+    path('api/user/', include('user_system.urls')),
     path('discussion/', include('discussion.urls')),
-    path('messages/', include('msg_system.urls')),
-] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+    path('message/', include('msg_system.urls')),
+]
 
 # This will serve static files in production
 urlpatterns += staticfiles_urlpatterns()

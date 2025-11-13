@@ -93,7 +93,7 @@ async function _request(method, url, data = {}, content_type = 'form', response_
     let attempt = 0;
     while (attempt < MAX_RETRIES) {
         try {
-            const { access_token } = await _get_session('access_token');
+            const { access_token, extension_session_token } = await _get_session(['access_token', 'extension_session_token']);
             let headers = {
                 'Accept': 'application/json'
             };
@@ -125,6 +125,9 @@ async function _request(method, url, data = {}, content_type = 'form', response_
 
             if (access_token && url !== config.urls.token_login) {
                 headers["Authorization"] = `Bearer ${access_token}`;
+                if (extension_session_token) {
+                    headers["X-Extension-Session-Token"] = extension_session_token;
+                }
             }
 
             const controller = new AbortController();
@@ -270,6 +273,10 @@ function getCssSelector(el) {
     if (!(el instanceof Element)) return;
     const path = [];
     while (el.nodeType === Node.ELEMENT_NODE) {
+        if (el.classList.contains('evidence-highlight') && el.tagName.toLowerCase() === 'span') {
+            el = el.parentNode;
+            continue;
+        }
         let selector = el.nodeName.toLowerCase();
         if (el.id) {
             selector += '#' + el.id;

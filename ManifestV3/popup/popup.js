@@ -299,7 +299,7 @@ function handleRegister() {
     window.open(config.urls.register);
 }
 
-async function handleLoginAttempt() {
+async function handleLoginAttempt(force = false) {
     const loginBtn = document.getElementById('loginBtn');
     loginBtn.disabled = true;
     loginBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Logging in...';
@@ -315,14 +315,31 @@ async function handleLoginAttempt() {
     }
 
     const credentials = { username, password, ext: true };
+    if (force) {
+        credentials.force = true;
+    }
+    
     try {
         const config = getConfig();
         const login_response = await _post(config.urls.token_login, credentials, 'form');
+
+        if (login_response?.status === 'already_logged_in') {
+            const confirmed = await showConfirm(`You are already logged in on another device (from ${login_response.last_login_from}). Do you want to log out the other device and log in here?`);
+            if (confirmed) {
+                await handleLoginAttempt(true); // Force login
+            } else {
+                loginBtn.disabled = false;
+                loginBtn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Login';
+            }
+            return;
+        }
+
         if (login_response?.access && login_response?.refresh) {
             await _set_session({
                 'username': username,
                 'access_token': login_response.access,
                 'refresh_token': login_response.refresh,
+                'extension_session_token': login_response.extension_session_token,
                 'logged_in': true
             });
             await sendMessageFromPopup({ command: "alter_logging_status", log_status: true });
@@ -382,7 +399,7 @@ async function handleLogout() {
             }
         });
     }
-    await _remove_session(['username', 'access_token', 'refresh_token', 'logged_in']);
+    await _remove_session(['username', 'access_token', 'refresh_token', 'logged_in', 'extension_session_token']);
     await sendMessageFromPopup({ command: "alter_logging_status", log_status: false });
     chrome.action.setBadgeText({ text: '' });
     showLoginTab();

@@ -438,19 +438,6 @@ def forget_password(request):
         )
 
 
-def check_pending_annotations(request):
-    """
-    Checks if there are any pending annotations for the current user.
-    """
-    user = request.user
-    pending_annotation_url = get_pending_annotation(user)
-    print_debug(f"Pending annotation URL for user {user.username}: {pending_annotation_url}")
-    if pending_annotation_url:
-        return JsonResponse({"pending": True, "url": pending_annotation_url})
-    else:
-        return JsonResponse({"pending": False})
-
-
 def reset_password(request, token_str):
     token = get_object_or_404(ResetPasswordRequest, token=token_str)
     

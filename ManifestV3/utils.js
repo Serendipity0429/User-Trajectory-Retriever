@@ -94,7 +94,9 @@ async function _request(method, url, data = {}, content_type = 'form', response_
     while (attempt < MAX_RETRIES) {
         try {
             const { access_token } = await _get_session('access_token');
-            let headers = {};
+            let headers = {
+                'Accept': 'application/json'
+            };
             let body;
             let request_url = url;
 

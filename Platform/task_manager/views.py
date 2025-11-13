@@ -1219,3 +1219,18 @@ def get_rrweb_record(request, webpage_id):
     except Exception as e:
         logger.error(f"Error fetching rrweb record for webpage {webpage_id}: {e}")
         return JsonResponse({"status": "error", "message": "An internal error occurred."}, status=500)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def check_pending_annotations(request):
+    """
+    Checks if there are any pending annotations for the current user.
+    """
+    user = request.user
+    pending_annotation_url = get_pending_annotation(user)
+    print_debug(f"Pending annotation URL for user {user.username}: {pending_annotation_url}")
+    if pending_annotation_url:
+        return JsonResponse({"pending": True, "url": pending_annotation_url})
+    else:
+        return JsonResponse({"pending": False})

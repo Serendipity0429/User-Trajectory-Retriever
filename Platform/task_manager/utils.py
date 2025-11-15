@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-__author__ = 'steven'
-
+import os
+from openai import OpenAI
 from rest_framework.response import Response
 from django.http import HttpResponse
 from django.conf import settings
@@ -9,6 +9,7 @@ import logging
 from datetime import datetime
 from django.utils import timezone
 import re
+import httpx
 from dateutil.parser import parse as parse_date, ParserError
 
 from .models import Task, Webpage, TaskDataset
@@ -236,21 +237,16 @@ def _normalize(text):
     text = ' '.join(text.split())
     return text
 
-def check_answer(entry, user_answer):
-    try:
-        entry_answers = json.loads(entry.answer)
-    except json.JSONDecodeError:
-        logger.error(f"Error decoding JSON: {entry.answer}")
-        return False
-
-    print_debug("Question:", entry.question)
+def check_answer_rule(question, authentic_answers, user_answer):
+    print_debug("Question:", question)
     print_debug("User Answer:", user_answer)
-    print_debug("Correct Answer List:", entry_answers)
+    print_debug("Correct Answer List:", authentic_answers)
 
+    # Fallback to original normalization logic
     normalized_user_answer = _normalize(user_answer)
     print_debug(f"Normalized User Answer: '{normalized_user_answer}'")
 
-    for answer in entry_answers:
+    for answer in authentic_answers:
         normalized_correct_answer = _normalize(answer)
         print_debug(f"Comparing with normalized correct answer: '{normalized_correct_answer}'")
         if normalized_user_answer == normalized_correct_answer:
@@ -258,6 +254,62 @@ def check_answer(entry, user_answer):
         
     return False
 
+
+def check_answer_llm(question, authentic_answers, user_answer):
+    """
+    Checks if the user's answer is correct using an LLM-as-a-judge.
+    """
+    base_url = os.environ.get("LLM_BASE_URL")
+    api_key = os.environ.get("LLM_API_KEY")
+    model = os.environ.get("LLM_MODEL", "gpt-3.5-turbo")
+
+    if not base_url or not api_key:
+        raise ValueError("LLM_BASE_URL and LLM_API_KEY environment variables must be set.")
+
+    client = OpenAI(base_url=base_url, api_key=api_key)
+
+    prompt = f"""You are a meticulous and strict evaluator. Your sole task is to compare a `User's Answer` to an `Authentic Answer` for a given `Question` and determine if the user's answer is correct.
+
+**Instructions:**
+1.  **Strictly Adhere to Provided Information:** Base your judgment *only* on the text provided in the `Authentic Answer`. Do not use any external knowledge or make assumptions.
+2.  **Semantic Equivalence:** The `User's Answer` is considered correct if it is semantically equivalent to the `Authentic Answer`. This means it conveys the same meaning, even if the wording is different.
+3.  **Completeness:** The `User's Answer` must be complete. A partially correct answer is considered incorrect.
+4.  **Output Format:** Your response must be a single word: either `yes` or `no`. Do not provide any explanation or other text.
+
+**Evaluation Task:**
+
+**Question:** "{question}"
+
+**Authentic Answer:** "{"; ".join(authentic_answers)}"
+
+**User's Answer:** "{user_answer}"
+
+Is the user's answer correct?
+"""
+
+    completion = client.chat.completions.create(
+        model=model,
+        messages=[{"role": "user", "content": prompt}]
+    )
+
+    judgment = completion.choices[0].message.content.strip().lower()
+    print_debug(f"LLM response: {judgment}")
+
+    return judgment == "yes"
+
+
+def check_answer(entry, user_answer, llm = True):
+    try:
+        authentic_answers = json.loads(entry.answer)
+    except json.JSONDecodeError:
+        logger.error(f"Error decoding JSON: {entry.answer}")
+        return False
+    question = entry.question
+
+    if llm:
+        return check_answer_llm(question, authentic_answers, user_answer)
+    else:
+        return check_answer_rule(question, authentic_answers, user_answer)
 
 def close_window():
     return HttpResponse('<html><body><script>window.close()</script></body></html>')

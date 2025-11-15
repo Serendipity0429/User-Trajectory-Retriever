@@ -365,6 +365,8 @@ chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
         return true;
     }
 
+    
+
     // Handle messages from the popup
     if (message.type === MSG_TYPE_POPUP) {
         if (document.visibilityState === 'hidden') {

@@ -423,6 +423,69 @@ function getSelectionDetails() {
     return null;
 }
 
+function highlightElement(selector) {
+    const el = document.querySelector(selector);
+    if (!el) return;
+
+    // Create a unique ID for our style and overlay elements to avoid conflicts
+    const uniqueId = 'gemini-highlight-' + Date.now();
+
+    // 1. Get element's position
+    const rect = el.getBoundingClientRect();
+
+    // 2. Create the overlay element
+    const overlay = document.createElement('div');
+    overlay.id = uniqueId;
+    overlay.style.position = 'fixed';
+    overlay.style.top = `${rect.top}px`;
+    overlay.style.left = `${rect.left}px`;
+    overlay.style.width = `${rect.width}px`;
+    overlay.style.height = `${rect.height}px`;
+    overlay.style.backgroundColor = 'rgba(102, 8, 116, 0.3)'; // A nice purple, from the badge color
+    overlay.style.boxShadow = '0 0 0 2px white, 0 0 0 4px rgba(102, 8, 116, 0.8)';
+    overlay.style.borderRadius = '5px';
+    overlay.style.zIndex = '999999999';
+    overlay.style.pointerEvents = 'none'; // Make sure it doesn't interfere with mouse events
+    overlay.style.animation = `${uniqueId}-pulse 1.2s infinite alternate`;
+    overlay.style.transition = 'opacity 0.5s ease-in-out';
+    overlay.style.opacity = '1';
+
+
+    // 3. Create the CSS animation as a style tag
+    const style = document.createElement('style');
+    style.id = `${uniqueId}-style`;
+    style.innerHTML = `
+        @keyframes ${uniqueId}-pulse {
+            0% {
+                box-shadow: 0 0 0 2px white, 0 0 0 4px rgba(102, 8, 116, 0.8);
+            }
+            100% {
+                box-shadow: 0 0 0 2px white, 0 0 0 8px rgba(102, 8, 116, 0.4);
+            }
+        }
+    `;
+
+    // 4. Append elements to the body
+    document.head.appendChild(style);
+    document.body.appendChild(overlay);
+
+    // 5. Set timeout to remove the highlight
+    setTimeout(() => {
+        overlay.style.opacity = '0';
+        // Wait for the fade-out transition to finish before removing
+        setTimeout(() => {
+            const overlayToRemove = document.getElementById(uniqueId);
+            const styleToRemove = document.getElementById(`${uniqueId}-style`);
+            if (overlayToRemove) {
+                overlayToRemove.remove();
+            }
+            if (styleToRemove) {
+                styleToRemove.remove();
+            }
+        }, 500); // Corresponds to the opacity transition duration
+    }, 2500); // Total duration of the highlight effect
+}
+
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     if (_is_server_page(tab.url) || _is_extension_page(tab.url)) {
         return;
@@ -516,6 +579,13 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 
                     // Notify the content script to show a confirmation
                     chrome.tabs.sendMessage(tab.id, { command: "evidence-added-successfully", newCount: newCount });
+
+                    // Highlight the element that was added
+                    chrome.scripting.executeScript({
+                        target: { tabId: tab.id, frameIds: [info.frameId] },
+                        function: highlightElement,
+                        args: [details.selector]
+                    });
 
                     // Broadcast the new count to all tabs
                     broadcastToTabs({ command: "update_evidence_count", count: newCount });

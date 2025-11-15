@@ -7,8 +7,10 @@ from django.views.generic.base import RedirectView
 from django.contrib.staticfiles.urls import staticfiles_urlpatterns
 
 urlpatterns = [
+    path('', RedirectView.as_view(url='/task/home/', permanent=True), name='home'),
     path('admin/', admin.site.urls),
     path('task/', include('task_manager.urls')),
+    path('user/', include('user_system.urls')),
     path('api/user/', include('user_system.urls')),
     path('discussion/', include('discussion.urls')),
     path('message/', include('msg_system.urls')),

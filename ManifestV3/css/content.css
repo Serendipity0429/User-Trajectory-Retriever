@@ -2,3 +2,10 @@
     background-color: #FFFF88 !important;
     color: inherit !important;
 }
+
+.evidence-element-highlight {
+    outline: 3px solid #4A90E2 !important;
+    outline-offset: 2px;
+    transition: outline 0.5s ease-in-out, box-shadow 0.5s ease-in-out;
+    box-shadow: 0 0 15px rgba(74, 144, 226, 0.7) !important;
+}

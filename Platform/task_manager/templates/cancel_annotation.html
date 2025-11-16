@@ -58,7 +58,17 @@
 
                     <!-- Task Info -->
                     <div class="mb-4 p-3 border rounded">
-                        <h5><span class="fw-bold">1. Task Review</span></h5>
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h5 class="mb-0"><span class="fw-bold">1. Task Review</span></h5>
+                            <div>
+                                {% if last_trial_duration %}
+                                <span class="text-muted me-3 fw-normal"><i class="bi bi-clock-history me-1"></i> Last Trial: {{ last_trial_duration|format_duration }}</span>
+                                {% endif %}
+                                {% if total_duration %}
+                                <span class="text-muted fw-normal"><i class="bi bi-calendar-check me-1"></i> Total: {{ total_duration|format_duration }}</span>
+                                {% endif %}
+                            </div>
+                        </div>
                         <p><span class="fw-bold">Question:</span></p>
                         <div class="p-3 bg-light rounded mb-3 loaded-box">
                             <div class="question-text">{{ question }}</div>

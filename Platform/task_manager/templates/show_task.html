@@ -82,7 +82,6 @@
     <p><strong>Task Description:</strong></p>
     <div class="question-text">{{ task_question }}</div>
 </div>
-                    <p><i class="bi bi-calendar-check me-2"></i><strong>Total Duration:</strong> <span class="text-muted">{{ total_duration|format_duration }}</span></p>
                     <hr>
                     <div class="d-flex justify-content-between align-items-center">
                         <h6 class="mb-0"><i class="bi bi-check2-all me-2"></i>Correct Answer(s):</h6>
@@ -409,7 +408,10 @@
                     <div class="card shadow-sm">
                         <div class="card-header d-flex justify-content-between align-items-center collapsed" data-bs-toggle="collapse" data-bs-target="#collapse-final-annotation" aria-expanded="false" aria-controls="collapse-final-annotation" style="cursor: pointer;">
                             <h5 class="mb-0"><i class="bi bi-award-fill me-2"></i>Final Annotation</h5>
-                            <span class="badge bg-success"><i class="bi bi-check-circle-fill me-1"></i> Successful</span>
+                            <div class="d-flex align-items-center">
+                                <span class="text-muted me-3 fw-normal"><i class="bi bi-stopwatch me-1"></i> {{ total_duration|format_duration }} in total</span>
+                                <span class="badge bg-success"><i class="bi bi-check-circle-fill me-1"></i> Successful</span>
+                            </div>
                         </div>
                         <div id="collapse-final-annotation" class="collapse">
                             <div class="card-body">

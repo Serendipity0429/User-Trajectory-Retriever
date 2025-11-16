@@ -73,11 +73,14 @@
                                     <h5 class="mb-1">Task ID: {{ task_id }}</h5>
                                     <span class="badge bg-success d-flex align-items-center">Completed</span>
                                 </div>
-                                <p class="mb-1">
-                                    {% for webpage in webpages %}
-                                        <a href="{{ webpage.url }}">{{ webpage.title }}</a>{% if not forloop.last %}, {% endif %}
+                                <ul class="list-unstyled mt-2 mb-2 text-muted">
+                                    {% for webpage in webpages|slice:":5" %}
+                                        <li><a href="{{ webpage.url }}" target="_blank" rel="noopener noreferrer"><i class="bi bi-link-45deg"></i> {{ webpage.title }}</a></li>
                                     {% endfor %}
-                                </p>
+                                    {% if webpages|length > 5 %}
+                                        <li>...</li>
+                                    {% endif %}
+                                </ul>
                                 <div class="mt-2">
                                     <a href="/task/show_task/{{ task_id }}/" class="btn btn-sm btn-primary-custom btn-view-task"><i class="bi bi-eye"></i> View</a>
                                     {% comment %} <button class="btn btn-sm btn-outline-danger remove-task-btn" data-task-id="{{ task_id }}"><i class="bi bi-trash"></i> Remove</button> {% endcomment %}
@@ -98,11 +101,14 @@
                                     <h5 class="mb-1">Task ID: {{ task_id }}</h5>
                                     <span class="badge bg-warning text-white">Ongoing</span>
                                 </div>
-                                <p class="mb-1">
-                                    {% for webpage in webpages %}
-                                        {{ webpage.title }}{% if not forloop.last %}, {% endif %}
+                                <ul class="list-unstyled mt-2 mb-1 text-muted">
+                                    {% for webpage in webpages|slice:":5" %}
+                                        <li><i class="bi bi-file-earmark-text"></i> {{ webpage.title }}</li>
                                     {% endfor %}
-                                </p>
+                                    {% if webpages|length > 5 %}
+                                        <li>...</li>
+                                    {% endif %}
+                                </ul>
                             </div>
                             {% endfor %}
                         </div>

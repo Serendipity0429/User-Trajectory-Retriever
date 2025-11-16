@@ -436,9 +436,9 @@ function highlightElement(selector) {
     // 2. Create the overlay element
     const overlay = document.createElement('div');
     overlay.id = uniqueId;
-    overlay.style.position = 'fixed';
-    overlay.style.top = `${rect.top}px`;
-    overlay.style.left = `${rect.left}px`;
+    overlay.style.position = 'absolute';
+    overlay.style.top = `${rect.top + window.scrollY}px`;
+    overlay.style.left = `${rect.left + window.scrollX}px`;
     overlay.style.width = `${rect.width}px`;
     overlay.style.height = `${rect.height}px`;
     overlay.style.backgroundColor = 'rgba(102, 8, 116, 0.3)'; // A nice purple, from the badge color

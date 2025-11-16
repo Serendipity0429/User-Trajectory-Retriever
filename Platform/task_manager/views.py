@@ -284,6 +284,9 @@ def post_task_annotation(request, task_id):
             post_annotation.belong_task = task
             post_annotation.save()
 
+            task.active = False
+            task.save()
+
             stop_annotating(request)
             return close_window()
         else:
@@ -327,11 +330,6 @@ def post_task_annotation(request, task_id):
             }
             return render(request, "status_page.html", context)
 
-        # Deactivate the task as soon as the user lands on the page
-        if task.active:
-            task.active = False
-            task.save()
-
         # Fetch trials and their relevant webpages
         trials = TaskTrial.objects.filter(belong_task=task).order_by('num_trial')
         for trial in trials:
@@ -347,6 +345,9 @@ def post_task_annotation(request, task_id):
         latest_trial = TaskTrial.objects.filter(belong_task=task).order_by('-num_trial').first()
         user_answer = latest_trial.answer if latest_trial else ""
 
+        last_trial_duration = latest_trial.end_timestamp - latest_trial.start_timestamp
+        total_duration = task.end_timestamp - task.start_timestamp if task.end_timestamp else None
+
         annotation_id = start_annotating(request, "post_task_annotation")
         return render(
             request,
@@ -359,6 +360,8 @@ def post_task_annotation(request, task_id):
                 "answer": answer,
                 "user_answer": user_answer,
                 "annotation_id": annotation_id,
+                "last_trial_duration": last_trial_duration,
+                "total_duration": total_duration,
                 "DIFFICULTY_MAP": DIFFICULTY_MAP,
                 "AHA_MOMENT_MAP": AHA_MOMENT_MAP,
                 "UNHELPFUL_PATHS_MAP": UNHELPFUL_PATHS_MAP,
@@ -426,7 +429,7 @@ def task_home(request):
     pending_annotation_url = get_pending_annotation(user)
     return render(
         request,
-        "task_home.html",
+        "index.html",
         {
             "cur_user": user,
             "completed_num": completed_num,
@@ -564,7 +567,39 @@ def show_task(request, task_id):
         trial.webpages = Webpage.objects.filter(
             belong_task_trial=trial, is_redirected=False, during_annotation=False
         ).order_by("start_timestamp")
-        trial.submitted_sources = trial.justifications.all()
+        
+        justifications = trial.justifications.all()
+        
+        active_justifications = [j for j in justifications if j.status == 'active']
+        abandoned_justifications = [j for j in justifications if j.status == 'abandoned']
+
+        text_justifications = []
+        image_justifications = []
+        element_justifications = []
+
+        for j in active_justifications:
+            if j.evidence_type == 'text_selection':
+                text_justifications.append(j)
+            elif j.evidence_type == 'element':
+                try:
+                    details = json.loads(j.element_details) if isinstance(j.element_details, str) and j.element_details else j.element_details
+                    if details and details.get('tagName', '').upper() == 'IMG':
+                        image_justifications.append(j)
+                    else:
+                        j.element_details = details
+                        element_justifications.append(j)
+                except (json.JSONDecodeError, TypeError):
+                    element_justifications.append(j)
+        
+        trial.text_justifications = text_justifications
+        trial.image_justifications = image_justifications
+        trial.element_justifications = element_justifications
+        trial.abandoned_justifications = abandoned_justifications
+
+        if trial.end_timestamp and trial.start_timestamp:
+            trial.duration = trial.end_timestamp - trial.start_timestamp
+        else:
+            trial.duration = None
         if hasattr(trial, 'reflectionannotation') and trial.reflectionannotation:
             if isinstance(trial.reflectionannotation.failure_category, str):
                 try:
@@ -580,6 +615,9 @@ def show_task(request, task_id):
     # 4. Fetch Post-Task or Cancellation Annotation
     post_task_annotation = None
     cancel_annotation = None
+    total_duration = None
+    if task.end_timestamp and task.start_timestamp:
+        total_duration = task.end_timestamp - task.start_timestamp
     if task.cancelled:
         cancel_annotation = CancelAnnotation.objects.filter(belong_task=task).first()
     else:
@@ -609,6 +647,7 @@ def show_task(request, task_id):
         "cancel_categories": cancel_categories,
         "cancel_missing_resources": cancel_missing_resources,
         "task": task,
+        "total_duration": total_duration,
         "FAMILIARITY_MAP": FAMILIARITY_MAP,
         "DIFFICULTY_MAP": DIFFICULTY_MAP,
         "EFFORT_MAP": EFFORT_MAP,
@@ -683,6 +722,13 @@ def cancel_annotation(request, task_id):
 
         task.cancelled = True
         task.active = False
+        
+        last_trial = TaskTrial.objects.filter(belong_task=task).order_by('-num_trial').first()
+        if last_trial:
+            task.end_timestamp = last_trial.end_timestamp
+        else:
+            task.end_timestamp = timezone.now()
+        
         task.save()
         cancel_annotation = CancelAnnotation()
         cancel_annotation.belong_task = task
@@ -751,6 +797,15 @@ def cancel_annotation(request, task_id):
                 )
                 trials.append(current_trial)
 
+        last_trial_duration = None
+        total_duration = None
+        completed_trials = [t for t in trials if hasattr(t, 'end_timestamp') and t.end_timestamp]
+        if completed_trials:
+            last_completed_trial = completed_trials[-1]
+            last_trial_duration = last_completed_trial.end_timestamp - last_completed_trial.start_timestamp
+            total_duration = sum([t.end_timestamp - t.start_timestamp for t in completed_trials], timezone.timedelta(0))
+
+
         annotation_id = start_annotating(request, "cancel_annotation")
         return render(
             request,
@@ -762,6 +817,8 @@ def cancel_annotation(request, task_id):
                 "answer": answer,
                 "trials": trials,
                 "annotation_id": annotation_id,
+                "last_trial_duration": last_trial_duration,
+                "total_duration": total_duration,
                 "CANCEL_CATEGORY_MAP": CANCEL_CATEGORY_MAP,
                 "MISSING_RESOURCES_MAP": MISSING_RESOURCES_MAP,
                 "CANCEL_CATEGORY_EXPLANATION_MAP": CANCEL_CATEGORY_EXPLANATION_MAP,
@@ -847,6 +904,8 @@ def reflection_annotation(request, task_trial_id):
         # User answer
         user_answer = task_trial.answer if task_trial.answer else ""
 
+        trial_duration = task_trial.end_timestamp - task_trial.start_timestamp
+
         annotation_id = start_annotating(request, "reflection_annotation")
         return render(
             request,
@@ -857,6 +916,7 @@ def reflection_annotation(request, task_trial_id):
                 "question": question,
                 "webpages": webpages,
                 "user_answer": user_answer,
+                "trial_duration": trial_duration,
                 "annotation_id": annotation_id,
                 "FAILURE_CATEGORY_MAP": FAILURE_CATEGORY_MAP,
                 "CORRECTIVE_PLAN_MAP": CORRECTIVE_PLAN_MAP,
@@ -906,8 +966,12 @@ def submit_answer(request, task_id):
                     belong_task=task, num_trial=num_trial
                 ).first()
                 if last_task_trial:
-                    start_timestamp = last_task_trial.end_timestamp
-
+                    try:
+                        reflection = ReflectionAnnotation.objects.get(belong_task_trial=last_task_trial)
+                        start_timestamp = reflection.submission_timestamp
+                    except ReflectionAnnotation.DoesNotExist:
+                        start_timestamp = last_task_trial.end_timestamp
+            
             answer = request.POST.get("answer")
             answer = answer if answer else ""
             
@@ -931,7 +995,7 @@ def submit_answer(request, task_id):
             task_trial.is_correct = is_correct
 
             if is_correct:
-                task.end_timestamp = timezone.now()
+                task.end_timestamp = task_trial.end_timestamp
 
             task_trial.save()
 

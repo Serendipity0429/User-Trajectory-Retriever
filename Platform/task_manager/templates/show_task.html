@@ -35,6 +35,26 @@
     .strategy-shift-text {
         color: dimgrey;
     }
+    .justification-toggle {
+        transition: background-color 0.2s ease-in-out;
+    }
+    .justification-toggle:hover {
+        background-color: #f8f9fa; /* A light gray */
+    }
+    .collapse-indicator {
+        transition: transform 0.2s ease-in-out;
+    }
+    .justification-toggle:not(.collapsed) .collapse-indicator {
+        transform: rotate(90deg);
+    }
+    .evidence-image {
+        max-height: 200px;
+        width: 100%;
+        object-fit: contain;
+    }
+    .abandoned-justification {
+        opacity: 0.6;
+    }
 </style>
 {% endblock %}
 
@@ -62,6 +82,7 @@
     <p><strong>Task Description:</strong></p>
     <div class="question-text">{{ task_question }}</div>
 </div>
+                    <p><i class="bi bi-calendar-check me-2"></i><strong>Total Duration:</strong> <span class="text-muted">{{ total_duration|format_duration }}</span></p>
                     <hr>
                     <div class="d-flex justify-content-between align-items-center">
                         <h6 class="mb-0"><i class="bi bi-check2-all me-2"></i>Correct Answer(s):</h6>
@@ -73,13 +94,13 @@
                     <ul id="answer-list" class="list-group list-group-flush mt-2">
                         {% if user_final_answer %}
                         <li class="list-group-item list-group-item-success d-flex justify-content-between align-items-center">
-                            {{ user_final_answer }}
+                            {{ user_final_answer|split:"-"|last|striptags }}
                             <span class="badge bg-success-light">Your Answer</span>
                         </li>
                         {% endif %}
                         {% for item in task_answer %}
                             {% if item != user_final_answer %}
-                            <li class="list-group-item">{{ item }}</li>
+                            <li class="list-group-item">{{ item|split:"-"|last|striptags }}</li>
                             {% endif %}
                         {% endfor %}
                     </ul>
@@ -126,11 +147,14 @@
                     <div class="card shadow-sm">
                         <div id="heading-trial-{{ trial.num_trial }}-main" class="card-header d-flex justify-content-between align-items-center collapsed" data-bs-toggle="collapse" data-bs-target="#collapse-trial-{{ trial.num_trial }}-main" aria-expanded="false" aria-controls="collapse-trial-{{ trial.num_trial }}-main" style="cursor: pointer;">
                             <h5 class="mb-0">Trial {{ trial.num_trial }}</h5>
-                            {% if trial.is_correct %}
-                            <span class="badge bg-success"><i class="bi bi-check-circle-fill me-1"></i> Correct</span>
-                            {% else %}
-                            <span class="badge bg-danger"><i class="bi bi-x-circle-fill me-1"></i> Incorrect</span>
-                            {% endif %}
+                            <div class="d-flex align-items-center">
+                                <span class="text-muted me-3 fw-normal"><i class="bi bi-stopwatch me-1"></i> {{ trial.duration|format_duration }}</span>
+                                {% if trial.is_correct %}
+                                <span class="badge bg-success"><i class="bi bi-check-circle-fill me-1"></i> Correct</span>
+                                {% else %}
+                                <span class="badge bg-danger"><i class="bi bi-x-circle-fill me-1"></i> Incorrect</span>
+                                {% endif %}
+                            </div>
                         </div>
                         <div id="collapse-trial-{{ trial.num_trial }}-main" class="collapse" aria-labelledby="heading-trial-{{ trial.num_trial }}-main">
                             <div class="card-body">
@@ -169,29 +193,174 @@
                                         <h6 class="mb-0"><i class="bi bi-file-earmark-text me-2"></i>Submitted Answer</h6>
                                     </div>
                                     <div class="card-body p-4">
-                                        <p><span class="annotation-key">Your Answer:</span> {{ trial.answer }}</p>
-                                        <p><span class="annotation-key">Evidence Count:</span> <span id="evidence-count-{{ trial.num_trial }}">{{ trial.justifications.all|length }}</span></p>
-                                        <p><span class="annotation-key">Confidence:</span> {{ CONFIDENCE_MAP|get_item:trial.confidence }}</p>
-                                        <p><span class="annotation-key">Justification:</span></p>
-                                        <div class="ps-4">
-                                            <ul class="list-unstyled">
-                                                {% for justification in trial.justifications.all %}
-                                                <li class="mb-2">
-                                                    <p class="mb-1"><span class="annotation-key">URL:</span> <a href="{{ justification.url }}" target="_blank">{{ justification.url }}</a></p>
-                                                    <p class="mb-1"><span class="annotation-key">Confidence:</span> 
-                                                        {% if justification.confidence == 3 %} High
-                                                        {% elif justification.confidence == 2 %} Medium
-                                                        {% elif justification.confidence == 1 %} Low
-                                                        {% endif %}
-                                                    </p>
-                                                    <blockquote class="blockquote bg-light p-2 rounded" style="font-size: 0.9rem;">
-                                                        {{ justification.text }}
-                                                    </blockquote>
-                                                </li>
-                                                {% endfor %}
-                                            </ul>
+                                        <div class="row align-items-start">
+                                            <div class="col-md-8">
+                                                <p class="mb-2"><strong>Your Answer:</strong></p>
+                                                <p class="bg-light p-2 rounded">{{ trial.answer|split:"-"|last|striptags }}</p>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <p class="mb-2"><strong>Confidence:</strong> {{ CONFIDENCE_MAP|get_item:trial.confidence }}</p>
+                                                <p class="mb-2"><strong>Evidence Count:</strong> <span id="evidence-count-{{ trial.num_trial }}">{{ trial.justifications.all|length }}</span></p>
+                                            </div>
                                         </div>
-                                        <p><span class="annotation-key">Answer Formulation Method:</span> {{ ANSWER_FORMULATION_MAP|get_item:trial.answer_formulation_method|safe }}</p>
+                                        <div class="mt-3">
+                                            <p class="mb-2">
+                                                <a class="justification-toggle text-decoration-none text-muted collapsed" data-bs-toggle="collapse" href="#justifications-{{ trial.num_trial }}" role="button" aria-expanded="false" aria-controls="justifications-{{ trial.num_trial }}">
+                                                    <strong>Justifications:</strong>
+                                                    <i class="bi bi-chevron-right collapse-indicator ms-1"></i>
+                                                </a>
+                                            </p>
+                                            <div class="collapse" id="justifications-{{ trial.num_trial }}">
+                                                <div class="pt-2 ps-3 pe-2">
+                                                    {% if trial.text_justifications %}
+                                                    <div class="accordion mt-2" id="text-evidence-accordion-{{ trial.num_trial }}">
+                                                        <div class="accordion-item">
+                                                            <h2 class="accordion-header" id="text-evidence-heading-{{ trial.num_trial }}">
+                                                                <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-text-evidence-{{ trial.num_trial }}" aria-expanded="true" aria-controls="collapse-text-evidence-{{ trial.num_trial }}">
+                                                                    Textual Evidence
+                                                                </button>
+                                                            </h2>
+                                                            <div id="collapse-text-evidence-{{ trial.num_trial }}" class="accordion-collapse collapse show" aria-labelledby="text-evidence-heading-{{ trial.num_trial }}">
+                                                                <div class="accordion-body">
+                                                                    {% for justification in trial.text_justifications %}
+                                                                    <div class="card mb-2 bg-light border-start border-gray-300 border-3">
+                                                                        <div class="card-body">
+                                                                            <p class="mb-1 small text-muted"><strong>Source:</strong> <a href="{{ justification.url }}" target="_blank">{{ justification.page_title }}</a></p>
+                                                                            <blockquote class="blockquote mb-1 text-muted" style="font-size: 0.9rem;">
+                                                                                <i class="bi bi-quote"></i> {{ justification.text }}
+                                                                            </blockquote>
+                                                                            <div class="d-flex">
+                                                                                <p class="mb-0 small me-3"><strong>Relevance:</strong> 
+                                                                                    {% if justification.relevance == 3 %} <span class="badge bg-success">High</span>
+                                                                                    {% elif justification.relevance == 2 %} <span class="badge bg-warning text-dark">Medium</span>
+                                                                                    {% elif justification.relevance == 1 %} <span class="badge bg-danger">Low</span>
+                                                                                    {% else %} <span class="badge bg-secondary">Not Set</span>
+                                                                                    {% endif %}
+                                                                                </p>
+                                                                                <p class="mb-0 small"><strong>Credibility:</strong> 
+                                                                                    {% if justification.credibility == 3 %} <span class="badge bg-success">High</span>
+                                                                                    {% elif justification.credibility == 2 %} <span class="badge bg-warning text-dark">Medium</span>
+                                                                                    {% elif justification.credibility == 1 %} <span class="badge bg-danger">Low</span>
+                                                                                    {% else %} <span class="badge bg-secondary">Not Set</span>
+                                                                                    {% endif %}
+                                                                                </p>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                    {% endfor %}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    {% endif %}
+
+                                                    {% if trial.image_justifications %}
+                                                    <div class="accordion mt-2" id="image-evidence-accordion-{{ trial.num_trial }}">
+                                                        <div class="accordion-item">
+                                                            <h2 class="accordion-header" id="image-evidence-heading-{{ trial.num_trial }}">
+                                                                <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-image-evidence-{{ trial.num_trial }}" aria-expanded="true" aria-controls="collapse-image-evidence-{{ trial.num_trial }}">
+                                                                    Image Evidence
+                                                                </button>
+                                                            </h2>
+                                                            <div id="collapse-image-evidence-{{ trial.num_trial }}" class="accordion-collapse collapse show" aria-labelledby="image-evidence-heading-{{ trial.num_trial }}">
+                                                                <div class="accordion-body">
+                                                                    {% for justification in trial.image_justifications %}
+                                                                    <div class="card mb-2 bg-light border-start border-gray-300 border-3">
+                                                                        <div class="card-body">
+                                                                            <p class="mb-1 small text-muted"><strong>Source:</strong> <a href="{{ justification.url }}" target="_blank">{{ justification.page_title }}</a></p>
+                                                                            {% if justification.evidence_image %}
+                                                                                <img src="{{ justification.evidence_image.url }}" class="img-fluid rounded evidence-image" alt="Evidence Image">
+                                                                            {% endif %}
+                                                                            <div class="d-flex mt-2">
+                                                                                <p class="mb-0 small me-3"><strong>Relevance:</strong> 
+                                                                                    {% if justification.relevance == 3 %} <span class="badge bg-success">High</span>
+                                                                                    {% elif justification.relevance == 2 %} <span class="badge bg-warning text-dark">Medium</span>
+                                                                                    {% elif justification.relevance == 1 %} <span class="badge bg-danger">Low</span>
+                                                                                    {% else %} <span class="badge bg-secondary">Not Set</span>
+                                                                                    {% endif %}
+                                                                                </p>
+                                                                                <p class="mb-0 small"><strong>Credibility:</strong> 
+                                                                                    {% if justification.credibility == 3 %} <span class="badge bg-success">High</span>
+                                                                                    {% elif justification.credibility == 2 %} <span class="badge bg-warning text-dark">Medium</span>
+                                                                                    {% elif justification.credibility == 1 %} <span class="badge bg-danger">Low</span>
+                                                                                    {% else %} <span class="badge bg-secondary">Not Set</span>
+                                                                                    {% endif %}
+                                                                                </p>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                    {% endfor %}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    {% endif %}
+
+                                                    {% if trial.element_justifications %}
+                                                    <div class="accordion mt-2" id="element-evidence-accordion-{{ trial.num_trial }}">
+                                                        <div class="accordion-item">
+                                                            <h2 class="accordion-header" id="element-evidence-heading-{{ trial.num_trial }}">
+                                                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-element-evidence-{{ trial.num_trial }}" aria-expanded="false" aria-controls="collapse-element-evidence-{{ trial.num_trial }}">
+                                                                    Other Evidence
+                                                                </button>
+                                                            </h2>
+                                                            <div id="collapse-element-evidence-{{ trial.num_trial }}" class="accordion-collapse collapse" aria-labelledby="element-evidence-heading-{{ trial.num_trial }}">
+                                                                <div class="accordion-body">
+                                                                    {% for justification in trial.element_justifications %}
+                                                                    <div class="card mb-2 bg-light border-start border-gray-300 border-3">
+                                                                        <div class="card-body">
+                                                                            <p class="mb-1 small text-muted"><strong>Source:</strong> <a href="{{ justification.url }}" target="_blank">{{ justification.page_title }}</a></p>
+                                                                            <p class="mb-0"><strong>Element:</strong> <code>{{ justification.element_details.tagName }}</code></p>
+                                                                        </div>
+                                                                    </div>
+                                                                    {% endfor %}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    {% endif %}
+
+                                                    {% if trial.abandoned_justifications %}
+                                                    <div class="accordion mt-2" id="abandoned-evidence-accordion-{{ trial.num_trial }}">
+                                                        <div class="accordion-item">
+                                                            <h2 class="accordion-header" id="abandoned-evidence-heading-{{ trial.num_trial }}">
+                                                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-abandoned-evidence-{{ trial.num_trial }}" aria-expanded="false" aria-controls="collapse-abandoned-evidence-{{ trial.num_trial }}">
+                                                                    Abandoned Justifications
+                                                                </button>
+                                                            </h2>
+                                                            <div id="collapse-abandoned-evidence-{{ trial.num_trial }}" class="accordion-collapse collapse" aria-labelledby="abandoned-evidence-heading-{{ trial.num_trial }}">
+                                                                <div class="accordion-body">
+                                                                    {% for justification in trial.abandoned_justifications %}
+                                                                    <div class="card mb-2 bg-light border-start border-gray-300 border-3 abandoned-justification">
+                                                                        <div class="card-body">
+                                                                            <p class="mb-1 small text-muted"><strong>Source:</strong> <a href="{{ justification.url }}" target="_blank">{{ justification.page_title }}</a></p>
+                                                                            {% if justification.evidence_type == 'text_selection' %}
+                                                                            <blockquote class="blockquote mb-1 text-muted" style="font-size: 0.9rem; text-decoration: line-through;">
+                                                                                <i class="bi bi-quote"></i> {{ justification.text }}
+                                                                            </blockquote>
+                                                                            {% elif justification.evidence_type == 'element' %}
+                                                                                {% if justification.evidence_image %}
+                                                                                    <img src="{{ justification.evidence_image.url }}" class="img-fluid rounded evidence-image" alt="Evidence Image">
+                                                                                {% else %}
+                                                                                    <p class="mb-0"><strong>Element:</strong> <code>{{ justification.element_details.tagName }}</code></p>
+                                                                                {% endif %}
+                                                                            {% endif %}
+                                                                        </div>
+                                                                    </div>
+                                                                    {% endfor %}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    {% endif %}
+                                                    
+                                                    {% if not trial.text_justifications and not trial.image_justifications and not trial.element_justifications and not trial.abandoned_justifications %}
+                                                        <p class="text-muted">No justifications provided for this trial.</p>
+                                                    {% endif %}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <p class="mt-3"><strong>Answer Formulation Method:</strong><br> <ul><li class="text-muted">{{ ANSWER_FORMULATION_MAP|get_item:trial.answer_formulation_method|safe }}</li></ul></p>
                                     </div>
                                 </div>
 
@@ -247,6 +416,13 @@
                                 <p><span class="annotation-key">Overall Difficulty:</span> {{ DIFFICULTY_MAP|get_item:post_task_annotation.difficulty_actual }}</p>
                                 <p><span class="annotation-key">"Aha!" Moment:</span> {{ AHA_MOMENT_MAP|get_item:post_task_annotation.aha_moment_type|safe }}</p>
                                 {% if post_task_annotation.aha_moment_other %}<p><span class="annotation-key">Details:</span> {{ post_task_annotation.aha_moment_other }}</p>{% endif %}
+                                <p><span class="annotation-key">Unhelpful Paths:</span></p>
+                                <ul>
+                                    {% for path in post_task_annotation.unhelpful_paths %}
+                                    <li class="strategy-shift-text">{{ UNHELPFUL_PATHS_MAP|get_item:path|safe }}</li>
+                                    {% endfor %}
+                                </ul>
+                                {% if post_task_annotation.unhelpful_paths_other %}<p><span class="annotation-key">Details:</span> {{ post_task_annotation.unhelpful_paths_other }}</p>{% endif %}
                                 <p><span class="annotation-key">Strategic Shift:</span></p>
                                 <ul>
                                     {% for shift in post_task_annotation.strategy_shift %}

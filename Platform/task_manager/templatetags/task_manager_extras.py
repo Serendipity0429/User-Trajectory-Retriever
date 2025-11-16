@@ -30,3 +30,11 @@ def safe_json_string(s):
     Escapes `</script>` in a string to make it safe for embedding in a `<script>` tag.
     """
     return mark_safe(s.replace('</script>', '<\\/script>'))
+
+@register.filter
+def format_duration(duration):
+    if duration is None:
+        return ""
+    seconds = duration.total_seconds()
+    minutes = seconds / 60
+    return f"{minutes:.1f} minutes"

@@ -58,7 +58,10 @@
                 
                                         <!-- User's Answer -->
                                         <div class="mb-4 p-3 border rounded">
-                                            <h5><strong>2. Your Answer</strong></h5>
+                                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                                <h5 class="mb-0"><strong>2. Your Answer</strong></h5>
+                                                <span class="text-muted fw-normal"><i class="bi bi-clock-history me-1"></i> {{ trial_duration|format_duration }}</span>
+                                            </div>
                                             <p>This is the answer you submitted in the previous trial.</p>
                                             <div class="p-3 bg-light rounded loaded-box">
                                                 <div class="question-text">

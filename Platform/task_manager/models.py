@@ -36,7 +36,7 @@ class Task(models.Model):
     cancelled = models.BooleanField(default=False)  # whether the task is cancelled
     active = models.BooleanField(default=True)  # whether the task is active
     start_timestamp = models.DateTimeField(auto_now_add=True)
-    end_timestamp = models.DateTimeField(auto_now=True)
+    end_timestamp = models.DateTimeField(null=True)
 
     # task content
     content = models.ForeignKey(
@@ -83,6 +83,7 @@ class ReflectionAnnotation(models.Model):
     adjusted_difficulty = models.IntegerField(null=True) # user's adjusted difficulty of the task
 
     additional_reflection = models.TextField(null=True)  # additional reflection on the task
+    submission_timestamp = models.DateTimeField(auto_now_add=True, null=True)
 
 # Post-task annotation
 class PostTaskAnnotation(models.Model):
@@ -101,6 +102,7 @@ class PostTaskAnnotation(models.Model):
 
     strategy_shift = models.JSONField(null=True)  # strategy shift during the task
     strategy_shift_other = models.TextField(null=True)  # other strategy shift
+    submission_timestamp = models.DateTimeField(auto_now_add=True, null=True)
 
 
 # Cancel annotation
@@ -114,6 +116,7 @@ class CancelAnnotation(models.Model):
     reason = models.TextField(null=True)  # reason for cancellation
     missing_resources = models.JSONField(null=True)  # missing resources that led to cancellation
     missing_resources_other = models.TextField(null=True)  # other missing resources
+    submission_timestamp = models.DateTimeField(auto_now_add=True, null=True)
 
 
 # Task Trial

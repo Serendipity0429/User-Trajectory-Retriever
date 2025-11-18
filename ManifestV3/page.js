@@ -193,8 +193,7 @@ class ViewState {
     }
 
     startRecording() {
-        this.rrweb_record = []; // Clear the rrweb record
-        this.event_list = []; // Clear the events
+        unitPage.initialize();
         this._stop_rrweb_record_fn = rrweb.record({
             emit(event) {
                 unitPage.addRRWebEvent(event);

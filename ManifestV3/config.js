@@ -18,64 +18,70 @@ const defaultConfig = {
 
 // --- Global Config Variable ---
 let config = null;
-let configInitialized = false;
+let initializationPromise = null;
 
 // --- Initialization Function ---
-async function initializeConfig() {
-    if (configInitialized) return; // Prevent re-initialization
-    configInitialized = true;
-
-    // NOTICE: manually switch the development mode
-    // const IS_DEV = false; // For production use, set to false
-    const IS_DEV = true; // For development purposes, set to true
-
-    const _get_local_config = (keys) => new Promise(resolve => chrome.storage.local.get(keys, resolve));
-    const _set_local_config = (kv_pairs) => new Promise(resolve => chrome.storage.local.set(kv_pairs, resolve));
-
-    const stored = await _get_local_config(['serverType', 'localServerAddress', 'remoteServerAddress']);
-    
-    const serverType = stored.serverType || defaultConfig.serverType;
-    const localServerAddress = stored.localServerAddress || defaultConfig.localServerAddress;
-    const remoteServerAddress = stored.remoteServerAddress || defaultConfig.remoteServerAddress;
-
-    if (!stored.serverType || !stored.localServerAddress || !stored.remoteServerAddress) {
-        await _set_local_config({ serverType, localServerAddress, remoteServerAddress });
+function initializeConfig() {
+    if (initializationPromise) {
+        return initializationPromise;
     }
 
-    const IS_REMOTE = serverType === 'remote';
-    const URL_BASE = IS_REMOTE ? remoteServerAddress : localServerAddress;
+    initializationPromise = (async () => {
+        // NOTICE: manually switch the development mode
+        // const IS_DEV = false; // For production use, set to false
+        const IS_DEV = true; // For development purposes, set to true
 
-    const URLS = {
-        base: URL_BASE,
-        health_check: `${URL_BASE}/user/health_check/`,
-        login: `${URL_BASE}/user/login/`,
-        token_login: `${URL_BASE}/api/user/token_login/`,
-        token_refresh: `${URL_BASE}/api/user/token/refresh/`,
-        data: `${URL_BASE}/task/data/`,
-        cancel: `${URL_BASE}/task/cancel_annotation/`,
-        active_task: `${URL_BASE}/task/active_task/`,
-        get_task_info: `${URL_BASE}/task/get_task_info/`,
-        register: `${URL_BASE}/user/signup/`,
-        home: `${URL_BASE}/task/home/`,
-        stop_annotation: `${URL_BASE}/task/stop_annotation/`,
-        add_justification: `${URL_BASE}/task/justification/add/`,
-        get_justifications: `${URL_BASE}/task/justification/get`,
-        check_pending_annotations: `${URL_BASE}/task/check_pending_annotations/`,
-        initial_page: "https://www.bing.com/",
-    };
+        const _get_local_config = (keys) => new Promise(resolve => chrome.storage.local.get(keys, resolve));
+        const _set_local_config = (kv_pairs) => new Promise(resolve => chrome.storage.local.set(kv_pairs, resolve));
 
-    config = {
-        is_dev: IS_DEV,
-        is_remote: IS_REMOTE,
-        serverType: serverType,
-        localServerAddress: localServerAddress,
-        remoteServerAddress: remoteServerAddress,
-        is_passive_mode: defaultConfig.isPassiveMode,
-        urls: URLS,
-        version: chrome.runtime.getManifest().version,
-        max_retries: 3,
-        cancel_trial_threshold: defaultConfig.cancelTrialThreshold,
-    };
+        const stored = await _get_local_config(['serverType', 'localServerAddress', 'remoteServerAddress']);
+        
+        const serverType = stored.serverType || defaultConfig.serverType;
+        const localServerAddress = stored.localServerAddress || defaultConfig.localServerAddress;
+        const remoteServerAddress = stored.remoteServerAddress || defaultConfig.remoteServerAddress;
+
+        if (!stored.serverType || !stored.localServerAddress || !stored.remoteServerAddress) {
+            await _set_local_config({ serverType, localServerAddress, remoteServerAddress });
+        }
+
+        const IS_REMOTE = serverType === 'remote';
+        const URL_BASE = IS_REMOTE ? remoteServerAddress : localServerAddress;
+
+        const URLS = {
+            base: URL_BASE,
+            health_check: `${URL_BASE}/user/health_check/`,
+            login: `${URL_BASE}/user/login/`,
+            token_login: `${URL_BASE}/api/user/token_login/`,
+            token_refresh: `${URL_BASE}/api/user/token/refresh/`,
+            data: `${URL_BASE}/task/data/`,
+            cancel: `${URL_BASE}/task/cancel_annotation/`,
+            active_task: `${URL_BASE}/task/active_task/`,
+            get_task_info: `${URL_BASE}/task/get_task_info/`,
+            register: `${URL_BASE}/user/signup/`,
+            home: `${URL_BASE}/task/home/`,
+            stop_annotation: `${URL_BASE}/task/stop_annotation/`,
+            add_justification: `${URL_BASE}/task/justification/add/`,
+            get_justifications: `${URL_BASE}/task/justification/get`,
+            check_pending_annotations: `${URL_BASE}/task/check_pending_annotations/`,
+            initial_page: "https://www.bing.com/",
+        };
+
+        config = {
+            is_dev: IS_DEV,
+            is_remote: IS_REMOTE,
+            serverType: serverType,
+            localServerAddress: localServerAddress,
+            remoteServerAddress: remoteServerAddress,
+            is_passive_mode: defaultConfig.isPassiveMode,
+            urls: URLS,
+            version: chrome.runtime.getManifest().version,
+            max_retries: 3,
+            cancel_trial_threshold: defaultConfig.cancelTrialThreshold,
+        };
+        return config;
+    })();
+
+    return initializationPromise;
 }
 
 // --- Accessor Function ---

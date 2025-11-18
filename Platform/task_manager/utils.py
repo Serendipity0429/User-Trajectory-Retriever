@@ -134,6 +134,9 @@ def store_data(request, message, user):
     last_webpage_id = state.get('last_webpage_id')
     last_webpage_url = state.get('last_webpage_url')
     
+    sent_when_active = message.get('sent_when_active', False)
+    print_debug("Annotating:", state['is_annotating'] and not sent_when_active)  
+            
     should_merge = False
     if last_webpage_id and last_webpage_url == message['url']:
         should_merge = True
@@ -141,28 +144,32 @@ def store_data(request, message, user):
     if should_merge:
         try:
             last_webpage = Webpage.objects.get(id=last_webpage_id, belong_task=task)
-            print_debug(f"Merging data for URL: {message['url']}")
-            last_webpage.end_timestamp = timezone.make_aware(datetime.fromtimestamp(message['end_timestamp'] / 1000))
-            last_webpage.dwell_time += message['dwell_time']
-            
-            # Append events, handling potential empty or invalid JSON
-            try:
-                existing_events = json.loads(last_webpage.event_list) if last_webpage.event_list else []
-                new_events = json.loads(message['event_list']) if message['event_list'] else []
-                last_webpage.event_list = json.dumps(existing_events + new_events)
-            except json.JSONDecodeError:
-                print_debug("Could not decode existing event_list, overwriting.")
-                last_webpage.event_list = message['event_list']
-
-            try:
-                existing_rrweb = json.loads(last_webpage.rrweb_record) if last_webpage.rrweb_record else []
-                new_rrweb = json.loads(message['rrweb_record']) if message['rrweb_record'] else []
-                last_webpage.rrweb_record = json.dumps(existing_rrweb + new_rrweb)
-            except json.JSONDecodeError:
-                print_debug("Could not decode existing rrweb_record, overwriting.")
-                last_webpage.rrweb_record = message['rrweb_record']
+            last_webpage_is_annotating = last_webpage.during_annotation
+            if last_webpage_is_annotating == state['is_annotating']:
+                print_debug(f"Merging data for URL: {message['url']}")
+                last_webpage.end_timestamp = timezone.make_aware(datetime.fromtimestamp(message['end_timestamp'] / 1000))
+                last_webpage.dwell_time += message['dwell_time']
                 
-            last_webpage.save()
+                # Append events, handling potential empty or invalid JSON
+                try:
+                    existing_events = json.loads(last_webpage.event_list) if last_webpage.event_list else []
+                    new_events = json.loads(message['event_list']) if message['event_list'] else []
+                    last_webpage.event_list = json.dumps(existing_events + new_events)
+                except json.JSONDecodeError:
+                    print_debug("Could not decode existing event_list, overwriting.")
+                    last_webpage.event_list = message['event_list']
+
+                try:
+                    existing_rrweb = json.loads(last_webpage.rrweb_record) if last_webpage.rrweb_record else []
+                    new_rrweb = json.loads(message['rrweb_record']) if message['rrweb_record'] else []
+                    last_webpage.rrweb_record = json.dumps(existing_rrweb + new_rrweb)
+                except json.JSONDecodeError:
+                    print_debug("Could not decode existing rrweb_record, overwriting.")
+                    last_webpage.rrweb_record = message['rrweb_record']
+                    
+                last_webpage.save()
+            else:
+                should_merge = False
         except Webpage.DoesNotExist:
             should_merge = False # Fallback to create a new one
     
@@ -173,9 +180,6 @@ def store_data(request, message, user):
             print_debug("Redirect detected, setting is_redirected to True")
             webpage.is_redirected = True
         
-        sent_when_active = message.get('sent_when_active', False)
-        
-        print_debug("Annotating:", state['is_annotating'] and not sent_when_active)  
         webpage.during_annotation = state['is_annotating'] and not sent_when_active
         webpage.annotation_name = state['annotation_name']
         webpage.user = user
@@ -187,6 +191,7 @@ def store_data(request, message, user):
         webpage.start_timestamp = timezone.make_aware(datetime.fromtimestamp(message['start_timestamp'] / 1000))
         webpage.end_timestamp = timezone.make_aware(datetime.fromtimestamp(message['end_timestamp'] / 1000))
         webpage.dwell_time = message['dwell_time']
+        webpage.page_switch_record = message['page_switch_record']
         webpage.mouse_moves = message['mouse_moves']
         webpage.event_list = message['event_list']
         webpage.rrweb_record = message['rrweb_record'].replace(

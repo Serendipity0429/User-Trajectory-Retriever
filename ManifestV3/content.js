@@ -261,9 +261,9 @@ async function initialize() {
         viewState.initialize();
 
         if (!_is_server_page(_content_vars.url_now)) {
-            const { is_recording_paused } = await getSessionDataFromBackground('is_recording_paused');
+            const { has_pending_annotation } = await getSessionDataFromBackground('has_pending_annotation');
 
-            if (is_recording_paused) {
+            if (has_pending_annotation) {
                 displayMessageBox({
                     title: "Recording Paused",
                     message: "You have a pending annotation.\nPlease open the popup to complete it.",
@@ -273,19 +273,8 @@ async function initialize() {
                 });
                 printDebug("content", "Pending annotation message displayed.");
             }
-
-            rrweb.record({
-                emit(event) {
-                    unitPage.addRRWebEvent(event);
-                },
-                recordCrossOriginIframes: true, // NOTICE: enable cross-origin iframe recording, which is under experimental stage
-                recordCanvas: true, // NOTICE: enable canvas recording, which is under experimental stage
-                // inlineImages: true, // NOTICE: enable image inlining to capture images as base64
-                collectFonts: true, // NOTICE: enable font collection to capture custom fonts
-            });
-            printDebug("content", "rrweb recording started.");
         }
-            
+
         printDebug("content", "content.js is loaded");
         await setupTaskUI();
         } catch (error) {

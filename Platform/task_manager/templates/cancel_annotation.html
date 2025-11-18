@@ -90,6 +90,7 @@
                     <form id="query-form" action="" method="post" enctype='multipart/form-data'>
                         {% csrf_token %}
                         <input type="hidden" name="annotation_id" value="{{ annotation_id }}">
+                        <input type="hidden" name="duration" id="duration">
 
                         <div class="mb-4 p-3 border rounded">
                             <h5><span class="fw-bold">2. Cancellation Reason</span></h5>
@@ -150,6 +151,7 @@
 <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
 <script>
 $(function () {
+    const startTime = new Date().getTime();
     // Answer list expansion
     const answerList = $('#answer-list');
     const listItems = answerList.find('li');
@@ -259,6 +261,9 @@ $(function () {
 
         if (confirm("Are you sure you want to cancel this task?")) {
             is_submitted = true;
+            const endTime = new Date().getTime();
+            const duration = Math.round((endTime - startTime) / 1000);
+            $('#duration').val(duration);
             // Disable button and show loading state
             $(this).prop('disabled', true);
             $(this).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Submitting...');

@@ -24,7 +24,6 @@ from .utils import (
     wait_until_data_stored,
     check_answer,
     get_pending_annotation,
-    start_storing_data,
 )
 from .models import (
     Task,
@@ -123,7 +122,6 @@ def auth_redirect(request):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def data(request):
-    start_storing_data(request)
     print_debug("function data")
     message = request.POST["message"]
     # decompress the message if it is compressed
@@ -174,6 +172,7 @@ def pre_task_annotation(request):
         pre_annotation.initial_guess_unknown = request.POST.get("initial_guess_unknown") == "on"
         pre_annotation.expected_source = request.POST.getlist("expected_source")
         pre_annotation.expected_source_other = request.POST.get("expected_source_other")
+        pre_annotation.duration = request.POST.get("duration")
         pre_annotation.save()
 
         # Update user progress
@@ -282,6 +281,7 @@ def post_task_annotation(request, task_id):
             post_annotation.strategy_shift = request.POST.getlist("strategy_shift")
             post_annotation.strategy_shift_other = request.POST.get("strategy_shift_other")
             post_annotation.belong_task = task
+            post_annotation.duration = request.POST.get("duration")
             post_annotation.save()
 
             task.active = False
@@ -740,6 +740,7 @@ def cancel_annotation(request, task_id):
         cancel_annotation.missing_resources_other = request.POST.get(
             "cancel_missing_resources_other"
         )
+        cancel_annotation.duration = request.POST.get("duration")
         cancel_annotation.save()
         stop_annotating(request)
         return close_window()
@@ -875,6 +876,7 @@ def reflection_annotation(request, task_trial_id):
             future_plan_other=request.POST.get("future_plan_other"),
             estimated_time=request.POST.get("estimated_time"),
             adjusted_difficulty=request.POST.get("adjusted_difficulty"),
+            duration=request.POST.get("duration"),
         )
         ref_annotation.save()
 

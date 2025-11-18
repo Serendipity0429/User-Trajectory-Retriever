@@ -30,3 +30,5 @@ whitenoise
 markdown
 python-dateutil
 openai>=1.9.0
+redis==5.0.7
+django-redis==5.4.0

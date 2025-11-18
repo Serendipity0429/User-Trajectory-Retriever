@@ -6,12 +6,11 @@
 class Message {
     constructor() {
         this.send_flag = false;
-        this.username = "";
         this.command = "";
         this.start_timestamp = 0;
         this.end_timestamp = 0;
         this.dwell_time = 0;
-        this.page_timestamps = [];
+        this.page_switch_record = [];
         this.type = "msg_from_content";
         this.url = "";
         this.referrer = "";

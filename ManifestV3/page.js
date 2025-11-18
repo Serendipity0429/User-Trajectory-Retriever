@@ -70,7 +70,7 @@ class PageManager {
         this.start_timestamp = 0;
         this.end_timestamp = 0;
         this.dwell_time = 0;
-        this.page_timestamps = [];
+        this.page_switch_record = [];
         this.last_viewed_time = 0;
     }
 
@@ -79,7 +79,7 @@ class PageManager {
         this.start_timestamp = _time_now();
         this.end_timestamp = this.start_timestamp;
         this.dwell_time = 0;
-        this.page_timestamps = [];
+        this.page_switch_record = [];
         this.last_viewed_time = this.start_timestamp;
     }
 
@@ -89,7 +89,7 @@ class PageManager {
 
     pageLeave() {
         this.end_timestamp = _time_now();
-        this.page_timestamps.push({ inT: this.last_viewed_time, outT: this.end_timestamp });
+        this.page_switch_record.push({ inT: this.last_viewed_time, outT: this.end_timestamp });
         this.dwell_time += this.end_timestamp - this.last_viewed_time;
         this.last_viewed_time = this.end_timestamp;
     }
@@ -106,6 +106,7 @@ class ViewState {
         this.time_limit = 60000; // 1 minute
         this._is_visibility_listener_added = false;
         this._are_event_listeners_added = false;
+        this._stop_rrweb_record_fn = null;
     }
 
     checkState() {
@@ -150,15 +151,22 @@ class ViewState {
 
         if (!this._is_visibility_listener_added) {
             document.addEventListener("visibilitychange", (event) => {
+                printDebug("page", "ViewState: visibility change to", document.hidden ? "Hidden" : "Shown");
                 if (document.hidden) {
                     this.pageManager.pageLeave();
                     if (this.sent_when_active) {
                         this.sent_when_active = false;
                         return;
                     }
+                    if(this._stop_rrweb_record_fn)
+                        this._stop_rrweb_record_fn();
                     this.flush();
                 } else {
                     this.pageManager.pageInteract();
+                    this.pageManager.initialize(); // If this is unset, the start timestamp will not update!
+                    if (window.rrweb) {
+                        this.startRecording();
+                    }
                 }
             });
             this._is_visibility_listener_added = true;
@@ -180,6 +188,23 @@ class ViewState {
         this.pageManager.initialize();
         mouseRecord.initialize();
         this.checkState();
+
+        this.startRecording();
+    }
+
+    startRecording() {
+        this.rrweb_record = []; // Clear the rrweb record
+        this.event_list = []; // Clear the events
+        this._stop_rrweb_record_fn = rrweb.record({
+            emit(event) {
+                unitPage.addRRWebEvent(event);
+            },
+            recordCrossOriginIframes: true, // NOTICE: enable cross-origin iframe recording, which is under experimental stage
+            recordCanvas: true, // NOTICE: enable canvas recording, which is under experimental stage
+            // inlineImages: true, // NOTICE: enable image inlining to capture images as base64
+            collectFonts: true, // NOTICE: enable font collection to capture custom fonts
+        });
+        printDebug("page", "rrweb recording started.");
     }
 
     sendMessage() {
@@ -195,7 +220,7 @@ class ViewState {
         message.start_timestamp = this.pageManager.start_timestamp;
         message.end_timestamp = this.pageManager.end_timestamp;
         message.dwell_time = this.pageManager.dwell_time;
-        message.page_timestamps = JSON.stringify(this.pageManager.page_timestamps);
+        message.page_switch_record = JSON.stringify(this.pageManager.page_switch_record);
         message.url = _content_vars.url_now;
         message.referrer = _content_vars.referrer_now;
         message.title = this.unitPage.getTitle();
@@ -221,11 +246,7 @@ class ViewState {
         }
         this.sendMessage();
         this.initialize();
-        if (window.rrweb) {
-            this.rrweb_record = []; // Clear the rrweb events that are already sent
-            this.event_list = []; // Clear the events that are already sent
-            rrweb.record.takeFullSnapshot();
-        }
+        // Re-initialized rrweb when the user re-enter the page
     }
 }
 

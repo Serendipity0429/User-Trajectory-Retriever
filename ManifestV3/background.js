@@ -24,7 +24,6 @@ let isConnected = true;
 
 (async () => {
     await initializeConfig();
-
 })();
 
 // --- State Management ---
@@ -304,7 +303,7 @@ chrome.runtime.onInstalled.addListener(() => {
     createContextMenu();
     chrome.alarms.create(ALARM_CLEAR_STORAGE, { periodInMinutes: 1 });
     chrome.alarms.create(ALARM_CHECK_TASK, { delayInMinutes: 1, periodInMinutes: 5 });
-    _set_session({ is_recording_paused: false });
+    _set_session({ has_pending_annotation: false });
 });
 
 function highlightSelection() {
@@ -630,15 +629,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 try {
                     const pending_response = await _get(config.urls.check_pending_annotations);
                     if (pending_response && pending_response.pending) {
-                        await _set_session({ is_recording_paused: true });
+                        await _set_session({ has_pending_annotation: true });
                         pending_url = pending_response.url;
                     } else {
-                        await _set_session({ is_recording_paused: false });
+                        await _set_session({ has_pending_annotation: false });
                         broadcastToTabs({ command: 'remove_message_box', id: 'server-pending-annotation-message' });
                     }
                 } catch (error) {
                     console.error("Error checking pending annotations:", error);
-                    await _set_session({ is_recording_paused: false });
+                    await _set_session({ has_pending_annotation: false });
                     broadcastToTabs({ command: 'remove_message_box', id: 'server-pending-annotation-message' });
                 }
             

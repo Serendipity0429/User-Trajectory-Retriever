@@ -17,7 +17,7 @@ const defaultConfig = {
 };
 
 // --- Global Config Variable ---
-let config;
+let config = null;
 let configInitialized = false;
 
 // --- Initialization Function ---
@@ -26,8 +26,8 @@ async function initializeConfig() {
     configInitialized = true;
 
     // NOTICE: manually switch the development mode
-    const IS_DEV = false; // For production use, set to false
-    // const IS_DEV = true; // For development purposes, set to true
+    // const IS_DEV = false; // For production use, set to false
+    const IS_DEV = true; // For development purposes, set to true
 
     const _get_local_config = (keys) => new Promise(resolve => chrome.storage.local.get(keys, resolve));
     const _set_local_config = (kv_pairs) => new Promise(resolve => chrome.storage.local.set(kv_pairs, resolve));

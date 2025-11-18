@@ -98,7 +98,7 @@ function displayActiveTask(task_id, task_info) {
     const activeTaskEl = document.getElementById('active_task');
     const startTaskBtn = document.getElementById('startTaskBtn');
     const taskTrialEl = document.getElementById('task_trial');
-    const config = getConfig();
+    // const config = getConfig();
 
     if (active_task_id === -1) {
         switchTaskButtonStatus('off');
@@ -890,7 +890,7 @@ async function testConnection(serverType) {
                                 sendMessageToContentScript(style, retries - 1);
                             }, 100);
                         } else {
-                            console.error("Failed to send message to content script after multiple retries.");
+                            console.error("Failed to send message to content script after multiple retries:", chrome.runtime.lastError.message);
                         }
                     }
                 });

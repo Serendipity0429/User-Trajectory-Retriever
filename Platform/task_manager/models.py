@@ -184,9 +184,10 @@ class Webpage(models.Model):
     start_timestamp = models.DateTimeField()
     end_timestamp = models.DateTimeField()
     dwell_time = models.IntegerField()
+    page_switch_record = models.JSONField() # page switch record in JSON format
     mouse_moves = models.JSONField()  # mouse move data in JSON format
     event_list = models.JSONField()  # list of events in JSON format
-    rrweb_record = models.JSONField()  # rrweb record in JSON format
+    rrweb_record = models.JSONField()  # rrweb record in JSON forma
     
     is_redirected = models.BooleanField(default=False)  # whether the webpage is redirected
     during_annotation = models.BooleanField(default=False)  # whether the webpage is during annotation

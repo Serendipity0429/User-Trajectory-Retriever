@@ -31,6 +31,10 @@ class Command(BaseCommand):
         profile.field_of_expertise = "Computer Science"
         profile.llm_frequency = "frequently"
         profile.llm_history = "long"
+        profile.english_proficiency = "advanced"
+        profile.web_search_proficiency = "advanced"
+        profile.web_agent_familiarity = "moderately_familiar"
+        profile.web_agent_frequency = "sometimes"
         profile.save()
 
         self.stdout.write(self.style.SUCCESS(f"User {username} created successfully with password '{password}'."))

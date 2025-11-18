@@ -44,17 +44,17 @@ class ResetPasswordRequest(models.Model):
 class Profile(models.Model):
     LLM_FREQUENCY_CHOICES = (
         ('', u''),
-        ('frequently', u'Several times a day'),
-        ('usually', u'Once per day'),
-        ('sometimes', u'Several times a week'),
-        ('rarely', u'Less than once a week'),
+        ('frequently', u'Many times a day'),
+        ('usually', u'About daily'),
+        ('sometimes', u'A few times a week'),
+        ('rarely', u'Less than weekly'),
     )
     LLM_HISTORY_CHOICES = (
         ('', u''),
-        ('very long', u'five years or longer'),
-        ('long', u'three to five years'),
-        ('short', u'one to three years'),
         ('very short', u'less than one year'),
+        ('short', u'one to three years'),
+        ('long', u'three to five years'),
+        ('very long', u'five years or longer'),
     )
     GENDER_CHOICES = (
         ('', u''),
@@ -77,6 +77,37 @@ class Profile(models.Model):
         ('phd', 'PhD'),
         ('other', 'Other'),
     )
+    ENGLISH_PROFICIENCY_CHOICES = (
+        ('', u''),
+        ('native', 'Native Speaker'),
+        ('fluent', 'Fluent'),
+        ('advanced', 'Advanced'),
+        ('intermediate', 'Intermediate'),
+        ('beginner', 'Beginner'),
+    )
+    WEB_SEARCH_PROFICIENCY_CHOICES = (
+        ('', u''),
+        ('expert', 'Expert'),
+        ('advanced', 'Advanced'),
+        ('intermediate', 'Intermediate'),
+        ('beginner', 'Beginner'),
+    )
+    WEB_AGENT_FAMILIARITY_CHOICES = (
+        ('', u''),
+        ('not_familiar', 'Not familiar at all'),
+        ('slightly_familiar', 'Slightly familiar'),
+        ('moderately_familiar', 'Moderately familiar'),
+        ('very_familiar', 'Very familiar'),
+        ('expert', 'Expert'),
+    )
+    WEB_AGENT_FREQUENCY_CHOICES = (
+        ('', u''),
+        ('frequently', u'Many times a day'),
+        ('usually', u'About daily'),
+        ('sometimes', u'A few times a week'),
+        ('rarely', u'Less than weekly'),
+        ('never', u'Never'),
+    )
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     icon = models.ImageField(default='profile_pics/default.jpg', upload_to='profile_pics')
     name = models.CharField(max_length=50, blank=True)
@@ -88,6 +119,10 @@ class Profile(models.Model):
     field_of_expertise = models.CharField(max_length=100, blank=True)
     llm_frequency = models.CharField(max_length=50, choices=LLM_FREQUENCY_CHOICES, blank=True)
     llm_history = models.CharField(max_length=50, choices=LLM_HISTORY_CHOICES, blank=True)
+    english_proficiency = models.CharField(max_length=50, choices=ENGLISH_PROFICIENCY_CHOICES, blank=True)
+    web_search_proficiency = models.CharField(max_length=50, choices=WEB_SEARCH_PROFICIENCY_CHOICES, blank=True)
+    web_agent_familiarity = models.CharField(max_length=50, choices=WEB_AGENT_FAMILIARITY_CHOICES, blank=True)
+    web_agent_frequency = models.CharField(max_length=50, choices=WEB_AGENT_FREQUENCY_CHOICES, blank=True)
 
     def __str__(self):
         return f'{self.user.username} Profile'

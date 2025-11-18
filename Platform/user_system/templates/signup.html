@@ -72,7 +72,7 @@
                         <div class="row">
                             <div class="col-12 text-center">
                                 <div class="form-text text-muted small">
-                                    *Your password is securely encrypted with one-way hashing and cannot be viewed by anyone, including us.
+                                    *Your password is securely encrypted with one-way hashing and <strong>cannot be decrypted by anyone, including us.</strong> For details, please click <a class="text-decoration-underline" href="https://docs.djangoproject.com/en/5.2/topics/auth/passwords/">here</a>.
                                 </div>
                             </div>
                         </div>
@@ -164,10 +164,46 @@
                             <div class="col-md-6 mb-3">
                                 <div class="form-floating">
                                     <input type="text" name="field_of_expertise" class="form-control {% if form.field_of_expertise.errors %}is-invalid{% endif %}" id="id_field_of_expertise" value="{{ form.field_of_expertise.value|default_if_none:'' }}">
-                                    <label for="id_field_of_expertise"><i class="bi bi-lightbulb-fill me-2"></i>Field of Expertise</label>
+                                    <label for="id_field_of_expertise"><i class="bi bi-lightbulb-fill me-2"></i>Field of Profession</label>
                                     {% if form.field_of_expertise.errors %}
                                         <div class="invalid-feedback">
                                             {{ form.field_of_expertise.errors.as_text }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <hr class="my-4">
+
+                        <h5 class="mb-4"><i class="bi bi-tools me-2"></i>Skills and Experience</h5>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <div class="form-floating">
+                                    <select name="english_proficiency" class="form-select {% if form.english_proficiency.errors %}is-invalid{% endif %}" id="id_english_proficiency">
+                                        {% for value, text in form.fields.english_proficiency.choices %}
+                                            <option value="{{ value }}" {% if form.english_proficiency.value == value %}selected{% endif %}>{{ text }}</option>
+                                        {% endfor %}
+                                    </select>
+                                    <label for="id_english_proficiency">English Proficiency</label>
+                                    {% if form.english_proficiency.errors %}
+                                        <div class="invalid-feedback">
+                                            {{ form.english_proficiency.errors.as_text }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <div class="form-floating">
+                                    <select name="web_search_proficiency" class="form-select {% if form.web_search_proficiency.errors %}is-invalid{% endif %}" id="id_web_search_proficiency">
+                                        {% for value, text in form.fields.web_search_proficiency.choices %}
+                                            <option value="{{ value }}" {% if form.web_search_proficiency.value == value %}selected{% endif %}>{{ text }}</option>
+                                        {% endfor %}
+                                    </select>
+                                    <label for="id_web_search_proficiency">Web Search Proficiency</label>
+                                    {% if form.web_search_proficiency.errors %}
+                                        <div class="invalid-feedback">
+                                            {{ form.web_search_proficiency.errors.as_text }}
                                         </div>
                                     {% endif %}
                                 </div>
@@ -204,6 +240,42 @@
                                     {% if form.llm_history.errors %}
                                         <div class="invalid-feedback">
                                             {{ form.llm_history.errors.as_text }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <hr class="my-4">
+
+                        <h5 class="mb-4"><i class="bi bi-robot me-2"></i>Web Agent Usage <i class="bi bi-question-circle text-muted" data-bs-toggle="tooltip" data-bs-placement="top" title="Web agents are AI assistants that can autonomously browse websites and perform tasks for you."></i></h5>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <div class="form-floating">
+                                    <select name="web_agent_familiarity" class="form-select {% if form.web_agent_familiarity.errors %}is-invalid{% endif %}" id="id_web_agent_familiarity">
+                                        {% for value, text in form.fields.web_agent_familiarity.choices %}
+                                            <option value="{{ value }}" {% if form.web_agent_familiarity.value == value %}selected{% endif %}>{{ text }}</option>
+                                        {% endfor %}
+                                    </select>
+                                    <label for="id_web_agent_familiarity">How familiar are you with web agents?</label>
+                                    {% if form.web_agent_familiarity.errors %}
+                                        <div class="invalid-feedback">
+                                            {{ form.web_agent_familiarity.errors.as_text }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <div class="form-floating">
+                                    <select name="web_agent_frequency" class="form-select {% if form.web_agent_frequency.errors %}is-invalid{% endif %}" id="id_web_agent_frequency">
+                                        {% for value, text in form.fields.web_agent_frequency.choices %}
+                                            <option value="{{ value }}" {% if form.web_agent_frequency.value == value %}selected{% endif %}>{{ text }}</option>
+                                        {% endfor %}
+                                    </select>
+                                    <label for="id_web_agent_frequency">How often do you use web agents?</label>
+                                    {% if form.web_agent_frequency.errors %}
+                                        <div class="invalid-feedback">
+                                            {{ form.web_agent_frequency.errors.as_text }}
                                         </div>
                                     {% endif %}
                                 </div>

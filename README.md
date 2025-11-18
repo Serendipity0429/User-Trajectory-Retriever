@@ -18,6 +18,8 @@ The system is composed of two main parts:
 - **Messaging System:** A private messaging system for administrators to communicate with users.
 - **Bulletin Notifications:** Automatic notifications are sent to all users via the private messaging system whenever a new bulletin is posted.
 - **Discussion Forum:** A platform for users to ask questions, share insights, and engage in discussions related to their research and tasks.
+- **Extension Version Management:** Admins can add new extension versions, view version history, and revert to the latest version.
+- **AJAX-powered Admin Page:** The admin page now uses AJAX for filtering and sorting users and tasks, providing a smoother experience without page reloads.
 
 ## Recent Updates
 
@@ -38,6 +40,7 @@ Before you begin, ensure you have the following installed:
 - Python 3.8+
 - pip (Python package installer)
 - virtualenv (optional, but recommended)
+- Redis
 
 ## Installation
 
@@ -45,41 +48,42 @@ To get the system up and running, you need to set up both the backend platform a
 
 ### 1. Backend (Django Platform)
 
-The backend server is located in the `Platform/` directory.
+All commands should be run from the root of the project directory.
 
 1.  **Clone the repository:**
     ```bash
     git clone https://github.com/your-username/User-Trajectory-Retriever.git
-    cd User-Trajectory-Retriever/Platform
+    cd User-Trajectory-Retriever
     ```
 
 2.  **Create a virtual environment and install dependencies:**
+    It is recommended to use a virtual environment.
     ```bash
     python -m venv venv
     source venv/bin/activate  # On Windows, use `venv\Scripts\activate`
-    pip install -r ../requirements.txt
+    pip install -r requirements.txt
     ```
 
 3.  **Configure environment variables:**
     ```bash
-    cp .env.example .env
+    cp Platform/.env.example Platform/.env
     ```
-    Open the `.env` file and add your email server configuration.
+    Open the `Platform/.env` file and add your email server configuration.
 
 4.  **Apply database migrations:**
     ```bash
-    python manage.py migrate
+    python Platform/manage.py migrate
     ```
 
 5.  **Create a superuser:**
     ```bash
-    python manage.py createsuperuser
+    python Platform/manage.py createsuperuser
     ```
     Follow the prompts to create an administrator account.
 
 6.  **Start the development server:**
     ```bash
-    python manage.py runserver
+    python Platform/manage.py runserver
     ```
     The platform should now be running at `http://127.0.0.1:8000/`.
 

@@ -125,6 +125,7 @@ async function hasPendingAnnotation() {
 }
 
 async function checkActiveTaskID() {
+    await initializeConfig();
     printDebug("background", "Checking active task ID...");
     const { logged_in } = await _get_session('logged_in');
     if (!logged_in) {
@@ -486,6 +487,7 @@ function highlightElement(selector) {
 }
 
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
+    await initializeConfig();
     if (_is_server_page(tab.url) || _is_extension_page(tab.url)) {
         return;
     }
@@ -603,8 +605,9 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 });
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    printDebug("background", `Received message: ${message.command || 'unknown'}:`, message);
     (async () => {
+        await initializeConfig();
+        printDebug("background", `Received message: ${message.command || 'unknown'}:`, message);
         let response;
         const config = getConfig();
         switch (message.command) {
@@ -761,6 +764,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 
 chrome.runtime.onStartup.addListener(async () => {
+    await initializeConfig();
     printDebug("background", "Extension started up.");
     try {
         await flush();
@@ -772,6 +776,7 @@ chrome.runtime.onStartup.addListener(async () => {
 });
 
 chrome.alarms.onAlarm.addListener(async (alarm) => {
+    await initializeConfig();
     const config = getConfig();
     switch (alarm.name) {
         case ALARM_CLEAR_STORAGE:
@@ -785,7 +790,8 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
     }
 });
 
-chrome.tabs.onRemoved.addListener((tabId, removeInfo) => {
+chrome.tabs.onRemoved.addListener(async (tabId, removeInfo) => {
+    await initializeConfig();
     printDebug("background", `Tab ${tabId} was closed. Forcing a check for active task status.`);
     checkActiveTaskID();
 });

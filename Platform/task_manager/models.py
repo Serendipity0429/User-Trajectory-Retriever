@@ -67,6 +67,8 @@ class PreTaskAnnotation(models.Model):
     initial_guess_unknown = models.BooleanField(default=False)
     expected_source = models.JSONField(null=True, blank=True)
     expected_source_other = models.TextField(null=True, blank=True)
+    submission_timestamp = models.DateTimeField(auto_now_add=True, null=True)
+    duration = models.IntegerField(null=True)  # time spent on annotation in seconds
 
 # Reflection annotation
 class ReflectionAnnotation(models.Model):
@@ -84,6 +86,7 @@ class ReflectionAnnotation(models.Model):
 
     additional_reflection = models.TextField(null=True)  # additional reflection on the task
     submission_timestamp = models.DateTimeField(auto_now_add=True, null=True)
+    duration = models.IntegerField(null=True)  # time spent on annotation in seconds
 
 # Post-task annotation
 class PostTaskAnnotation(models.Model):
@@ -103,6 +106,7 @@ class PostTaskAnnotation(models.Model):
     strategy_shift = models.JSONField(null=True)  # strategy shift during the task
     strategy_shift_other = models.TextField(null=True)  # other strategy shift
     submission_timestamp = models.DateTimeField(auto_now_add=True, null=True)
+    duration = models.IntegerField(null=True)  # time spent on annotation in seconds
 
 
 # Cancel annotation
@@ -117,6 +121,7 @@ class CancelAnnotation(models.Model):
     missing_resources = models.JSONField(null=True)  # missing resources that led to cancellation
     missing_resources_other = models.TextField(null=True)  # other missing resources
     submission_timestamp = models.DateTimeField(auto_now_add=True, null=True)
+    duration = models.IntegerField(null=True)  # time spent on annotation in seconds
 
 
 # Task Trial

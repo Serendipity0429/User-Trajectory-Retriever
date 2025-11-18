@@ -11,6 +11,7 @@ from django.utils import timezone
 import re
 import httpx
 from dateutil.parser import parse as parse_date, ParserError
+import redis
 
 from .models import Task, Webpage, TaskDataset
 
@@ -27,9 +28,18 @@ from django.urls import reverse
 from .models import Task, TaskTrial
 from django.core.exceptions import ObjectDoesNotExist
 
-def get_annotation_state(request):
-    """Helper to get annotation state from session, initializing if not present."""
-    state = request.session.get('annotation_state', {})
+# Redis client instance
+redis_client = redis.StrictRedis(host=settings.REDIS_HOST, port=settings.REDIS_PORT, db=settings.REDIS_DB)
+
+def get_annotation_state(user_id):
+    """Helper to get annotation state from Redis, initializing if not present."""
+    state_key = f"annotation_state:{user_id}"
+    state = redis_client.get(state_key)
+    if state:
+        state = json.loads(state)
+    else:
+        state = {}
+
     if not isinstance(state, dict):  # Ensure it's a dictionary
         state = {}
     
@@ -37,15 +47,17 @@ def get_annotation_state(request):
     state.setdefault('is_annotating', False)
     state.setdefault('is_storing_data', False)
     state.setdefault('annotation_name', 'none')
-    state.setdefault('annotation_start_time', float('inf'))
+    state.setdefault('annotation_start_time', None)
     state.setdefault('annotation_id', None)
+    state.setdefault('last_webpage_id', None)
+    state.setdefault('last_webpage_url', None)
     
     return state
 
-def set_annotation_state(request, state):
-    """Helper to save annotation state back to session."""
-    request.session['annotation_state'] = state
-    request.session.modified = True
+def set_annotation_state(user_id, state):
+    """Helper to save annotation state back to Redis."""
+    state_key = f"annotation_state:{user_id}"
+    redis_client.set(state_key, json.dumps(state))
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -72,95 +84,89 @@ def decompress_json_data(compressed_data):
     return decompressed_json
 
 def start_annotating(request, name):
-    state = get_annotation_state(request)
+    user_id = request.user.id
+    state = get_annotation_state(user_id)
     state['annotation_start_time'] = time.time()
     state['annotation_name'] = name
     state['is_annotating'] = True
     state['annotation_id'] = str(uuid.uuid4())
-    set_annotation_state(request, state)
+    set_annotation_state(user_id, state)
     print_debug(f"Started annotating for {name} with ID {state['annotation_id']}.")
     return state['annotation_id']
 
 def stop_annotating(request, annotation_id=None):
-    state = get_annotation_state(request)
+    user_id = request.user.id
+    state = get_annotation_state(user_id)
     if annotation_id and annotation_id != state.get('annotation_id'):
         print_debug(f"Annotation ID mismatch. Expected {state.get('annotation_id')}, got {annotation_id}. Not stopping.")
         return False
     
-    state['annotation_start_time'] = float('inf')
+    state['annotation_start_time'] = None
     state['annotation_name'] = 'none'
     state['is_annotating'] = False
     state['annotation_id'] = None
-    set_annotation_state(request, state)
+    state['last_webpage_id'] = None
+    state['last_webpage_url'] = None
+    set_annotation_state(user_id, state)
     print_debug("Stopped annotating.")
     return True
     
-def start_storing_data(request):
-    state = get_annotation_state(request)
-    state['is_storing_data'] = True
-    set_annotation_state(request, state)
-    
-def stop_storing_data(request):
-    state = get_annotation_state(request)
-    state['is_storing_data'] = False
-    set_annotation_state(request, state)
-    
-    
 def store_data(request, message, user):
-    state = get_annotation_state(request)
+    user_id = user.id
+    state = get_annotation_state(user_id)
     state['is_storing_data'] = True
-    set_annotation_state(request, state)
+    set_annotation_state(user_id, state)
     
     print_json_debug(message)
     if message['url'].startswith(settings.IP_TO_LAUNCH):
         print_debug("Skipping storing data for local URL:", message['url'])
         state['is_storing_data'] = False
-        set_annotation_state(request, state)
+        set_annotation_state(user_id, state)
         return
     task = Task.objects.filter(user=user, active=True).first()
     if not task:
         print_debug("No active task found for user", user.username)
         state['is_storing_data'] = False
-        set_annotation_state(request, state)
+        set_annotation_state(user_id, state)
         return
 
-    # Check for the most recent webpage for this task
-    last_webpage = Webpage.objects.filter(belong_task=task).order_by('-end_timestamp').first()
-
+    # Check for the most recent webpage for this task from Redis
+    last_webpage_id = state.get('last_webpage_id')
+    last_webpage_url = state.get('last_webpage_url')
+    
     should_merge = False
-    if last_webpage:
-        try:
-            last_url = last_webpage.url
-            current_origin = message['url']
-            if last_url == current_origin:
-                should_merge = True
-        except Exception as e:
-            print_debug(f"Could not parse URL to determine origin: {e}")
+    if last_webpage_id and last_webpage_url == message['url']:
+        should_merge = True
 
     if should_merge:
-        print_debug(f"Merging data for URL: {message['url']}")
-        last_webpage.end_timestamp = timezone.make_aware(datetime.fromtimestamp(message['end_timestamp'] / 1000))
-        last_webpage.dwell_time += message['dwell_time']
-        
-        # Append events, handling potential empty or invalid JSON
         try:
-            existing_events = json.loads(last_webpage.event_list) if last_webpage.event_list else []
-            new_events = json.loads(message['event_list']) if message['event_list'] else []
-            last_webpage.event_list = json.dumps(existing_events + new_events)
-        except json.JSONDecodeError:
-            print_debug("Could not decode existing event_list, overwriting.")
-            last_webpage.event_list = message['event_list']
-
-        try:
-            existing_rrweb = json.loads(last_webpage.rrweb_record) if last_webpage.rrweb_record else []
-            new_rrweb = json.loads(message['rrweb_record']) if message['rrweb_record'] else []
-            last_webpage.rrweb_record = json.dumps(existing_rrweb + new_rrweb)
-        except json.JSONDecodeError:
-            print_debug("Could not decode existing rrweb_record, overwriting.")
-            last_webpage.rrweb_record = message['rrweb_record']
+            last_webpage = Webpage.objects.get(id=last_webpage_id, belong_task=task)
+            print_debug(f"Merging data for URL: {message['url']}")
+            last_webpage.end_timestamp = timezone.make_aware(datetime.fromtimestamp(message['end_timestamp'] / 1000))
+            last_webpage.dwell_time += message['dwell_time']
             
-        last_webpage.save()
-    else:
+            # Append events, handling potential empty or invalid JSON
+            try:
+                existing_events = json.loads(last_webpage.event_list) if last_webpage.event_list else []
+                new_events = json.loads(message['event_list']) if message['event_list'] else []
+                last_webpage.event_list = json.dumps(existing_events + new_events)
+            except json.JSONDecodeError:
+                print_debug("Could not decode existing event_list, overwriting.")
+                last_webpage.event_list = message['event_list']
+
+            try:
+                existing_rrweb = json.loads(last_webpage.rrweb_record) if last_webpage.rrweb_record else []
+                new_rrweb = json.loads(message['rrweb_record']) if message['rrweb_record'] else []
+                last_webpage.rrweb_record = json.dumps(existing_rrweb + new_rrweb)
+            except json.JSONDecodeError:
+                print_debug("Could not decode existing rrweb_record, overwriting.")
+                last_webpage.rrweb_record = message['rrweb_record']
+                
+            last_webpage.save()
+        except Webpage.DoesNotExist:
+            should_merge = False # Fallback to create a new one
+    
+    if not should_merge:
         print_debug(f"Creating new webpage entry for URL: {message['url']}")
         webpage = Webpage()
         if check_is_redirected_page(message):
@@ -187,10 +193,13 @@ def store_data(request, message, user):
                     "</script>", "<\\/script>"
             )
         webpage.save()
+        state['last_webpage_id'] = webpage.id
+        state['last_webpage_url'] = webpage.url
 
     task.end_timestamp = timezone.make_aware(datetime.fromtimestamp(message['end_timestamp'] / 1000))
     task.save()
-    stop_storing_data(request)
+    state['is_storing_data'] = False
+    set_annotation_state(user_id, state)
     
 def check_is_redirected_page(message):
     # A page is considered a redirect if the dwell time is very short (< 1000ms) or if there's no user interaction.
@@ -206,13 +215,14 @@ def wait_until_data_stored(func):
                 break
         
         if request:
+            user_id = request.user.id
             # Sleep for a short duration to ensure the backend receives the data
             time.sleep(0.3)
-            state = get_annotation_state(request)
+            state = get_annotation_state(user_id)
             while state.get('is_storing_data', False):
                 print_debug("Waiting for data to be stored...")
                 time.sleep(0.5)
-                state = get_annotation_state(request)  # Re-fetch state
+                state = get_annotation_state(user_id)  # Re-fetch state
         
         return func(*args, **kwargs)
     return wrapper

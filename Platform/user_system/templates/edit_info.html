@@ -23,14 +23,26 @@
                             </div>
                         </div>
 
-                        <h5 class="mb-4"><i class="bi bi-file-person-fill me-2"></i>Personal Details</h5>
+                        <h5 class="mb-4"><i class="bi bi-person-badge-fill me-2"></i>Account Information</h5>
                         <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <div class="form-floating">
+                                    <input type="text" class="form-control" id="id_username" value="{{ cur_user.username }}" readonly>
+                                    <label for="id_username"><i class="bi bi-person-fill me-2"></i>Username</label>
+                                </div>
+                            </div>
                             <div class="col-md-6 mb-3">
                                 <div class="form-floating">
                                     {{ form.name }}
                                     <label for="id_name"><i class="bi bi-person-circle me-2"></i>Name</label>
                                 </div>
                             </div>
+                        </div>
+
+                        <hr class="my-4">
+
+                        <h5 class="mb-4"><i class="bi bi-file-person-fill me-2"></i>Personal Details</h5>
+                        <div class="row">
                             <div class="col-md-6 mb-3">
                                 <div class="form-floating">
                                     {{ form.email }}
@@ -72,7 +84,25 @@
                             <div class="col-md-6 mb-3">
                                 <div class="form-floating">
                                     {{ form.field_of_expertise }}
-                                    <label for="id_field_of_expertise"><i class="bi bi-lightbulb-fill me-2"></i>Field of Expertise</label>
+                                    <label for="id_field_of_expertise"><i class="bi bi-lightbulb-fill me-2"></i>Field of Profession</label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <hr class="my-4">
+
+                        <h5 class="mb-4"><i class="bi bi-tools me-2"></i>Skills and Experience</h5>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <div class="form-floating">
+                                    {{ form.english_proficiency }}
+                                    <label for="id_english_proficiency">English Proficiency</label>
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <div class="form-floating">
+                                    {{ form.web_search_proficiency }}
+                                    <label for="id_web_search_proficiency">Web Search Proficiency</label>
                                 </div>
                             </div>
                         </div>
@@ -91,6 +121,24 @@
                                 <div class="form-floating">
                                     {{ form.llm_history }}
                                     <label for="id_llm_history">How long have you been using LLMs?</label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <hr class="my-4">
+
+                        <h5 class="mb-4"><i class="bi bi-robot me-2"></i>Web Agent Usage <i class="bi bi-question-circle text-muted" data-bs-toggle="tooltip" data-bs-placement="top" title="Web agents are AI assistants that can autonomously browse websites and perform tasks for you."></i></h5>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <div class="form-floating">
+                                    {{ form.web_agent_familiarity }}
+                                    <label for="id_web_agent_familiarity">How familiar are you with web agents?</label>
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <div class="form-floating">
+                                    {{ form.web_agent_frequency }}
+                                    <label for="id_web_agent_frequency">How often do you use web agents?</label>
                                 </div>
                             </div>
                         </div>

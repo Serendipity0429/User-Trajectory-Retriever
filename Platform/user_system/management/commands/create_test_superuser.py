@@ -35,6 +35,10 @@ class Command(BaseCommand):
         profile.field_of_expertise = "System Administration"
         profile.llm_frequency = "frequently"
         profile.llm_history = "very long"
+        profile.english_proficiency = "fluent"
+        profile.web_search_proficiency = "expert"
+        profile.web_agent_familiarity = "very_familiar"
+        profile.web_agent_frequency = "frequently"
         profile.save()
         
         if is_primary:

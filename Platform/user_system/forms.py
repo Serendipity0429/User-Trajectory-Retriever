@@ -167,7 +167,7 @@ class SignupForm(forms.Form):
     )
     field_of_expertise = forms.CharField(
         required=True,
-        label=u'Field of Expertise',
+        label=u'Field of Profession',
         widget=forms.TextInput(
             attrs={
                 'class': 'form-control login-field',
@@ -191,6 +191,47 @@ class SignupForm(forms.Form):
         choices=Profile.LLM_HISTORY_CHOICES,
         label=u'How long have you been using large language models(LLMs)?',
         help_text=u'This helps us understand your experience with LLMs.',
+        widget=forms.Select(
+            attrs={
+                'class': 'form-select',
+            }
+        )
+    )
+    english_proficiency = forms.ChoiceField(
+        required=True,
+        choices=Profile.ENGLISH_PROFICIENCY_CHOICES,
+        label=u'What is your English proficiency level?',
+        widget=forms.Select(
+            attrs={
+                'class': 'form-select',
+            }
+        )
+    )
+    web_search_proficiency = forms.ChoiceField(
+        required=True,
+        choices=Profile.WEB_SEARCH_PROFICIENCY_CHOICES,
+        label=u'How would you rate your web search proficiency?',
+        widget=forms.Select(
+            attrs={
+                'class': 'form-select',
+            }
+        )
+    )
+    web_agent_familiarity = forms.ChoiceField(
+        required=True,
+        choices=Profile.WEB_AGENT_FAMILIARITY_CHOICES,
+        label=u'How familiar are you with web agents?',
+        help_text=u'Web agents are AI assistants that can autonomously browse websites and perform tasks for you.',
+        widget=forms.Select(
+            attrs={
+                'class': 'form-select',
+            }
+        )
+    )
+    web_agent_frequency = forms.ChoiceField(
+        required=True,
+        choices=Profile.WEB_AGENT_FREQUENCY_CHOICES,
+        label=u'How often do you use web agents?',
         widget=forms.Select(
             attrs={
                 'class': 'form-select',
@@ -224,7 +265,7 @@ class EditInfoForm(forms.ModelForm):
     )
     class Meta:
         model = Profile
-        fields = ['name', 'gender', 'age', 'phone', 'occupation', 'education', 'field_of_expertise', 'llm_frequency', 'llm_history', 'icon']
+        fields = ['name', 'gender', 'age', 'phone', 'occupation', 'education', 'field_of_expertise', 'llm_frequency', 'llm_history', 'icon', 'english_proficiency', 'web_search_proficiency', 'web_agent_familiarity', 'web_agent_frequency']
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Name'}),
             'gender': forms.Select(attrs={'class': 'form-select'}),
@@ -232,9 +273,13 @@ class EditInfoForm(forms.ModelForm):
             'phone': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Phone'}),
             'occupation': forms.Select(attrs={'class': 'form-select'}),
             'education': forms.Select(attrs={'class': 'form-select'}),
-            'field_of_expertise': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Field of Expertise'}),
+            'field_of_expertise': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Field of Profession'}),
             'llm_frequency': forms.Select(attrs={'class': 'form-select'}),
             'llm_history': forms.Select(attrs={'class': 'form-select'}),
+            'english_proficiency': forms.Select(attrs={'class': 'form-select'}),
+            'web_search_proficiency': forms.Select(attrs={'class': 'form-select'}),
+            'web_agent_familiarity': forms.Select(attrs={'class': 'form-select'}),
+            'web_agent_frequency': forms.Select(attrs={'class': 'form-select'}),
         }
 
 

@@ -522,7 +522,7 @@ def task_home(request):
         },
     )
 
-
+@login_required
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def annotation_home(request):

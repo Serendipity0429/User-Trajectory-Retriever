@@ -1,6 +1,7 @@
 from django import forms
 from .models import Post, Comment, Bulletin, Label, DiscussionSettings
 from task_manager.models import ExtensionVersion
+from captcha.fields import CaptchaField
 import re
 from packaging.version import parse as parse_version
 
@@ -41,6 +42,7 @@ class PostForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         user = kwargs.pop('user', None)
+        require_captcha = kwargs.pop('require_captcha', False)
         super(PostForm, self).__init__(*args, **kwargs)
         if self.instance and self.instance.pk:
             self.initial['content'] = self.instance.raw_content
@@ -50,6 +52,10 @@ class PostForm(forms.ModelForm):
 
         if not user:
             self.fields.pop('is_private', None)
+        
+        if require_captcha:
+            self.fields['captcha'] = CaptchaField()
+            self.fields['captcha'].widget.attrs.update({'class': 'form-control', 'placeholder': 'Enter characters'})
 
 class CommentForm(forms.ModelForm):
     class Meta:

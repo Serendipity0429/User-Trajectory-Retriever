@@ -4,6 +4,7 @@
 from django import forms
 from .models import User, Profile, InformedConsent
 from django.contrib.auth.forms import AuthenticationForm, UserCreationForm as AuthUserCreationForm
+from captcha.fields import CaptchaField
 
 class InformedConsentForm(forms.ModelForm):
     class Meta:
@@ -31,6 +32,15 @@ class CustomAuthenticationForm(AuthenticationForm):
             }
         )
     )
+
+    def __init__(self, request=None, *args, **kwargs):
+        self.request = request
+        super().__init__(request, *args, **kwargs)
+        if self.request and self.request.session.get('login_attempts', 0) >= 2:
+            self.fields['captcha'] = CaptchaField()
+            # Add order-first class to the input field
+            self.fields['captcha'].widget.attrs.update({'class': 'form-control order-first', 'placeholder': 'Enter characters'})
+
 
 class LoginForm(forms.Form):
     username = forms.CharField(
@@ -246,6 +256,13 @@ class SignupForm(forms.Form):
             }
         )
     )
+    
+    captcha = CaptchaField()
+
+    def __init__(self, *args, **kwargs):
+        super(SignupForm, self).__init__(*args, **kwargs)
+        # Add order-first class to the input field
+        self.fields['captcha'].widget.attrs.update({'class': 'form-control order-first', 'placeholder': 'Enter characters'})
 
     def clean_username(self):
         username = self.cleaned_data.get('username')
@@ -348,6 +365,13 @@ class ForgetPasswordForm(forms.Form):
             }
         )
     )
+    captcha = CaptchaField()
+
+    def __init__(self, *args, **kwargs):
+        super(ForgetPasswordForm, self).__init__(*args, **kwargs)
+        # Add order-first class to the input field
+        self.fields['captcha'].widget.attrs.update({'class': 'form-control order-first', 'placeholder': 'Enter characters'})
+
 
 
 class ResetPasswordForm(forms.Form):

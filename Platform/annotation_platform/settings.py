@@ -54,7 +54,12 @@ INSTALLED_APPS = [
     'user_system.apps.UserSystemConfig',
     'discussion',
     'msg_system',
+    'captcha',
 ]
+
+# Captcha Configuration
+CAPTCHA_OUTPUT_FORMAT = '%(hidden_field)s%(text_field)s%(image)s'
+CAPTCHA_FONT_SIZE = 30
 
 MESSAGE_TAGS = {
     messages.DEBUG: 'alert-info',

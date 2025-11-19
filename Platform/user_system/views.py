@@ -343,16 +343,33 @@ def login(request):
     form = CustomAuthenticationForm(request, data=request.POST or None)
     error_message = None
 
-    if request.method == 'POST' and form.is_valid():
-        user = form.get_user()
-        auth_login(request, user)  # user_logged_in signal will be triggered here
-        messages.success(request, 'Successfully logged in.')
-        if user.is_superuser:
-            return redirect_to_prev_page(request, reverse('user_system:admin_page'))
+    if request.method == 'POST':
+        if form.is_valid():
+            request.session['login_attempts'] = 0  # Reset attempts on success
+            user = form.get_user()
+            auth_login(request, user)
+            messages.success(request, 'Successfully logged in.')
+            if user.is_superuser:
+                return redirect_to_prev_page(request, reverse('user_system:admin_page'))
+            else:
+                return redirect_to_prev_page(request, reverse('task_manager:home'))
         else:
-            return redirect_to_prev_page(request, reverse('task_manager:home'))
-    elif request.method == 'POST':
-        error_message = "Invalid username or password."
+            # Increment login attempts
+            request.session['login_attempts'] = request.session.get('login_attempts', 0) + 1
+            error_message = "Invalid username or password."
+
+            # If we just crossed the threshold, the current 'form' instance doesn't have the captcha field.
+            # We need to add it so it renders for the user to fill in next time.
+            if request.session['login_attempts'] >= 2 and 'captcha' not in form.fields:
+                from captcha.fields import CaptchaField
+                form.fields['captcha'] = CaptchaField()
+                form.fields['captcha'].widget.attrs.update({'class': 'form-control', 'placeholder': 'Enter characters'})
+
+            # If captcha error exists, update error message
+            if 'captcha' in form.errors:
+                error_message = "Invalid CAPTCHA. Please try again."
+
+    show_captcha = request.session.get('login_attempts', 0) >= 2
 
     return render(
         request,
@@ -360,6 +377,7 @@ def login(request):
         {
             'form': form,
             'error_message': error_message,
+            'show_captcha': show_captcha,
         }
     )
 

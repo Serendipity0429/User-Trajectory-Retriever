@@ -228,8 +228,17 @@ def post_detail(request, pk):
 
 @login_required
 def create_post(request):
+    # Check for post frequency: if user posted in the last 5 minutes
+    from django.utils import timezone
+    from datetime import timedelta
+    
+    now = timezone.now()
+    five_minutes_ago = now - timedelta(minutes=5)
+    recent_posts_count = Post.objects.filter(author=request.user, created_at__gte=five_minutes_ago).count()
+    require_captcha = recent_posts_count >= 1 and not request.user.is_staff
+
     if request.method == 'POST':
-        form = PostForm(request.POST, request.FILES, user=request.user)
+        form = PostForm(request.POST, request.FILES, user=request.user, require_captcha=require_captcha)
         files = request.FILES.getlist('attachments')
         
         # Check for duplicate filenames
@@ -258,7 +267,7 @@ def create_post(request):
                 Attachment.objects.create(post=post, file=f)
             return redirect('discussion_home')
     else:
-        form = PostForm(user=request.user)
+        form = PostForm(user=request.user, require_captcha=require_captcha)
     return render(request, 'create_post.html', {'form': form})
 
 @staff_member_required

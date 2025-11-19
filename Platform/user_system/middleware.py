@@ -31,6 +31,8 @@ class EnforceConsentMiddleware:
                 if request.user.agreed_consent_version != latest_consent or not request.user.consent_agreed:
                     # Add exceptions for logout and consent pages
                     if request.path not in [reverse('user_system:logout'), reverse('user_system:informed_consent')]:
+                        # Store the current path to redirect back after consent
+                        request.session['prev_page'] = request.get_full_path()
                         # Redirect the user to the consent page
                         return redirect('user_system:informed_consent')
 

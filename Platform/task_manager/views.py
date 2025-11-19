@@ -2,12 +2,13 @@
 # -*- coding: utf-8 -*-
 
 import logging
+import random
 from datetime import datetime
 from django.utils import timezone
 from django.db import transaction
 from django.shortcuts import render
 from django.core.files.base import ContentFile
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import login_required, user_passes_test
 import base64
 import uuid
 import json
@@ -26,6 +27,7 @@ from .utils import (
     get_pending_annotation,
 )
 from .models import (
+    TaskDataset,
     Task,
     TaskDatasetEntry,
     PreTaskAnnotation,
@@ -35,7 +37,6 @@ from .models import (
     TaskTrial,
     ReflectionAnnotation,
     Justification,
-    UserTaskProgress,
     ExtensionVersion,
 )
 from .mappings import *
@@ -175,12 +176,6 @@ def pre_task_annotation(request):
         pre_annotation.duration = request.POST.get("duration")
         pre_annotation.save()
 
-        # Update user progress
-        progress, created = UserTaskProgress.objects.get_or_create(user=user, dataset=entry.belong_dataset)
-        if entry.id > progress.highest_entry_id:
-            progress.highest_entry_id = entry.id
-            progress.save()
-
         stop_annotating(request)
 
         return close_window()
@@ -195,7 +190,7 @@ def pre_task_annotation(request):
             return render(request, "status_page.html", context)
 
         # Randomly choose a task from the dataset
-        dataset = get_active_task_dataset()
+        dataset = get_active_task_dataset(user)
         if dataset is None:
             context = {
                 'title': 'Not Found',
@@ -204,16 +199,29 @@ def pre_task_annotation(request):
             }
             return render(request, "status_page.html", context)
         
-        # Get user's progress
-        progress, created = UserTaskProgress.objects.get_or_create(user=user, dataset=dataset)
-        last_entry_id = progress.highest_entry_id
+        # Get IDs of entries the user has already interacted with
+        interacted_entry_ids = Task.objects.filter(
+            user=user,
+            content__belong_dataset=dataset
+        ).values_list('content_id', flat=True)
 
-        # Find the next task for the user
-        entry = (
-            TaskDatasetEntry.objects.filter(belong_dataset=dataset, id__gt=last_entry_id)
-            .order_by("id")
-            .first()
-        )
+        # Filter for entries in the dataset that haven't been interacted with
+        available_entries = TaskDatasetEntry.objects.filter(
+            belong_dataset=dataset
+        ).exclude(id__in=interacted_entry_ids)
+
+        entry = None
+        if dataset.name == "tutorial":
+            # Sequential for tutorial
+            entry = available_entries.order_by("id").first()
+        else:
+            # Random for others (Optimized)
+            count = available_entries.count()
+            if count > 0:
+                random_index = random.randint(0, count - 1)
+                entry = available_entries[random_index]
+            else:
+                entry = None
 
         if entry is None:
             # This could mean either the dataset is empty, or the user has completed all tasks.
@@ -234,6 +242,31 @@ def pre_task_annotation(request):
         print_debug(f"[Question] {entry.question}")
         print_debug(f"[Answer] {entry.answer}")
 
+        is_tutorial = False
+        total_tutorial_tasks = 0
+        current_tutorial_step = 0
+        
+        is_formal = False
+        total_formal_tasks = 0
+        current_formal_step = 0
+
+        if dataset and dataset.name == "tutorial":
+            is_tutorial = True
+            total_tutorial_tasks = TaskDatasetEntry.objects.filter(belong_dataset=dataset).count()
+            tutorial_tasks_objs = Task.objects.filter(user=user, content__belong_dataset__name="tutorial")
+            completed_tutorial_tasks = tutorial_tasks_objs.filter(active=False).count()
+            current_tutorial_step = completed_tutorial_tasks + 1
+            if current_tutorial_step > total_tutorial_tasks:
+                current_tutorial_step = total_tutorial_tasks
+        elif dataset:
+            is_formal = True
+            total_formal_tasks = TaskDatasetEntry.objects.filter(belong_dataset=dataset).count()
+            formal_tasks_objs = Task.objects.filter(user=user, content__belong_dataset=dataset)
+            completed_formal_tasks = formal_tasks_objs.filter(active=False).count()
+            current_formal_step = completed_formal_tasks + 1
+            if current_formal_step > total_formal_tasks:
+                current_formal_step = total_formal_tasks
+
         annotation_id = start_annotating(request, "pre_task_annotation")
         return render(
             request,
@@ -250,6 +283,12 @@ def pre_task_annotation(request):
                 "DIFFICULTY_EXPLANATION_MAP": DIFFICULTY_EXPLANATION_MAP,
                 "EFFORT_EXPLANATION_MAP": EFFORT_EXPLANATION_MAP,
                 "EXPECTED_SOURCES_MAP": EXPECTED_SOURCES_MAP,
+                "is_tutorial": is_tutorial,
+                "current_tutorial_step": current_tutorial_step,
+                "total_tutorial_tasks": total_tutorial_tasks,
+                "is_formal": is_formal,
+                "current_formal_step": current_formal_step,
+                "total_formal_tasks": total_formal_tasks,
             },
         )
 
@@ -427,6 +466,45 @@ def task_home(request):
     completed_num = len(Task.objects.filter(user=user, active=False))
     pending_num = len(Task.objects.filter(user=user, active=True))
     pending_annotation_url = get_pending_annotation(user)
+
+    is_tutorial = False
+    total_tutorial_tasks = 0
+    current_tutorial_step = 0
+    
+    is_formal = False
+    total_formal_tasks = 0
+    current_formal_step = 0
+
+    active_dataset = get_active_task_dataset(user)
+    
+    if active_dataset:
+        if active_dataset.name == "tutorial":
+            is_tutorial = True
+            total_tutorial_tasks = TaskDatasetEntry.objects.filter(belong_dataset=active_dataset).count()
+            
+            tutorial_tasks = Task.objects.filter(
+                user=user, 
+                content__belong_dataset__name="tutorial"
+            )
+            completed_tutorial_tasks = tutorial_tasks.filter(active=False).count()
+            
+            current_tutorial_step = completed_tutorial_tasks + 1
+            if current_tutorial_step > total_tutorial_tasks:
+                current_tutorial_step = total_tutorial_tasks
+        else:
+            is_formal = True
+            total_formal_tasks = TaskDatasetEntry.objects.filter(belong_dataset=active_dataset).count()
+            
+            formal_tasks_objs = Task.objects.filter(
+                user=user, 
+                content__belong_dataset=active_dataset
+            )
+            completed_formal_tasks = formal_tasks_objs.filter(active=False).count()
+            
+            current_formal_step = completed_formal_tasks + 1
+            if current_formal_step > total_formal_tasks:
+                current_formal_step = total_formal_tasks
+
     return render(
         request,
         "index.html",
@@ -435,6 +513,12 @@ def task_home(request):
             "completed_num": completed_num,
             "pending_num": pending_num,
             "pending_annotation_url": pending_annotation_url,
+            "is_tutorial": is_tutorial,
+            "current_tutorial_step": current_tutorial_step,
+            "total_tutorial_tasks": total_tutorial_tasks,
+            "is_formal": is_formal,
+            "current_formal_step": current_formal_step,
+            "total_formal_tasks": total_formal_tasks,
         },
     )
 
@@ -445,60 +529,92 @@ def annotation_home(request):
     print_debug("function annotation_home")
 
     user = request.user
-    annotated_tasks = sorted(
-        Task.objects.filter(user=user, active=False), key=lambda task: -task.id
-    )
+    
     unannotated_tasks = sorted(
         Task.objects.filter(user=user, active=True), key=lambda task: -task.id
     )
-    annotated_tasks_to_webpages = []
-    unannotated_tasks_to_webpages = []
-    for task in unannotated_tasks:
-        # end_timestamp = task.end_timestamp
-        # Convert to human-readable time
-        # end_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(end_timestamp))
-        unannotated_tasks_to_webpages.append(
-            (
-                task.id,
-                sorted(
-                    Webpage.objects.filter(
-                        user=user,
-                        belong_task=task,
-                        is_redirected=False,
-                        during_annotation=False,
+    annotated_tasks = sorted(
+        Task.objects.filter(user=user, active=False), key=lambda task: -task.id
+    )
+    
+    def get_webpages(tasks):
+        tasks_to_webpages = []
+        for task in tasks:
+            tasks_to_webpages.append(
+                (
+                    task.id, 
+                    sorted(
+                        Webpage.objects.filter(
+                            user=user,
+                            belong_task=task,
+                            is_redirected=False,
+                            during_annotation=False,
+                        ),
+                        key=lambda item: item.start_timestamp,
                     ),
-                    key=lambda item: item.start_timestamp,
-                ),
+                )
             )
-        )
-    for task in annotated_tasks:
-        # end_timestamp = task.end_timestamp
-        # Convert to human-readable time
-        # end_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(end_timestamp))
-        annotated_tasks_to_webpages.append(
-            (
-                task.id,
-                sorted(
-                    Webpage.objects.filter(
-                        user=user,
-                        belong_task=task,
-                        is_redirected=False,
-                        during_annotation=False,
-                    ),
-                    key=lambda item: item.start_timestamp,
-                ),
-            )
-        )
+        return tasks_to_webpages
+
+    # Split unannotated
+    tut_unannotated = [t for t in unannotated_tasks if t.content and t.content.belong_dataset.name == 'tutorial']
+    formal_unannotated = [t for t in unannotated_tasks if not (t.content and t.content.belong_dataset.name == 'tutorial')]
+    
+    # Split annotated
+    tut_annotated = [t for t in annotated_tasks if t.content and t.content.belong_dataset.name == 'tutorial']
+    formal_annotated = [t for t in annotated_tasks if not (t.content and t.content.belong_dataset.name == 'tutorial')]
+    
+    tut_unannotated_webpages = get_webpages(tut_unannotated)
+    formal_unannotated_webpages = get_webpages(formal_unannotated)
+    tut_annotated_webpages = get_webpages(tut_annotated)
+    formal_annotated_webpages = get_webpages(formal_annotated)
 
     pending_annotation_url = get_pending_annotation(user)
+    
+    is_tutorial = False
+    total_tutorial_tasks = 0
+    current_tutorial_step = 0
+    
+    is_formal = False
+    total_formal_tasks = 0
+    current_formal_step = 0
+
+    active_dataset = get_active_task_dataset(user)
+    
+    if active_dataset:
+        if active_dataset.name == "tutorial":
+            is_tutorial = True
+            total_tutorial_tasks = TaskDatasetEntry.objects.filter(belong_dataset=active_dataset).count()
+            tutorial_tasks_objs = Task.objects.filter(user=user, content__belong_dataset__name="tutorial")
+            completed_tutorial_tasks = tutorial_tasks_objs.filter(active=False).count()
+            current_tutorial_step = completed_tutorial_tasks + 1
+            if current_tutorial_step > total_tutorial_tasks:
+                current_tutorial_step = total_tutorial_tasks
+        else:
+            is_formal = True
+            total_formal_tasks = TaskDatasetEntry.objects.filter(belong_dataset=active_dataset).count()
+            formal_tasks_objs = Task.objects.filter(user=user, content__belong_dataset=active_dataset)
+            completed_formal_tasks = formal_tasks_objs.filter(active=False).count()
+            current_formal_step = completed_formal_tasks + 1
+            if current_formal_step > total_formal_tasks:
+                current_formal_step = total_formal_tasks
+
     return render(
         request,
         "annotation_home.html",
         {
             "cur_user": user,
-            "unannotated_tasks_to_webpages": unannotated_tasks_to_webpages,
-            "annotated_tasks_to_webpages": annotated_tasks_to_webpages,
+            "tut_unannotated_webpages": tut_unannotated_webpages,
+            "formal_unannotated_webpages": formal_unannotated_webpages,
+            "tut_annotated_webpages": tut_annotated_webpages,
+            "formal_annotated_webpages": formal_annotated_webpages,
             "pending_annotation_url": pending_annotation_url,
+            "is_tutorial": is_tutorial,
+            "current_tutorial_step": current_tutorial_step,
+            "total_tutorial_tasks": total_tutorial_tasks,
+            "is_formal": is_formal,
+            "current_formal_step": current_formal_step,
+            "total_formal_tasks": total_formal_tasks,
         },
     )
 
@@ -1300,3 +1416,15 @@ def check_pending_annotations(request):
         return JsonResponse({"pending": True, "url": pending_annotation_url})
     else:
         return JsonResponse({"pending": False})
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+@user_passes_test(lambda u: u.is_superuser)
+def dataset_qa_list(request):
+    """
+    Lists all dataset questions and answers for admin review.
+    """
+    print_debug("function dataset_qa_list")
+    datasets = TaskDataset.objects.prefetch_related('taskdatasetentry_set').all()
+    return render(request, 'dataset_qa_list.html', {'datasets': datasets})

@@ -347,7 +347,10 @@ def login(request):
         user = form.get_user()
         auth_login(request, user)  # user_logged_in signal will be triggered here
         messages.success(request, 'Successfully logged in.')
-        return redirect_to_prev_page(request, reverse('task_manager:home'))
+        if user.is_superuser:
+            return redirect_to_prev_page(request, reverse('user_system:admin_page'))
+        else:
+            return redirect_to_prev_page(request, reverse('task_manager:home'))
     elif request.method == 'POST':
         error_message = "Invalid username or password."
 
@@ -375,6 +378,7 @@ def informed_consent(request):
 
             if request.user.is_authenticated:
                 request.user.agreed_consent_version = latest_consent
+                request.user.consent_agreed = True
                 request.user.save()
                 return redirect_to_prev_page(request, reverse('task_manager:home'))
             else:

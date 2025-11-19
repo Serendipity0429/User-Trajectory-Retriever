@@ -119,6 +119,12 @@ def setup_development_data() -> None:
         "./task_manager/dataset/hard_questions_refined.jsonl", 
         "nq_hard_questions"
     )
+
+    run_manage_py_command(
+        "load_nq_dataset", 
+        "./task_manager/dataset/tutorial_questions.jsonl", 
+        "tutorial"
+    )
     
     # Create test users.
     print_info("Creating test users...")

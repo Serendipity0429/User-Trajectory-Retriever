@@ -27,7 +27,7 @@
                     <i class="bi bi-check-circle-fill fs-1 me-3"></i>
                     <div>
                         <h5 class="card-title">Completed Tasks</h5>
-                        <p class="card-text fs-4 text-white">{{ annotated_tasks_to_webpages|length }}</p>
+                        <p class="card-text fs-4 text-white">{{ tut_annotated_webpages|length|add:formal_annotated_webpages|length }}</p>
                     </div>
                 </div>
             </div>
@@ -38,12 +38,40 @@
                     <i class="bi bi-hourglass-split fs-1 me-3"></i>
                     <div>
                         <h5 class="card-title">Ongoing Tasks</h5>
-                        <p class="card-text fs-4 text-white">{{ unannotated_tasks_to_webpages|length }}</p>
+                        <p class="card-text fs-4 text-white">{{ tut_unannotated_webpages|length|add:formal_unannotated_webpages|length }}</p>
                     </div>
                 </div>
             </div>
         </div>
     </div>
+
+
+    <!-- Tutorial Progress -->
+    {% if is_tutorial %}
+    <div class="mb-4">
+        <h5 class="text-info mb-2"><i class="bi bi-book me-2"></i>Tutorial Progress</h5>
+        <div class="progress" style="height: 25px;">
+            <div class="progress-bar progress-bar-striped progress-bar-animated bg-info" role="progressbar" 
+                    style="width: {% widthratio current_tutorial_step total_tutorial_tasks 100 %}%;" 
+                    aria-valuenow="{{ current_tutorial_step }}" aria-valuemin="0" aria-valuemax="{{ total_tutorial_tasks }}">
+                Step {{ current_tutorial_step }} / {{ total_tutorial_tasks }}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if is_formal %}
+    <div class="mb-4">
+        <h5 class="text-success mb-2"><i class="bi bi-check-circle-fill me-2"></i>Formal Study Progress</h5>
+        <div class="progress" style="height: 25px;">
+            <div class="progress-bar progress-bar-striped progress-bar-animated bg-success" role="progressbar" 
+                    style="width: {% widthratio current_formal_step total_formal_tasks 100 %}%;" 
+                    aria-valuenow="{{ current_formal_step }}" aria-valuemin="0" aria-valuemax="{{ total_formal_tasks }}">
+                Task {{ current_formal_step }} / {{ total_formal_tasks }}
+            </div>
+        </div>
+    </div>
+    {% endif %}
 
     <!-- Task Lists -->
     <div class="card shadow-sm">
@@ -65,9 +93,39 @@
             </ul>
             <div class="tab-content" id="taskTabsContent">
                 <div class="tab-pane fade show active" id="completed" role="tabpanel" aria-labelledby="completed-tab">
-                    {% if annotated_tasks_to_webpages %}
-                        <div class="list-group mt-3">
-                            {% for task_id, webpages in annotated_tasks_to_webpages %}
+                    
+                    <!-- Tutorial Completed -->
+                    {% if tut_annotated_webpages %}
+                        <h5 class="mt-3 text-info"><i class="bi bi-book-half"></i> Tutorial Tasks</h5>
+                        <div class="list-group mt-2">
+                            {% for task_id, webpages in tut_annotated_webpages %}
+                            <div class="list-group-item list-group-item-action border-info">
+                                <div class="d-flex w-100 justify-content-between">
+                                    <h5 class="mb-1">Task ID: {{ task_id }}</h5>
+                                    <span class="badge bg-success d-flex align-items-center">Completed</span>
+                                </div>
+                                <ul class="list-unstyled mt-2 mb-2 text-muted">
+                                    {% for webpage in webpages|slice:":5" %}
+                                        <li><a href="{{ webpage.url }}" target="_blank" rel="noopener noreferrer"><i class="bi bi-link-45deg"></i> {{ webpage.title }}</a></li>
+                                    {% endfor %}
+                                    {% if webpages|length > 5 %}
+                                        <li>...</li>
+                                    {% endif %}
+                                </ul>
+                                <div class="mt-2">
+                                    <a href="/task/show_task/{{ task_id }}/" class="btn btn-sm btn-primary-custom btn-view-task"><i class="bi bi-eye"></i> View</a>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+
+                    <!-- Formal Completed -->
+                    {% if formal_annotated_webpages %}
+                        {% if tut_annotated_webpages %}<hr class="my-4">{% endif %}
+                        <h5 class="mt-3 {% if tut_annotated_webpages %}text-dark{% endif %}"><i class="bi bi-list-check"></i> Formal Tasks</h5>
+                        <div class="list-group mt-2">
+                            {% for task_id, webpages in formal_annotated_webpages %}
                             <div class="list-group-item list-group-item-action">
                                 <div class="d-flex w-100 justify-content-between">
                                     <h5 class="mb-1">Task ID: {{ task_id }}</h5>
@@ -83,19 +141,48 @@
                                 </ul>
                                 <div class="mt-2">
                                     <a href="/task/show_task/{{ task_id }}/" class="btn btn-sm btn-primary-custom btn-view-task"><i class="bi bi-eye"></i> View</a>
-                                    {% comment %} <button class="btn btn-sm btn-outline-danger remove-task-btn" data-task-id="{{ task_id }}"><i class="bi bi-trash"></i> Remove</button> {% endcomment %}
                                 </div>
                             </div>
                             {% endfor %}
                         </div>
-                    {% else %}
+                    {% endif %}
+
+                    {% if not tut_annotated_webpages and not formal_annotated_webpages %}
                         <p class="text-center p-3">No completed tasks yet.</p>
                     {% endif %}
                 </div>
+
                 <div class="tab-pane fade" id="ongoing" role="tabpanel" aria-labelledby="ongoing-tab">
-                    {% if unannotated_tasks_to_webpages %}
-                        <div class="list-group mt-3">
-                            {% for task_id, webpages in unannotated_tasks_to_webpages %}
+                    
+                    <!-- Tutorial Ongoing -->
+                    {% if tut_unannotated_webpages %}
+                        <h5 class="mt-3 text-info"><i class="bi bi-book-half"></i> Tutorial Tasks</h5>
+                        <div class="list-group mt-2">
+                            {% for task_id, webpages in tut_unannotated_webpages %}
+                            <div class="list-group-item list-group-item-action border-info">
+                                <div class="d-flex w-100 justify-content-between">
+                                    <h5 class="mb-1">Task ID: {{ task_id }}</h5>
+                                    <span class="badge bg-warning text-white">Ongoing</span>
+                                </div>
+                                <ul class="list-unstyled mt-2 mb-1 text-muted">
+                                    {% for webpage in webpages|slice:":5" %}
+                                        <li><i class="bi bi-file-earmark-text"></i> {{ webpage.title }}</li>
+                                    {% endfor %}
+                                    {% if webpages|length > 5 %}
+                                        <li>...</li>
+                                    {% endif %}
+                                </ul>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+
+                    <!-- Formal Ongoing -->
+                    {% if formal_unannotated_webpages %}
+                        {% if tut_unannotated_webpages %}<hr class="my-4">{% endif %}
+                        <h5 class="mt-3 {% if tut_unannotated_webpages %}text-dark{% endif %}"><i class="bi bi-list-check"></i> Formal Tasks</h5>
+                        <div class="list-group mt-2">
+                            {% for task_id, webpages in formal_unannotated_webpages %}
                             <div class="list-group-item list-group-item-action">
                                 <div class="d-flex w-100 justify-content-between">
                                     <h5 class="mb-1">Task ID: {{ task_id }}</h5>
@@ -112,7 +199,9 @@
                             </div>
                             {% endfor %}
                         </div>
-                    {% else %}
+                    {% endif %}
+
+                    {% if not tut_unannotated_webpages and not formal_unannotated_webpages %}
                         <p class="text-center p-3">No ongoing tasks.</p>
                     {% endif %}
                 </div>
@@ -131,7 +220,7 @@
                 $.ajax({
                     type: "POST",
                     url: "/task/remove_task/" + taskId + "/",
-                    success: function (response) {.
+                    success: function (response) {
                         alert(response);
                         window.location.reload();
                     },

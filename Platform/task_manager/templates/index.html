@@ -13,6 +13,33 @@
                 <div class="card-body p-5">
                     <p class="text-center text-muted mb-4">Here is a summary of your annotation progress.</p>
 
+                    {% if is_tutorial %}
+                    <div class="mb-5">
+                        <h5 class="text-center text-info mb-3"><i class="bi bi-book me-2"></i>Tutorial Progress</h5>
+                        <div class="progress" style="height: 30px;">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated bg-info" role="progressbar" 
+                                 style="width: {% widthratio current_tutorial_step total_tutorial_tasks 100 %}%;" 
+                                 aria-valuenow="{{ current_tutorial_step }}" aria-valuemin="0" aria-valuemax="{{ total_tutorial_tasks }}">
+                                Step {{ current_tutorial_step }} / {{ total_tutorial_tasks }}
+                            </div>
+                        </div>
+                        <p class="text-center mt-2 text-muted small">Complete the tutorial to unlock the formal tasks.</p>
+                    </div>
+                    {% endif %}
+
+                    {% if is_formal %}
+                    <div class="mb-5">
+                        <h5 class="text-center text-success mb-3"><i class="bi bi-check-circle-fill me-2"></i>Formal Study Progress</h5>
+                        <div class="progress" style="height: 30px;">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated bg-success" role="progressbar" 
+                                 style="width: {% widthratio current_formal_step total_formal_tasks 100 %}%;" 
+                                 aria-valuenow="{{ current_formal_step }}" aria-valuemin="0" aria-valuemax="{{ total_formal_tasks }}">
+                                Task {{ current_formal_step }} / {{ total_formal_tasks }}
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
                     {% if pending_annotation_url %}
                     <div class="alert alert-warning text-center" role="alert">
                         <strong>You have a pending annotation.</strong> Please complete it before starting a new task.<br/>

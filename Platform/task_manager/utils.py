@@ -13,7 +13,7 @@ import httpx
 from dateutil.parser import parse as parse_date, ParserError
 import redis
 
-from .models import Task, Webpage, TaskDataset
+from .models import Task, Webpage, TaskDataset, TaskDatasetEntry
 
 try:
     import simplejson as json
@@ -329,7 +329,21 @@ def check_answer(entry, user_answer, llm = True):
 def close_window():
     return HttpResponse('<html><body><script>window.close()</script></body></html>')
 
-def get_active_task_dataset():
+def get_active_task_dataset(user=None):
+    if user and not user.is_superuser:
+        tutorial_dataset_name = "tutorial"
+        tutorial_dataset = TaskDataset.objects.filter(name=tutorial_dataset_name).first()
+        if tutorial_dataset:
+            # Check if user has finished tutorial
+            # Get all entries in tutorial
+            tutorial_entries = TaskDatasetEntry.objects.filter(belong_dataset=tutorial_dataset).values_list('id', flat=True)
+            # Get all entries user has interacted with
+            user_interacted_entries = Task.objects.filter(user=user, content__belong_dataset=tutorial_dataset).values_list('content_id', flat=True)
+            
+            # If there are any tutorial entries not in user_interacted_entries, then tutorial is not finished
+            if set(tutorial_entries) - set(user_interacted_entries):
+                return tutorial_dataset
+
     active_dataset = "nq_hard_questions"
     try:
         active_dataset = TaskDataset.objects.filter(name=active_dataset).first()

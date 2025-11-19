@@ -32,6 +32,15 @@ def safe_json_string(s):
     return mark_safe(s.replace('</script>', '<\\/script>'))
 
 @register.filter
+def parse_json(value):
+    try:
+        if isinstance(value, str):
+            return json.loads(value)
+        return value
+    except (ValueError, TypeError):
+        return value
+
+@register.filter
 def format_duration(duration):
     if duration is None:
         return ""

@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% load task_manager_extras %}
+
+{% block title %}Dataset Questions and Answers{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4 px-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h2 text-gray-800">Dataset Questions and Answers</h1>
+        <a href="{% url 'user_system:admin_page' %}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i> Back to Dashboard</a>
+    </div>
+    
+    {% for dataset in datasets %}
+        <div class="card shadow-sm mb-4 border-0">
+            <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center py-3" 
+                 data-bs-toggle="collapse" 
+                 href="#collapseDataset{{ dataset.id }}" 
+                 role="button" 
+                 aria-expanded="true" 
+                 aria-controls="collapseDataset{{ dataset.id }}"
+                 style="cursor: pointer;">
+                <h4 class="card-title mb-0 fw-bold text-primary">
+                    <i class="bi bi-chevron-down me-2 transition-icon"></i><i class="bi bi-database me-2"></i>{{ dataset.name }}
+                </h4>
+                <span class="text-muted small">{{ dataset.taskdatasetentry_set.count }} Entries</span>
+            </div>
+            <div class="collapse show" id="collapseDataset{{ dataset.id }}">
+                <div class="card-body p-0">
+                    <div class="bg-light p-2 border-bottom text-muted small px-4">
+                        <i class="bi bi-folder2-open me-1"></i> Path: <span class="font-monospace">{{ dataset.path }}</span>
+                    </div>
+                    
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light text-uppercase small fw-bold text-muted">
+                                <tr>
+                                    <th class="px-4 py-3" style="width: 5%">ID</th>
+                                    <th class="px-4 py-3" style="width: 40%">Question</th>
+                                    <th class="px-4 py-3" style="width: 45%">Answer</th>
+                                    <th class="px-4 py-3 text-center" style="width: 10%">Tasks</th>
+                                </tr>
+                            </thead>
+                            <tbody class="border-top-0">
+                                {% for entry in dataset.taskdatasetentry_set.all %}
+                                    <tr>
+                                        <td class="px-4 fw-bold text-muted small">#{{ entry.id }}</td>
+                                        <td class="px-4">
+                                            <div class="text-dark">{{ entry.question }}</div>
+                                        </td>
+                                        <td class="px-4">
+                                            {% with answers=entry.answer|parse_json %}
+                                                {% if answers %}
+                                                    <div style="max-height: 100px; overflow-y: auto;" class="pe-2">
+                                                        <ul class="list-unstyled mb-0">
+                                                            {% for ans in answers %}
+                                                                <li class="mb-1 text-secondary small">
+                                                                    <i class="bi bi-dot me-1 text-muted"></i>{{ ans }}
+                                                                </li>
+                                                            {% endfor %}
+                                                        </ul>
+                                                    </div>
+                                                {% else %}
+                                                    <span class="text-muted small fst-italic">No answer defined</span>
+                                                {% endif %}
+                                            {% endwith %}
+                                        </td>
+                                        <td class="px-4 text-center text-muted">
+                                            {{ entry.num_associated_tasks }}
+                                        </td>
+                                    </tr>
+                                {% empty %}
+                                    <tr>
+                                        <td colspan="4" class="text-center text-muted py-5">
+                                            <div class="d-flex flex-column align-items-center">
+                                                <i class="bi bi-inbox fs-1 mb-2 opacity-50"></i>
+                                                <p class="mb-0">No entries found in this dataset.</p>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% empty %}
+        <div class="alert alert-light border shadow-sm" role="alert">
+            <div class="d-flex align-items-center">
+                <i class="bi bi-info-circle text-primary fs-4 me-3"></i>
+                <div>
+                    <h5 class="alert-heading mb-1">No Datasets Found</h5>
+                    <p class="mb-0 text-muted">There are currently no datasets loaded in the system.</p>
+                </div>
+            </div>
+        </div>
+    {% endfor %}
+</div>
+
+<style>
+    .card-header[aria-expanded="true"] .bi-chevron-down {
+        transform: rotate(180deg);
+    }
+    .bi-chevron-down {
+        transition: transform 0.2s ease-in-out;
+    }
+</style>
+{% endblock %}

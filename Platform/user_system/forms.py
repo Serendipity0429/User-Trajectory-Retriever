@@ -2,8 +2,16 @@
 # -*- coding: utf-8 -*-
 
 from django import forms
-from .models import User, Profile
+from .models import User, Profile, InformedConsent
 from django.contrib.auth.forms import AuthenticationForm, UserCreationForm as AuthUserCreationForm
+
+class InformedConsentForm(forms.ModelForm):
+    class Meta:
+        model = InformedConsent
+        fields = ['content']
+        widgets = {
+            'content': forms.Textarea(attrs={'class': 'form-control', 'rows': 15}),
+        }
 
 class CustomAuthenticationForm(AuthenticationForm):
     username = forms.CharField(

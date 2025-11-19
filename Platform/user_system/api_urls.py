@@ -10,5 +10,5 @@ from . import views
 
 urlpatterns = [
     path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
-    path('token_login/', views.token_login, name='token_login'),
+    path('token/login/', views.token_login, name='token_login'),
 ]

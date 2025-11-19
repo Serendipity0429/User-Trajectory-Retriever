@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+
+{% block title %}Manage Informed Consent{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1 class="mt-4">Manage Informed Consent</h1>
+    <p>Here you can update the informed consent form. When you submit a new version, all users will be required to read and agree to the new terms before they can continue to use the platform.</p>
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-header">
+            Update Informed Consent
+        </div>
+        <div class="card-body">
+            <form method="post">
+                {% csrf_token %}
+                {{ form.as_p }}
+                <button type="submit" class="btn btn-primary">Update Consent</button>
+            </form>
+        </div>
+    </div>
+
+    {% if latest_consent %}
+    <div class="card shadow-sm">
+        <div class="card-header">
+            Current Version (v{{ latest_consent.version }})
+        </div>
+        <div class="card-body">
+            {{ latest_consent.content|linebreaks }}
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

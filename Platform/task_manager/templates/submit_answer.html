@@ -5,6 +5,7 @@
 
 {% block head %}
 <link rel="icon" href="{% static 'img/IR4.png' %}" type="image/png"/>
+<link href="{% static 'css/task_manager_overrides.css' %}" rel="stylesheet">
 <style>
     .justification-item.abandoned {
         opacity: 0.6;
@@ -165,7 +166,7 @@
                         <div class="mb-4 p-3 border rounded">
                             <h5><strong>3. Confidence</strong></h5>
                             <p>How confident are you in your answer?</p>
-                            <div class="btn-group" role="group" aria-label="Confidence">
+                            <div class="btn-group w-100" role="group" aria-label="Confidence">
                                 {% for value, text in confidence_choices %}
                                 <input type="radio" class="btn-check" name="confidence_radio" id="c{{ forloop.counter }}" value="{{ value }}" autocomplete="off" required>
                                 <label class="btn btn-outline-primary" for="c{{ forloop.counter }}">

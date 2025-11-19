@@ -51,7 +51,7 @@ function initializeConfig() {
             base: URL_BASE,
             health_check: `${URL_BASE}/user/health_check/`,
             login: `${URL_BASE}/user/login/`,
-            token_login: `${URL_BASE}/api/user/token_login/`,
+            token_login: `${URL_BASE}/api/user/token/login/`,
             token_refresh: `${URL_BASE}/api/user/token/refresh/`,
             data: `${URL_BASE}/task/data/`,
             cancel: `${URL_BASE}/task/cancel_annotation/`,
@@ -126,7 +126,7 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
             config.urls.health_check = `${URL_BASE}/user/health_check/`;
             config.urls.login = `${URL_BASE}/user/login/`;
             config.urls.token_login = `${URL_BASE}/api/user/token_login/`;
-            config.urls.token_refresh = `${URL_BASE}/api/user/token/refresh/`;
+            config.urls.token_refresh = `${URL_BASE}/api/user/toke//refresh/`;
             config.urls.data = `${URL_BASE}/task/data/`;
             config.urls.cancel = `${URL_BASE}/task/cancel_annotation/`;
             config.urls.active_task = `${URL_BASE}/task/active_task/`;

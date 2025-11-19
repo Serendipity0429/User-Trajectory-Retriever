@@ -4,7 +4,7 @@
 from django.shortcuts import render, get_object_or_404
 from django.http import HttpResponseRedirect, JsonResponse
 from .forms import *
-from .models import User, ResetPasswordRequest
+from .models import User, ResetPasswordRequest, InformedConsent
 from .utils import *
 from django.utils.timezone import now
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -15,7 +15,7 @@ import uuid
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth import login as auth_login, logout as auth_logout, get_user_model
 from django.contrib.auth.decorators import login_required, user_passes_test
-from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.db.models import Q
 from django.templatetags.static import static
 from django.core.paginator import Paginator
@@ -38,6 +38,45 @@ USER_SEARCH_RESULT_LIMIT = 8
 
 def is_superuser(user):
     return user.is_superuser
+
+@login_required
+@user_passes_test(is_superuser)
+def view_current_consent(request):
+    latest_consent = InformedConsent.get_latest()
+    if latest_consent:
+        signed_users_count = User.objects.filter(agreed_consent_version=latest_consent).count()
+        return JsonResponse({
+            'version': latest_consent.version,
+            'content': latest_consent.content,
+            'signed_users_count': signed_users_count,
+        })
+    return JsonResponse({'error': 'No consent form found.'}, status=404)
+
+
+@login_required
+@user_passes_test(is_superuser)
+def manage_informed_consent(request):
+    latest_consent = InformedConsent.get_latest()
+    if request.method == 'POST':
+        form = InformedConsentForm(request.POST)
+        if form.is_valid():
+            new_version = (latest_consent.version + 1) if latest_consent else 1
+            new_consent = form.save(commit=False)
+            new_consent.version = new_version
+            new_consent.save()
+            # Reset consent for all users
+            User.objects.update(agreed_consent_version=None)
+            messages.success(request, f'Informed consent has been updated to v{new_version}. All users will be required to re-consent.')
+            return HttpResponseRedirect(reverse('user_system:admin_page'))
+    else:
+        initial_data = {'content': latest_consent.content} if latest_consent else {}
+        form = InformedConsentForm(initial=initial_data)
+
+    return render(request, 'manage_informed_consent.html', {
+        'form': form,
+        'latest_consent': latest_consent
+    })
+
 
 @login_required
 @user_passes_test(is_superuser)
@@ -303,7 +342,29 @@ def login(request):
     )
 
 
+def informed_consent(request):
+    latest_consent = InformedConsent.get_latest()
+    if request.method == 'POST':
+        if 'agree' in request.POST:
+            if request.user.is_authenticated:
+                request.user.agreed_consent_version = latest_consent
+                request.user.save()
+                return redirect_to_prev_page(request, reverse('task_manager:home'))
+            else:
+                request.session['consent_agreed'] = True
+                return HttpResponseRedirect(reverse('user_system:signup'))
+        else:
+            if request.user.is_authenticated:
+                logout(request)
+            return HttpResponseRedirect(reverse('user_system:login'))
+
+    return render(request, 'informed_consent.html', {'latest_consent': latest_consent})
+
+
 def signup(request):
+    if not request.session.get('consent_agreed'):
+        return HttpResponseRedirect(reverse('user_system:informed_consent'))
+
     if request.method == 'POST':
         form = SignupForm(request.POST)
         if form.is_valid():
@@ -312,6 +373,10 @@ def signup(request):
                 password=form.cleaned_data['password'],
                 email=form.cleaned_data['email']
             )
+            user.consent_agreed = True
+            user.agreed_consent_version = InformedConsent.get_latest()
+            user.save()
+            
             profile = user.profile
             profile.name = form.cleaned_data['name']
             profile.gender = form.cleaned_data['gender']
@@ -323,6 +388,10 @@ def signup(request):
             profile.llm_frequency = form.cleaned_data['llm_frequency']
             profile.llm_history = form.cleaned_data['llm_history']
             profile.save()
+            
+            # Clean up the session
+            request.session.pop('consent_agreed', None)
+            
             return HttpResponseRedirect(reverse('user_system:login'))
         else:
             # Store form data and errors in session, then redirect
@@ -522,7 +591,10 @@ def revert_latest_extension_version(request):
     return HttpResponseRedirect(reverse('user_system:manage_extension_versions'))
 
 
-class UserSearchView(LoginRequiredMixin, View):
+class UserSearchView(LoginRequiredMixin, UserPassesTestMixin, View):
+    def test_func(self):
+        return self.request.user.is_superuser
+
     def get(self, request):
         term = request.GET.get('term', '')
         User = get_user_model()

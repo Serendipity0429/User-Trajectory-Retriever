@@ -26,7 +26,6 @@
     <link href="{% static 'css/rrweb-player.css' %}" rel="stylesheet"/>
     <link id="dark-mode-stylesheet" href="{% static 'css/dark.css' %}" rel="stylesheet" disabled>
     <link id="compact-mode-stylesheet" href="{% static 'css/compact.css' %}" rel="stylesheet" disabled>
-    <link href="{% static 'css/custom_bootstrap_overrides.css' %}" rel="stylesheet">
 
     <!-- Bootstrap 5 JS -->
     <script src="{% static 'js/vendor/bootstrap.bundle.min.js' %}"></script>
@@ -164,22 +163,6 @@
                                         </div>
                                         <div class="dropdown-divider"></div>
                                         <div class="px-3 py-1">
-                                            <label class="form-label d-flex align-items-center"><i class="bi bi-gear-wide-connected me-2 pb-1"></i>Playback</label>
-                                            <div class="d-flex flex-column">
-                                                <div class="form-check form-switch mb-2">
-                                                    <input class="form-check-input" type="checkbox" id="skipInactiveSwitch">
-                                                    <label class="form-check-label" for="skipInactiveSwitch">Skip Inactivity</label>
-                                                </div>
-                                                <div class="btn-group" role="group" aria-label="Playback speed">
-                                                    <button type="button" class="btn btn-sm btn-outline-secondary playback-speed-btn" data-speed="1">1x</button>
-                                                    <button type="button" class="btn btn-sm btn-outline-secondary playback-speed-btn" data-speed="2">2x</button>
-                                                    <button type="button" class="btn btn-sm btn-outline-secondary playback-speed-btn" data-speed="4">4x</button>
-                                                    <button type="button" class="btn btn-sm btn-outline-secondary playback-speed-btn" data-speed="8">8x</button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div class="dropdown-divider"></div>
-                                        <div class="px-3 py-1">
                                             <label class="form-label d-flex align-items-center"><i class="bi bi-distribute-vertical me-2 pb-1"></i>Layout</label>
                                             <div class="form-check form-switch">
                                                 <input class="form-check-input" type="checkbox" id="compactModeSwitch">
@@ -288,38 +271,6 @@
                     document.documentElement.classList.remove('font-size-large');
                 }
             }
-
-            // Playback Speed Control
-            const playbackSpeedButtons = document.querySelectorAll('.playback-speed-btn');
-            
-            function applyPlaybackSpeed(speed) {
-                playbackSpeedButtons.forEach(button => {
-                    if (button.dataset.speed === speed) {
-                        button.classList.add('active');
-                    } else {
-                        button.classList.remove('active');
-                    }
-                });
-                localStorage.setItem('playbackSpeed', speed);
-                // Note: This only sets the preference. The rrweb player needs to read this value.
-            }
-
-            playbackSpeedButtons.forEach(button => {
-                button.addEventListener('click', (event) => {
-                    event.stopPropagation();
-                    const speed = event.target.dataset.speed;
-                    applyPlaybackSpeed(speed);
-                });
-            });
-
-            // Skip Inactivity Switch
-            const skipInactiveSwitch = document.getElementById('skipInactiveSwitch');
-
-            skipInactiveSwitch.addEventListener('change', () => {
-                const enabled = skipInactiveSwitch.checked;
-                localStorage.setItem('skipInactive', enabled ? 'enabled' : 'disabled');
-                // Note: This only sets the preference. The rrweb player needs to read this value.
-            });
 
             // Compact Mode Switch
             const compactModeSwitch = document.getElementById('compactModeSwitch');
@@ -446,15 +397,6 @@
                     darkModeSwitch.checked = true;
                     rootElement.classList.add('dark-mode');
                     document.getElementById('dark-mode-stylesheet').disabled = false;
-                }
-
-                // Playback Speed
-                const savedSpeed = localStorage.getItem('playbackSpeed') || '1';
-                applyPlaybackSpeed(savedSpeed);
-
-                // Skip Inactivity
-                if (localStorage.getItem('skipInactive') === 'enabled') {
-                    skipInactiveSwitch.checked = true;
                 }
 
                 // Compact Mode

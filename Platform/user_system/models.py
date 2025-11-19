@@ -18,6 +18,14 @@ class User(AbstractUser):
     is_primary_superuser = models.BooleanField(default=False)
     extension_session_token = models.CharField(max_length=255, blank=True, null=True)
     last_login_from = models.GenericIPAddressField(blank=True, null=True)
+    consent_agreed = models.BooleanField(default=False)
+    agreed_consent_version = models.ForeignKey(
+        'InformedConsent',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='users'
+    )
 
     # No need for custom manager, USERNAME_FIELD, or REQUIRED_FIELDS as AbstractUser provides sensible defaults.
     # 'username' is the default USERNAME_FIELD.
@@ -126,3 +134,17 @@ class Profile(models.Model):
 
     def __str__(self):
         return f'{self.user.username} Profile'
+
+
+class InformedConsent(models.Model):
+    version = models.PositiveIntegerField(default=1, unique=True)
+    content = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Informed Consent v{self.version}"
+
+    @classmethod
+    def get_latest(cls):
+        return cls.objects.order_by('-version').first()

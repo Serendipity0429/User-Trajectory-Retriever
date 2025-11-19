@@ -1,12 +1,3 @@
-
-:root {
-    --bs-yellow: #ffb700;
-    --bs-warning: #ffb700;
-    --bs-warning-rgb: 255, 183, 0;
-    --bs-warning-bg-subtle: #ffeebb;
-    --bs-warning-border-subtle: #ffdd77;
-}
-
 /* Scoped overrides for annotation area */
 .card #query-form .btn-primary-custom {
     --bs-btn-color: #fff;
@@ -37,17 +28,16 @@
     --bs-btn-disabled-border-color: #021e4d;
 }
 
-.card #query-form .text-primary {
-    color: #021e4d !important;
+
+:root {
+    --bs-yellow: #ffb700;
+    --bs-warning: #ffb700;
+    --bs-warning-rgb: 255, 183, 0;
+    --bs-warning-bg-subtle: #ffeebb;
+    --bs-warning-border-subtle: #ffdd77;
 }
 
-.card #query-form a {
-    color: #021e4d;
-}
 
-.card #query-form h5 {
-    color: #021e4d;
-}
 
 p strong {
     font-weight: bold;
@@ -64,4 +54,21 @@ p strong {
     padding-bottom: 0.625rem;
     line-height: 1.5;
     height: calc(3.75rem + calc(var(--bs-border-width) * 2));
+}
+
+
+h1, h2, h3, h4, h5, h6, b {
+    color: #021e4d;
+}
+
+.card #query-form .text-primary {
+    color: #021e4d !important;
+}
+
+.card #query-form a {
+    color: #021e4d;
+}
+
+.card #query-form h5 {
+    color: #021e4d;
 }

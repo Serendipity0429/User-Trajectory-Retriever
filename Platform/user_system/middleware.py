@@ -28,7 +28,7 @@ class EnforceConsentMiddleware:
         if hasattr(request, 'user') and request.user.is_authenticated and not request.user.is_superuser:
             latest_consent = InformedConsent.get_latest()
             if latest_consent:
-                if request.user.agreed_consent_version != latest_consent:
+                if request.user.agreed_consent_version != latest_consent or not request.user.consent_agreed:
                     # Add exceptions for logout and consent pages
                     if request.path not in [reverse('user_system:logout'), reverse('user_system:informed_consent')]:
                         # Redirect the user to the consent page

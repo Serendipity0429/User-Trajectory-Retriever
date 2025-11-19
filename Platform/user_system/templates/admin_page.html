@@ -175,7 +175,7 @@
             <div class="card-body">
                 <p>Update the informed consent form for all users. When a new version is published, all users will be required to re-consent.</p>
                 <a href="{% url 'user_system:manage_informed_consent' %}" class="btn btn-primary">Update Informed Consent</a>
-                <button type="button" class="btn btn-info" data-bs-toggle="modal" data-bs-target="#viewConsentModal">
+                <button type="button" class="btn btn-secondary" data-bs-toggle="modal" data-bs-target="#viewConsentModal">
                     View Current Form
                 </button>
             </div>
@@ -184,17 +184,50 @@
 
     <!-- Modal -->
     <div class="modal fade" id="viewConsentModal" tabindex="-1" aria-labelledby="viewConsentModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-lg">
+        <div class="modal-dialog modal-xl">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="viewConsentModalLabel">Current Informed Consent</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-                <div class="modal-body">
-                    <p><strong>Version:</strong> <span id="consent-version"></span></p>
-                    <p><strong>Signed Users:</strong> <span id="consent-signed-users"></span></p>
-                    <hr>
-                    <div id="consent-content" style="white-space: pre-wrap;"></div>
+                <div class="modal-body bg-light">
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-4">
+                            <div class="card border-0 shadow-sm h-100">
+                                <div class="card-body text-center">
+                                    <h6 class="text-muted text-uppercase small fw-bold mb-2">Version</h6>
+                                    <h3 class="text-primary mb-0 fw-bold" id="consent-version"></h3>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card border-0 shadow-sm h-100">
+                                <div class="card-body text-center">
+                                    <h6 class="text-muted text-uppercase small fw-bold mb-2">Last Updated</h6>
+                                    <div class="d-flex align-items-center justify-content-center h-75">
+                                        <span class="fw-bold" id="consent-date"></span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card border-0 shadow-sm h-100">
+                                <div class="card-body text-center">
+                                    <h6 class="text-muted text-uppercase small fw-bold mb-2">Signed / Total</h6>
+                                    <h3 class="text-success mb-0 fw-bold" id="consent-stats"></h3>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-header bg-white py-3">
+                            <h6 class="mb-0 fw-bold"><i class="bi bi-file-text me-2"></i>Content Preview</h6>
+                        </div>
+                        <div class="card-body p-0">
+                            <div id="consent-content" class="p-4" style="max-height: 60vh; overflow-y: auto;"></div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -208,12 +241,14 @@
                 .then(data => {
                     if (data.error) {
                         document.getElementById('consent-version').textContent = 'N/A';
-                        document.getElementById('consent-signed-users').textContent = 'N/A';
-                        document.getElementById('consent-content').textContent = data.error;
+                        document.getElementById('consent-date').textContent = 'N/A';
+                        document.getElementById('consent-stats').textContent = 'N/A';
+                        document.getElementById('consent-content').innerHTML = `<div class="text-danger p-3">${data.error}</div>`;
                     } else {
-                        document.getElementById('consent-version').textContent = data.version;
-                        document.getElementById('consent-signed-users').textContent = data.signed_users_count;
-                        document.getElementById('consent-content').textContent = data.content;
+                        document.getElementById('consent-version').textContent = `v${data.version}`;
+                        document.getElementById('consent-date').textContent = data.created_at;
+                        document.getElementById('consent-stats').textContent = `${data.signed_users_count} / ${data.total_users_count}`;
+                        document.getElementById('consent-content').innerHTML = data.content;
                     }
                 });
         });

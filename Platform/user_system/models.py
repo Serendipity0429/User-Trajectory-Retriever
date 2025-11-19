@@ -136,6 +136,34 @@ class Profile(models.Model):
         return f'{self.user.username} Profile'
 
 
+DEFAULT_CONSENT_CONTENT = """# Informed Consent Form
+
+## Introduction
+Welcome to our research study. Please read this document carefully before deciding to participate.
+
+## Purpose
+This study aims to understand user behavior in web search and interaction.
+
+## Procedures
+If you agree to participate, you will perform specific tasks on the web while your interactions are recorded.
+
+## Data Collection
+We will record your:
+
++ Browser interactions (clicks, scrolls, keystrokes)
+
++ Web pages visited during the tasks
+
+## Confidentiality
+All data collected will be anonymized and used solely for research purposes.
+
+## Voluntary Participation
+Your participation is voluntary, and you may withdraw at any time.
+
+## Contact
+If you have any questions, please contact the research team.
+"""
+
 class InformedConsent(models.Model):
     version = models.PositiveIntegerField(default=1, unique=True)
     content = models.TextField()
@@ -147,4 +175,7 @@ class InformedConsent(models.Model):
 
     @classmethod
     def get_latest(cls):
-        return cls.objects.order_by('-version').first()
+        obj = cls.objects.order_by('-version').first()
+        if obj:
+            return obj
+        return cls(version=1, content=DEFAULT_CONSENT_CONTENT)

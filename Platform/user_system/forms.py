@@ -39,7 +39,7 @@ class CustomAuthenticationForm(AuthenticationForm):
         if self.request and self.request.session.get('login_attempts', 0) >= 2:
             self.fields['captcha'] = CaptchaField()
             # Add order-first class to the input field
-            self.fields['captcha'].widget.attrs.update({'class': 'form-control order-first', 'placeholder': 'Enter characters'})
+            self.fields['captcha'].widget.attrs.update({'class': 'form-control order-first', 'placeholder': 'Enter captcha'})
 
 
 class LoginForm(forms.Form):
@@ -262,7 +262,7 @@ class SignupForm(forms.Form):
     def __init__(self, *args, **kwargs):
         super(SignupForm, self).__init__(*args, **kwargs)
         # Add order-first class to the input field
-        self.fields['captcha'].widget.attrs.update({'class': 'form-control order-first', 'placeholder': 'Enter characters'})
+        self.fields['captcha'].widget.attrs.update({'class': 'form-control order-first', 'placeholder': 'Enter captcha'})
 
     def clean_username(self):
         username = self.cleaned_data.get('username')
@@ -370,7 +370,7 @@ class ForgetPasswordForm(forms.Form):
     def __init__(self, *args, **kwargs):
         super(ForgetPasswordForm, self).__init__(*args, **kwargs)
         # Add order-first class to the input field
-        self.fields['captcha'].widget.attrs.update({'class': 'form-control order-first', 'placeholder': 'Enter characters'})
+        self.fields['captcha'].widget.attrs.update({'class': 'form-control order-first', 'placeholder': 'Enter captcha'})
 
 
 

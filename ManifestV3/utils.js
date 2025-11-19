@@ -85,7 +85,7 @@ async function refreshToken() {
     }
 }
 
-async function _request(method, url, data = {}, content_type = 'form', response_type = 'json', request_timeout = null)
+async function _request(method, url, data = {}, content_type = 'form', response_type = 'json', request_timeout = null, with_credentials = false)
 {
     const config = getConfig();
     const MAX_RETRIES = config.max_retries || 3;
@@ -133,12 +133,18 @@ async function _request(method, url, data = {}, content_type = 'form', response_
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), TIMEOUT);
 
-            let response = await fetch(request_url, {
+            const fetchOptions = {
                 method: method.toUpperCase(),
                 headers,
                 body,
                 signal: controller.signal,
-            });
+            };
+
+            if (with_credentials) {
+                fetchOptions.credentials = 'include';
+            }
+
+            let response = await fetch(request_url, fetchOptions);
 
             clearTimeout(timeoutId);
 
@@ -147,11 +153,15 @@ async function _request(method, url, data = {}, content_type = 'form', response_
                 const new_token = await refreshToken();
                 if (new_token) {
                     headers["Authorization"] = `Bearer ${new_token}`;
-                    response = await fetch(request_url, {
+                    const retryOptions = {
                         method: method.toUpperCase(),
                         headers,
                         body,
-                    });
+                    };
+                    if (with_credentials) {
+                        retryOptions.credentials = 'include';
+                    }
+                    response = await fetch(request_url, retryOptions);
                 } else {
                     throw new Error("Authentication failed.");
                 }
@@ -189,12 +199,12 @@ async function _request(method, url, data = {}, content_type = 'form', response_
     }
 }
 
-async function _get(url, response_type = 'json') {
-    return _request('GET', url, {}, 'none', response_type);
+async function _get(url, response_type = 'json', with_credentials = false) {
+    return _request('GET', url, {}, 'none', response_type, null, with_credentials);
 }
 
 async function _post(url, data = {}, content_type = 'form', response_type = 'json') {
-    return _request('POST', url, data, content_type, response_type);
+    return _request('POST', url, data, content_type, response_type, null, false);
 }
 
 // --- Storage --- 

@@ -14,6 +14,7 @@ urlpatterns = [
     path('api/user/', include(('user_system.api_urls', 'user_system'), namespace='user_system_api')),
     path('discussion/', include('discussion.urls')),
     path('message/', include('msg_system.urls')),
+    path('captcha/', include('captcha.urls')),
 ]
 
 # This will serve static files in production

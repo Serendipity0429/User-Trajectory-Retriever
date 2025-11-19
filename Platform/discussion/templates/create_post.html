@@ -85,6 +85,22 @@
                 <input type="file" name="{{ form.attachments.name }}" id="{{ form.attachments.id_for_label }}" multiple>
             </div>
         </div>
+
+        {% if form.captcha %}
+        <div class="mb-3">
+            <div class="d-block mb-2">
+                <label class="form-label"><i class="bi bi-shield-lock-fill me-2"></i>Security Check</label>
+            </div>
+            <div class="d-flex gap-4">
+                {{ form.captcha }}
+            </div>
+            {% if form.captcha.errors %}
+                <div class="invalid-feedback d-block">
+                    {{ form.captcha.errors.as_text }}
+                </div>
+            {% endif %}
+        </div>
+        {% endif %}
         
         <div class="post-actions text-end">
             <div class="d-flex justify-content-between align-items-start mt-4">

@@ -33,6 +33,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from .forms import EditInfoForm, ForgetPasswordForm, ResetPasswordForm
 from .utils import send_reset_password_email
 from discussion.models import Bulletin, Post, Comment
+import markdown
 
 USER_SEARCH_RESULT_LIMIT = 8
 
@@ -43,12 +44,24 @@ def is_superuser(user):
 @user_passes_test(is_superuser)
 def view_current_consent(request):
     latest_consent = InformedConsent.get_latest()
-    if latest_consent:
+    total_users_count = User.objects.count()
+    
+    if latest_consent and latest_consent.pk:
         signed_users_count = User.objects.filter(agreed_consent_version=latest_consent).count()
         return JsonResponse({
             'version': latest_consent.version,
-            'content': latest_consent.content,
+            'content': markdown.markdown(latest_consent.content),
             'signed_users_count': signed_users_count,
+            'total_users_count': total_users_count,
+            'created_at': latest_consent.created_at.strftime("%Y-%m-%d %H:%M:%S"),
+        })
+    elif latest_consent: # Default unsaved consent
+        return JsonResponse({
+            'version': latest_consent.version,
+            'content': markdown.markdown(latest_consent.content),
+            'signed_users_count': 0,
+            'total_users_count': total_users_count,
+            'created_at': "Not saved yet",
         })
     return JsonResponse({'error': 'No consent form found.'}, status=404)
 
@@ -60,7 +73,9 @@ def manage_informed_consent(request):
     if request.method == 'POST':
         form = InformedConsentForm(request.POST)
         if form.is_valid():
-            new_version = (latest_consent.version + 1) if latest_consent else 1
+            # If latest_consent is saved (pk exists), increment version. 
+            # If it's default (unsaved), start at 1.
+            new_version = (latest_consent.version + 1) if latest_consent.pk else 1
             new_consent = form.save(commit=False)
             new_consent.version = new_version
             new_consent.save()
@@ -69,12 +84,16 @@ def manage_informed_consent(request):
             messages.success(request, f'Informed consent has been updated to v{new_version}. All users will be required to re-consent.')
             return HttpResponseRedirect(reverse('user_system:admin_page'))
     else:
-        initial_data = {'content': latest_consent.content} if latest_consent else {}
+        initial_data = {'content': latest_consent.content}
         form = InformedConsentForm(initial=initial_data)
+
+    preview_html = markdown.markdown(latest_consent.content)
 
     return render(request, 'manage_informed_consent.html', {
         'form': form,
-        'latest_consent': latest_consent
+        'latest_consent': latest_consent if latest_consent.pk else None,
+        'preview_html': preview_html,
+        'is_default': latest_consent.pk is None
     })
 
 
@@ -344,8 +363,16 @@ def login(request):
 
 def informed_consent(request):
     latest_consent = InformedConsent.get_latest()
+    
+    # latest_consent is guaranteed to be an object (saved or unsaved)
+    html_content = markdown.markdown(latest_consent.content)
+
     if request.method == 'POST':
         if 'agree' in request.POST:
+            if not latest_consent.pk:
+                # If it's an unsaved default object, save it now as the first version
+                latest_consent.save()
+
             if request.user.is_authenticated:
                 request.user.agreed_consent_version = latest_consent
                 request.user.save()
@@ -355,10 +382,13 @@ def informed_consent(request):
                 return HttpResponseRedirect(reverse('user_system:signup'))
         else:
             if request.user.is_authenticated:
-                logout(request)
+                auth_logout(request)
             return HttpResponseRedirect(reverse('user_system:login'))
 
-    return render(request, 'informed_consent.html', {'latest_consent': latest_consent})
+    return render(request, 'informed_consent.html', {
+        'latest_consent': latest_consent if latest_consent.pk else None, # Pass None if unsaved so template knows it's default
+        'html_content': html_content
+    })
 
 
 def signup(request):

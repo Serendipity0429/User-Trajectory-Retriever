@@ -5,7 +5,7 @@
 {% block content %}
 <div class="container">
     <h1 class="mt-4">Manage Informed Consent</h1>
-    <p>Here you can update the informed consent form. When you submit a new version, all users will be required to read and agree to the new terms before they can continue to use the platform.</p>
+    <p>Here you can update the informed consent form. The content supports Markdown formatting. When you submit a new version, all users will be required to read and agree to the new terms before they can continue to use the platform.</p>
 
     <div class="card shadow-sm mb-4">
         <div class="card-header">
@@ -14,21 +14,43 @@
         <div class="card-body">
             <form method="post">
                 {% csrf_token %}
-                {{ form.as_p }}
+                <div class="mb-3">
+                    <textarea name="{{ form.content.name }}" class="form-control" id="{{ form.content.auto_id }}">{{ form.content.value|default_if_none:'' }}</textarea>
+                    {% if form.content.errors %}
+                        <div class="invalid-feedback d-block">
+                            {{ form.content.errors.as_text }}
+                        </div>
+                    {% endif %}
+                </div>
                 <button type="submit" class="btn btn-primary">Update Consent</button>
             </form>
         </div>
     </div>
 
-    {% if latest_consent %}
     <div class="card shadow-sm">
         <div class="card-header">
-            Current Version (v{{ latest_consent.version }})
+            {% if latest_consent %}
+                Current Version (v{{ latest_consent.version }})
+            {% else %}
+                Default Version (Not yet saved)
+            {% endif %}
         </div>
         <div class="card-body">
-            {{ latest_consent.content|linebreaks }}
+            {{ preview_html|safe }}
         </div>
     </div>
-    {% endif %}
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        initializeEasyMDE({
+            elementId: "{{ form.content.auto_id }}",
+            initialValue: `{{ form.content.value|default_if_none:""|escapejs }}`,
+            csrfToken: "{{ csrf_token }}",
+            uploadUrl: "{% url 'upload_image' %}"
+        });
+    });
+</script>
 {% endblock %}

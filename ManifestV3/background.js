@@ -76,18 +76,22 @@ async function makeApiRequest(requestFunc) {
         return response;
     } catch (error) {
         const { logged_in } = await getUserInfo();
+        const task_id = await getCurrentTask();
+
         if (isConnected && logged_in) {
             isConnected = false;
-            broadcastToTabs({
-                command: 'display_message',
-                options: {
-                    id: 'connection-error-message',
-                    title: 'Connection Error',
-                    message: 'Please check your internet connection and the server status.',
-                    type: 'error',
-                    duration: 0
-                }
-            });
+            if (task_id > -1) {
+                broadcastToTabs({
+                    command: 'display_message',
+                    options: {
+                        id: 'connection-error-message',
+                        title: 'Connection Error',
+                        message: 'Please check your internet connection and the server status.',
+                        type: 'error',
+                        duration: 0
+                    }
+                });
+            }
         }
         if (error.message.startsWith("Server error:") || error instanceof TypeError) {
             chrome.action.setBadgeText({ text: 'err' });

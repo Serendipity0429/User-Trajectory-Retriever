@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% load task_manager_extras %}
+{% load static %}
 {% block title %} Pre-Task Annotation {% endblock %}
 
 {% block navbar_extra %}
@@ -9,6 +10,7 @@
 {% endblock %}
 
 {% block css %}
+<link href="{% static 'css/task_manager_overrides.css' %}" rel="stylesheet">
 <style>
 .question-in-header {
     display: none; /* Hidden by default */
@@ -105,7 +107,7 @@
                         <div class="mb-4 p-3 border rounded">
                             <h5><strong>3. Your Familiarity with the Topic</strong></h5>
                             <p>How familiar are you with the subject of this question?</p>
-                            <div class="btn-group" role="group" aria-label="Familiarity">
+                            <div class="btn-group w-100" role="group" aria-label="Familiarity">
                                 {% for key, value in FAMILIARITY_MAP.items %}
                                 <input type="radio" class="btn-check" name="familiarity" id="familiarity{{ key }}" value="{{ key }}" autocomplete="off" required>
                                 <label class="btn btn-outline-custom-dark-blue" for="familiarity{{ key }}" data-bs-toggle="tooltip" data-bs-placement="top" title="{{ FAMILIARITY_EXPLANATION_MAP|get_item:key }}">
@@ -120,7 +122,7 @@
                         <div class="mb-4 p-3 border rounded">
                             <h5><strong>4. Perceived Task Difficulty</strong></h5>
                             <p>How difficult do you think this task will be?</p>
-                            <div class="btn-group" role="group" aria-label="Difficulty">
+                            <div class="btn-group w-100" role="group" aria-label="Difficulty">
                                 {% for key, value in DIFFICULTY_MAP.items %}
                                 <input type="radio" class="btn-check" name="difficulty" id="difficulty{{ key }}" value="{{ key }}" autocomplete="off" required>
                                 <label class="btn btn-outline-custom-dark-blue" for="difficulty{{ key }}" data-bs-toggle="tooltip" data-bs-placement="top" title="{{ DIFFICULTY_EXPLANATION_MAP|get_item:key }}">
@@ -135,7 +137,7 @@
                         <div class="mb-4 p-3 border rounded">
                             <h5><strong>5. Estimated Time Commitment</strong></h5>
                             <p>Estimate the time you'll need for this task. This helps us understand the complexity of the task.</p>
-                            <div class="btn-group" role="group" aria-label="Effort">
+                            <div class="btn-group w-100" role="group" aria-label="Effort">
                                 {% for key, value in EFFORT_MAP.items %}
                                 <input type="radio" class="btn-check" name="effort" id="effort{{ key }}" value="{{ key }}" autocomplete="off" required>
                                 <label class="btn btn-outline-custom-dark-blue" for="effort{{ key }}" data-bs-toggle="tooltip" data-bs-placement="top" title="{{ EFFORT_EXPLANATION_MAP|get_item:key }}">

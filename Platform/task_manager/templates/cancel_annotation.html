@@ -1,7 +1,12 @@
 {% extends "base.html" %}
 {% load task_manager_extras %}
+{% load static %}
 
 {% block title %}Cancel Task{% endblock %}
+
+{% block css %}
+<link href="{% static 'css/task_manager_overrides.css' %}" rel="stylesheet">
+{% endblock %}
 
 {% block content %}
 <div class="container">

@@ -1,7 +1,12 @@
 {% extends "base.html" %}
 {% load task_manager_extras %}
+{% load static %}
 
 {% block title %}Reflection Annotation{% endblock %}
+
+{% block css %}
+<link href="{% static 'css/task_manager_overrides.css' %}" rel="stylesheet">
+{% endblock %}
 
 {% block content %}
 <div class="container">
@@ -127,7 +132,7 @@
                         <div class="mb-4 p-3 border rounded">
                             <h5><strong>5. Estimated Time Left</strong></h5>
                             <p>Please estimate how much more time you think you'll need to complete this task.</p>
-                            <div class="btn-group" role="group" aria-label="Effort">
+                            <div class="btn-group w-100" role="group" aria-label="Effort">
                                 {% for key, value in EFFORT_MAP.items %}
                                 <input type="radio" class="btn-check" name="estimated_time" id="effort{{ key }}" value="{{ key }}" autocomplete="off" required>
                                 <label class="btn btn-outline-primary" for="effort{{ key }}" data-bs-toggle="tooltip" data-bs-placement="top" title="{{ EFFORT_EXPLANATION_MAP|get_item:key }}">
@@ -141,7 +146,7 @@
                         <div class="mb-4 p-3 border rounded">
                             <h5><strong>6. Adjusted Difficulty</strong></h5>
                             <p>After this attempt, how would you rate the difficulty of the task?</p>
-                            <div class="btn-group" role="group" aria-label="Adjusted Difficulty">
+                            <div class="btn-group w-100" role="group" aria-label="Adjusted Difficulty">
                                 {% for key, value in DIFFICULTY_MAP.items %}
                                 <input type="radio" class="btn-check" name="adjusted_difficulty" id="adjusted_difficulty{{ key }}" value="{{ key }}" autocomplete="off" required>
                                 <label class="btn btn-outline-primary" for="adjusted_difficulty{{ key }}" data-bs-toggle="tooltip" data-bs-placement="top" title="{{ DIFFICULTY_EXPLANATION_MAP|get_item:key }}">

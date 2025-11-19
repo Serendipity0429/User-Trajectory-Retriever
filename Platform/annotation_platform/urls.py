@@ -23,3 +23,6 @@ if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
 handler404 = 'annotation_platform.views.custom_error_view'
+handler403 = 'annotation_platform.views.custom_permission_denied_view'
+handler400 = 'annotation_platform.views.custom_bad_request_view'
+handler500 = 'annotation_platform.views.custom_server_error_view'

@@ -167,6 +167,59 @@
     </div>
 
     <div class="card shadow-sm mb-4">
+        <div class="card-header" data-bs-toggle="collapse" href="#consentManagementCollapse" role="button" aria-expanded="true" aria-controls="consentManagementCollapse">
+            <i class="bi bi-shield-check me-2"></i>
+            Informed Consent Management
+        </div>
+        <div class="collapse show" id="consentManagementCollapse">
+            <div class="card-body">
+                <p>Update the informed consent form for all users. When a new version is published, all users will be required to re-consent.</p>
+                <a href="{% url 'user_system:manage_informed_consent' %}" class="btn btn-primary">Update Informed Consent</a>
+                <button type="button" class="btn btn-info" data-bs-toggle="modal" data-bs-target="#viewConsentModal">
+                    View Current Form
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal -->
+    <div class="modal fade" id="viewConsentModal" tabindex="-1" aria-labelledby="viewConsentModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="viewConsentModalLabel">Current Informed Consent</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p><strong>Version:</strong> <span id="consent-version"></span></p>
+                    <p><strong>Signed Users:</strong> <span id="consent-signed-users"></span></p>
+                    <hr>
+                    <div id="consent-content" style="white-space: pre-wrap;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        var viewConsentModal = document.getElementById('viewConsentModal')
+        viewConsentModal.addEventListener('show.bs.modal', function (event) {
+            fetch("{% url 'user_system:view_current_consent' %}")
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        document.getElementById('consent-version').textContent = 'N/A';
+                        document.getElementById('consent-signed-users').textContent = 'N/A';
+                        document.getElementById('consent-content').textContent = data.error;
+                    } else {
+                        document.getElementById('consent-version').textContent = data.version;
+                        document.getElementById('consent-signed-users').textContent = data.signed_users_count;
+                        document.getElementById('consent-content').textContent = data.content;
+                    }
+                });
+        });
+    });
+    </script>
+    <div class="card shadow-sm mb-4">
         <div class="card-header" data-bs-toggle="collapse" href="#userManagementCollapse" role="button" aria-expanded="true" aria-controls="userManagementCollapse">
             <i class="bi bi-people-fill me-2"></i>
             User Management

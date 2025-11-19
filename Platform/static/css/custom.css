@@ -575,9 +575,7 @@ h2.text-success {
     margin-bottom: 0;
 }
 
-h1, h2, h3, h4, h5, h6, b {
-    color: #021e4d;
-}
+
 
 .card-header h1, .card-header h2, .card-header h3, .card-header h4, .card-header h5, .card-header h6 {
     color: inherit;

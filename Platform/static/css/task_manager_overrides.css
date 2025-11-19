@@ -72,3 +72,25 @@ h1, h2, h3, h4, h5, h6, b {
 .card #query-form h5 {
     color: #021e4d;
 }
+
+
+input {
+    accent-color: #021e4d;
+}
+
+.task-process-container summary, .summary {
+    font-size: large; /* Larger text for summary */
+    font-weight: bold;
+    cursor: pointer;
+    padding: 5px 10px;
+    /* Using list-header style from your CSS */
+    background: #edeff1;
+    border-bottom: 2px solid #021e4d;
+    color: #021e4d;
+    list-style: none; /* Remove default arrow/marker */
+    display: block;
+}
+
+input {
+    accent-color: #021e4d;
+}

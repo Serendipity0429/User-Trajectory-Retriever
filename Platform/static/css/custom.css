@@ -674,10 +674,6 @@ div.question-wrapper > :not(.question-text, input, textarea) {
     min-width: 100%;
 }
 
-input {
-    accent-color: #021e4d;
-}
-
 label {
     margin-bottom: 0 !important;
 }

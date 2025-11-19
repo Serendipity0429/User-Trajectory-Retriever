@@ -363,7 +363,7 @@ def login(request):
             if request.session['login_attempts'] >= 2 and 'captcha' not in form.fields:
                 from captcha.fields import CaptchaField
                 form.fields['captcha'] = CaptchaField()
-                form.fields['captcha'].widget.attrs.update({'class': 'form-control', 'placeholder': 'Enter characters'})
+                form.fields['captcha'].widget.attrs.update({'class': 'form-control', 'placeholder': 'Enter captcha'})
 
             # If captcha error exists, update error message
             if 'captcha' in form.errors:
@@ -668,4 +668,11 @@ class UserSearchView(LoginRequiredMixin, UserPassesTestMixin, View):
                 'image_url': image_url
             })
         return JsonResponse(results, safe=False)
+
+
+def check_web_session(request):
+    if request.user.is_authenticated:
+        return JsonResponse({'status': 'authenticated', 'username': request.user.username})
+    else:
+        return JsonResponse({'status': 'anonymous'})
 

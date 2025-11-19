@@ -35,4 +35,5 @@ urlpatterns = [
     path('admin/extension_versions/', views.manage_extension_versions, name='manage_extension_versions'),
     path('admin/extension_versions/revert/', views.revert_latest_extension_version, name='revert_latest_extension_version'),
     path('search/', views.UserSearchView.as_view(), name='user_search'),
+    path('check_web_session/', views.check_web_session, name='check_web_session'),
 ]

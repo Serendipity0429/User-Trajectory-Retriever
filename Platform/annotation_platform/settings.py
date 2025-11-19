@@ -59,7 +59,9 @@ INSTALLED_APPS = [
 
 # Captcha Configuration
 CAPTCHA_OUTPUT_FORMAT = '%(hidden_field)s%(text_field)s%(image)s'
-CAPTCHA_FONT_SIZE = 30
+CAPTCHA_FONT_SIZE = 40
+CAPTCHA_LETTER_COLOR_FUNCT = 'annotation_platform.utils.random_color_func'
+CAPTCHA_IMAGE_SIZE = (150, 50)
 
 MESSAGE_TAGS = {
     messages.DEBUG: 'alert-info',
@@ -194,6 +196,9 @@ CSRF_TRUSTED_ORIGINS = [
     "http://101.6.41.59:32904",
 ]
 CSRF_TRUSTED_ORIGINS_REGEXES = [
+    r"^chrome-extension://.*$",
+]
+CORS_ALLOWED_ORIGIN_REGEXES = [
     r"^chrome-extension://.*$",
 ]
 

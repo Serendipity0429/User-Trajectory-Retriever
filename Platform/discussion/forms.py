@@ -55,7 +55,7 @@ class PostForm(forms.ModelForm):
         
         if require_captcha:
             self.fields['captcha'] = CaptchaField()
-            self.fields['captcha'].widget.attrs.update({'class': 'form-control', 'placeholder': 'Enter characters'})
+            self.fields['captcha'].widget.attrs.update({'class': 'form-control', 'placeholder': 'Enter captcha'})
 
 class CommentForm(forms.ModelForm):
     class Meta:

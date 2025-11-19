@@ -51,6 +51,7 @@ function initializeConfig() {
             base: URL_BASE,
             health_check: `${URL_BASE}/user/health_check/`,
             login: `${URL_BASE}/user/login/`,
+            logout: `${URL_BASE}/user/logout/`,
             token_login: `${URL_BASE}/api/user/token/login/`,
             token_refresh: `${URL_BASE}/api/user/token/refresh/`,
             data: `${URL_BASE}/task/data/`,
@@ -63,6 +64,7 @@ function initializeConfig() {
             add_justification: `${URL_BASE}/task/justification/add/`,
             get_justifications: `${URL_BASE}/task/justification/get`,
             check_pending_annotations: `${URL_BASE}/task/check_pending_annotations/`,
+            check_web_session: `${URL_BASE}/user/check_web_session/`,
             initial_page: "https://www.bing.com/",
         };
 
@@ -126,7 +128,7 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
             config.urls.health_check = `${URL_BASE}/user/health_check/`;
             config.urls.login = `${URL_BASE}/user/login/`;
             config.urls.token_login = `${URL_BASE}/api/user/token_login/`;
-            config.urls.token_refresh = `${URL_BASE}/api/user/toke//refresh/`;
+            config.urls.token_refresh = `${URL_BASE}/api/user/token/refresh/`;
             config.urls.data = `${URL_BASE}/task/data/`;
             config.urls.cancel = `${URL_BASE}/task/cancel_annotation/`;
             config.urls.active_task = `${URL_BASE}/task/active_task/`;
@@ -137,6 +139,7 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
             config.urls.add_justification = `${URL_BASE}/task/justification/add/`;
             config.urls.get_justifications = `${URL_BASE}/task/justification/get`;
             config.urls.check_pending_annotations = `${URL_BASE}/task/check_pending_annotations/`;
+            config.urls.check_web_session = `${URL_BASE}/user/check_web_session/`;
         }
     }
 });

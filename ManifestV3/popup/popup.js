@@ -234,6 +234,31 @@ function applyColors(mainColor, isDarkMode) {
 
 // --- API CALLS ---
 
+async function syncWebSession(extensionUsername, isLoginAction = false) {
+    const config = getConfig();
+    try {
+        const webSession = await _get(config.urls.check_web_session, 'json', true);
+        if (webSession.status === 'authenticated') {
+            const webUser = webSession.username;
+            if (extensionUsername !== webUser) {
+                if (isLoginAction) {
+                    // User just logged into Extension. Web is the "old" / conflicting one.
+                    await _get(config.urls.logout, 'text', true); 
+                    console.log(`Account mismatch (Ext: ${extensionUsername}, Web: ${webUser}). Logged out Web session.`);
+                } else {
+                    // Extension startup. 
+                    await showAlert(`Account mismatch detected. Web: ${webUser}, Extension: ${extensionUsername}. \nLogging out of extension to ensure consistency.`, "Account Sync");
+                    await handleLogout();
+                    return false; 
+                }
+            }
+        }
+    } catch (e) {
+        console.error("Failed to check web session:", e);
+    }
+    return true;
+}
+
 async function sendMessageFromPopup(message) {
     return new Promise((resolve, reject) => {
         if (!message.type) {
@@ -343,6 +368,7 @@ async function handleLoginAttempt(force = false) {
                 'logged_in': true
             });
             await sendMessageFromPopup({ command: "alter_logging_status", log_status: true });
+            await syncWebSession(username, true);
             const response = await sendMessageFromPopup({ command: "get_popup_data" });
             await showUserTab(response.task_id, response.task_info);
             chrome.action.setBadgeText({ text: 'off' });
@@ -933,6 +959,7 @@ async function testConnection(serverType) {
     });
 
     const response = await sendMessageFromPopup({ command: "get_popup_data" });
+
     if (response.log_status) {
         await showUserTab(response.task_id, response.task_info);
         const pendingBtn = document.getElementById('pendingAnnotationBtn');

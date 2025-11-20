@@ -851,7 +851,7 @@ def cancel_annotation(request, task_id):
 
         entry = task.content
         question = entry.question
-        answer = json.loads(entry.answer)
+        # answer = json.loads(entry.answer)
 
         # Fetch completed trials and their webpages
         trials = list(TaskTrial.objects.filter(belong_task=task).order_by('num_trial'))
@@ -906,7 +906,7 @@ def cancel_annotation(request, task_id):
                 "cur_user": user,
                 "task_id": task_id,
                 "question": question,
-                "answer": answer,
+                # "answer": answer,
                 "trials": trials,
                 "annotation_id": annotation_id,
                 "last_trial_duration": last_trial_duration,

@@ -123,7 +123,6 @@ def auth_redirect(request):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def data(request):
-    print_debug("function data")
     message = request.POST["message"]
     # decompress the message if it is compressed
     message = decompress_json_data(message)
@@ -136,7 +135,6 @@ def data(request):
 @api_view(["GET", "POST"])
 @permission_classes([IsAuthenticated])
 def pre_task_annotation(request):
-    print_debug("function pre_task_annotation")
     user = request.user
 
     pending_annotation_url = get_pending_annotation(user)
@@ -145,7 +143,6 @@ def pre_task_annotation(request):
 
     if request.method == "POST":
         # Start a new task
-        print_debug("start_task")
         task = Task()
         task.user = user
         task.active = True
@@ -298,11 +295,9 @@ def pre_task_annotation(request):
 @permission_classes([IsAuthenticated])
 @wait_until_data_stored
 def post_task_annotation(request, task_id):
-    print_debug("function post_task_annotation")
     user = request.user
     if request.method == "POST":
         # End a task
-        print_debug("end_task")
         task = Task.objects.filter(id=task_id, user=user).first()
         if task is not None:
             # Check if an annotation already exists to prevent duplicates
@@ -419,7 +414,6 @@ def post_task_annotation(request, task_id):
 @permission_classes([IsAuthenticated])
 def active_task(request):
     # Return active tasks
-    print_debug("active_task")
     user = request.user
 
     # Version check
@@ -447,7 +441,6 @@ def active_task(request):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def initialize(request):
-    print_debug("initialize")
 
     user = request.user
     # Delete all active tasks and relevant queries and pages
@@ -461,7 +454,6 @@ def initialize(request):
 @permission_classes([IsAuthenticated])
 @wait_until_data_stored
 def task_home(request):
-    print_debug("function task_home")
     user = request.user
     completed_num = len(Task.objects.filter(user=user, active=False))
     pending_num = len(Task.objects.filter(user=user, active=True))
@@ -526,7 +518,6 @@ def task_home(request):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def annotation_home(request):
-    print_debug("function annotation_home")
 
     user = request.user
     
@@ -630,7 +621,6 @@ def map_json_list(json_string, mapping):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def get_task_info(request):
-    print_debug("function get_task_info")
     user = request.user
     task_id = request.query_params.get("task_id")
     task = Task.objects.filter(id=task_id, user=user, active=True).first()
@@ -655,7 +645,6 @@ def show_task(request, task_id):
     webpages, submitted answers, reflections, and the post-task or cancellation survey.
     Allows access to the task owner or any superuser.
     """
-    print_debug(f"function show_task for task_id: {task_id}")
     user = request.user
     
     # Fetch the task by ID.
@@ -783,7 +772,6 @@ def show_task(request, task_id):
 
 @permission_classes([IsAuthenticated])
 def show_tool_use_page(request):
-    print_debug("function show_tool_use_page")
     user = request.user
     return render(
         request,
@@ -796,10 +784,7 @@ def show_tool_use_page(request):
 
 @permission_classes([IsAuthenticated])
 def tool_use(request):
-    print_debug("function tool_use")
     if request.method == "POST":
-        print_debug("tool_use")
-
         tool = request.POST["tool"]
 
         for_url = ""
@@ -1051,7 +1036,6 @@ def reflection_annotation(request, task_trial_id):
 @permission_classes([IsAuthenticated])
 @wait_until_data_stored
 def submit_answer(request, task_id):
-    print_debug("function submit_answer")
     user = request.user
 
     pending_annotation_url = get_pending_annotation(user)
@@ -1219,7 +1203,6 @@ def submit_answer(request, task_id):
 
 @permission_classes([IsAuthenticated])
 def remove_task(request, task_id):
-    print_debug("function remove_task")
     user = request.user
     task = Task.objects.filter(id=task_id, user=user).first()
     if task is None:
@@ -1425,6 +1408,5 @@ def dataset_qa_list(request):
     """
     Lists all dataset questions and answers for admin review.
     """
-    print_debug("function dataset_qa_list")
     datasets = TaskDataset.objects.prefetch_related('taskdatasetentry_set').all()
     return render(request, 'dataset_qa_list.html', {'datasets': datasets})

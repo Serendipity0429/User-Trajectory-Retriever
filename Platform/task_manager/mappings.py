@@ -92,8 +92,8 @@ CORRECTIVE_PLAN_MAP = {
 }
 
 AHA_MOMENT_MAP = {
-    "data_table": "Data Table / Chart",
     "direct_statement": "Direct Statement / Paragraph",
+    "data_table": "Data Table / Chart",
     "official_document": "Official Document / Report",
     "key_definition": "Key Definition / Concept",
     "synthesis": "Synthesizing Multiple Sources",

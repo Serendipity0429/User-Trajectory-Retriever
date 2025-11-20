@@ -374,7 +374,7 @@ def get_pending_annotation(user):
 
         # Check for pending reflection annotations
         pending_reflection_trials = TaskTrial.objects.filter(
-            belong_task__user=user, is_correct=False, reflectionannotation__isnull=True
+            belong_task__user=user, belong_task__cancelled=False, is_correct=False, reflectionannotation__isnull=True
         ).order_by('end_timestamp')
 
         if pending_reflection_trials.exists():

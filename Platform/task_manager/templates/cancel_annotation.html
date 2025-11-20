@@ -78,13 +78,13 @@
                         <div class="p-3 bg-light rounded mb-3 loaded-box">
                             <div class="question-text">{{ question }}</div>
                         </div>
-                        <div class="d-flex justify-content-between align-items-center">
+                        {% comment %} <div class="d-flex justify-content-between align-items-center">
                             <p class="mb-0"><span class="fw-bold">Correct Answer(s):</span></p>
                             <div class="mt-2">
                                 <a href="#" id="show-all-answers" class="btn btn-outline-secondary btn-sm" style="display: none;">Show all...</a>
                                 <a href="#" id="show-fewer-answers" class="btn btn-outline-secondary btn-sm" style="display: none;">Show fewer...</a>
                             </div>
-                        </div>
+                        </div> {% endcomment %}
                         <ul id="answer-list" class="list-group mt-2">
                             {% for item in answer %}
                             <li class="list-group-item">{{ item }}</li>

@@ -193,6 +193,10 @@ class ViewState {
     }
 
     startRecording() {
+        if (this._stop_rrweb_record_fn) {
+            this._stop_rrweb_record_fn();
+            this._stop_rrweb_record_fn = null;
+        }
         unitPage.initialize();
         this._stop_rrweb_record_fn = rrweb.record({
             emit(event) {
@@ -204,6 +208,14 @@ class ViewState {
             collectFonts: true, // NOTICE: enable font collection to capture custom fonts
         });
         printDebug("page", "rrweb recording started.");
+
+        // Notify iframes to start recording
+        const iframes = document.querySelectorAll('iframe');
+        iframes.forEach(iframe => {
+            if (iframe.contentWindow) {
+                iframe.contentWindow.postMessage({ type: 'start-recording' }, '*');
+            }
+        });
     }
 
     sendMessage() {
@@ -252,3 +264,4 @@ class ViewState {
 const unitPage = new UnitPage();
 const pageManager = new PageManager();
 const viewState = new ViewState(unitPage, pageManager);
+

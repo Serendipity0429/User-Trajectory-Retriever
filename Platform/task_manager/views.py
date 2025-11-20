@@ -40,6 +40,7 @@ from .models import (
     ExtensionVersion,
 )
 from .mappings import *
+from user_system.decorators import consent_exempt
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework_simplejwt.authentication import JWTAuthentication
@@ -381,7 +382,7 @@ def post_task_annotation(request, task_id):
 
         last_trial_duration = latest_trial.end_timestamp - latest_trial.start_timestamp
         total_duration = task.end_timestamp - task.start_timestamp if task.end_timestamp else None
-
+ 
         annotation_id = start_annotating(request, "post_task_annotation")
         return render(
             request,
@@ -409,6 +410,7 @@ def post_task_annotation(request, task_id):
 
 
 # Return active tasks
+@consent_exempt
 @api_view(["POST"])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAuthenticated])
@@ -618,6 +620,7 @@ def map_json_list(json_string, mapping):
         return []
 
 
+@consent_exempt
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def get_task_info(request):
@@ -1386,6 +1389,7 @@ def get_rrweb_record(request, webpage_id):
         return JsonResponse({"status": "error", "message": "An internal error occurred."}, status=500)
 
 
+@consent_exempt
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def check_pending_annotations(request):

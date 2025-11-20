@@ -37,7 +37,8 @@ async function initializeInIframe() {
             },
             recordCrossOriginIframes: true,
             recordCanvas: true,
-            // inlineImages: true,         
+            inlineStylesheet: true,
+            inlineImages: true,         
             collectFonts: true,
         });
         printDebug("iframe", "rrweb recording initialized in iframe.");

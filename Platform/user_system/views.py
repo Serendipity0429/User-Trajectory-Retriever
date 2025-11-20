@@ -33,6 +33,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from .forms import EditInfoForm, ForgetPasswordForm, ResetPasswordForm
 from .utils import send_reset_password_email
 from discussion.models import Bulletin, Post, Comment
+from .decorators import consent_exempt
 import markdown
 
 USER_SEARCH_RESULT_LIMIT = 8
@@ -382,6 +383,7 @@ def login(request):
     )
 
 
+@consent_exempt
 def informed_consent(request):
     latest_consent = InformedConsent.get_latest()
     
@@ -471,6 +473,7 @@ def signup(request):
     )
 
 
+@consent_exempt
 def logout(request):
     auth_logout(request)
     return HttpResponseRedirect(reverse('user_system:login'))

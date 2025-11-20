@@ -1,3 +1,31 @@
+let isStartRequested = false;
+let areChecksPassed = false;
+let isRecording = false;
+
+function startRecording() {
+    if (isRecording || !isStartRequested || !areChecksPassed) return;
+
+    isRecording = true;
+    rrweb.record({
+        emit(event) {
+            window.parent.postMessage(event, '*');
+        },
+        recordCrossOriginIframes: true,
+        recordCanvas: true,
+        inlineStylesheet: true,
+        inlineImages: true,
+        collectFonts: true,
+    });
+    printDebug("iframe", "rrweb recording initialized in iframe.");
+}
+
+window.addEventListener('message', (event) => {
+    if (event.data && event.data.type === 'start-recording') {
+        isStartRequested = true;
+        startRecording();
+    }
+});
+
 async function initializeInIframe() {
     try {
         await initializeConfig();
@@ -31,24 +59,25 @@ async function initializeInIframe() {
             return;
         }
 
-        rrweb.record({
-            emit(event) {
-                window.parent.postMessage(event, '*');
-            },
-            recordCrossOriginIframes: true,
-            recordCanvas: true,
-            inlineStylesheet: true,
-            inlineImages: true,         
-            collectFonts: true,
-        });
-        printDebug("iframe", "rrweb recording initialized in iframe.");
+        // Wait a bit for the iframe content to stabilize
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        areChecksPassed = true;
+        startRecording();
+
     } catch (error) {
         console.error("Error during iframe initialization:", error);
     }
 }
 
-document.addEventListener("DOMContentLoaded", () => {
+if (document.readyState === 'complete') {
     if (window.self !== window.top) {
         initializeInIframe();
     }
-});
+} else {
+    window.addEventListener("load", () => {
+        if (window.self !== window.top) {
+            initializeInIframe();
+        }
+    });
+}

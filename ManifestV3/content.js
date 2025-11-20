@@ -238,6 +238,7 @@ async function initialize() {
         // Not in the top frame, don't run initialization
         return;
     }
+    
     try {
         await initializeConfig(); // Ensure config is loaded before proceeding
 
@@ -252,6 +253,7 @@ async function initialize() {
 
         if (!login_response || !login_response.log_status) {
             printDebug("content", "User is not logged in. Exiting content script.");
+            unblockInteractions();
             return;
         }
 
@@ -259,8 +261,15 @@ async function initialize() {
 
         if (!getTaskStatus()) {
             printDebug("content", "No active task. Exiting content script.");
+            unblockInteractions();
             return;
         }
+
+        // Ensure blocking is active
+        blockInteractions();
+
+        // Wait a bit for the page to stabilize (frameworks hydration, etc.)
+        await new Promise(resolve => setTimeout(resolve, 500));
 
         // Monkey-patch history API for SPA navigation tracking
         (function (history) {
@@ -299,6 +308,7 @@ async function initialize() {
             };
         })(window.history);
 
+        unblockInteractions();
         viewState.initialize();
 
         if (!_is_server_page(_content_vars.url_now)) {
@@ -320,12 +330,16 @@ async function initialize() {
         await setupTaskUI();
         } catch (error) {
         console.error("Error during main initialization:", error);
+        unblockInteractions();
     }
 }
 
 // --- Event Listeners ---
-
-document.addEventListener("DOMContentLoaded", initialize);
+if (document.readyState === 'complete') {
+    initialize();
+} else {
+    window.addEventListener("load", initialize);
+}
 
 window.addEventListener('popstate', async () => {
     await initializeConfig(); // Ensure config is loaded
@@ -449,3 +463,27 @@ function applyMessageBoxStyle(style) {
         }
     }
 }
+
+// --- Interaction Blocking Logic ---
+function blockInteractions() {
+    if (document.getElementById('utrt-interaction-blocker')) return;
+    const blocker = document.createElement('div');
+    blocker.id = 'utrt-interaction-blocker';
+    blocker.classList.add('rr-block', 'rr-ignore');
+    blocker.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:2147483647;background:transparent;cursor:wait;';
+    
+    if (document.body) document.body.appendChild(blocker);
+    else if (document.documentElement) document.documentElement.appendChild(blocker);
+}
+
+function unblockInteractions() {
+    const blocker = document.getElementById('utrt-interaction-blocker');
+    if (blocker) blocker.remove();
+}
+
+// Immediate check on script load
+updateTaskStatus().then(() => {
+    if (getTaskStatus()) {
+        blockInteractions();
+    }
+});

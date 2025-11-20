@@ -368,9 +368,9 @@
             printDebug("general", "Event tracker initialized with " + (getConfig().is_passive_mode ? "passive" : "active") + " mode.");
         }
     };
-        // Defer initialization until the DOM is ready to avoid accessing null document.body
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', event_tracker.initialize.bind(event_tracker));
+        // Defer initialization until everything is ready to avoid accessing null elements
+        if (document.readyState === "complete") {
+            document.addEventListener("loaded", event_tracker.initialize.bind(event_tracker));
         } else {
             event_tracker.initialize();
         }

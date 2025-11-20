@@ -382,7 +382,7 @@ def post_task_annotation(request, task_id):
 
         last_trial_duration = latest_trial.end_timestamp - latest_trial.start_timestamp
         total_duration = task.end_timestamp - task.start_timestamp if task.end_timestamp else None
- 
+
         annotation_id = start_annotating(request, "post_task_annotation")
         return render(
             request,

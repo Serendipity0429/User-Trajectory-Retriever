@@ -432,7 +432,7 @@ function highlightElement(selector) {
     if (!el) return;
 
     // Create a unique ID for our style and overlay elements to avoid conflicts
-    const uniqueId = 'gemini-highlight-' + Date.now();
+    const uniqueId = 'utrt-highlight-' + Date.now();
 
     // 1. Get element's position
     const rect = el.getBoundingClientRect();

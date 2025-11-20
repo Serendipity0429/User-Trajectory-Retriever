@@ -181,7 +181,7 @@ def store_data(request, message, user):
             webpage.is_redirected = True
         
         webpage.during_annotation = state['is_annotating'] and not sent_when_active
-        webpage.annotation_name = state['annotation_name']
+        webpage.annotation_name = state['annotation_name'] if webpage.during_annotation else 'none'
         webpage.user = user
         
         webpage.belong_task = task

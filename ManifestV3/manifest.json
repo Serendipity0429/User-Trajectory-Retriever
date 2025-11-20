@@ -122,7 +122,6 @@
         "content.js"
       ],
       "css": [
-        "css/rrweb-player.css",
         "css/content.css"
       ],
       "run_at": "document_start",

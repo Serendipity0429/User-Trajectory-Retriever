@@ -65,7 +65,10 @@ accordions.forEach(function(collapseEl) {
                             const containerWidth = container.clientWidth * 0.9;
                             const screenRatio = window.innerHeight / window.innerWidth;
                             const calculatedHeight = containerWidth * screenRatio;
-                            new rrwebPlayer({
+                            
+                            const PlayerClass = (typeof rrwebPlayer === 'object' && rrwebPlayer.default) ? rrwebPlayer.default : rrwebPlayer;
+                            
+                            new PlayerClass({
                                 target: wrapper,
                                 props: {
                                     events: events,

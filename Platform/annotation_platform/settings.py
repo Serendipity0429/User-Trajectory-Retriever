@@ -194,6 +194,7 @@ CSRF_TRUSTED_ORIGINS = [
     "http://localhost:8080",
     "http://127.0.0.1:8000",
     "http://101.6.41.59:32904",
+    "chrome-extension://bbjnmhakmlafhniehkjmpcgfalppcjmf",
 ]
 CSRF_TRUSTED_ORIGINS_REGEXES = [
     r"^chrome-extension://.*$",

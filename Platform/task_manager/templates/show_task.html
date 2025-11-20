@@ -193,16 +193,17 @@
                                     </div>
                                     <div class="card-body p-4">
                                         <div class="row align-items-start">
-                                            <div class="col-md-8">
+                                            <div class="col-md-7">
                                                 <p class="mb-2"><strong>Your Answer:</strong></p>
                                                 <p class="bg-light p-2 rounded">{{ trial.answer|split:"-"|last|striptags }}</p>
                                             </div>
-                                            <div class="col-md-4">
+                                            <div class="col-md-5">
+                                                <br>
                                                 <p class="mb-2"><strong>Confidence:</strong> {{ CONFIDENCE_MAP|get_item:trial.confidence }}</p>
                                                 <p class="mb-2"><strong>Evidence Count:</strong> <span id="evidence-count-{{ trial.num_trial }}">{{ trial.justifications.all|length }}</span></p>
                                             </div>
                                         </div>
-                                        <div class="mt-3">
+                                        <div class="mt-1">
                                             <p class="mb-2">
                                                 <a class="justification-toggle text-decoration-none text-muted collapsed" data-bs-toggle="collapse" href="#justifications-{{ trial.num_trial }}" role="button" aria-expanded="false" aria-controls="justifications-{{ trial.num_trial }}">
                                                     <strong>Justifications:</strong>

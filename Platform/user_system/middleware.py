@@ -21,20 +21,22 @@ class EnforceConsentMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
-        from django.urls import reverse
+        response = self.get_response(request)
+        return response
+
+    def process_view(self, request, view_func, view_args, view_kwargs):
         from django.shortcuts import redirect
         from .models import InformedConsent
+
+        if getattr(view_func, 'consent_exempt', False):
+            return None
 
         if hasattr(request, 'user') and request.user.is_authenticated and not request.user.is_superuser:
             latest_consent = InformedConsent.get_latest()
             if latest_consent:
                 if request.user.agreed_consent_version != latest_consent or not request.user.consent_agreed:
-                    # Add exceptions for logout and consent pages
-                    if request.path not in [reverse('user_system:logout'), reverse('user_system:informed_consent')]:
-                        # Store the current path to redirect back after consent
-                        request.session['prev_page'] = request.get_full_path()
-                        # Redirect the user to the consent page
-                        return redirect('user_system:informed_consent')
-
-        response = self.get_response(request)
-        return response
+                    # Store the current path to redirect back after consent
+                    request.session['prev_page'] = request.get_full_path()
+                    # Redirect the user to the consent page
+                    return redirect('user_system:informed_consent')
+        return None

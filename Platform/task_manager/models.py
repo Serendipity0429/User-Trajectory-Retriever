@@ -127,7 +127,7 @@ class CancelAnnotation(models.Model):
 # Task Trial
 class TaskTrial(models.Model):
     start_timestamp = models.DateTimeField(auto_now_add=True)
-    end_timestamp = models.DateTimeField(auto_now=True)
+    end_timestamp = models.DateTimeField(null=True)
     num_trial = models.IntegerField()  # number of trials
 
     answer = models.CharField(max_length=1000, default='undefined')

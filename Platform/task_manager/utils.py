@@ -201,8 +201,6 @@ def store_data(request, message, user):
         state['last_webpage_id'] = webpage.id
         state['last_webpage_url'] = webpage.url
 
-    task.end_timestamp = timezone.make_aware(datetime.fromtimestamp(message['end_timestamp'] / 1000))
-    task.save()
     state['is_storing_data'] = False
     set_annotation_state(user_id, state)
     
@@ -326,8 +324,18 @@ def check_answer(entry, user_answer, llm = True):
     else:
         return check_answer_rule(question, authentic_answers, user_answer)
 
+from django.shortcuts import render
+
 def close_window():
     return HttpResponse('<html><body><script>window.close()</script></body></html>')
+
+def render_status_page(request, title, message, alert_type='info'):
+    context = {
+        'title': title,
+        'message': message,
+        'alert_type': alert_type,
+    }
+    return render(request, "status_page.html", context)
 
 def get_active_task_dataset(user=None):
     if user and not user.is_superuser:

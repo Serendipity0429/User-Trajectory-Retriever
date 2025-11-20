@@ -25,6 +25,7 @@ from .utils import (
     wait_until_data_stored,
     check_answer,
     get_pending_annotation,
+    render_status_page,
 )
 from .models import (
     TaskDataset,
@@ -150,12 +151,7 @@ def pre_task_annotation(request):
         entry_id = int(request.POST.get("entry_id"))
         entry = TaskDatasetEntry.objects.filter(id=entry_id).first()
         if entry is None:
-            context = {
-                'title': 'Not Found',
-                'message': f"No entry found with entry_id={entry_id}",
-                'alert_type': 'danger',
-            }
-            return render(request, "status_page.html", context)
+            return render_status_page(request, 'Not Found', f"No entry found with entry_id={entry_id}", 'danger')
         entry.num_associated_tasks += 1
         task.content = entry
         entry.save()
@@ -180,22 +176,12 @@ def pre_task_annotation(request):
 
     else:
         if Task.objects.filter(user=user, active=True).exists():
-            context = {
-                'title': 'Ongoing Task!',
-                'message': 'You already have an active task. Please complete or cancel it before starting a new one.',
-                'alert_type': 'warning',
-            }
-            return render(request, "status_page.html", context)
+            return render_status_page(request, 'Ongoing Task!', 'You already have an active task. Please complete or cancel it before starting a new one.', 'warning')
 
         # Randomly choose a task from the dataset
         dataset = get_active_task_dataset(user)
         if dataset is None:
-            context = {
-                'title': 'Not Found',
-                'message': 'No active dataset found.',
-                'alert_type': 'danger',
-            }
-            return render(request, "status_page.html", context)
+            return render_status_page(request, 'Not Found', 'No active dataset found.', 'danger')
         
         # Get IDs of entries the user has already interacted with
         interacted_entry_ids = Task.objects.filter(
@@ -231,12 +217,7 @@ def pre_task_annotation(request):
                 message = "You have completed all available tasks. Thank you!"
                 title = 'All Tasks Completed'
                 alert_type = 'success'
-            context = {
-                'title': title,
-                'message': message,
-                'alert_type': alert_type,
-            }
-            return render(request, "status_page.html", context)
+            return render_status_page(request, title, message, alert_type)
         print_debug(f"[Question] {entry.question}")
         print_debug(f"[Answer] {entry.answer}")
 
@@ -332,38 +313,18 @@ def post_task_annotation(request, task_id):
         # Fetch task and relevant webpages
         task = Task.objects.filter(id=task_id, user=user).first()
         if task is None:
-            context = {
-                'title': 'Task Not Found',
-                'message': f"No task found with task_id={task_id}",
-                'alert_type': 'danger',
-            }
-            return render(request, "status_page.html", context)
+            return render_status_page(request, 'Task Not Found', f"No task found with task_id={task_id}", 'danger')
 
         if task.cancelled:
-            context = {
-                'title': 'Task Cancelled',
-                'message': 'This task has been cancelled and can no longer be annotated.',
-                'alert_type': 'warning',
-            }
-            return render(request, "status_page.html", context)
+            return render_status_page(request, 'Task Cancelled', 'This task has been cancelled and can no longer be annotated.', 'warning')
 
         # Check if annotation already exists
         if PostTaskAnnotation.objects.filter(belong_task=task).exists():
-            context = {
-                'title': 'Annotation Already Completed!',
-                'message': 'You have already submitted the annotation for this task.',
-                'alert_type': 'success',
-            }
-            return render(request, "status_page.html", context)
+            return render_status_page(request, 'Annotation Already Completed!', 'You have already submitted the annotation for this task.', 'success')
 
         latest_trial = TaskTrial.objects.filter(belong_task=task).order_by('-num_trial').first()
         if not latest_trial or latest_trial.is_correct is not True:
-            context = {
-                'title': 'Annotation Not Ready!',
-                'message': 'This annotation cannot be completed yet. Please complete the previous steps of the task first.',
-                'alert_type': 'warning',
-            }
-            return render(request, "status_page.html", context)
+            return render_status_page(request, 'Annotation Not Ready!', 'This annotation cannot be completed yet. Please complete the previous steps of the task first.', 'warning')
 
         # Fetch trials and their relevant webpages
         trials = TaskTrial.objects.filter(belong_task=task).order_by('num_trial')
@@ -655,12 +616,7 @@ def show_task(request, task_id):
 
     # Check if the task exists and if the user has permission to view it.
     if task is None or (task.user != user and not user.is_superuser):
-        context = {
-            'title': 'Access Denied',
-            'message': f"No task found with task_id={task_id} or you do not have permission to view it.",
-            'alert_type': 'danger',
-        }
-        return render(request, "status_page.html", context)
+        return render_status_page(request, 'Access Denied', f"No task found with task_id={task_id} or you do not have permission to view it.", 'danger')
 
     # 1. Fetch general task information
     task_question = task.content.question
@@ -809,54 +765,85 @@ def tool_use(request):
 def cancel_annotation(request, task_id):
     print_debug("function cancel_annotation")
     user = request.user
-    task = Task.objects.filter(id=task_id, user=user).first()
-    if task is None:
-        context = {
-            'title': 'Task Not Found',
-            'message': f"No task found with task_id={task_id}",
-            'alert_type': 'danger',
-        }
-        return render(request, "status_page.html", context)
+    
+    # Initial check (read-only) to fail fast if task doesn't exist
+    if not Task.objects.filter(id=task_id, user=user).exists():
+        return render_status_page(request, 'Task Not Found', f"No task found with task_id={task_id}", 'danger')
 
     if request.method == "POST":
-        if CancelAnnotation.objects.filter(belong_task=task).exists():
-            print_debug(f"CancelAnnotation for task {task_id} already exists.")
+        with transaction.atomic():
+            # Lock the task for update to prevent race conditions
+            try:
+                task = Task.objects.select_for_update().get(id=task_id, user=user)
+            except Task.DoesNotExist:
+                # Should be caught by initial check, but safety first
+                return HttpResponse("Task not found", status=404)
+
+            if CancelAnnotation.objects.filter(belong_task=task).exists():
+                print_debug(f"CancelAnnotation for task {task_id} already exists.")
+                stop_annotating(request)
+                return close_window()
+
+            start_timestamp = task.start_timestamp
+            num_trial = task.num_trial
+            if num_trial > 0:
+                last_task_trial = TaskTrial.objects.filter(
+                    belong_task=task, num_trial=num_trial
+                ).first()
+                if last_task_trial:
+                    try:
+                        reflection = ReflectionAnnotation.objects.get(belong_task_trial=last_task_trial)
+                        start_timestamp = reflection.submission_timestamp
+                    except ReflectionAnnotation.DoesNotExist:
+                        start_timestamp = last_task_trial.end_timestamp
+            
+            current_trial_num = task.num_trial + 1
+            task_trial, created = TaskTrial.objects.get_or_create(
+                belong_task=task,
+                num_trial=current_trial_num,
+            )
+            task_trial.start_timestamp = start_timestamp
+            task_trial.end_timestamp = timezone.now()
+            task_trial.is_correct = False
+            task_trial.save()
+
+            task.num_trial = current_trial_num
+
+            all_webpages = Webpage.objects.filter(
+                belong_task=task, start_timestamp__gte=start_timestamp
+            )
+            for webpage in all_webpages:
+                webpage.belong_task_trial = task_trial
+                webpage.save()
+
+            task.cancelled = True
+            task.active = False
+            task.end_timestamp = task_trial.end_timestamp
+            
+            task.save()
+            cancel_annotation = CancelAnnotation()
+            cancel_annotation.belong_task = task
+            cancel_annotation.category = request.POST.getlist("cancel_category")
+            cancel_annotation.reason = request.POST.get("cancel_reason")
+            cancel_annotation.missing_resources = request.POST.get(
+                "cancel_missing_resources_list"
+            )
+            cancel_annotation.missing_resources_other = request.POST.get(
+                "cancel_missing_resources_other"
+            )
+            cancel_annotation.duration = request.POST.get("duration")
+            cancel_annotation.save()
+            
             stop_annotating(request)
             return close_window()
 
-        task.cancelled = True
-        task.active = False
-        
-        last_trial = TaskTrial.objects.filter(belong_task=task).order_by('-num_trial').first()
-        if last_trial:
-            task.end_timestamp = last_trial.end_timestamp
-        else:
-            task.end_timestamp = timezone.now()
-        
-        task.save()
-        cancel_annotation = CancelAnnotation()
-        cancel_annotation.belong_task = task
-        cancel_annotation.category = request.POST.getlist("cancel_category")
-        cancel_annotation.reason = request.POST.get("cancel_reason")
-        cancel_annotation.missing_resources = request.POST.get(
-            "cancel_missing_resources_list"
-        )
-        cancel_annotation.missing_resources_other = request.POST.get(
-            "cancel_missing_resources_other"
-        )
-        cancel_annotation.duration = request.POST.get("duration")
-        cancel_annotation.save()
-        stop_annotating(request)
-        return close_window()
-
     else:
+        task = Task.objects.filter(id=task_id, user=user).first()
+        if task is None:
+             return render_status_page(request, 'Task Not Found', f"No task found with task_id={task_id}", 'danger')
+
         if CancelAnnotation.objects.filter(belong_task=task).exists():
-            context = {
-                'title': 'Annotation Already Completed!',
-                'message': 'You have already submitted the annotation for this task.',
-                'alert_type': 'success',
-            }
-            return render(request, "status_page.html", context)
+            return render_status_page(request, 'Annotation Already Completed!', 'You have already submitted the annotation for this task.', 'success')
 
         task.end_timestamp = timezone.now()
         # NOTICE: Give user change to reconsider cancellation
@@ -939,29 +926,14 @@ def reflection_annotation(request, task_trial_id):
     user = request.user
     task_trial = TaskTrial.objects.filter(id=task_trial_id).first()
     if task_trial is None:
-        context = {
-            'title': 'Not Found',
-            'message': f"No trial found with id={task_trial_id}",
-            'alert_type': 'danger',
-        }
-        return render(request, "status_page.html", context)
+        return render_status_page(request, 'Not Found', f"No trial found with id={task_trial_id}", 'danger')
 
     task = task_trial.belong_task
     if task.user != user and not user.is_superuser:
-        context = {
-            'title': 'Access Denied',
-            'message': 'You do not have permission to view this page.',
-            'alert_type': 'danger',
-        }
-        return render(request, "status_page.html", context)
+        return render_status_page(request, 'Access Denied', 'You do not have permission to view this page.', 'danger')
 
     if task_trial.is_correct is not False:
-        context = {
-            'title': 'Annotation Not Ready!',
-            'message': 'This annotation cannot be completed yet. Please complete the previous steps of the task first.',
-            'alert_type': 'warning',
-        }
-        return render(request, "status_page.html", context)
+        return render_status_page(request, 'Annotation Not Ready!', 'This annotation cannot be completed yet. Please complete the previous steps of the task first.', 'warning')
 
     entry = task.content
     question = entry.question
@@ -990,12 +962,7 @@ def reflection_annotation(request, task_trial_id):
 
     else:
         if ReflectionAnnotation.objects.filter(belong_task_trial=task_trial).exists():
-            context = {
-                'title': 'Annotation Already Completed!',
-                'message': 'You have already submitted the annotation for this task.',
-                'alert_type': 'success',
-            }
-            return render(request, "status_page.html", context)
+            return render_status_page(request, 'Annotation Already Completed!', 'You have already submitted the annotation for this task.', 'success')
 
         # Filter the webpage whose timestamp is within the range of start_timestamp and timestamp
         end_datetime = task_trial.end_timestamp
@@ -1050,19 +1017,9 @@ def submit_answer(request, task_id):
             try:
                 task = Task.objects.select_for_update().get(id=task_id, user=user)
                 if task.cancelled:
-                    context = {
-                        'title': 'Task Cancelled',
-                        'message': 'This task has been cancelled and no new answers can be submitted.',
-                        'alert_type': 'warning',
-                    }
-                    return render(request, "status_page.html", context)
+                    return render_status_page(request, 'Task Cancelled', 'This task has been cancelled and no new answers can be submitted.', 'warning')
             except Task.DoesNotExist:
-                context = {
-                    'title': 'Task Not Found',
-                    'message': f"No task found with task_id={task_id}",
-                    'alert_type': 'danger',
-                }
-                return render(request, "status_page.html", context)
+                return render_status_page(request, 'Task Not Found', f"No task found with task_id={task_id}", 'danger')
 
             start_timestamp = task.start_timestamp
             num_trial = task.num_trial
@@ -1107,7 +1064,6 @@ def submit_answer(request, task_id):
             task.num_trial = current_trial_num
             task.save()
 
-            end_datetime = timezone.now()
             all_webpages = Webpage.objects.filter(
                 belong_task=task, start_timestamp__gte=start_timestamp
             )
@@ -1132,17 +1088,18 @@ def submit_answer(request, task_id):
                     except (Justification.DoesNotExist, ValueError):
                         pass
 
+            response = None
             if is_correct:
                 if PostTaskAnnotation.objects.filter(belong_task=task).exists():
-                    redirect_url = reverse("task_manager:status_page") + "?title=Annotation+Already+Completed%21&message=You+have+already+submitted+the+annotation+for+this+task.&alert_type=success"
+                    response = render_status_page(request, 'Annotation Already Completed!', 'You have already submitted the annotation for this task.', 'success')
                 else:
-                    redirect_url = reverse("task_manager:post_task_annotation", args=[task_id])
+                    response = HttpResponseRedirect(reverse("task_manager:post_task_annotation", args=[task_id]))
             else:
                 if ReflectionAnnotation.objects.filter(belong_task_trial=task_trial).exists():
-                    redirect_url = reverse("task_manager:status_page") + "?title=Annotation+Already+Completed%21&message=You+have+already+submitted+the+annotation+for+this+task.&alert_type=success"
+                    response = render_status_page(request, 'Annotation Already Completed!', 'You have already submitted the annotation for this task.', 'success')
                 else:
-                    redirect_url = reverse(
-                        "task_manager:reflection_annotation", args=[task_trial.id]
+                    response = HttpResponseRedirect(
+                        reverse("task_manager:reflection_annotation", args=[task_trial.id])
                     )
 
             for webpage in all_webpages:
@@ -1150,24 +1107,14 @@ def submit_answer(request, task_id):
                 webpage.save()
             stop_annotating(request)
 
-            return HttpResponseRedirect(redirect_url)
+            return response
     else:
         task = Task.objects.filter(id=task_id, user=user).first()
         if task is None:
-            context = {
-                'title': 'Task Not Found',
-                'message': f"No task found with task_id={task_id}",
-                'alert_type': 'danger',
-            }
-            return render(request, "status_page.html", context)
+            return render_status_page(request, 'Task Not Found', f"No task found with task_id={task_id}", 'danger')
         
         if task.cancelled:
-            context = {
-                'title': 'Task Cancelled',
-                'message': 'This task has been cancelled and can no longer be annotated.',
-                'alert_type': 'warning',
-            }
-            return render(request, "status_page.html", context)
+            return render_status_page(request, 'Task Cancelled', 'This task has been cancelled and can no longer be annotated.', 'warning')
         
         question = task.content.question
         start_timestamp = task.start_timestamp
@@ -1349,12 +1296,7 @@ def status_page(request):
     title = request.GET.get('title', 'Notice')
     message = request.GET.get('message', 'Something happened.')
     alert_type = request.GET.get('alert_type', 'info')
-    context = {
-        'title': title,
-        'message': message,
-        'alert_type': alert_type,
-    }
-    return render(request, "status_page.html", context)
+    return render_status_page(request, title, message, alert_type)
 
 
 @api_view(["GET"])

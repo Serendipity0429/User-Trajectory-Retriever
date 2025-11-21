@@ -134,14 +134,14 @@ async function displayQuestionBox(question) {
     const box = document.getElementById('task-question-box');
     if (box) {
         box.style.pointerEvents = 'none';
-        box.style.opacity = '0.9';
+        box.style.opacity = '0.8';
         
         questionBoxMousemoveListener = (e) => {
             const rect = box.getBoundingClientRect();
             if (e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom) {
                 box.style.opacity = '0';
             } else {
-                box.style.opacity = '0.9';
+                box.style.opacity = '0.8';
             }
         };
         document.addEventListener('mousemove', questionBoxMousemoveListener);
@@ -355,13 +355,6 @@ window.addEventListener('popstate', async () => {
     }
 });
 
-window.addEventListener('message', (event) => {
-    // Check if the message is from an iframe and is an rrweb event
-    if (event.source !== window && event.data && event.data.type) {
-        unitPage.addRRWebEvent(event.data);
-    }
-});
-
 chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
     // Handle messages from the background script
     if (message.command === 'get-element-details') {
@@ -482,8 +475,14 @@ function unblockInteractions() {
 }
 
 // Immediate check on script load
-updateTaskStatus().then(() => {
-    if (getTaskStatus()) {
-        blockInteractions();
+(async () => {
+    try {
+        await initializeConfig();
+        await updateTaskStatus();
+        if (getTaskStatus()) {
+            blockInteractions();
+        }
+    } catch (e) {
+        // console.error("Error in immediate task status check:", e);
     }
-});
+})();

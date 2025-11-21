@@ -64,6 +64,7 @@ from django.contrib.auth import login
 logger = logging.getLogger(__name__)
 
 
+@consent_exempt
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def stop_annotation_api(request):
@@ -496,7 +497,7 @@ def annotation_home(request):
         for task in tasks:
             tasks_to_webpages.append(
                 (
-                    task.id, 
+                    task, 
                     sorted(
                         Webpage.objects.filter(
                             user=user,

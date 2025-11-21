@@ -1,7 +1,6 @@
 /**
 * @fileoverview Manages page-specific data and events.
 */
-
 class Event {
     constructor(is_active, type, timestamp, screenX, screenY, clientX, clientY, tag, content, hierachy, related_info, annotation = null) {
         this.is_active = is_active;
@@ -164,7 +163,7 @@ class ViewState {
                 } else {
                     this.pageManager.pageInteract();
                     this.pageManager.initialize(); // If this is unset, the start timestamp will not update!
-                    if (window.rrweb) {
+                    if (rrweb) {
                         this.startRecording();
                     }
                 }
@@ -198,28 +197,23 @@ class ViewState {
             this._stop_rrweb_record_fn = null;
         }
         unitPage.initialize();
-        this._stop_rrweb_record_fn = rrweb.record({
-            emit(event) {
-                unitPage.addRRWebEvent(event);
-            },
-            recordCrossOriginIframes: true, // NOTICE: enable cross-origin iframe recording, which is under experimental stage
-            recordCanvas: true, // NOTICE: enable canvas recording, which is under experimental stage
-            // inlineImages: true, // NOTICE: enable image inlining to capture images as base64
-            collectFonts: true, // NOTICE: enable font collection to capture custom fonts
-        });
+        if (window.self === window.top) {
+            this._stop_rrweb_record_fn = rrweb.record({
+                emit(event) {
+                    unitPage.addRRWebEvent(event);
+                },
+                // recordCrossOriginIframes: true, // TODO: Add iframe support
+                recordCanvas: true, // NOTICE: enable canvas recording, which is under experimental stage
+                inlineImages: true, // NOTICE: enable image inlining to capture images as base64
+                inlineStylesheet: true,
+                collectFonts: true, // NOTICE: enable font collection to capture custom fonts
+            });
+        } 
         printDebug("page", "rrweb recording started.");
-
-        // Notify iframes to start recording
-        const iframes = document.querySelectorAll('iframe');
-        iframes.forEach(iframe => {
-            if (iframe.contentWindow) {
-                iframe.contentWindow.postMessage({ type: 'start-recording' }, '*');
-            }
-        });
     }
 
     sendMessage() {
-        if (this.is_sent || _is_server_page(_content_vars.url_now)) {
+        if (this.is_sent || _is_server_page(_content_vars.url_now) || window.self !== window.top) {
             return;
         }
 
@@ -255,6 +249,7 @@ class ViewState {
         if (this.is_sent) {
             return;
         }
+
         this.sendMessage();
         this.initialize();
         // Re-initialized rrweb when the user re-enter the page

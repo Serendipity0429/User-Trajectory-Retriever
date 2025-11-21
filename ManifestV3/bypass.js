@@ -27,7 +27,7 @@
     };
 
     document.addEventListener('selectstart', allowSelection, true);
-    document.addEventListener('mousedown', allowSelection, true);
+    // document.addEventListener('mousedown', allowSelection, true);
 
     // Function to add the style
     const addStyle = () => {

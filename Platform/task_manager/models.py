@@ -178,7 +178,7 @@ class Webpage(models.Model):
     )
 
 
-    title = models.CharField(max_length=512)
+    title = models.CharField(max_length=512, null=True)
     url = models.URLField(max_length=1000)
     referrer = models.URLField(max_length=1000)
     start_timestamp = models.DateTimeField()

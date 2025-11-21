@@ -240,7 +240,7 @@ async function sendInfo(message) {
     }
 }
 
-async function flush() {
+async function flushLocalStorage() {
     try {
         const items = await _get_local(null);
         const promises = [];
@@ -771,7 +771,7 @@ chrome.runtime.onStartup.addListener(async () => {
     await initializeConfig();
     printDebug("background", "Extension started up.");
     try {
-        await flush();
+        await flushLocalStorage();
         chrome.alarms.create(ALARM_CLEAR_STORAGE, { periodInMinutes: 1 });
         chrome.alarms.create(ALARM_CHECK_TASK, { delayInMinutes: 1, periodInMinutes: 5 });
     } catch (error) {

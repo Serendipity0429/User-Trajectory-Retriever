@@ -206,7 +206,7 @@ def store_data(request, message, user):
     
 def check_is_redirected_page(message):
     # A page is considered a redirect if the dwell time is very short (< 1000ms) or if there's no user interaction.
-    return message['dwell_time'] < 1000 or (message['mouse_moves'] == '[]' and message['rrweb_record'] == '[]' and message['event_list'] == '[]') or message['title'] == '' or 'redirect' in message['title'].lower()
+    return message['dwell_time'] < 1000 or (message['mouse_moves'] == '[]' and message['rrweb_record'] == '[]' and message['event_list'] == '[]') or message['title'] == '' or (message['title'] and 'redirect' in message['title'].lower())
 
 def wait_until_data_stored(func):
     def wrapper(*args, **kwargs):

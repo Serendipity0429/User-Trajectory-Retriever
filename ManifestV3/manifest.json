@@ -40,8 +40,8 @@
   "content_scripts": [
     {
       "matches": [
-        "http://*/*",
-        "https://*/*"
+        "<all_urls>",
+        "*://*/*"
       ],
       "exclude_matches": [
         "file:///*",
@@ -62,20 +62,8 @@
     },
     {
       "matches": [
-        "http://*/*",
-        "https://*/*"
-      ],
-      
-      "js": [
-        "scripts/rrweb.min.js"
-      ],
-      "run_at": "document_start",
-      "all_frames": true
-    },
-    {
-      "matches": [
-        "http://*/*",
-        "https://*/*"
+        "<all_urls>",
+        "*://*/*"
       ],
       "exclude_matches": [
         "file:///*",
@@ -89,20 +77,17 @@
         "https://101.6.41.59:32904/*"
       ],
       "js": [
-        "config.js",
-        "utils.js",
-        "iframe.js"
+        "scripts/rrweb.min.js"
       ],
       "run_at": "document_start",
       "all_frames": true
     },
     {
       "matches": [
-        "http://*/*",
-        "https://*/*"
+        "<all_urls>",
+        "*://*/*"
       ],
       "exclude_matches": [
-        "file:///*",
         "http://localhost/*",
         "https://localhost/*",
         "http://127.0.0.1/*",

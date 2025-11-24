@@ -180,11 +180,11 @@ class Webpage(models.Model):
 
     title = models.CharField(max_length=512, null=True)
     url = models.URLField(max_length=1000)
-    referrer = models.URLField(max_length=1000)
-    start_timestamp = models.DateTimeField()
-    end_timestamp = models.DateTimeField()
-    dwell_time = models.IntegerField()
-    page_switch_record = models.JSONField() # page switch record in JSON format
+    referrer = models.URLField(max_length=1000, null=True)
+    start_timestamp = models.DateTimeField(null=True)
+    end_timestamp = models.DateTimeField(null=True)
+    dwell_time = models.IntegerField(null=True)
+    page_switch_record = models.JSONField(null=True) # page switch record in JSON format
     mouse_moves = models.JSONField()  # mouse move data in JSON format
     event_list = models.JSONField()  # list of events in JSON format
     rrweb_record = models.JSONField()  # rrweb record in JSON forma

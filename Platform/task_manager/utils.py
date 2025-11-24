@@ -123,6 +123,7 @@ def store_data(request, message, user):
         state['is_storing_data'] = False
         set_annotation_state(user_id, state)
         return
+        
     task = Task.objects.filter(user=user, active=True).first()
     if not task:
         print_debug("No active task found for user", user.username)
@@ -130,73 +131,82 @@ def store_data(request, message, user):
         set_annotation_state(user_id, state)
         return
 
-    # Check for the most recent webpage for this task from Redis
+    def append_json_data_strings(existing_json_str, new_json_str):
+        if not existing_json_str or existing_json_str in ('[]', '{}'):
+            return new_json_str
+        if not new_json_str or new_json_str in ('[]', '{}'):
+            return existing_json_str
+        # Efficiently combine two JSON array strings
+        return existing_json_str[:-1] + ',' + new_json_str[1:]
+
     last_webpage_id = state.get('last_webpage_id')
     last_webpage_url = state.get('last_webpage_url')
     
-    sent_when_active = message.get('sent_when_active', False)
-    print_debug("Annotating:", state['is_annotating'] and not sent_when_active)  
-            
-    should_merge = False
+    webpage = None
     if last_webpage_id and last_webpage_url == message['url']:
-        should_merge = True
-
-    if should_merge:
         try:
-            last_webpage = Webpage.objects.get(id=last_webpage_id, belong_task=task)
-            last_webpage_is_annotating = last_webpage.during_annotation
-            if last_webpage_is_annotating == state['is_annotating']:
-                print_debug(f"Merging data for URL: {message['url']}")
-                last_webpage.end_timestamp = timezone.make_aware(datetime.fromtimestamp(message['end_timestamp'] / 1000))
-                last_webpage.dwell_time += message['dwell_time']
-                
-                # Append events, handling potential empty or invalid JSON
-                try:
-                    existing_events = json.loads(last_webpage.event_list) if last_webpage.event_list else []
-                    new_events = json.loads(message['event_list']) if message['event_list'] else []
-                    last_webpage.event_list = json.dumps(existing_events + new_events)
-                except json.JSONDecodeError:
-                    print_debug("Could not decode existing event_list, overwriting.")
-                    last_webpage.event_list = message['event_list']
-
-                try:
-                    existing_rrweb = json.loads(last_webpage.rrweb_record) if last_webpage.rrweb_record else []
-                    new_rrweb = json.loads(message['rrweb_record']) if message['rrweb_record'] else []
-                    last_webpage.rrweb_record = json.dumps(existing_rrweb + new_rrweb)
-                except json.JSONDecodeError:
-                    print_debug("Could not decode existing rrweb_record, overwriting.")
-                    last_webpage.rrweb_record = message['rrweb_record']
-                    
-                last_webpage.save()
-            else:
-                should_merge = False
+            webpage = Webpage.objects.get(id=last_webpage_id, belong_task=task)
         except Webpage.DoesNotExist:
-            should_merge = False # Fallback to create a new one
-    
-    if not should_merge:
+            pass  # Will create a new one
+
+    is_routine_update = message.get('is_routine_update', False)
+
+    if webpage:
+        # MERGE CASE: Append data to existing webpage record
+        print_debug(f"Merging data for URL: {message['url']}")
+        
+        webpage.rrweb_record = append_json_data_strings(webpage.rrweb_record, message.get('rrweb_record', '[]'))
+        webpage.event_list = append_json_data_strings(webpage.event_list, message.get('event_list', '[]'))
+        webpage.mouse_moves = append_json_data_strings(webpage.mouse_moves, message.get('mouse_moves', '[]'))
+
+        if not is_routine_update:
+            # This is a final message, so update all metadata.
+            webpage.title = message.get('title') or webpage.title
+            webpage.referrer = message.get('referrer') or webpage.referrer
+            
+            if message.get('end_timestamp'):
+                webpage.end_timestamp = timezone.make_aware(datetime.fromtimestamp(message['end_timestamp'] / 1000))
+            
+            webpage.dwell_time = message.get('dwell_time', webpage.dwell_time)
+            webpage.page_switch_record = message.get('page_switch_record', webpage.page_switch_record)
+
+        webpage.save()
+
+    else:
+        # CREATE CASE: Create a new webpage record
         print_debug(f"Creating new webpage entry for URL: {message['url']}")
         webpage = Webpage()
+        webpage.user = user
+        webpage.belong_task = task
+        webpage.url = message['url']
+        
+        webpage.title = message.get('title')
+        webpage.referrer = message.get('referrer')
+
+        start_ts = message.get('start_timestamp')
+        webpage.start_timestamp = timezone.make_aware(datetime.fromtimestamp(start_ts / 1000)) if start_ts else timezone.now()
+        
+        end_ts = message.get('end_timestamp')
+        webpage.end_timestamp = timezone.make_aware(datetime.fromtimestamp(end_ts / 1000)) if end_ts else webpage.start_timestamp
+
+        webpage.dwell_time = message.get('dwell_time', 0)
+        webpage.page_switch_record = message.get('page_switch_record', '[]')
+        webpage.mouse_moves = message.get('mouse_moves', '[]')
+        webpage.event_list = message.get('event_list', '[]')
+        
+        raw_rrweb = message.get('rrweb_record', '[]')
+        if isinstance(raw_rrweb, str):
+            webpage.rrweb_record = raw_rrweb.replace("</script>", "<\\/script>")
+        else:
+            webpage.rrweb_record = json.dumps(raw_rrweb).replace("</script>", "<\\/script>")
+
+        sent_when_active = message.get('sent_when_active', False)
+        webpage.during_annotation = state.get('is_annotating', False) and not sent_when_active
+        webpage.annotation_name = state.get('annotation_name', 'none') if webpage.during_annotation else 'none'
+        
         if check_is_redirected_page(message):
-            print_debug("Redirect detected, setting is_redirected to True")
             webpage.is_redirected = True
         
-        webpage.during_annotation = state['is_annotating'] and not sent_when_active
-        webpage.annotation_name = state['annotation_name'] if webpage.during_annotation else 'none'
-        webpage.user = user
-        
-        webpage.belong_task = task
-        webpage.title = message['title']
-        webpage.url = message['url']
-        webpage.referrer = message['referrer']
-        webpage.start_timestamp = timezone.make_aware(datetime.fromtimestamp(message['start_timestamp'] / 1000))
-        webpage.end_timestamp = timezone.make_aware(datetime.fromtimestamp(message['end_timestamp'] / 1000))
-        webpage.dwell_time = message['dwell_time']
-        webpage.page_switch_record = message['page_switch_record']
-        webpage.mouse_moves = message['mouse_moves']
-        webpage.event_list = message['event_list']
-        webpage.rrweb_record = message['rrweb_record'].replace(
-                    "</script>", "<\\/script>"
-            )
         webpage.save()
         state['last_webpage_id'] = webpage.id
         state['last_webpage_url'] = webpage.url

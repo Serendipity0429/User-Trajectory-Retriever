@@ -18,5 +18,6 @@ class Message {
         this.event_list = "";
         this.rrweb_record = "";
         this.sent_when_active = false;
+        this.is_routine_update = false;
     }
 }

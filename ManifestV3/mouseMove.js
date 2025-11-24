@@ -67,7 +67,7 @@ const mouseRecord = {
         return [...this.movePath, ...this.scrollPath];
     },
 
-    clear() {
+    clearData() {
         this.movePath = [];
         this.scrollPath = [];
     }

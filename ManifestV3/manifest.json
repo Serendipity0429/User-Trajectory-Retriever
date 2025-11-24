@@ -20,7 +20,6 @@
     "storage",
     "cookies",
     "notifications",
-    "history",
     "scripting",
     "alarms",
     "contextMenus"
@@ -40,11 +39,9 @@
   "content_scripts": [
     {
       "matches": [
-        "<all_urls>",
         "*://*/*"
       ],
       "exclude_matches": [
-        "file:///*",
         "http://localhost/*",
         "https://localhost/*",
         "http://127.0.0.1/*",
@@ -62,11 +59,9 @@
     },
     {
       "matches": [
-        "<all_urls>",
         "*://*/*"
       ],
       "exclude_matches": [
-        "file:///*",
         "http://localhost/*",
         "https://localhost/*",
         "http://127.0.0.1/*",
@@ -84,7 +79,6 @@
     },
     {
       "matches": [
-        "<all_urls>",
         "*://*/*"
       ],
       "exclude_matches": [

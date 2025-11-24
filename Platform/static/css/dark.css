@@ -1,10 +1,11 @@
 /* Dark Mode Overrides */
 :root.dark-mode {
-    --bs-body-bg: #2a2a2a; /* Lighter background */
-    --bs-body-color: #e0e0e0;
+    --bs-body-bg: #2a2a2a;
+    --bs-body-bg-light: #303133;  /* Lighter background */
+    --bs-body-color: #f6f6f6;
     --bs-border-color: #444;
-    --primary-accent-color: #8AC7DB;
-    --secondary-accent-color: #3c90ac;
+    --primary-accent-color: #6A8EAE; /* Elegant Slate Blue */
+    --secondary-accent-color: #4A6A80; /* Deeper Muted Blue */
     --dark-color: #212529;
 }
 
@@ -17,9 +18,9 @@
 .dark-mode .list-group-item,
 .dark-mode .accordion-item,
 .dark-mode .modal-content {
-    background-color: #343434 !important; /* Lighter component background */
-    border: 1px solid var(--bs-border-color) !important;
-    color: var(--bs-body-color) !important;
+    background-color: var(--bs-body-bg-light);
+    border: 1px solid var(--bs-border-color);
+    color: var(--bs-body-color);
 }
 
 .dark-mode .navbar,
@@ -32,16 +33,17 @@
 }
 
 .dark-mode #sidebar ul li a:hover, .dark-mode #sidebar ul li.active > a:hover {
-    color: #343a40 !important;
+    color: var(--bs-body-bg-light) !important;
 }
 
 .dark-mode a:not(.btn-view-task) {
-    color: var(--primary-accent-color);
+    /* color: var(--primary-accent-color); */
+    color: white !important;
 }
 
-.dark-mode a:not(.btn-view-task):hover {
+/* .dark-mode a:not(.btn-view-task):hover {
     color: #a0d1e2;
-}
+} */
 
 .dark-mode #sidebar a,
 .dark-mode #sidebar p {
@@ -74,7 +76,7 @@
 }
 
 .dark-mode .bg-light {
-    background-color: #343a40 !important;
+    background-color: var(--bs-body-bg-light) !important;
 }
 
 .dark-mode .form-control {
@@ -116,8 +118,9 @@
 .dark-mode .btn-primary-custom:not(.btn-view-task) {
     background-color: var(--primary-accent-color) !important;
     border-color: var(--primary-accent-color) !important;
-    color: #212529 !important;
+    color: var(--bs-body-color) !important;
 }
+
 
 .dark-mode .btn-primary-custom:not(.btn-view-task):hover {
     background-color: #a0d1e2 !important;
@@ -157,7 +160,7 @@
 
 .dark-mode .btn-link {
     color: var(--primary-accent-color) !important;
-}
+}   
 
 
 .dark-mode .drag-option:hover {
@@ -202,13 +205,13 @@
 }
 
 .dark-mode .tooltip .tooltip-inner {
-    background-color: #343a40;
+    background-color: var(--bs-body-bg-light);
     color: #fff;
     border: 1px solid #555;
 }
 
 .dark-mode .tooltip .tooltip-arrow::before {
-    border-top-color: #343a40;
+    border-top-color: var(--bs-body-bg-light);
 }
 
 /* Success colors for dark mode */
@@ -429,4 +432,113 @@
 
 .dark-mode .text-danger {
     color: #ea7171 !important;
+}
+
+.dark-mode .editor-preview {
+    background-color: var(--bs-body-bg);
+}
+
+
+.dark-mode .CodeMirror, .dark-mode .editor-toolbar {
+    background-color: var(--bs-body-bg-light);
+    color: var(--bs-body-color);
+}
+
+/* Bootstrap Button Overrides for Dark Mode */
+.dark-mode .btn-primary {
+    background-color: var(--primary-accent-color) !important;
+    border-color: var(--primary-accent-color) !important;
+    color: var(--bs-body-color) !important;
+}
+
+.dark-mode .btn-primary:hover {
+    background-color: #a0d1e2 !important; /* Slightly lighter primary accent on hover */
+    border-color: #a0d1e2 !important;
+}
+
+.dark-mode .btn-secondary:hover {
+    background-color: #5a6268 !important; /* Darker secondary on hover */
+    border-color: #5a6268 !important;
+}
+
+.dark-mode .btn-info {
+    background-color: #17a2b8 !important; /* Bootstrap info color */
+    border-color: #17a2b8 !important;
+    color: #fff !important;
+}
+
+.dark-mode .btn-info:hover {
+    background-color: #138496 !important;
+    border-color: #138496 !important;
+}
+
+.dark-mode .btn-success {
+    background-color: #28a745 !important; /* Bootstrap success color */
+    border-color: #28a745 !important;
+    color: #fff !important;
+}
+
+.dark-mode .btn-success:hover {
+    background-color: #218838 !important;
+    border-color: #218838 !important;
+}
+
+.dark-mode .btn-warning {
+    background-color: #ffc107 !important; /* Bootstrap warning color */
+    border-color: #ffc107 !important;
+    color: var(--dark-color) !important; /* Dark text for warning */
+}
+
+.dark-mode .btn-warning:hover {
+    background-color: #e0a800 !important;
+    border-color: #e0a800 !important;
+}
+
+.dark-mode .btn-danger {
+    background-color: #dc3545 !important; /* Bootstrap danger color */
+    border-color: #dc3545 !important;
+    color: #fff !important;
+}
+
+.dark-mode .btn-danger:hover {
+    background-color: #c82333 !important;
+    border-color: #c82333 !important;
+}
+
+.dark-mode .btn-light {
+    background-color: var(--bs-body-bg-light) !important;
+    border-color: var(--bs-border-color) !important;
+    color: var(--bs-body-color) !important;
+}
+
+.dark-mode .btn-light:hover {
+    background-color: #5a6268 !important; /* Darker secondary on hover */
+    border-color: #5a6268 !important;
+}
+
+
+.dark-mode .fa {
+    color: var(--bs-body-color) !important
+}
+
+.dark-mode .page-link {
+    color: var(--bs-body-color) !important;
+    background-color: var(--bs-body-bg) !important;
+    border-color: #444 !important;
+}
+
+.dark-mode .page-link:hover {
+    color: var(--primary-accent-color) !important;
+    background-color: var(--bs-body-bg-light) !important;
+    border-color: #444 !important;
+}
+
+.dark-mode .page-item.active .page-link {
+    background-color: var(--primary-accent-color) !important;
+    border-color: var(--primary-accent-color) !important;
+    color: var(--bs-body-color) !important;
+}
+
+.dark-mode button.active .fa, .dark-mode button.active:hover .fa {
+    color: var(--bs-body-bg) !important;
 }

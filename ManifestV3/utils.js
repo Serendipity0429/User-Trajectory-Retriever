@@ -322,8 +322,52 @@ function broadcastToTabs(message) {
     });
 }
 
+const hoverableMessageBoxManager = {
+    boxes: new Set(),
+    listener: null,
+
+    add(box) {
+        this.boxes.add(box);
+        if (!this.listener) {
+            this.startListening();
+        }
+    },
+
+    remove(box) {
+        this.boxes.delete(box);
+        if (this.boxes.size === 0) {
+            this.stopListening();
+        }
+    },
+
+    startListening() {
+        this.listener = throttleManager.get('messageBoxHover', (e) => {
+            this.boxes.forEach(box => {
+                if (!document.body.contains(box)) {
+                    this.remove(box);
+                    return;
+                }
+                const rect = box.getBoundingClientRect();
+                if (e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom) {
+                    box.style.opacity = '0';
+                } else {
+                    box.style.opacity = '0.8';
+                }
+            });
+        }, 50);
+        document.addEventListener('mousemove', this.listener);
+    },
+
+    stopListening() {
+        if (this.listener) {
+            document.removeEventListener('mousemove', this.listener);
+            this.listener = null;
+        }
+    }
+};
+
 async function displayMessageBox(options) {
-    const { message, innerHTML, title = '', type = 'info', duration = 3000, id = null, css = '' } = options;
+    const { message, innerHTML, title = '', type = 'info', duration = 3000, id = null, css = '', hoverable = true } = options;
     
     if (id && document.getElementById(id)) {
         return; // Don't display if a box with the same ID already exists
@@ -396,6 +440,7 @@ async function displayMessageBox(options) {
         transition: opacity 0.5s ease-in-out, width 0.3s ease, height 0.3s ease, top 0.3s ease, left 0.3s ease;
         font-family: 'Noto Sans SC', sans-serif !important;
         word-wrap: break-word;
+        ${hoverable ? 'pointer-events: none;' : ''}
         ${css}
     `;
 
@@ -427,12 +472,23 @@ async function displayMessageBox(options) {
 
     document.body.appendChild(box);
 
-    setTimeout(() => { box.style.opacity = '0.9'; }, 10);
+    setTimeout(() => {
+        box.style.opacity = hoverable ? '0.8' : '0.9';
+    }, 10);
+
+    if (hoverable) {
+        hoverableMessageBoxManager.add(box);
+    }
 
     if (duration > 0) {
         setTimeout(() => {
             box.style.opacity = '0';
-            setTimeout(() => { box.remove(); }, 500);
+            setTimeout(() => {
+                if (hoverable) {
+                    hoverableMessageBoxManager.remove(box);
+                }
+                box.remove();
+            }, 500);
         }, duration);
     }
 }
@@ -441,6 +497,7 @@ function removeMessageBox(id) {
     if (!id || !document) return; // safety check
     const box = document.getElementById(id);
     if (box) {
+        hoverableMessageBoxManager.remove(box);
         box.style.opacity = '0';
         setTimeout(() => { box.remove(); }, 500);
     }
@@ -497,3 +554,49 @@ function colorDistance(hex1, hex2) {
 function rgbToHex(r, g, b) {
     return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1).toUpperCase();
 }
+
+class ThrottledFunctionManager {
+    constructor() {
+        this.functions = {};
+    }
+
+    get(key, func, throttleMs) {
+        if (!this.functions[key]) {
+            this.functions[key] = this._createThrottledFunction(func, throttleMs, key);
+        }
+        return this.functions[key];
+    }
+
+    _createThrottledFunction(func, throttleMs, key) {
+        let lastCall = 0;
+        let cachedPromise = null;
+        let isRunning = false;
+
+        return async (...args) => {
+            const now = Date.now();
+            if (isRunning) {
+                printDebug("ThrottledManager", `Function ${key} is already running. Returning cached promise.`);
+                return cachedPromise;
+            }
+
+            if (now - lastCall < throttleMs) {
+                printDebug("ThrottledManager", `Function ${key} was called too recently. Returning cached promise.`);
+                return cachedPromise;
+            }
+            
+            lastCall = now;
+            isRunning = true;
+            
+            try {
+                cachedPromise = func(...args);
+                const result = await cachedPromise;
+                lastCall = Date.now(); // Reset timer only on successful completion
+                return result;
+            } finally {
+                isRunning = false;
+            }
+        };
+    }
+}
+
+const throttleManager = new ThrottledFunctionManager();

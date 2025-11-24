@@ -109,14 +109,14 @@ def admin_page(request):
         user_sort_dir = 'asc'
     user_order = f"{'-' if user_sort_dir == 'desc' else ''}{user_sort_by}"
 
+    user_list_query = User.objects.all()
     if user_search_query:
-        users_list = User.objects.filter(
+        user_list_query = user_list_query.filter(
             Q(username__icontains=user_search_query) |
             Q(email__icontains=user_search_query) |
             Q(profile__name__icontains=user_search_query)
-        ).order_by(user_order)
-    else:
-        users_list = User.objects.all().order_by(user_order)
+        )
+    users_list = user_list_query.order_by(user_order)
 
     user_paginator = Paginator(users_list, 10)
     user_page_number = request.GET.get('user_page')
@@ -132,7 +132,7 @@ def admin_page(request):
         task_sort_dir = 'asc'
     task_order = f"{'-' if task_sort_dir == 'desc' else ''}{task_sort_by}"
 
-    tasks_list = Task.objects.all()
+    tasks_list = Task.objects.select_related('user').all()
     if task_user_filter:
         tasks_list = tasks_list.filter(user__id=task_user_filter)
     if task_date_start_filter:
@@ -145,67 +145,44 @@ def admin_page(request):
     task_page_number = request.GET.get('task_page')
     tasks = task_paginator.get_page(task_page_number)
 
-    if request.GET.get('ajax'):
-        tasks_data = []
-        for task in tasks:
-            status_badge = ''
-            if task.cancelled:
-                status_badge = '<span class="badge bg-danger">Cancelled</span>'
-            elif not task.active:
-                status_badge = '<span class="badge bg-success">Completed</span>'
-            else:
-                status_badge = '<span class="badge bg-warning">Active</span>'
-            
-            tasks_data.append({
-                'id': task.id,
-                'user': task.user.username,
-                'start_timestamp': task.start_timestamp.strftime("%Y-%m-%d %H:%M:%S"),
-                'status_badge': status_badge,
-            })
-        return JsonResponse({'tasks': tasks_data})
+    context = {
+        'users': users,
+        'user_search_query': user_search_query,
+        'user_sort_by': user_sort_by,
+        'user_sort_dir': user_sort_dir,
+        'tasks': tasks,
+        'task_user_filter': task_user_filter,
+        'task_date_start_filter': task_date_start_filter,
+        'task_date_end_filter': task_date_end_filter,
+        'task_sort_by': task_sort_by,
+        'task_sort_dir': task_sort_dir,
+    }
 
-    # Dashboard metrics
-    total_users = User.objects.count()
-    superusers = User.objects.filter(is_superuser=True).count()
-    thirty_days_ago = timezone.now() - timedelta(days=30)
-    active_users = User.objects.filter(last_login__gte=thirty_days_ago).count()
-    total_tasks = Task.objects.count()
-    completed_tasks = Task.objects.filter(cancelled=False, active=False).count()
-    cancelled_tasks = Task.objects.filter(cancelled=True).count()
-    active_tasks = Task.objects.filter(active=True).count()
-    total_bulletins = Bulletin.objects.count()
-    total_posts = Post.objects.count()
-    total_comments = Comment.objects.count()
+    if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+        partial_target = request.GET.get('partial')
+        if partial_target == 'user-table-container':
+            return render(request, 'partials/_user_table.html', context)
+        elif partial_target == 'task-table-container':
+            # Add all_users to context for the filter dropdown in the partial
+            context['all_users'] = User.objects.all()
+            return render(request, 'partials/_task_table.html', context)
 
-    all_users = User.objects.all()
+    # Dashboard metrics for full page load
+    context.update({
+        'total_users': User.objects.count(),
+        'superusers': User.objects.filter(is_superuser=True).count(),
+        'active_users': User.objects.filter(last_login__gte=timezone.now() - timedelta(days=30)).count(),
+        'total_tasks': Task.objects.count(),
+        'completed_tasks': Task.objects.filter(cancelled=False, active=False).count(),
+        'cancelled_tasks': Task.objects.filter(cancelled=True).count(),
+        'active_tasks': Task.objects.filter(active=True).count(),
+        'total_bulletins': Bulletin.objects.count(),
+        'total_posts': Post.objects.count(),
+        'total_comments': Comment.objects.count(),
+        'all_users': User.objects.all(),
+    })
 
-    return render(
-        request,
-        'admin_page.html',
-        {
-            'users': users,
-            'user_search_query': user_search_query,
-            'user_sort_by': user_sort_by,
-            'user_sort_dir': user_sort_dir,
-            'tasks': tasks,
-            'all_users': all_users,
-            'task_user_filter': task_user_filter,
-            'task_date_start_filter': task_date_start_filter,
-            'task_date_end_filter': task_date_end_filter,
-            'task_sort_by': task_sort_by,
-            'task_sort_dir': task_sort_dir,
-            'total_users': total_users,
-            'superusers': superusers,
-            'active_users': active_users,
-            'total_tasks': total_tasks,
-            'completed_tasks': completed_tasks,
-            'cancelled_tasks': cancelled_tasks,
-            'active_tasks': active_tasks,
-            'total_bulletins': total_bulletins,
-            'total_posts': total_posts,
-            'total_comments': total_comments,
-        }
-    )
+    return render(request, 'admin_page.html', context)
 
 
 @csrf_exempt
@@ -214,7 +191,6 @@ def token_login(request):
         return JsonResponse({'error': 'Only POST method is allowed'}, status=405)
 
     try:
-        print_debug(request.POST)
         username = request.POST.get('username')
         password = request.POST.get('password')
         force_login = request.POST.get('force', 'false').lower() == 'true'

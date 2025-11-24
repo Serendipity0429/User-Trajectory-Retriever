@@ -15,7 +15,9 @@
             <form method="post">
                 {% csrf_token %}
                 <div class="mb-3">
-                    <textarea name="{{ form.content.name }}" class="form-control" id="{{ form.content.auto_id }}">{{ form.content.value|default_if_none:'' }}</textarea>
+                    <textarea name="{{ form.content.name }}" class="form-control" id="{{ form.content.auto_id }}">
+
+                    </textarea>
                     {% if form.content.errors %}
                         <div class="invalid-feedback d-block">
                             {{ form.content.errors.as_text }}
@@ -44,13 +46,11 @@
 
 {% block scripts %}
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        initializeEasyMDE({
-            elementId: "{{ form.content.auto_id }}",
-            initialValue: `{{ form.content.value|default_if_none:""|escapejs }}`,
-            csrfToken: "{{ csrf_token }}",
-            uploadUrl: "{% url 'upload_image' %}"
-        });
+    const easyMDE = initializeEasyMDE({
+        elementId: "{{ form.content.auto_id }}",
+        initialValue: `{{ form.content.value|default_if_none:""|escapejs }}`,
+        csrfToken: "{{ csrf_token }}",
+        uploadUrl: "{% url 'upload_image' %}"
     });
 </script>
 {% endblock %}

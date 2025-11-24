@@ -43,7 +43,7 @@ function initializeEasyMDE(config) {
         },
     });
 
-    easyMDE.toggleSideBySide();
+    easyMDE.toggleSideBySide(); 
 
     return easyMDE;
 }

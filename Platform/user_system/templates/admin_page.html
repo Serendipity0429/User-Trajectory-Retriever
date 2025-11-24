@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% load query_extras %}
+{% load static %}
 
 {% block title %}Admin Page - User Management{% endblock %}
 
@@ -186,7 +187,7 @@
     </div>
 
     <!-- Modal -->
-    <div class="modal fade" id="viewConsentModal" tabindex="-1" aria-labelledby="viewConsentModalLabel" aria-hidden="true">
+    <div class="modal fade" id="viewConsentModal" tabindex="-1" aria-labelledby="viewConsentModalLabel" aria-hidden="true" data-url="{% url 'user_system:view_current_consent' %}">
         <div class="modal-dialog modal-xl">
             <div class="modal-content">
                 <div class="modal-header">
@@ -235,28 +236,6 @@
             </div>
         </div>
     </div>
-    <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        var viewConsentModal = document.getElementById('viewConsentModal')
-        viewConsentModal.addEventListener('show.bs.modal', function (event) {
-            fetch("{% url 'user_system:view_current_consent' %}")
-                .then(response => response.json())
-                .then(data => {
-                    if (data.error) {
-                        document.getElementById('consent-version').textContent = 'N/A';
-                        document.getElementById('consent-date').textContent = 'N/A';
-                        document.getElementById('consent-stats').textContent = 'N/A';
-                        document.getElementById('consent-content').innerHTML = `<div class="text-danger p-3">${data.error}</div>`;
-                    } else {
-                        document.getElementById('consent-version').textContent = `v${data.version}`;
-                        document.getElementById('consent-date').textContent = data.created_at;
-                        document.getElementById('consent-stats').textContent = `${data.signed_users_count} / ${data.total_users_count}`;
-                        document.getElementById('consent-content').innerHTML = data.content;
-                    }
-                });
-        });
-    });
-    </script>
     <div class="card shadow-sm mb-4">
         <div class="card-header" data-bs-toggle="collapse" href="#userManagementCollapse" role="button" aria-expanded="true" aria-controls="userManagementCollapse">
             <i class="bi bi-people-fill me-2"></i>
@@ -313,115 +292,5 @@
         </div>
     </div>
 </div>
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const userManagementContainer = document.getElementById('userManagementCollapse');
-
-    function updateContainer(url, containerId) {
-        const container = document.getElementById(containerId);
-        if (!container) return;
-
-        const ajaxUrl = new URL(url, window.location.origin);
-        ajaxUrl.searchParams.set('partial', containerId);
-
-        fetch(ajaxUrl.toString(), {
-            headers: {
-                'X-Requested-With': 'XMLHttpRequest'
-            }
-        })
-        .then(response => response.text())
-        .then(html => {
-            container.innerHTML = html;
-            const historyUrl = new URL(url, window.location.origin);
-            window.history.pushState({path: historyUrl.toString()}, '', historyUrl.toString());
-        })
-        .catch(error => console.error('Error updating container:', error));
-    }
-
-    document.body.addEventListener('submit', function(e) {
-        const form = e.target;
-        if (form.id === 'user-filter-form' || form.id === 'task-filter-form') {
-            e.preventDefault();
-            const params = new URLSearchParams(new FormData(form));
-            const url = `${form.action}?${params.toString()}`;
-            const containerId = form.id === 'user-filter-form' ? 'user-table-container' : 'task-table-container';
-            updateContainer(url, containerId);
-        }
-    });
-
-    document.body.addEventListener('click', function(e) {
-        const target = e.target.closest('#user-table-container a.page-link, #user-table-container thead a, #task-table-container a.page-link, #task-table-container thead a');
-        if (target) {
-            e.preventDefault();
-            const containerId = target.closest('#user-table-container') ? 'user-table-container' : 'task-table-container';
-            updateContainer(target.href, containerId);
-        }
-    });
-
-    if (userManagementContainer) {
-        userManagementContainer.addEventListener('submit', function(event) {
-            const form = event.target;
-            if (form.matches('form[action*="toggle_superuser"]')) {
-                event.preventDefault();
-                const url = form.action;
-                const csrfToken = form.querySelector('input[name="csrfmiddlewaretoken"]').value;
-                const button = form.querySelector('button[type="submit"]');
-                const userRow = form.closest('tr');
-                const statusBadge = userRow.querySelector('.badge');
-
-                fetch(url, {
-                    method: 'POST',
-                    headers: {
-                        'X-CSRFToken': csrfToken,
-                        'Content-Type': 'application/json',
-                        'X-Requested-With': 'XMLHttpRequest'
-                    },
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.status === 'success') {
-                        if (data.is_superuser) {
-                            button.textContent = 'Demote';
-                            statusBadge.textContent = 'Yes';
-                            statusBadge.classList.remove('bg-secondary');
-                            statusBadge.classList.add('bg-success');
-                        } else {
-                            button.textContent = 'Promote';
-                            statusBadge.textContent = 'No';
-                            statusBadge.classList.remove('bg-success');
-                            statusBadge.classList.add('bg-secondary');
-                        }
-                    }
-                })
-                .catch(error => console.error('Error:', error));
-            } else if (form.matches('form[action*="delete_user"]')) {
-                event.preventDefault();
-                if (confirm('Are you sure you want to delete this user?')) {
-                    const url = form.action;
-                    const csrfToken = form.querySelector('input[name="csrfmiddlewaretoken"]').value;
-                    const userRow = form.closest('tr');
-
-                    fetch(url, {
-                        method: 'POST',
-                        headers: {
-                            'X-CSRFToken': csrfToken,
-                            'Content-Type': 'application/json',
-                            'X-Requested-With': 'XMLHttpRequest'
-                        },
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.status === 'success') {
-                            userRow.remove();
-                        } else {
-                            alert(data.message || 'An error occurred.');
-                        }
-                    })
-                    .catch(error => console.error('Error:', error));
-                }
-            }
-        });
-    }
-});
-</script>
+<script src="{% static 'js/admin.js' %}" defer></script>
 {% endblock %}

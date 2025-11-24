@@ -62,6 +62,8 @@ let _content_vars = {
 
 let questionBoxMousemoveListener = null;
 
+
+
 function addPulseAnimation() {
     const styleId = 'pulsing-dot-animation';
     if (document.getElementById(styleId)) {
@@ -128,24 +130,9 @@ async function displayQuestionBox(question) {
         duration: 0, // Persists until manually removed
         id: 'task-question-box',
         css,
+        hoverable: true, // Explicitly enable hover effect
     };
     await displayMessageBox(options);
-
-    const box = document.getElementById('task-question-box');
-    if (box) {
-        box.style.pointerEvents = 'none';
-        box.style.opacity = '0.8';
-        
-        questionBoxMousemoveListener = (e) => {
-            const rect = box.getBoundingClientRect();
-            if (e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom) {
-                box.style.opacity = '0';
-            } else {
-                box.style.opacity = '0.8';
-            }
-        };
-        document.addEventListener('mousemove', questionBoxMousemoveListener);
-    }
 
     updateEvidenceCount();
 }
@@ -205,16 +192,16 @@ function getTaskStatus() {
 }
 
 function removeExistingBoxes() {
-    if (questionBoxMousemoveListener) {
-        document.removeEventListener('mousemove', questionBoxMousemoveListener);
-        questionBoxMousemoveListener = null;
-    }
     const questionBox = document.getElementById('task-question-box');
     if (questionBox) {
-        questionBox.remove();
+        removeMessageBox('task-question-box');
     }
     const loadedBoxes = document.querySelectorAll('.loaded-box');
-    loadedBoxes.forEach(box => box.remove());
+    loadedBoxes.forEach(box => {
+        if (box.id !== 'task-question-box') {
+            box.remove();
+        }
+    });
 }
 
 async function setupTaskUI() {

@@ -502,9 +502,21 @@ h2.text-success {
     margin-right: 0.5rem; /* Space between text and icon */
 }
 
+/* Fix for EasyMDE fullscreen flicker issue inside cards */
+body.EasyMDE-fullscreen .card {
+    transform: none !important;
+    transition: none !important;
+}
+
+.EasyMDEContainer .fullscreen,
+.EasyMDEContainer .CodeMirror-fullscreen {
+    z-index: 1051 !important; /* Bootstrap's navbar is 1030, modals are 1050 */
+}
+
 .form-check-input {
     vertical-align: middle;
 }
+
 
 .login-error-message {
     border: solid 2px red;
@@ -787,6 +799,10 @@ button.remove-source:hover {
     background-color: #f8f9fa;
 }
 
+body.EasyMDE-fullscreen #content {
+    transition: none !important;
+}
+
 .dark-mode .dropdown-menu[aria-labelledby="messageDropdown"] .dropdown-item:hover {
     background-color: #343a40;
 }
@@ -794,5 +810,11 @@ button.remove-source:hover {
 /* Improve form label spacing */
 .form-label {
     margin-bottom: 0.75rem !important;
+}
+
+/* Fix for EasyMDE fullscreen flicker issue inside cards */
+body.EasyMDE-fullscreen .card {
+    transition: none !important;
+    transform: none !important;
 }
 

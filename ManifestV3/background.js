@@ -51,7 +51,8 @@ async function getUserInfo() {
 
 // --- Core Logic ---
 
-async function makeApiRequest(requestFunc) {
+async function 
+makeApiRequest(requestFunc) {
     try {
         const response = await requestFunc();
         if (!isConnected) {
@@ -103,7 +104,7 @@ async function makeApiRequest(requestFunc) {
     }
 }
 
-async function getTaskInfo(task_id) {
+const getTaskInfo = throttleManager.get('getTaskInfo', async (task_id) => {
     if (task_id === -1) return;
     try {
         const config = getConfig();
@@ -114,21 +115,9 @@ async function getTaskInfo(task_id) {
     } catch (error) {
         console.error("Error getting task info:", error.message);
     }
-}
+}, 10000);
 
-async function hasPendingAnnotation() {
-    try {
-        const config = getConfig();
-        const pending_response = await makeApiRequest(() => _get(config.urls.check_pending_annotations));
-        return pending_response && pending_response.pending;
-    }
-    catch (error) {
-        console.error("Error checking pending annotations:", error.message);
-        return false;
-    }
-}
-
-async function checkActiveTaskID() {
+const throttledCheckActiveTaskID = throttleManager.get('checkActiveTaskID', async () => {
     await initializeConfig();
     printDebug("background", "Checking active task ID...");
     const { logged_in } = await _get_session('logged_in');
@@ -196,15 +185,26 @@ async function checkActiveTaskID() {
     } catch (error) {
         console.error("Error checking active task ID:", error.message);
         if (error.message === "Authentication failed.") {
-            await setCurrentTask(-1); // Clear current task on auth error
-            // Force logout if authentication fails
+            await setCurrentTask(-1);
             await _remove_session(['access_token', 'refresh_token', 'username', 'logged_in']);
             chrome.runtime.sendMessage({ command: "alter_logging_status", log_status: false });
             chrome.action.setBadgeText({ text: '' });
         }
-        return -2; // Indicate server failure
+        return -2;
     }
-}
+}, 10000);
+
+const hasPendingAnnotation = throttleManager.get('hasPendingAnnotation', async () => {
+    try {
+        const config = getConfig();
+        const pending_response = await makeApiRequest(() => _get(config.urls.check_pending_annotations));
+        return pending_response && pending_response.pending;
+    }
+    catch (error) {
+        console.error("Error checking pending annotations:", error.message);
+        return false;
+    }
+}, 10000);
 
 function closeAllIrrelevantTabs() {
     const config = getConfig();
@@ -622,22 +622,26 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     return;
                 }
             
-                const task_id = await checkActiveTaskID();
+                const task_id = await throttledCheckActiveTaskID();
                 let task_info = null;
                 if (task_id > 0) {
-                    task_info = await _get_session(TASK_INFO_KEY);
-                    if (!task_info) {
+                    let session_task_info = await _get_session(TASK_INFO_KEY);
+                    if (!session_task_info || !session_task_info[TASK_INFO_KEY]) {
                         await getTaskInfo(task_id);
-                        task_info = await _get_session(TASK_INFO_KEY);
+                        session_task_info = await _get_session(TASK_INFO_KEY);
                     }
+                    task_info = session_task_info;
                 }
             
                 let pending_url = "";
                 try {
-                    const pending_response = await _get(config.urls.check_pending_annotations);
-                    if (pending_response && pending_response.pending) {
-                        await _set_session({ has_pending_annotation: true });
-                        pending_url = pending_response.url;
+                    const pending = await hasPendingAnnotation();
+                    if (pending) {
+                        const pending_response = await makeApiRequest(() => _get(config.urls.check_pending_annotations));
+                        if (pending_response && pending_response.pending) {
+                            await _set_session({ has_pending_annotation: true });
+                            pending_url = pending_response.url;
+                        }
                     } else {
                         await _set_session({ has_pending_annotation: false });
                         broadcastToTabs({ command: 'remove_message_box', id: 'server-pending-annotation-message' });
@@ -654,7 +658,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     task_info: task_info ? task_info[TASK_INFO_KEY] : null,
                     pending_url: pending_url
                 });
-                checkActiveTaskID();
+                throttledCheckActiveTaskID();
                 break;
 
             case MSG_CHECK_LOGGING_STATUS:
@@ -708,7 +712,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 break;
 
             case MSG_GET_ACTIVE_TASK:
-                const active_task_id = await checkActiveTaskID();
+                const active_task_id = await throttledCheckActiveTaskID();
                 const is_task_active = active_task_id > 0;
                 printDebug("background", `Active task ID: ${active_task_id}`);
                 sendResponse({ is_task_active: is_task_active, task_id: active_task_id });
@@ -719,15 +723,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 if (!task_info_data) {
                     const task_id_info = await getCurrentTask();
                     if (task_id_info !== -1) {
-                        try {
-                            const response_task_info = await _get(`${config.urls.get_task_info}?task_id=${task_id_info}`);
-                            if (response_task_info) {
-                                await _set_session({ [TASK_INFO_KEY]: response_task_info });
-                                task_info_data = response_task_info;
-                            }
-                        } catch (error) {
-                            console.error("Error getting task info on demand:", error);
-                        }
+                        await getTaskInfo(task_id_info);
+                        const session_data = await _get_session(TASK_INFO_KEY);
+                        task_info_data = session_data ? session_data[TASK_INFO_KEY] : null;
                     }
                 }
                 sendResponse(task_info_data);
@@ -737,7 +735,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 const task_id_justifications = message.task_id;
                 if (task_id_justifications !== -1) {
                     try {
-                        const response_justifications = await _get(`${config.urls.get_justifications}/${task_id_justifications}/`);
+                        const response_justifications = await makeApiRequest(() => _get(`${config.urls.get_justifications}/${task_id_justifications}/`));
                         sendResponse(response_justifications);
                     } catch (error) {
                         console.error("Error getting justifications:", error);
@@ -789,7 +787,7 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
             break;
         case ALARM_CHECK_TASK:
             printDebug("background", "Checking active task ID from alarm...");
-            await checkActiveTaskID();
+            await throttledCheckActiveTaskID();
             break;
     }
 });
@@ -797,5 +795,5 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
 chrome.tabs.onRemoved.addListener(async (tabId, removeInfo) => {
     await initializeConfig();
     printDebug("background", `Tab ${tabId} was closed. Forcing a check for active task status.`);
-    checkActiveTaskID();
+    throttledCheckActiveTaskID();
 });

@@ -268,8 +268,8 @@ async function initialize() {
         // Ensure blocking is active
         blockInteractions();
 
-        // Wait a bit for the page to stabilize (frameworks hydration, etc.)
-        await new Promise(resolve => setTimeout(resolve, 500));
+        // // Wait a bit for the page to stabilize (frameworks hydration, etc.)
+        await new Promise(resolve => setTimeout(resolve, 500) );
 
         // Monkey-patch history API for SPA navigation tracking
         (function (history) {
@@ -328,18 +328,25 @@ async function initialize() {
 
         printDebug("content", "content.js is loaded");
         await setupTaskUI();
-        } catch (error) {
+    } catch (error) {
         console.error("Error during main initialization:", error);
         unblockInteractions();
     }
 }
 
 // --- Event Listeners ---
-if (document.readyState === 'complete') {
+// if (document.readyState === 'complete') {
+//     initialize();
+// } else {
+//     window.addEventListener("load", initialize);
+// }
+
+if (document.readyState == 'interactive' || document.readyState == 'complete') {
     initialize();
 } else {
-    window.addEventListener("load", initialize);
+    window.addEventListener("DOMContentLoaded", initialize);
 }
+
 
 window.addEventListener('popstate', async () => {
     await initializeConfig(); // Ensure config is loaded

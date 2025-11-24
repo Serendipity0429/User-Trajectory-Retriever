@@ -204,7 +204,7 @@ class ViewState {
                 },
                 // recordCrossOriginIframes: true, // TODO: Add iframe support
                 recordCanvas: true, // NOTICE: enable canvas recording, which is under experimental stage
-                inlineImages: true, // NOTICE: enable image inlining to capture images as base64
+                // inlineImages: true, // NOTICE: enable image inlining to capture images as base64
                 inlineStylesheet: true,
                 collectFonts: true, // NOTICE: enable font collection to capture custom fonts
             });

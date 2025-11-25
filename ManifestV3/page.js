@@ -108,10 +108,10 @@ class ViewState {
         this.is_visible = true;
         this.time_last_op = 0;
         this.time_limit = 60000; // 1 minute
+        this.update_rountine = 10000; // 10 seconds
         this._is_visibility_listener_added = false;
         this._are_event_listeners_added = false;
         this._stop_rrweb_record_fn = null;
-        this._routine_interval = null;
     }
 
     checkState() {
@@ -154,9 +154,9 @@ class ViewState {
         printDebug("page", "ViewState: initializing");
         this.is_sent = false;
 
-        if (this._routine_interval) {
-            clearInterval(this._routine_interval);
-            this._routine_interval = null;
+        if (window._utrt_routine_interval) {
+            clearInterval(window._utrt_routine_interval);
+            window._utrt_routine_interval = null;
         }
 
         if (!this._is_visibility_listener_added) {
@@ -200,7 +200,7 @@ class ViewState {
         this.checkState();
 
         this.startRecording();
-        this._routine_interval = setInterval(() => this.routine_flush(), 10000);
+        window._utrt_routine_interval = setInterval(() => this.routine_flush(), this.update_rountine); // NOTICE: checkout per 5 seconds
     }
 
     startRecording() {
@@ -228,6 +228,7 @@ class ViewState {
         if (this.is_sent || _is_server_page(_content_vars.url_now) || window.self !== window.top) {
             return;
         }
+        printDebug("page", "rountine checkout")
 
         const message = new Message();
         message.command = "send_message";
@@ -242,7 +243,6 @@ class ViewState {
 
         if (!is_routine_update) {
             this.pageManager.pageLeave();
-            message.send_flag = true;
             message.end_timestamp = this.pageManager.end_timestamp;
             message.dwell_time = this.pageManager.dwell_time;
             message.page_switch_record = JSON.stringify(this.pageManager.page_switch_record);
@@ -264,19 +264,18 @@ class ViewState {
     }
 
     routine_flush() {
-        if (this.is_sent) {
+        if (this.is_sent || document.hidden) {
             return;
         }
         this.sendMessage(true);
 
         // Clear the data that has been sent
-        
-        mouseRecord.initialize();
+        this.clearRecordData();
     }
 
     clearRecordData() {
         this.unitPage.clearData();
-        mouseRecord.clearData();
+        mouseRecord.initialize();
     }
 
     flush() {
@@ -284,9 +283,9 @@ class ViewState {
             return;
         }
 
-        if (this._routine_interval) {
-            clearInterval(this._routine_interval);
-            this._routine_interval = null;
+        if (window._utrt_routine_interval) {
+            clearInterval(window._utrt_routine_interval);
+            window._utrt_routine_interval = null;
         }
 
         this.sendMessage(false);
@@ -295,6 +294,7 @@ class ViewState {
     }
 }
 
+window._utrt_routine_interval = null;
 const unitPage = new UnitPage();
 const pageManager = new PageManager();
 const viewState = new ViewState(unitPage, pageManager);

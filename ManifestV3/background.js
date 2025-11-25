@@ -691,12 +691,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
             case MSG_SEND_MESSAGE:
                 const current_task_id = await getCurrentTask();
-                if (current_task_id === -1 || message.send_flag === false) {
-                    sendResponse({ success: false, error: "No active task or send_flag is false" });
+                if (current_task_id === -1) {
+                    sendResponse({ success: false, error: "No active task" });
                     return;
                 }
-
-                const { username } = await _get_session(['username']);
 
                 const msg_json = JSON.stringify(message);
                 const data_to_compress = new TextEncoder().encode(msg_json);

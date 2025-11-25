@@ -4,8 +4,8 @@
     --bs-body-bg-light: #303133;  /* Lighter background */
     --bs-body-color: #f6f6f6;
     --bs-border-color: #444;
-    --primary-accent-color: #6A8EAE; /* Elegant Slate Blue */
-    --secondary-accent-color: #4A6A80; /* Deeper Muted Blue */
+    --primary-accent-color: #A0D1E2; /* Lighter Sky Blue */
+    --secondary-accent-color: #7AB8D9; /* Soft Cyan Blue */
     --dark-color: #212529;
 }
 
@@ -431,7 +431,7 @@
 }
 
 .dark-mode .text-danger {
-    color: #ea7171 !important;
+    color: #ffcc3e !important;
 }
 
 .dark-mode .editor-preview {

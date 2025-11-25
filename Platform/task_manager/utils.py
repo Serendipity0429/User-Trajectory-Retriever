@@ -155,7 +155,10 @@ def store_data(request, message, user):
         # MERGE CASE: Append data to existing webpage record
         print_debug(f"Merging data for URL: {message['url']}")
         
-        webpage.rrweb_record = append_json_data_strings(webpage.rrweb_record, message.get('rrweb_record', '[]'))
+        raw_rrweb = message.get('rrweb_record', '[]')
+        new_rrweb_record = raw_rrweb.replace("</script>", "<\\/script>")
+        
+        webpage.rrweb_record = append_json_data_strings(webpage.rrweb_record, new_rrweb_record)
         webpage.event_list = append_json_data_strings(webpage.event_list, message.get('event_list', '[]'))
         webpage.mouse_moves = append_json_data_strings(webpage.mouse_moves, message.get('mouse_moves', '[]'))
 
@@ -169,10 +172,17 @@ def store_data(request, message, user):
             
             webpage.dwell_time = message.get('dwell_time', webpage.dwell_time)
             webpage.page_switch_record = message.get('page_switch_record', webpage.page_switch_record)
+            
+            sent_when_active = message.get('sent_when_active', False)
+            webpage.during_annotation = state.get('is_annotating', False) and not sent_when_active
+            webpage.annotation_name = state.get('annotation_name', 'none') if webpage.during_annotation else 'none'
+            
+            if check_is_redirected_page(webpage):
+                webpage.is_redirected = True
 
         webpage.save()
 
-    else:
+    else: # First Time
         # CREATE CASE: Create a new webpage record
         print_debug(f"Creating new webpage entry for URL: {message['url']}")
         webpage = Webpage()
@@ -195,18 +205,7 @@ def store_data(request, message, user):
         webpage.event_list = message.get('event_list', '[]')
         
         raw_rrweb = message.get('rrweb_record', '[]')
-        if isinstance(raw_rrweb, str):
-            webpage.rrweb_record = raw_rrweb.replace("</script>", "<\\/script>")
-        else:
-            webpage.rrweb_record = json.dumps(raw_rrweb).replace("</script>", "<\\/script>")
-
-        sent_when_active = message.get('sent_when_active', False)
-        webpage.during_annotation = state.get('is_annotating', False) and not sent_when_active
-        webpage.annotation_name = state.get('annotation_name', 'none') if webpage.during_annotation else 'none'
-        
-        if check_is_redirected_page(message):
-            webpage.is_redirected = True
-        
+        webpage.rrweb_record = raw_rrweb.replace("</script>", "<\\/script>")
         webpage.save()
         state['last_webpage_id'] = webpage.id
         state['last_webpage_url'] = webpage.url
@@ -214,9 +213,9 @@ def store_data(request, message, user):
     state['is_storing_data'] = False
     set_annotation_state(user_id, state)
     
-def check_is_redirected_page(message):
+def check_is_redirected_page(webpage):
     # A page is considered a redirect if the dwell time is very short (< 1000ms) or if there's no user interaction.
-    return message['dwell_time'] < 1000 or (message['mouse_moves'] == '[]' and message['rrweb_record'] == '[]' and message['event_list'] == '[]') or message['title'] == '' or (message['title'] and 'redirect' in message['title'].lower())
+    return webpage.dwell_time < 1000 or (webpage.mouse_moves == [] and webpage.rrweb_record == [] and webpage.event_list == []) or webpage.title == '' or (webpage.title and 'redirect' in webpage.title.lower())
 
 def wait_until_data_stored(func):
     def wrapper(*args, **kwargs):

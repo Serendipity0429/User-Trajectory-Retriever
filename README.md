@@ -42,11 +42,11 @@ Before you begin, ensure you have the following installed:
 - virtualenv (optional, but recommended)
 - Redis
 
-## Installation
+## Building and Running
 
 To get the system up and running, you need to set up both the backend platform and the browser extension.
 
-### 1. Backend (Django Platform)
+### Backend (Django Platform)
 
 All commands should be run from the root of the project directory.
 
@@ -87,7 +87,7 @@ All commands should be run from the root of the project directory.
     ```
     The platform should now be running at `http://127.0.0.1:8000/`.
 
-### 2. Frontend (Chrome Extension)
+### Frontend (Chrome Extension)
 
 The extension is located in the `ManifestV3/` directory.
 

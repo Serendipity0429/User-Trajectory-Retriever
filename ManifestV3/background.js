@@ -21,6 +21,7 @@ const MSG_GET_JUSTIFICATIONS = 'get_justifications';
 const MSG_GET_POPUP_DATA = 'get_popup_data';
 
 let isConnected = true;
+let isClosingTabs = false;
 
 (async () => {
     await initializeConfig();
@@ -177,7 +178,7 @@ const throttledCheckActiveTaskID = throttleManager.get('checkActiveTaskID', asyn
         if (is_task_started || is_task_finished) {
             printDebug("background", `Task state changed. Old: ${old_task_id}, New: ${new_task_id}`);
             if (!await hasPendingAnnotation()) {
-                closeAllIrrelevantTabs();
+                await closeAllIrrelevantTabs();
             }
         }
         await setCurrentTask(new_task_id);
@@ -206,21 +207,31 @@ const hasPendingAnnotation = throttleManager.get('hasPendingAnnotation', async (
     }
 }, 10000);
 
-function closeAllIrrelevantTabs() {
-    const config = getConfig();
-    printDebug("background", "Closing all irrelevant tabs...");
-    chrome.tabs.query({}, (tabs) => {
+async function closeAllIrrelevantTabs() {
+    if (isClosingTabs) {
+        printDebug("background", "Tab closing already in progress. Skipping.");
+        return;
+    }
+    isClosingTabs = true;
+    try {
+        const config = getConfig();
+        printDebug("background", "Closing all irrelevant tabs...");
+        const tabs = await chrome.tabs.query({});
         printDebug("background", "All open tabs:", tabs);
         const irrelevant_tab_ids = tabs
             .filter(tab => tab.url && !_is_server_page(tab.url) && !_is_extension_page(tab.url))
             .map(tab => tab.id);
 
-        chrome.tabs.create({ url: config.urls.initial_page, active: false });
+        await chrome.tabs.create({ url: config.urls.initial_page, active: false });
 
         if (irrelevant_tab_ids.length > 0) {
-            chrome.tabs.remove(irrelevant_tab_ids);
+            await chrome.tabs.remove(irrelevant_tab_ids);
         }
-    });
+    } catch (error) {
+        console.error("Error closing tabs:", error);
+    } finally {
+        isClosingTabs = false;
+    }
 }
 
 async function sendInfo(message) {

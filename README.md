@@ -87,6 +87,14 @@ All commands should be run from the root of the project directory.
     ```
     The platform should now be running at `http://127.0.0.1:8000/`.
 
+6.  **Running in Production (with Gunicorn):**
+    For a more robust setup suitable for production, you can use Gunicorn. Make sure you have installed all the dependencies from `requirements.txt`.
+    ```bash
+    cd Platform
+    gunicorn --config gunicorn.conf.py annotation_platform.wsgi
+    ```
+    This will start the server using the configuration specified in `gunicorn.conf.py`.
+
 ### Frontend (Chrome Extension)
 
 The extension is located in the `ManifestV3/` directory.

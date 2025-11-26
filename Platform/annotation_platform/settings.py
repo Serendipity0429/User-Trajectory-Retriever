@@ -27,9 +27,8 @@ ADMIN_USERNAME = config('ADMIN_USERNAME', default='admin')
 
 # SECURITY WARNING: Running a production server with DEBUG = True is a major security risk.
 # It exposes sensitive information, such as detailed error pages and configuration details.
-# Always set DEBUG = False in a production environment.
+# Always set DEBUG = False in a production environment.)
 DEBUG = config('DJANGO_DEBUG', default=True, cast=bool)
-
 
 # As requested, host permissions are not being strictly configured for this stage.
 # However, for production, you should replace '*' with your actual domain names.
@@ -120,6 +119,7 @@ DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
         'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
+        'timeout': 30,
     }
 }
 

@@ -1,0 +1,96 @@
+/* Scoped overrides for annotation area */
+.card #query-form .btn-primary-custom {
+    --bs-btn-color: #fff;
+    --bs-btn-bg: #021e4d;
+    --bs-btn-border-color: #021e4d;
+    --bs-btn-hover-color: #fff;
+    --bs-btn-hover-bg: #011533;
+    --bs-btn-hover-border-color: #011533;
+    --bs-btn-active-color: #fff;
+    --bs-btn-active-bg: #011533;
+    --bs-btn-active-border-color: #011533;
+    --bs-btn-disabled-color: #fff;
+    --bs-btn-disabled-bg: #021e4d;
+    --bs-btn-disabled-border-color: #021e4d;
+}
+
+.card #query-form .btn-outline-primary {
+    --bs-btn-color: #021e4d;
+    --bs-btn-border-color: #021e4d;
+    --bs-btn-hover-color: #fff;
+    --bs-btn-hover-bg: #021e4d;
+    --bs-btn-hover-border-color: #021e4d;
+    --bs-btn-active-color: #fff;
+    --bs-btn-active-bg: #021e4d;
+    --bs-btn-active-border-color: #021e4d;
+    --bs-btn-disabled-color: #021e4d;
+    --bs-btn-disabled-bg: transparent;
+    --bs-btn-disabled-border-color: #021e4d;
+}
+
+
+:root {
+    --bs-yellow: #ffb700;
+    --bs-warning: #ffb700;
+    --bs-warning-rgb: 255, 183, 0;
+    --bs-warning-bg-subtle: #ffeebb;
+    --bs-warning-border-subtle: #ffdd77;
+}
+
+
+
+p strong {
+    font-weight: bold;
+}
+
+.form-floating > .form-control {
+  padding: 1rem 0.75rem;
+}
+
+.form-floating > .form-control:focus,
+.form-floating > .form-control:not(:placeholder-shown),
+.form-floating > .form-select {
+    padding-top: 1.625rem;
+    padding-bottom: 0.625rem;
+    line-height: 1.5;
+    height: calc(3.75rem + calc(var(--bs-border-width) * 2));
+}
+
+
+h1, h2, h3, h4, h5, h6, b {
+    color: #021e4d;
+}
+
+.card #query-form .text-primary {
+    color: #021e4d !important;
+}
+
+.card #query-form a {
+    color: #021e4d;
+}
+
+.card #query-form h5 {
+    color: #021e4d;
+}
+
+
+input {
+    accent-color: #021e4d;
+}
+
+.task-process-container summary, .summary {
+    font-size: large; /* Larger text for summary */
+    font-weight: bold;
+    cursor: pointer;
+    padding: 5px 10px;
+    /* Using list-header style from your CSS */
+    background: #edeff1;
+    border-bottom: 2px solid #021e4d;
+    color: #021e4d;
+    list-style: none; /* Remove default arrow/marker */
+    display: block;
+}
+
+input {
+    accent-color: #021e4d;
+}

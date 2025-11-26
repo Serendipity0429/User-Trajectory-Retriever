@@ -14,3 +14,4 @@ tempFiles
 media
 .DS_Store
 benchmark_graphs
+Platform/staticfiles/

@@ -13,6 +13,7 @@ import base64
 import uuid
 import json
 from types import SimpleNamespace
+import zlib
 
 from .utils import (
     print_debug,
@@ -123,15 +124,20 @@ def auth_redirect(request):
 
 
 # Store data
+@csrf_exempt
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def data(request):
-    message = request.POST["message"]
-    # decompress the message if it is compressed
-    message = decompress_json_data(message)
-    user = request.user
-    store_data(request, message, user)
-    return JsonResponse({"status": "success"})
+    try:
+        message = request.POST["message"]
+        # decompress the message if it is compressed
+        message = decompress_json_data(message)
+        user = request.user
+        store_data(request, message, user)
+        return JsonResponse({"status": "success"})
+    except (zlib.error, json.JSONDecodeError, UnicodeDecodeError) as e:
+        logger.error(f"Failed to process incoming data for user {request.user.username}: {e}")
+        return JsonResponse({"status": "error", "message": "Invalid or corrupt data received."}, status=400)
 
 
 # Pre-Task Annotation Fetcher

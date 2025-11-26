@@ -11,9 +11,17 @@ load_dotenv()
 
 
 # --- Configuration ---
-# Set to True to run the server on 0.0.0.0:2904 for remote access.
-REMOTE: bool = os.getenv("REMOTE", "False").lower() in ("true", "1", "t")
+# Read settings from environment variables.
+IS_DEBUG: bool = os.getenv("DJANGO_DEBUG", "True").lower() in ("true", "1", "t")
+IS_REMOTE: bool = os.getenv("REMOTE", "False").lower() in ("true", "1", "t")
+
+# Determine bind address based on environment variables.
+if IS_REMOTE:
+    BIND_ADDRESS: str = os.getenv("BIND_ADDRESS_REMOTE", "0.0.0.0:8000")
+else:
+    BIND_ADDRESS: str = os.getenv("BIND_ADDRESS_LOCAL", "127.0.0.1:8000")
 # --- End Configuration ---
+
 
 # --- Constants ---
 WORK_DIR: Path = Path(__file__).parent.resolve()
@@ -58,7 +66,7 @@ def run_command(command: List[Union[str, Path]], check: bool = True) -> None:
     """
     print_info(f"Running command: {' '.join(map(str, command))}")
     try:
-        subprocess.run(command, check=check, cwd=WORK_DIR, text=True, 
+        subprocess.run(command, check=check, cwd=WORK_DIR, text=True,
                        stdout=sys.stdout, stderr=sys.stderr)
     except subprocess.CalledProcessError as e:
         print(f"{Colors.FAIL}Error running command: {e}{Colors.ENDC}", file=sys.stderr)
@@ -83,7 +91,7 @@ def clean_project() -> None:
     Removes migration files, the database, and media assets for a clean start.
     """
     print_header("Cleaning project for a fresh start")
-    
+
     # Define paths for directories and files to be removed.
     paths_to_remove: List[Path] = [
         WORK_DIR / "task_manager" / "migrations",
@@ -91,7 +99,8 @@ def clean_project() -> None:
         WORK_DIR / "discussion" / "migrations",
         WORK_DIR / "db.sqlite3",
         WORK_DIR / "media" / "attachments",
-        WORK_DIR / "media" / "evidence_images"
+        WORK_DIR / "media" / "evidence_images",
+        WORK_DIR / "staticfiles",
     ]
 
     for path in paths_to_remove:
@@ -112,20 +121,20 @@ def setup_development_data() -> None:
     Loads initial data and creates test users for a development environment.
     """
     print_header("Setting up development data")
-    
+
     # Load dataset.
     run_manage_py_command(
-        "load_nq_dataset", 
-        "./task_manager/dataset/hard_questions_refined.jsonl", 
+        "load_nq_dataset",
+        "./task_manager/dataset/hard_questions_refined.jsonl",
         "nq_hard_questions"
     )
 
     run_manage_py_command(
-        "load_nq_dataset", 
-        "./task_manager/dataset/tutorial_questions.jsonl", 
+        "load_nq_dataset",
+        "./task_manager/dataset/tutorial_questions.jsonl",
         "tutorial"
     )
-    
+
     # Create test users.
     print_info("Creating test users...")
     users = {"test": "thuirtest"}
@@ -134,47 +143,38 @@ def setup_development_data() -> None:
         users[f"user{i}"] = f"thuiruser{i}"
     for username, password in users.items():
         run_manage_py_command("create_test_user", username, password)
-    
+
     # Create a primary superuser.
     print_info("Creating test superuser...")
     run_manage_py_command("create_test_superuser", "admin", "thuirthuir", "--primary")
-    
+
     print_success("--- Development data setup complete ---")
+
 
 def main() -> None:
     """
     Main script execution flow.
     """
-    parser = argparse.ArgumentParser(description="Start the Django development server.")
+    parser = argparse.ArgumentParser(description="Start the Django server.")
     parser.add_argument(
-        "--debug", 
-        action="store_true", 
+        "--clean",
+        action="store_true",
         default=False,
-        help="Run in debug mode (clean project, load development data)."
+        help="Clean project, then set up development data. Only works in debug mode.",
     )
     args = parser.parse_args()
-    
-    if args.debug:
-        print_warning("Are you sure you want to run in debug mode?")
-        print_warning("This will delete the database and media files. (y/n): ", end="")
-        if input().strip().lower() != 'y':
-            print_info("Aborting debug mode.")
-            sys.exit(0)
-        
-        if REMOTE:
-            print_warning("Remote mode is not recommended in debug mode.")
-            print_warning("Switching to local mode for safety.")
-            print_warning("Are you sure you want to continue? (y/n): ", end="")
-            if input().strip().lower() != 'y':
-                print_info("Aborting debug mode.")
-                sys.exit(0)
-            print_warning("The LAST WARNING: Are you REALLY sure? (yes/no): ", end="")
-            if input() != 'yes':
-                print_info("Aborting debug mode.")
-                sys.exit(0)
-        
-        clean_project()
 
+    if args.clean:
+        RETYPE_CNT = 1 if IS_DEBUG else 3
+        while RETYPE_CNT > 0:
+            RETYPE_CNT -= 1
+            print_warning("Are you sure you want to clean the project?")
+            print_warning("This will delete the database and media files. (y/n): ", end="")
+            if input().strip().lower() != 'y':
+                print_info("Aborting clean.")
+                sys.exit(0)
+        clean_project()
+        
     # Apply database migrations.
     print_header("Running database migrations")
     for app in ["task_manager", "user_system", "discussion"]:
@@ -183,16 +183,28 @@ def main() -> None:
     run_manage_py_command("migrate")
     print_success("--- Migrations complete ---")
 
-    if args.debug:
+    if args.clean and IS_DEBUG:
         setup_development_data()
 
-    # Start the Django server.
-    if REMOTE:
-        print_header("Starting server for remote access on 0.0.0.0:2904")
-        run_manage_py_command("runserver", "0.0.0.0:2904")
+    # Start the appropriate server.
+    if IS_DEBUG:
+        print_header(f"Starting Django development server on {BIND_ADDRESS}")
+        run_manage_py_command("runserver", BIND_ADDRESS)
     else:
-        print_header("Starting development server")
-        run_manage_py_command("runserver")
+        print_header(f"Starting Gunicorn production server on {BIND_ADDRESS}")
+        print_info("Collecting static files...")
+        run_manage_py_command("collectstatic", "--noinput")
+        print_success("--- Static files collected ---")
+        
+        # Construct and run the Gunicorn command.
+        gunicorn_command = [
+            "gunicorn",
+            "--bind",
+            BIND_ADDRESS,
+            "annotation_platform.wsgi:application"
+        ]
+        run_command(gunicorn_command)
+
 
 if __name__ == "__main__":
     main()

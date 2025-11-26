@@ -1,0 +1,11 @@
+.color-palette .color-option.active {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+    box-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
+}
+
+.color-palette .custom-color-wrapper.active {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+    box-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
+}

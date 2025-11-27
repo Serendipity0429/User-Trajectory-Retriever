@@ -4,7 +4,7 @@
     {% for post in pinned_posts %}
         <a href="{% url 'post_detail' post.pk %}" class="list-group-item list-group-item-action">
             <div class="d-flex w-100 justify-content-between">
-                <h5 class="mb-1">
+                <h5 class="mb-1 discussion-title flex-fill">
                     {% if post.is_closed %}
                         <i class="bi bi-check-circle text-danger me-2"></i>
                     {% else %}
@@ -13,11 +13,14 @@
                     <i class="bi bi-pin-angle-fill"></i> {{ post.title }} 
                     {% if post.is_private %}<i class="bi bi-shield-lock-fill"></i>{% endif %} 
                 </h5>
-                <small>{{ post.updated_at|timesince }} ago {% if post|was_updated %}(edited){% endif %}</small>
+                <small>{{ post.updated_at|short_timesince }} ago {% if post|was_updated %}(edited){% endif %}</small>
             </div>
             <p class="mb-1 d-flex align-items-center">
                 <span class="me-1">By {{ post.author.username }} in</span>
-                <span class="badge {{ post.get_category_display|discussion_category_badge_subtle_class }}">{{ post.get_category_display }}</span>
+                <span class="badge {{ post.get_category_display|discussion_category_badge_subtle_class }}">
+                    <span class="d-none d-md-inline">{{ post.get_category_display }}</span>
+                    <span class="d-md-none">{{ post.get_category_display|abbreviate_category }}</span>
+                </span>
             </p>
             <p class="mb-1">
                 {% for label in post.labels.all %}
@@ -29,7 +32,7 @@
     {% for post in posts %}
         <a href="{% url 'post_detail' post.pk %}" class="list-group-item list-group-item-action">
             <div class="d-flex w-100 justify-content-between">
-                <h5 class="mb-1">
+                <h5 class="mb-1 discussion-title flex-fill">
                     {% if post.is_closed %}
                         <i class="bi bi-check-circle text-danger me-2"></i>
                     {% else %}
@@ -38,11 +41,14 @@
                     {{ post.title }} 
                     {% if post.is_private %}<i class="bi bi-shield-lock-fill"></i>{% endif %} 
                 </h5>
-                <small>{{ post.updated_at|timesince }} ago {% if post|was_updated %}(edited){% endif %}</small>
+                <small>{{ post.updated_at|short_timesince }} ago {% if post|was_updated %}(edited){% endif %}</small>
             </div>
             <p class="mb-1 d-flex align-items-center">
                 <span class="me-1">By {{ post.author.username }} in</span>
-                <span class="badge {{ post.get_category_display|discussion_category_badge_subtle_class }}">{{ post.get_category_display }}</span>
+                <span class="badge {{ post.get_category_display|discussion_category_badge_subtle_class }}">
+                    <span class="d-none d-md-inline">{{ post.get_category_display }}</span>
+                    <span class="d-md-none">{{ post.get_category_display|abbreviate_category }}</span>
+                </span>
             </p>
             <p class="mb-1">
                 {% for label in post.labels.all %}

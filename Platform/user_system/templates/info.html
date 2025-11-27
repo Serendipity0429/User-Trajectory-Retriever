@@ -12,39 +12,39 @@
                 <div class="card-body p-5">
                     <div class="row align-items-center mb-5">
                         <div class="col-md-4 text-center">
-                            <img src="{{ cur_user.profile.icon.url }}" alt="User Avatar" class="img-fluid rounded-circle mb-3" style="width: 150px; height: 150px; object-fit: cover;">
+                            <img src="{{ cur_user.profile.icon.url }}" alt="User Avatar" class="img-fluid rounded-circle mb-3 profile-avatar">
                             <h4>{{ cur_user.profile.name|default:"Not Provided" }}</h4>
                             <p class="text-muted">{{ cur_user.profile.occupation|capfirst|default:"Not Provided" }}</p>
                         </div>
                         <div class="col-md-8">
                             <ul class="list-group list-group-flush">
                                 <li class="list-group-item d-flex justify-content-between align-items-center">
-                                    <strong><i class="bi bi-person-fill me-2"></i>Username</strong>
+                                    <strong><i class="bi bi-person-fill me-2"></i><span class="info-label">Username</span></strong>
                                     <span>{{ cur_user.username }}</span>
                                 </li>
                                 <li class="list-group-item d-flex justify-content-between align-items-center">
-                                    <strong><i class="bi bi-gender-ambiguous me-2"></i>Gender</strong>
+                                    <strong><i class="bi bi-gender-ambiguous me-2"></i><span class="info-label">Gender</span></strong>
                                     <span>{{ cur_user.profile.get_gender_display|default:"Not Provided" }}</span>
                                 </li>
                                 <li class="list-group-item d-flex justify-content-between align-items-center">
-                                    <strong><i class="bi bi-calendar-event-fill me-2"></i>Age</strong>
+                                    <strong><i class="bi bi-calendar-event-fill me-2"></i><span class="info-label">Age</span></strong>
                                     <span>{{ cur_user.profile.age|default:"Not Provided" }}</span>
                                 </li>
                                 <li class="list-group-item d-flex justify-content-between align-items-center">
-                                    <strong><i class="bi bi-telephone-fill me-2"></i>Phone</strong>
+                                    <strong><i class="bi bi-telephone-fill me-2"></i><span class="info-label">Phone</span></strong>
                                     <span>{{ cur_user.profile.phone|default:"Not Provided" }}</span>
                                 </li>
                                 <li class="list-group-item d-flex justify-content-between align-items-center">
-                                    <strong><i class="bi bi-envelope-fill me-2"></i>Email</strong>
+                                    <strong><i class="bi bi-envelope-fill me-2"></i><span class="info-label">Email</span></strong>
                                     <span>{{ cur_user.email|default:"Not Provided" }}</span>
                                 </li>
                                 <li class="list-group-item d-flex justify-content-between align-items-center">
-                                    <strong><i class="bi bi-book-fill me-2"></i>Education Level</strong>
+                                    <strong><i class="bi bi-book-fill me-2"></i><span class="info-label">Education Level</span></strong>
                                     <span>{{ cur_user.profile.get_education_display|default:"Not Provided" }}</span>
                                 </li>
                                 <li class="list-group-item d-flex justify-content-between align-items-center">
-                                    <strong><i class="bi bi-lightbulb-fill me-2"></i>Field of Profession</strong>
-                                    <span>{{ cur_user.profile.field_of_expertise|default:"Not Provided" }}</span>
+                                    <strong><i class="bi bi-lightbulb-fill me-2"></i><span class="info-label">Field of Profession</span></strong>
+                                    <span>{{ cur__user.profile.field_of_expertise|default:"Not Provided" }}</span>
                                 </li>
                             </ul>
                         </div>
@@ -84,7 +84,7 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="col-md- mb-2">
+                        <div class="col-md-6 mb-2">
                             <div class="card bg-light border-0 text-center h-100">
                                 <div class="card-body">
                                     <h6 class="card-subtitle mb-2 mt-2 text-muted">History</h6>

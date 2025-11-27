@@ -6,11 +6,11 @@
 
 {% block content %}
 <div class="container-fluid">
-    <div class="d-flex justify-content-between align-items-center">
+    <div class="d-flex flex-wrap justify-content-between align-items-center">
         <h1 class="mt-4">Administrator Dashboard</h1>
-        <div>
-            <a href="{% url 'user_system:manage_extension_versions' %}" class="btn btn-primary mt-4"><i class="bi bi-git me-1"></i> Manage Extension Versions</a>
-            <a href="{% url 'task_manager:dataset_qa_list' %}" class="btn btn-secondary mt-4 ms-2"><i class="bi bi-question-circle me-1"></i> View Dataset Questions</a>
+        <div class="mt-4 gap-2 d-flex flex-wrap">
+            <a href="{% url 'user_system:manage_extension_versions' %}" class="btn btn-primary"><i class="bi bi-git me-1"></i> Manage Extension Versions</a>
+            <a href="{% url 'task_manager:dataset_qa_list' %}" class="btn btn-secondary"><i class="bi bi-question-circle me-1"></i> View Dataset Questions</a>
         </div>
     </div>
     <p>Welcome to the admin dashboard. Here you can manage users and other site settings.</p>
@@ -178,10 +178,12 @@
         <div class="collapse show" id="consentManagementCollapse">
             <div class="card-body">
                 <p>Update the informed consent form for all users. When a new version is published, all users will be required to re-consent.</p>
-                <a href="{% url 'user_system:manage_informed_consent' %}" class="btn btn-primary">Update Informed Consent</a>
-                <button type="button" class="btn btn-secondary" data-bs-toggle="modal" data-bs-target="#viewConsentModal">
-                    View Current Form
-                </button>
+                <div class="d-flex flex-wrap gap-2">
+                    <a href="{% url 'user_system:manage_informed_consent' %}" class="btn btn-primary">Update Informed Consent</a>
+                    <button type="button" class="btn btn-secondary" data-bs-toggle="modal" data-bs-target="#viewConsentModal">
+                        View Current Form
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -263,28 +265,49 @@
         </div>
         <div class="collapse show" id="taskManagementCollapse">
             <div class="card-body">
-                <form id="task-filter-form" method="get" class="row g-3 align-items-center">
-                    <div class="col-md-3">
-                        <label for="task_user" class="visually-hidden">User</label>
-                        <select name="task_user" id="task_user" class="form-select">
-                            <option value="">All Users</option>
-                            {% for user in all_users %}
-                                <option value="{{ user.id }}" {% if task_user_filter == user.id|stringformat:"s" %}selected{% endif %}>{{ user.username }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="col-md-3">
-                        <label for="task_date_start" class="visually-hidden">Start Date</label>
-                        <input type="date" name="task_date_start" id="task_date_start" class="form-control" value="{{ task_date_start_filter }}">
-                    </div>
-                    <div class="col-md-3">
-                        <label for="task_date_end" class="visually-hidden">End Date</label>
-                        <input type="date" name="task_date_end" id="task_date_end" class="form-control" value="{{ task_date_end_filter }}">
-                    </div>
-                    <div class="col-md-3">
-                        <button type="submit" class="btn btn-primary w-100">Filter Tasks</button>
-                    </div>
-                </form>
+                <a class="btn btn-light w-100 mb-3 task-filter-toggle" data-bs-toggle="collapse" href="#taskFilterCollapse" role="button" aria-expanded="false" aria-controls="taskFilterCollapse">
+                    <i class="bi bi-funnel me-2"></i> Filter Tasks
+                </a>
+                <div class="collapse" id="taskFilterCollapse">
+                    <form id="task-filter-form" method="get" class="card card-body p-2 mb-3">
+                        <div class="row g-2">
+                            <div class="col-md-4">
+                                <label for="task_id" class="form-label mb-1">Task ID</label>
+                                <input type="text" name="task_id" id="task_id" class="form-control" value="{{ task_id_filter }}">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="task_user" class="form-label mb-1">User</label>
+                                <select name="task_user" id="task_user" class="form-select">
+                                    <option value="">All Users</option>
+                                    {% for user in all_users %}
+                                        <option value="{{ user.id }}" {% if task_user_filter == user.id|stringformat:"s" %}selected{% endif %}>{{ user.username }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="task_status" class="form-label mb-1">Status</label>
+                                <select name="task_status" id="task_status" class="form-select">
+                                    <option value="">All Statuses</option>
+                                    <option value="active" {% if task_status_filter == 'active' %}selected{% endif %}>Active</option>
+                                    <option value="completed" {% if task_status_filter == 'completed' %}selected{% endif %}>Completed</option>
+                                    <option value="cancelled" {% if task_status_filter == 'cancelled' %}selected{% endif %}>Cancelled</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="task_date_start" class="form-label mb-1">Start Date</label>
+                                <input type="date" name="task_date_start" id="task_date_start" class="form-control" value="{{ task_date_start_filter }}">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="task_date_end" class="form-label mb-1">End Date</label>
+                                <input type="date" name="task_date_end" id="task_date_end" class="form-control" value="{{ task_date_end_filter }}">
+                            </div>
+                        </div>
+                        <div class="d-flex justify-content-end mt-2">
+                            <button type="button" class="btn btn-secondary me-2" id="clear-task-filter-btn">Clear</button>
+                            <button type="submit" class="btn btn-primary">Filter</button>
+                        </div>
+                    </form>
+                </div>
                 <div id="task-table-container">
                     {% include 'partials/_task_table.html' %}
                 </div>

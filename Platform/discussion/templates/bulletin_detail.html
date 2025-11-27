@@ -4,56 +4,88 @@
 {% block content %}
 <div class="container discussion-page">
     <a href="{% url 'discussion_home' %}" class="btn btn-outline-secondary mt-3 mb-3">&laquo; Back to Forum</a>
-    <div class="card my-4">
-        <div class="card-header d-flex justify-content-between align-items-center p-3">
-            <h1 class="mb-0">{{ bulletin.title }}</h1>
-            {% if user.is_staff %}
-                <span>
-                    <a href="{% url 'edit_bulletin' bulletin.pk %}" class="btn btn-primary btn-sm">Edit</a>
-                    <a href="{% url 'delete_bulletin' bulletin.pk %}" class="btn btn-danger btn-sm">Delete</a>
-                </span>
-            {% endif %}
+    <div class="card my-4 shadow-sm">
+        <div class="card-header p-3 bg-light">
+            <div class="d-flex flex-column flex-md-row justify-content-md-between align-items-md-center">
+                <h1 class="mb-2 mb-md-0 fs-3">{{ bulletin.title }}</h1>
+                {% if user.is_staff %}
+                    <div class="d-flex gap-2">
+                        <a href="{% url 'edit_bulletin' bulletin.pk %}" class="btn btn-outline-primary btn-sm"><i class="bi bi-pencil-fill me-1"></i>Edit</a>
+                        <a href="{% url 'delete_bulletin' bulletin.pk %}" class="btn btn-outline-danger btn-sm"><i class="bi bi-trash-fill me-1"></i>Delete</a>
+                    </div>
+                {% endif %}
+            </div>
         </div>
         <div class="card-body p-4">
-                        <h6 class="card-subtitle mb-2 text-muted">
-                <span class="badge {{ bulletin.get_category_display|category_color_class }}">{{ bulletin.get_category_display }}</span>
-                Posted on {{ bulletin.created_at }} {% if bulletin|was_updated %}(Last edited: {{ bulletin.updated_at }}){% endif %}
-                {% if user.is_staff and bulletin.expiry_date and bulletin.expiry_date < now %}<span class="text-danger">(Expired)</span>{% endif %}
-            </h6>
+            <div class="d-flex flex-wrap align-items-center gap-3 text-muted mb-3">
+                <div>
+                    <span class="badge {{ bulletin.get_category_display|category_badge_subtle_class }}">{{ bulletin.get_category_display }}</span>
+                </div>
+                <div class="d-flex align-items-center">
+                    <i class="bi bi-clock-fill me-2"></i>
+                    <span>Posted on {{ bulletin.created_at }}</span>
+                </div>
+                {% if bulletin|was_updated %}
+                <div class="d-flex align-items-center">
+                    <i class="bi bi-pencil-square me-2"></i>
+                    <span>Last edited: {{ bulletin.updated_at }}</span>
+                </div>
+                {% endif %}
+                {% if user.is_staff and bulletin.expiry_date and bulletin.expiry_date < now %}
+                <div class="d-flex align-items-center text-danger">
+                    <i class="bi bi-calendar-x-fill me-2"></i>
+                    <span class="fw-bold">(Expired)</span>
+                </div>
+                {% endif %}
+            </div>
             <hr>
-            <p class="card-text mt-3">{{ bulletin.content|safe }}</p>
-            
+            <div class="card-text mt-4 content-body" style="font-size: 1.1rem; line-height: 1.6;">
+                {{ bulletin.content|safe }}
+            </div>
+
             {% if bulletin.attachments.all %}
+            <div class="attachments-section mt-5">
                 {% with videos=bulletin.attachments.all|videos %}
                 {% if videos %}
-                <hr>
-                <h5 class="mt-4">Videos</h5>
-                {% for attachment in videos %}
-                <div class="video-player-container mb-3">
-                    <video controls class="w-100 rounded">
-                        <source src="{{ attachment.file.url }}" type="video/mp4">
-                        Your browser does not support the video tag.
-                    </video>
-                </div>
-                {% endfor %}
+                    <h5 class="mb-3"><i class="bi bi-camera-video-fill me-2"></i>Videos</h5>
+                    {% for attachment in videos %}
+                    <div class="video-player-container mb-3">
+                        <video controls class="w-100 rounded border bg-dark">
+                            <source src="{{ attachment.file.url }}" type="video/mp4">
+                            Your browser does not support the video tag.
+                        </video>
+                    </div>
+                    {% endfor %}
                 {% endif %}
                 {% endwith %}
-                <hr>
-                <h5 class="mt-4">Attachments</h5>
-                <div class="list-group">
-                    {% for attachment in bulletin.attachments.all %}
-                        {% if not attachment.file.name|is_video %}
-                        <a href="{{ attachment.file.url }}" class="list-group-item list-group-item-action" target="_blank">
-                            <i class="bi bi-file-earmark-arrow-down me-2"></i>{{ attachment.file|filename }}
-                        </a>
-                        {% endif %}
-                    {% endfor %}
-                </div>
+
+                {% with other_attachments=bulletin.attachments.all %}
+                {% if other_attachments %}
+                    {% if bulletin.attachments.all|videos %}
+                    <hr class="my-4">
+                    {% endif %}
+                    <h5 class="mb-3"><i class="bi bi-paperclip me-2"></i>Attachments</h5>
+                    <div class="list-group">
+                        {% for attachment in other_attachments %}
+                            {% if not attachment.file.name|is_video %}
+                            <a href="{{ attachment.file.url }}" class="list-group-item list-group-item-action d-flex align-items-center" target="_blank">
+                                <i class="{{ attachment.file.name|get_icon_for_file }} me-3 fs-4"></i>
+                                <div class="d-flex flex-column">
+                                    <span>{{ attachment.file|filename }}</span>
+                                    <small class="text-muted">{{ attachment.file.size|filesizeformat }}</small>
+                                </div>
+                            </a>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                {% endif %}
+                {% endwith %}
+            </div>
             {% endif %}
         </div>
         {% if user.is_staff %}
-        <div class="card-footer text-muted">
-            Read by {{ read_count }} users, <a href="{% url 'bulletin_read_status' bulletin.pk %}" style="text-decoration: underline;">click for detail.</a>
+        <div class="card-footer text-muted bg-light">
+            <i class="bi bi-eye-fill me-2"></i>Read by {{ read_count }} users, <a href="{% url 'bulletin_read_status' bulletin.pk %}" class="text-decoration-underline">click for detail.</a>
         </div>
         {% endif %}
     </div>

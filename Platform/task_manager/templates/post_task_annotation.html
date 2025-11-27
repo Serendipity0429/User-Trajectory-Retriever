@@ -108,7 +108,7 @@
                         <div class="mb-4 p-3 border rounded">
                             <h5><strong>2. Overall Difficulty</strong></h5>
                             <p>How would you rate the actual difficulty of the search process you completed?</p>
-                            <div class="btn-group w-100" role="group" aria-label="Difficulty">
+                            <div class="btn-group w-100 btn-group-responsive" role="group" aria-label="Difficulty">
                                 {% for key, value in DIFFICULTY_MAP.items %}
                                 <input type="radio" class="btn-check" name="difficulty_actual" id="difficulty{{ key }}" value="{{ key }}" autocomplete="off" required>
                                 <label class="btn btn-outline-primary" for="difficulty{{ key }}" data-bs-toggle="tooltip" data-bs-placement="top" title="{{ DIFFICULTY_EXPLANATION_MAP|get_item:key }}">

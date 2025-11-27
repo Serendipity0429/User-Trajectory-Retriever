@@ -123,7 +123,9 @@ def admin_page(request):
     users = user_paginator.get_page(user_page_number)
 
     # Task filter and sort
+    task_id_filter = request.GET.get('task_id', '')
     task_user_filter = request.GET.get('task_user', '')
+    task_status_filter = request.GET.get('task_status', '')
     task_date_start_filter = request.GET.get('task_date_start', '')
     task_date_end_filter = request.GET.get('task_date_end', '')
     task_sort_by = request.GET.get('task_sort_by', 'start_timestamp')
@@ -133,8 +135,17 @@ def admin_page(request):
     task_order = f"{'-' if task_sort_dir == 'desc' else ''}{task_sort_by}"
 
     tasks_list = Task.objects.select_related('user').all()
+    if task_id_filter:
+        tasks_list = tasks_list.filter(id=task_id_filter)
     if task_user_filter:
         tasks_list = tasks_list.filter(user__id=task_user_filter)
+    if task_status_filter:
+        if task_status_filter == 'active':
+            tasks_list = tasks_list.filter(active=True)
+        elif task_status_filter == 'completed':
+            tasks_list = tasks_list.filter(active=False, cancelled=False)
+        elif task_status_filter == 'cancelled':
+            tasks_list = tasks_list.filter(cancelled=True)
     if task_date_start_filter:
         tasks_list = tasks_list.filter(start_timestamp__date__gte=task_date_start_filter)
     if task_date_end_filter:
@@ -151,7 +162,9 @@ def admin_page(request):
         'user_sort_by': user_sort_by,
         'user_sort_dir': user_sort_dir,
         'tasks': tasks,
+        'task_id_filter': task_id_filter,
         'task_user_filter': task_user_filter,
+        'task_status_filter': task_status_filter,
         'task_date_start_filter': task_date_start_filter,
         'task_date_end_filter': task_date_end_filter,
         'task_sort_by': task_sort_by,

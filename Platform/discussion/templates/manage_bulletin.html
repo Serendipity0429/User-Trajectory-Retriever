@@ -109,29 +109,35 @@
                     </div>
                 </div>
                 
-                <div class="d-flex justify-content-between align-items-center mt-4">
-                    <div class="d-flex align-items-center" style="gap: 1rem;">
-                        <div class="form-check form-switch">
-                            <input type="checkbox" name="{{ form.pinned.name }}" class="form-check-input {% if form.pinned.errors %}is-invalid{% endif %}" id="{{ form.pinned.id_for_label }}" {% if form.pinned.value %}checked{% endif %}>
-                            <label class="form-check-label" for="{{ form.pinned.id_for_label }}">Pin to top</label>
-                            {% if form.pinned.errors %}
-                                <div class="invalid-feedback">
-                                    {{ form.pinned.errors.as_text }}
+                <div class="post-actions mt-4">
+                    <div class="row gy-3 align-items-center">
+                        <div class="col-lg-8">
+                            <div class="d-flex flex-wrap align-items-center gap-3">
+                                <div class="form-check form-switch">
+                                    <input type="checkbox" name="{{ form.pinned.name }}" class="form-check-input {% if form.pinned.errors %}is-invalid{% endif %}" id="{{ form.pinned.id_for_label }}" {% if form.pinned.value %}checked{% endif %}>
+                                    <label class="form-check-label" for="{{ form.pinned.id_for_label }}">Pin to top</label>
+                                    {% if form.pinned.errors %}
+                                        <div class="invalid-feedback">
+                                            {{ form.pinned.errors.as_text }}
+                                        </div>
+                                    {% endif %}
                                 </div>
-                            {% endif %}
-                        </div>
-                        <div class="form-check form-switch">
-                            <input type="checkbox" name="{{ form.send_notification.name }}" class="form-check-input {% if form.send_notification.errors %}is-invalid{% endif %}" id="{{ form.send_notification.id_for_label }}" {% if form.send_notification.value|default_if_none:True %}checked{% endif %}>
-                            <label class="form-check-label" for="{{ form.send_notification.id_for_label }}">Send Notification</label>
-                            {% if form.send_notification.errors %}
-                                <div class="invalid-feedback">
-                                    {{ form.send_notification.errors.as_text }}
+                                <div class="form-check form-switch">
+                                    <input type="checkbox" name="{{ form.send_notification.name }}" class="form-check-input {% if form.send_notification.errors %}is-invalid{% endif %}" id="{{ form.send_notification.id_for_label }}" {% if form.send_notification.value|default_if_none:True %}checked{% endif %}>
+                                    <label class="form-check-label" for="{{ form.send_notification.id_for_label }}">Send Notification</label>
+                                    {% if form.send_notification.errors %}
+                                        <div class="invalid-feedback">
+                                            {{ form.send_notification.errors.as_text }}
+                                        </div>
+                                    {% endif %}
                                 </div>
-                            {% endif %}
+                            </div>
                         </div>
-                    </div>
-                    <div>
-                        <button type="submit" class="btn btn-primary">Create</button>
+                        <div class="col-lg-4">
+                            <div class="d-grid d-lg-flex justify-content-lg-end">
+                                <button type="submit" class="btn btn-primary">Create</button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </form>
@@ -143,20 +149,22 @@
             Existing Announcements
         </div>
         <div class="card-body">
-            <ul class="list-group">
+            <ul class="list-group list-group-flush">
                 {% for bulletin in bulletins %}
-                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                        <div>
+                    <li class="list-group-item d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2 py-3">
+                        <div class="flex-grow-1">
                             <span class="fw-bold">{{ bulletin.title }}</span>
-                            <span class="badge {{ bulletin.get_category_display|category_color_class }} ms-2">{{ bulletin.get_category_display }}</span>
-                            {% if bulletin.expiry_date and bulletin.expiry_date < now %}<span class="text-danger">(Expired)</span>{% endif %}
+                            <span class="badge {{ bulletin.get_category_display|category_badge_subtle_class }} ms-2">{{ bulletin.get_category_display }}</span>
+                            {% if bulletin.expiry_date and bulletin.expiry_date < now %}<span class="text-danger fw-bold">(Expired)</span>{% endif %}
                         </div>
-                        <div>
-                            <a href="{% url 'edit_bulletin' bulletin.pk %}" class="btn btn-secondary btn-sm">Edit</a>
-                            <a href="{% url 'delete_bulletin' bulletin.pk %}" class="btn btn-danger btn-sm">Delete</a>
-                            <a href="{% url 'bulletin_read_status' bulletin.pk %}" class="btn btn-info btn-sm text-white">Read Status</a>
+                        <div class="d-flex flex-wrap justify-content-end gap-2 mt-2 mt-md-0">
+                            <a href="{% url 'edit_bulletin' bulletin.pk %}" class="btn btn-outline-primary btn-sm"><i class="bi bi-pencil-fill me-1"></i>Edit</a>
+                            <a href="{% url 'delete_bulletin' bulletin.pk %}" class="btn btn-outline-danger btn-sm"><i class="bi bi-trash-fill me-1"></i>Delete</a>
+                            <a href="{% url 'bulletin_read_status' bulletin.pk %}" class="btn btn-outline-info btn-sm"><i class="bi bi-eye-fill me-1"></i>Read Status</a>
                         </div>
                     </li>
+                {% empty %}
+                    <li class="list-group-item text-center text-muted">No announcements found.</li>
                 {% endfor %}
             </ul>
             <nav aria-label="Page navigation">

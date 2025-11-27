@@ -80,6 +80,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 const containerId = link.closest('#user-table-container') ? 'user-table-container' : 'task-table-container';
                 updateContainer(link.href, containerId);
             }
+
+            if (e.target.id === 'clear-task-filter-btn') {
+                e.preventDefault();
+                const form = document.getElementById('task-filter-form');
+                form.reset();
+                form.dispatchEvent(new Event('submit', { cancelable: true }));
+            }
         });
     };
 
@@ -88,27 +95,27 @@ document.addEventListener('DOMContentLoaded', function() {
         const userManagementContainer = document.getElementById('userManagementCollapse');
         if (!userManagementContainer) return;
 
-        userManagementContainer.addEventListener('submit', function(event) {
-            const form = event.target;
-            
-            if (form.matches('form[action*="toggle_superuser"]')) {
-                event.preventDefault();
-                handleToggleSuperuser(form);
-            } else if (form.matches('form[action*="delete_user"]')) {
-                event.preventDefault();
-                handleDeleteUser(form);
+        userManagementContainer.addEventListener('click', function(event) {
+            const button = event.target.closest('.user-action-btn');
+            if (!button) return;
+
+            const url = button.dataset.actionUrl;
+            const method = button.dataset.actionMethod || 'POST';
+            const confirmation = button.dataset.confirm;
+
+            if (confirmation && !confirm(confirmation)) {
+                return;
             }
+
+            performUserAction(url, method, button);
         });
 
-        const handleToggleSuperuser = (form) => {
-            const url = form.action;
-            const csrfToken = getCsrfToken(form);
-            const button = form.querySelector('button[type="submit"]');
-            const userRow = form.closest('tr');
-            const statusBadge = userRow.querySelector('.badge');
+        const performUserAction = (url, method, button) => {
+            const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
+            const userRow = button.closest('tr');
 
             fetch(url, {
-                method: 'POST',
+                method: method,
                 headers: {
                     'X-CSRFToken': csrfToken,
                     'Content-Type': 'application/json',
@@ -118,45 +125,25 @@ document.addEventListener('DOMContentLoaded', function() {
             .then(response => response.json())
             .then(data => {
                 if (data.status === 'success') {
-                    if (data.is_superuser) {
-                        button.textContent = 'Demote';
-                        statusBadge.textContent = 'Yes';
-                        statusBadge.classList.replace('bg-secondary', 'bg-success');
-                    } else {
-                        button.textContent = 'Promote';
-                        statusBadge.textContent = 'No';
-                        statusBadge.classList.replace('bg-success', 'bg-secondary');
+                    if (url.includes('toggle_superuser')) {
+                        const statusBadge = userRow.querySelector('.badge');
+                        if (data.is_superuser) {
+                            button.innerHTML = '<i class="bi bi-person-dash me-2"></i>Demote';
+                            statusBadge.textContent = 'Yes';
+                            statusBadge.classList.replace('bg-secondary', 'bg-success');
+                        } else {
+                            button.innerHTML = '<i class="bi bi-person-plus me-2"></i>Promote';
+                            statusBadge.textContent = 'No';
+                            statusBadge.classList.replace('bg-success', 'bg-secondary');
+                        }
+                    } else if (url.includes('delete_user')) {
+                        userRow.remove();
                     }
                 } else {
-                    alert(data.message || 'An error occurred during superuser toggle.');
+                    alert(data.message || 'An error occurred.');
                 }
             })
-            .catch(error => console.error('Error toggling superuser:', error));
-        };
-
-        const handleDeleteUser = (form) => {
-            if (confirm('Are you sure you want to delete this user?')) {
-                const url = form.action;
-                const csrfToken = getCsrfToken(form);
-                const userRow = form.closest('tr');
-
-                fetch(url, {
-                    method: 'POST',
-                    headers: {
-                        'X-CSRFToken': csrfToken,
-                        'X-Requested-With': 'XMLHttpRequest'
-                    },
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.status === 'success') {
-                        userRow.remove();
-                    } else {
-                        alert(data.message || 'An error occurred while deleting the user.');
-                    }
-                })
-                .catch(error => console.error('Error deleting user:', error));
-            }
+            .catch(error => console.error('Error performing user action:', error));
         };
     };
 

@@ -5,7 +5,7 @@
             <tr>
                 <th><a href="?{% url_replace task_sort_by='id' task_sort_dir=next_task_sort_dirs.id %}">Task ID</a></th>
                 <th><a href="?{% url_replace task_sort_by='user' task_sort_dir=next_task_sort_dirs.user %}">User</a></th>
-                <th><a href="?{% url_replace task_sort_by='start_timestamp' task_sort_dir=next_task_sort_dirs.start_timestamp %}">Start Time</a></th>
+                <th class="d-none d-md-table-cell"><a href="?{% url_replace task_sort_by='start_timestamp' task_sort_dir=next_task_sort_dirs.start_timestamp %}">Start Time</a></th>
                 <th>Status</th>
                 <th>Actions</th>
             </tr>
@@ -15,7 +15,7 @@
             <tr>
                 <td>{{ task.id }}</td>
                 <td>{{ task.user.username }}</td>
-                <td>{{ task.start_timestamp|date:"Y-m-d H:i:s" }}</td>
+                <td class="d-none d-md-table-cell">{{ task.start_timestamp|date:"Y-m-d H:i:s" }}</td>
                 <td>
                     {% if task.cancelled %}
                         <span class="badge bg-danger">Cancelled</span>

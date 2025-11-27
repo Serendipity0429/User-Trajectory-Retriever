@@ -12,6 +12,7 @@
     --bs-btn-disabled-color: #fff;
     --bs-btn-disabled-bg: #021e4d;
     --bs-btn-disabled-border-color: #021e4d;
+    --custom-dark-blue: #021e4d !important;
 }
 
 .card #query-form .btn-outline-primary {
@@ -94,3 +95,14 @@ input {
 input {
     accent-color: #021e4d;
 }
+
+@media (max-width: 480px) {
+    .btn-group {
+        flex-wrap: wrap;
+    }
+}
+
+.form-check-input:checked {                                                                                    
+    background-color: var(--custom-dark-blue);                                                                                 
+    border-color: var(--custom-dark-blue);                                                                                     
+}         

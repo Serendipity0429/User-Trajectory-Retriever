@@ -6,8 +6,10 @@
     <p>Are you sure you want to delete "{{ object.title|default:object }}"?</p>
     <form method="post">
         {% csrf_token %}
-        <button type="submit" class="btn btn-danger">Yes, delete</button>
-        <a href="{{ request.META.HTTP_REFERER }}" class="btn btn-secondary">Cancel</a>
+        <div class="d-grid gap-2 d-sm-flex">
+            <button type="submit" class="btn btn-danger">Yes, delete</button>
+            <a href="{{ request.META.HTTP_REFERER }}" class="btn btn-secondary">Cancel</a>
+        </div>
     </form>
 </div>
 {% endblock %}

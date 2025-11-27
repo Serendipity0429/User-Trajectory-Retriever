@@ -12,7 +12,7 @@
                 <div class="card-body p-5">
                     <div class="row align-items-center mb-5">
                         <div class="col-md-4 text-center">
-                            <img src="{{ user_info.profile.icon.url }}" alt="User Avatar" class="img-fluid rounded-circle mb-3" style="width: 150px; height: 150px; object-fit: cover;">
+                            <img src="{{ user_info.profile.icon.url }}" alt="User Avatar" class="img-fluid rounded-circle mb-3 profile-avatar">
                             <h4>{{ user_info.profile.name|default:"Not Provided" }}</h4>
                             <p class="text-muted">{{ user_info.profile.occupation|capfirst|default:"Not Provided" }}</p>
                         </div>

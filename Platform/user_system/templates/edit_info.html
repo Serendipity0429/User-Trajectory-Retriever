@@ -11,7 +11,7 @@
                 </div>
                 <div class="card-body p-5">
                     <div class="text-center mb-5">
-                        <img id="icon-preview" src="{{ cur_user.profile.icon.url }}" alt="User Icon" class="img-fluid rounded-circle" style="width: 150px; height: 150px; object-fit: cover;">
+                        <img id="icon-preview" src="{{ cur_user.profile.icon.url }}" alt="User Icon" class="img-fluid rounded-circle profile-avatar">
                     </div>
                     <form id="edit_info_form" name="edit_info_form" action="" method="POST" enctype="multipart/form-data">
                         {% csrf_token %}

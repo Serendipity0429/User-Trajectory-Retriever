@@ -100,3 +100,46 @@ def get_icon_for_file(filename):
     if extension in ['c', 'h', 'cpp', 'py', 'js', 'java']:
         return 'bi bi-file-earmark-code-fill'
     return 'bi bi-file-earmark-fill'
+
+from django.utils.timezone import now
+
+@register.filter
+def short_timesince(value):
+    if not value:
+        return ""
+    
+    time_now = now()
+    if value > time_now:
+        return "now"
+
+    delta = time_now - value
+
+    if delta.days >= 365:
+        years = delta.days // 365
+        return f"{years}y"
+    if delta.days >= 30:
+        months = delta.days // 30
+        return f"{months}mo"
+    if delta.days > 0:
+        return f"{delta.days}d"
+    
+    seconds = delta.seconds
+    if seconds < 60:
+        return "now"
+    
+    minutes = seconds // 60
+    if minutes < 60:
+        return f"{minutes}m"
+        
+    hours = minutes // 60
+    return f"{hours}h"
+
+@register.filter
+def abbreviate_category(category):
+    return {
+        'Bugs & Issues': 'Bugs',
+        'Feedback & Suggestions': 'Feedback',
+        'System Update': 'Update',
+    }.get(category, category)
+        
+    

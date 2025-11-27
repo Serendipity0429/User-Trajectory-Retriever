@@ -1,6 +1,5 @@
 :root {
     --custom-dark-blue: #0d6efd;
-
 }
 
 .form-control:focus, .form-select:focus {
@@ -38,7 +37,7 @@ textarea.form-control {
 /* Create Post Page Specifics */
 .create-post-form {
     background: #f8f9fa;
-    padding: 2rem;
+    padding: 1.5rem 1rem; /* Mobile-friendly padding */
     border-radius: 0.5rem;
     box-shadow: 0 2px 4px rgba(0,0,0,.1);
 }
@@ -63,7 +62,8 @@ textarea.form-control {
     transition: background-color 0.15s ease-in-out;
     display: flex;
     justify-content: space-between;
-    align-items: center;
+    align-items: flex-start; /* Mobile: align to start */
+    flex-direction: column; /* Mobile: stack vertically */
     margin-top: 0.5rem;
 }
 
@@ -77,10 +77,18 @@ textarea.form-control {
     overflow: hidden;
     text-overflow: ellipsis;
     margin-right: 1rem;
+    width: 100%; /* Take full width on mobile */
+    margin-bottom: 0.5rem; /* Space between text and buttons */
 }
 
 .attachment-item .btn-group {
     flex-shrink: 0;
+    width: 100%; /* Full-width buttons on mobile */
+    display: flex;
+}
+
+.attachment-item .btn-group .btn {
+    flex: 1; /* Distribute width equally */
 }
 
 .attachment-item i {
@@ -103,7 +111,7 @@ textarea.form-control {
 }
 
 .category-filters {
-    max-width: 50vw;
+    max-width: 100%;
     overflow-x: auto;
     white-space: nowrap;
 }
@@ -193,14 +201,14 @@ textarea.form-control {
     border-color: #c5003e;
 }
 .badge-warning-custom {
-    background-color: #ed6c02;
-    color: white !important;
-    border-color: #ed6c02;
+    background-color: #ffc107;
+    color: #212529 !important;
+    border-color: #ffc107;
 }
 .badge-warning-custom:hover {
-    background-color: #d46102;
-    border-color: #d46102;
-    color: white !important;
+    background-color: #e0a800;
+    border-color: #d39e00;
+    color: #212529 !important;
 }
 .badge-important-custom {
     background-color: #A0001C;
@@ -254,20 +262,27 @@ textarea.form-control {
 }
 
 .post-actions {
-    text-align: right;
+    text-align: center; /* Mobile: center align */
+    margin-top: 1.5rem;
+}
+
+.post-actions .btn {
+    display: block;
+    width: 100%;
+    margin-bottom: 0.5rem;
+}
+
+.post-actions .btn:last-child {
+    margin-bottom: 0;
 }
 
 /* post_detail.html and bulletin_detail.html improvements */
 .discussion-page .card.my-4 .card-body {
-    padding: 1.5rem;
+    padding: 1rem; /* Mobile-friendly padding */
 }
 
 .discussion-page .card.my-4 .card-header {
-    padding: 1rem 1.5rem;
-}
-
-.post-actions {
-    margin-top: 1.5rem;
+    padding: 0.75rem 1rem; /* Mobile-friendly padding */
 }
 
 .discussion-page h3 {
@@ -279,8 +294,8 @@ textarea.form-control {
     z-index: 1051; /* Bootstrap's navbar is 1030, modals are 1050 */
 }
 
-/* 
- * New Discussion Category Styles 
+/*
+ * New Discussion Category Styles
  * A modern, subtle color palette that matches the bulletin style.
  */
 
@@ -303,7 +318,7 @@ textarea.form-control {
 /* Pink Category */
 .badge-discussion-pink {
     color: #d63384;
-    background-color: rgba(214, 51, 132, 0.1);
+    background-color: rgba(214, 51, 132,.1);
     border: 1px solid rgba(214, 51, 132, 0.2);
 }
 .btn-outline-discussion-pink {
@@ -362,4 +377,105 @@ textarea.form-control {
     color: #fff;
     background-color: #fd7e14;
     border-color: #fd7e14;
+}
+
+/* Truncate long titles */
+.bulletin-title,
+.discussion-title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0; /* Allows flex items to shrink and truncate */
+}
+
+/* Base Mobile Styles */
+.bulletin-item-layout {
+  display: flex; /* Ensure flex is defined */
+  flex-direction: column;
+  align-items: flex-start !important;
+}
+.bulletin-item-layout small {
+  margin-top: 0.5rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.bulletin-alert {
+    overflow: hidden;
+}
+
+/* =============================================== */
+/* Responsive Media Queries (Mobile-First)         */
+/* =============================================== */
+
+/* @media (min-width: 576px): Small tablets */
+@media (min-width: 576px) {
+    .attachment-item {
+        flex-direction: row;
+        align-items: center;
+    }
+
+    .attachment-item span {
+        width: auto;
+        margin-bottom: 0;
+    }
+
+    .attachment-item .btn-group {
+        width: auto;
+    }
+
+    .attachment-item .btn-group .btn {
+        flex: none;
+    }
+
+    .post-actions .btn {
+        display: inline-block;
+        width: auto;
+        margin-left: 0.5rem;
+        margin-bottom: 0;
+    }
+}
+
+/* @media (min-width: 768px): Tablets */
+@media (min-width: 768px) {
+    .create-post-form {
+        padding: 2rem;
+    }
+
+    .post-actions {
+        text-align: right;
+    }
+
+    .discussion-page .card.my-4 .card-body {
+        padding: 1.5rem;
+    }
+
+    .discussion-page .card.my-4 .card-header {
+        padding: 1rem 1.5rem;
+    }
+
+    .bulletin-item-layout {
+        flex-direction: row;
+        align-items: center !important;
+    }
+    .bulletin-item-layout small {
+        margin-top: 0;
+    }
+}
+
+/* @media (min-width: 992px): Laptops */
+@media (min-width: 992px) {
+    /* Add laptop-specific styles here if needed */
+}
+
+/* @media (min-width: 1200px): Desktops */
+@media (min-width: 1200px) {
+    /* Add desktop-specific styles here if needed */
+}
+
+/* @media (min-width: 1400px): Extra Large Screens */
+@media (min-width: 1400px) {
+    /* Add extra-large-screen-specific styles here if needed */
 }

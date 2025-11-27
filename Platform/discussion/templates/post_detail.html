@@ -138,13 +138,13 @@
                 {% endwith %}
             </div>
             {% endif %}
-            <div class="post-actions mt-4 d-flex justify-content-end align-items-center flex-wrap" style="gap: 0.5rem;">
+            <div class="post-actions mt-4 d-grid gap-2 d-md-flex justify-content-md-end flex-md-wrap">
                 {% if user == post.author or user.is_staff %}
                     <a href="{% url 'edit_post' post.pk %}" class="btn btn-outline-primary btn-sm"><i class="bi bi-pencil-fill me-1"></i>Edit</a>
                     <a href="{% url 'delete_post' post.pk %}" class="btn btn-outline-danger btn-sm"><i class="bi bi-trash-fill me-1"></i>Delete</a>
                 {% endif %}
                 {% if user.is_staff %}
-                    <form action="{% url 'toggle_post_hidden' post.pk %}" method="post" class="d-inline">
+                    <form action="{% url 'toggle_post_hidden' post.pk %}" method="post" class="d-grid">
                         {% csrf_token %}
                         <button type="submit" class="btn btn-sm {% if post.is_hidden %}btn-outline-success{% else %}btn-outline-warning{% endif %}">
                             <i class="bi {% if post.is_hidden %}bi-eye-fill{% else %}bi-eye-slash-fill{% endif %} me-1"></i>
@@ -153,7 +153,7 @@
                     </form>
                 {% endif %}
                 {% if user == post.author or user.is_staff %}
-                    <form action="{% url 'toggle_post_private' post.pk %}" method="post" class="d-inline">
+                    <form action="{% url 'toggle_post_private' post.pk %}" method="post" class="d-grid">
                         {% csrf_token %}
                         <button type="submit" class="btn btn-sm {% if post.is_private %}btn-outline-secondary{% else %}btn-outline-info{% endif %}">
                             <i class="bi {% if post.is_private %}bi-shield-slash-fill{% else %}bi-shield-lock-fill{% endif %} me-1"></i>
@@ -162,7 +162,7 @@
                     </form>
                 {% endif %}
                 {% if user == post.author or user.is_staff %}
-                    <form action="{% url 'toggle_post_closed' post.pk %}" method="post" class="d-inline">
+                    <form action="{% url 'toggle_post_closed' post.pk %}" method="post" class="d-grid">
                         {% csrf_token %}
                         {% if post.is_closed %}
                             {% if user.is_staff %}
@@ -202,7 +202,7 @@
                                 <a href="{% url 'delete_comment' comment.pk %}" class="btn btn-danger btn-sm">Delete</a>
                             {% endif %}
                             {% if user.is_staff %}
-                                <form action="{% url 'toggle_comment_hidden' comment.pk %}" method="post" class="d-inline">
+                                <form action="{% url 'toggle_comment_hidden' comment.pk %}" method="post" class="d-grid">
                                     {% csrf_token %}
                                     <button type="submit" class="btn btn-sm {% if comment.is_hidden %}btn-success{% else %}btn-warning{% endif %}">
                                         {% if comment.is_hidden %}Show{% else %}Hide{% endif %}

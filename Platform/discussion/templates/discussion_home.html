@@ -3,7 +3,7 @@
 
 {% block content %}
 <div class="container discussion-page">
-    <div class="d-flex justify-content-between align-items-center">
+    <div class="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center">
         <h1 class="mt-4">Discussion Forum</h1>
         <button id="refresh-btn" class="btn btn-outline-secondary" onclick="location.reload();">
             Refresh <i class="bi bi-arrow-clockwise"></i>
@@ -12,40 +12,50 @@
 
     <div class="card my-4">
         <div class="card-header d-flex flex-column flex-lg-row justify-content-between align-items-center">
-            <span class="mb-2 mb-lg-0">Bulletin</span>
+            <div class="d-flex align-items-center mb-2 mb-lg-0">
+                <h5 class="mb-0">Bulletin</h5>
+            </div>
             {% if user.is_staff %}
                 <a href="{% url 'manage_bulletin' %}" class="btn btn-outline-secondary btn-sm">Manage Announcements</a>
             {% endif %}
         </div>
         <div class="card-body">
+            <div class="list-group">
             {% for bulletin in pinned_bulletins %}
-                <div class="alert alert-light" role="alert">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <h5 class="mb-0">
-                            {% if bulletin.pinned %}<i class="bi bi-pin-angle-fill"></i>{% endif %}
-                            <span class="badge {{ bulletin.get_category_display|category_badge_subtle_class }} me-2">{{ bulletin.get_category_display }}</span>
-                            <a href="{% url 'bulletin_detail' bulletin.pk %}" class="text-decoration-none text-dark fw-bold">{{ bulletin.title }}</a>
+                <a href="{% url 'bulletin_detail' bulletin.pk %}" class="list-group-item list-group-item-action">
+                    <div class="d-flex w-100 justify-content-between">
+                        <h5 class="mb-1 bulletin-title flex-fill">
+                            {% if bulletin.pinned %}<i class="bi bi-pin-angle-fill me-2"></i>{% endif %}
+                            <span class="badge {{ bulletin.get_category_display|category_badge_subtle_class }} me-2">
+                                <span class="d-none d-md-inline">{{ bulletin.get_category_display }}</span>
+                                <span class="d-md-none">{{ bulletin.get_category_display|abbreviate_category }}</span>
+                            </span>
+                            {{ bulletin.title }}
                         </h5>
-                        <small class="text-muted">{{ bulletin.updated_at|date:"Y-m-d" }} {% if bulletin|was_updated %}(edited){% endif %}
+                        <small class="text-muted">{{ bulletin.updated_at|short_timesince }} {% if bulletin|was_updated %}(edited){% endif %}
                             {% if user.is_staff and bulletin.expiry_date and bulletin.expiry_date < now %}<span class="text-danger">(Expired)</span>{% endif %}
                         </small>
                     </div>
-                </div>
+                </a>
             {% endfor %}
             {% for bulletin in bulletins %}
-                <div class="alert alert-light" role="alert">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <h5 class="mb-0">
-                            {% if bulletin.pinned %}<i class="bi bi-pin-angle-fill"></i>{% endif %}
-                            <span class="badge {{ bulletin.get_category_display|category_badge_subtle_class }} me-2">{{ bulletin.get_category_display }}</span>
-                            <a href="{% url 'bulletin_detail' bulletin.pk %}" class="text-decoration-none text-dark fw-bold">{{ bulletin.title }}</a>
+                <a href="{% url 'bulletin_detail' bulletin.pk %}" class="list-group-item list-group-item-action">
+                    <div class="d-flex w-100 justify-content-between">
+                        <h5 class="mb-1 bulletin-title flex-fill">
+                            {% if bulletin.pinned %}<i class="bi bi-pin-angle-fill me-2"></i>{% endif %}
+                            <span class="badge {{ bulletin.get_category_display|category_badge_subtle_class }} me-2">
+                                <span class="d-none d-md-inline">{{ bulletin.get_category_display }}</span>
+                                <span class="d-md-none">{{ bulletin.get_category_display|abbreviate_category }}</span>
+                            </span>
+                            {{ bulletin.title }}
                         </h5>
-                        <small class="text-muted">{{ bulletin.updated_at|date:"Y-m-d" }} {% if bulletin|was_updated %}(edited){% endif %}
+                        <small class="text-muted">{{ bulletin.updated_at|short_timesince }} {% if bulletin|was_updated %}(edited){% endif %}
                             {% if user.is_staff and bulletin.expiry_date and bulletin.expiry_date < now %}<span class="text-danger">(Expired)</span>{% endif %}
                         </small>
                     </div>
-                </div>
+                </a>
             {% endfor %}
+            </div>
 
             {% if not bulletins and not pinned_bulletins %}
                 <p>No announcements.</p>

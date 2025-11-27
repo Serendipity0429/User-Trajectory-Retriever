@@ -20,7 +20,7 @@
                         {% endif %}
                     </a>
                 </th>
-                <th scope="col">
+                <th scope="col" class="d-none d-sm-table-cell">
                     <a href="?{% url_replace user_sort_by='profile__name' user_sort_dir=next_user_sort_dirs.profile__name %}">
                         Name
                         {% if user_sort_by == 'profile__name' %}
@@ -53,7 +53,7 @@
                 <th scope="row">{{ forloop.counter0 | add:users.start_index }}</th>
                 <td>{{ user.username }}</td>
                 <td class="d-none d-md-table-cell">{{ user.email }}</td>
-                <td>{{ user.profile.name }}</td>
+                <td class="d-none d-sm-table-cell">{{ user.profile.name }}</td>
                 <td>
                     {% if user.is_primary_superuser %}
                         <span class="badge bg-primary">Primary</span>

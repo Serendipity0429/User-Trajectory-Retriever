@@ -28,6 +28,8 @@ The system is composed of two main parts:
 - **Discussion Forum:** A new discussion forum has been added to the platform, allowing users to interact with each other, ask questions, and share their findings.
 - **UI Enhancements:** The user interface has been updated for a more modern look and feel, including the addition of a dark mode.
 - **Performance Improvements:** The rrweb player is now lazy-loaded, improving the initial page load time.
+- **Improved Mobile Responsiveness:** The UI has been optimized for a better experience on mobile and tablet devices.
+- **Benchmarking as Django Commands:** The benchmarking scripts have been refactored into Django management commands for easier execution and integration.
 
 ## System Architecture
 

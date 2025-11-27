@@ -2,7 +2,7 @@
 
 {% block content %}
 <div class="container">
-    <div class="d-flex justify-content-between align-items-center mb-3">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
         <h2>Sent Messages</h2>
         <div>
             <a href="{% url 'msg_system:message_list' %}" class="btn btn-outline-secondary">Inbox</a>
@@ -17,7 +17,7 @@
                 {% elif message.level == 'WARNING' %}alert-warning
                 {% elif message.level == 'ERROR' %}alert-danger
                 {% endif %}">
-                <div class="d-flex w-100 justify-content-between">
+                <div class="d-flex w-100 flex-wrap justify-content-between gap-1">
                     <h5 class="mb-1">{{ message.subject }}</h5>
                     <small>{{ message.timestamp|timesince }} ago</small>
                 </div>
@@ -30,7 +30,7 @@
                         <span class="badge bg-light text-dark border">+{{ message.recipients.all|length|add:"-5" }} more</span>
                     {% endif %}
                 </p>
-                <small>{{ message.body|truncatewords:20 }}</small>
+                <small class="message-body-preview">{{ message.body|striptags }}</small>
             </a>
         {% empty %}
             <div class="list-group-item">

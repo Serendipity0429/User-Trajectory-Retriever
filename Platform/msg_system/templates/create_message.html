@@ -90,7 +90,7 @@
         {{ form.recipients }}
         
         <div class="mb-3" id="recipients-container">
-            <div class="d-flex justify-content-between align-items-center mb-2">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
                 <label for="recipient-input" class="form-label mb-0">Recipients</label>
                 <div class="form-check form-switch">
                     <input type="checkbox" name="{{ form.send_to_all.name }}" class="form-check-input" id="{{ form.send_to_all.id_for_label }}" {% if form.send_to_all.value %}checked{% endif %}>
@@ -143,7 +143,7 @@
             {% endif %}
         </div>
         
-        <div class="d-flex justify-content-between align-items-center mt-4">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-4">
             <div class="form-check form-switch">
                 <input type="checkbox" name="{{ form.is_pinned.name }}" class="form-check-input" id="{{ form.is_pinned.id_for_label }}" {% if form.is_pinned.value %}checked{% endif %}>
                 <label class="form-check-label" for="{{ form.is_pinned.id_for_label }}">Pin this message</label>

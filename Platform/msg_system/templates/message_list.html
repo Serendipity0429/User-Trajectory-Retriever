@@ -2,7 +2,7 @@
 
 {% block content %}
 <div class="container">
-    <div class="d-flex justify-content-between align-items-center mb-3">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
         <h2>Your Messages</h2>
         {% if user.is_superuser %}
         <div>
@@ -18,7 +18,7 @@
                 {% elif message.level == 'WARNING' %}alert-warning
                 {% elif message.level == 'ERROR' %}alert-danger
                 {% endif %}">
-                <div class="d-flex w-100 justify-content-between">
+                <div class="d-flex w-100 flex-wrap justify-content-between gap-1">
                     <h5 class="mb-1">
                         {% if message.is_pinned_for_user %}
                             <i class="bi bi-pin-angle-fill me-2"></i>
@@ -28,7 +28,7 @@
                     <small>{{ message.timestamp|timesince }} ago</small>
                 </div>
                 <p class="mb-1">From: {{ message.sender }}</p>
-                <small>{{ message.body|truncatewords:20 }}</small>
+                <small class="message-body-preview">{{ message.body|striptags }}</small>
             </a>
         {% empty %}
             <p>You have no messages.</p>

@@ -13,7 +13,7 @@
     {% for msg in conversation_messages %}
     <div class="card mb-3
         {% if msg.sender == request.user %}border-primary{% else %}border-secondary{% endif %}">
-        <div class="card-header d-flex justify-content-between align-items-center p-3
+        <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2 p-3
             {% if msg.level == 'INFO' %}alert-info
             {% elif msg.level == 'WARNING' %}alert-warning
             {% elif msg.level == 'ERROR' %}alert-danger
@@ -23,7 +23,7 @@
                 <span class="text-muted"> | {{ msg.timestamp }}</span>
             </div>
             {% if forloop.last and request.user != msg.sender %}
-            <div>
+            <div class="d-flex flex-wrap gap-2">
                 <a href="{% url 'msg_system:reply_message' msg.pk %}" class="btn btn-primary btn-sm">Reply</a>
                 <form action="{% url 'msg_system:pin_message' msg.pk %}" method="post" class="d-inline">
                     {% csrf_token %}

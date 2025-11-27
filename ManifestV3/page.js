@@ -234,6 +234,8 @@ class ViewState {
         message.command = "send_message";
         message.is_routine_update = is_routine_update;
         message.url = _content_vars.url_now;
+        message.width = window.innerWidth;
+        message.height = window.innerHeight;
         message.start_timestamp = this.pageManager.start_timestamp;
         message.referrer = _content_vars.referrer_now;
 

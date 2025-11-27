@@ -33,6 +33,12 @@
   "background": {
     "service_worker": "background.js"
   },
+  "externally_connectable": {
+    "matches": [
+      "http://127.0.0.1:8000/*",
+      "http://101.6.41.59:32904/*"
+    ]
+  },
   "content_security_policy": {
     "extension_pages": "script-src 'self'; connect-src http://127.0.0.1:8000 http://101.6.41.59:32904;"
   },
@@ -105,6 +111,14 @@
       ],
       "run_at": "document_start",
       "all_frames": false
+    },
+    {
+      "matches": [
+        "http://127.0.0.1:8000/*",
+        "http://101.6.41.59:32904/*"
+      ],
+      "js": ["close_helper.js"],
+      "run_at": "document_start"
     }
   ]
 }

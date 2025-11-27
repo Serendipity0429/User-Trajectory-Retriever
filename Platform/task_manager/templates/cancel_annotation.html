@@ -41,7 +41,7 @@
                                                 {% for webpage in trial.webpages %}
                                                 <div class="d-flex flex-column align-items-center mb-5 p-4 border rounded shadow-sm bg-light">
                                                                                                         <p class="h5"><a href="{{ webpage.url }}" target="_blank">{{ webpage.title }}</a></p>
-                                                                                                        <div class="rrweb-player-wrapper" id="rrweb-player-{{ webpage.id }}" data-webpage-id="{{ webpage.id }}" style="margin-top: 20px;"></div>
+                                                                                                        <div class="rrweb-player-wrapper" id="rrweb-player-{{ webpage.id }}" data-webpage-id="{{ webpage.id }}" data-webpage-width="{{ webpage.width }}" data-webpage-height="{{ webpage.height }}" style="margin-top: 20px;"></div>
                                                                                                     </div>                                                {% endfor %}
                                                 {% if not trial.webpages %}
                                                 <p>No trajectories recorded for this trial.</p>
@@ -121,7 +121,7 @@
                             <div id="unselected-resources-list" class="list-group">
                                 {% for key, value in MISSING_RESOURCES_MAP.items %}
                                 <div class="list-group-item drag-option d-flex align-items-center mb-2" data-value="{{ key }}">
-                                    <input class="form-check-input me-2" type="checkbox" name="cancel_missing_resources" value="{{ key }}">
+                                    <input class="form-check-input me-2 flex-shrink-0" type="checkbox" name="cancel_missing_resources" value="{{ key }}">
                                     <span class="drag-handle me-2"><i class="bi bi-grip-vertical"></i></span>
                                     <span class="priority-number me-2"></span>
                                     {% if key == 'other' %}

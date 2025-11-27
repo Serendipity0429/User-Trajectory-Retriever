@@ -5,19 +5,66 @@ function enableAccordionButtons() {
     });
 }
 
-// Check if the DOM is already loaded
 if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", enableAccordionButtons);
-} else {  // `DOMContentLoaded` has already fired
+} else {
     enableAccordionButtons();
 }
 
-const accordions = document.querySelectorAll('.accordion-collapse');
+const loadedPlayers = new Map();
 
+function debounce(func, delay) {
+    let timeout;
+    return function(...args) {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(this, args), delay);
+    };
+}
+
+function createPlayer(wrapper, events) {
+    wrapper.innerHTML = '';
+    if (!Array.isArray(events) || events.length === 0) {
+        wrapper.innerHTML = '<p class="text-center text-muted">No recording data available.</p>';
+        return null;
+    }
+
+    const recordedWidth = parseInt(wrapper.dataset.webpageWidth, 10);
+    const recordedHeight = parseInt(wrapper.dataset.webpageHeight, 10);
+    let recordedAspectRatio;
+
+    if (recordedWidth && recordedHeight) {
+        recordedAspectRatio = recordedHeight / recordedWidth;
+    } else {
+        const metaEvent = events.find(e => e.type === 2 && e.data.href);
+        const fallbackWidth = metaEvent ? metaEvent.data.width : 1920;
+        const fallbackHeight = metaEvent ? metaEvent.data.height : 1080;
+        recordedAspectRatio = fallbackHeight / fallbackWidth;
+    }
+
+    const container = wrapper.closest('.accordion-body');
+    if (container) {
+        const containerWidth = container.clientWidth * 0.9;
+        const calculatedHeight = containerWidth * recordedAspectRatio;
+
+        const PlayerClass = (typeof rrwebPlayer === 'object' && rrwebPlayer.default) ? rrwebPlayer.default : rrwebPlayer;
+
+        return new PlayerClass({
+            target: wrapper,
+            props: {
+                events: events,
+                autoPlay: false,
+                width: containerWidth,
+                height: calculatedHeight,
+                UNSAFE_replayCanvas: true,
+            },
+        });
+    }
+    return null;
+}
+
+const accordions = document.querySelectorAll('.accordion-collapse');
 accordions.forEach(function(collapseEl) {
-    collapseEl.addEventListener('shown.bs.collapse', function () {
-        // If the current accordion contains other accordions, don't load players here.
-        // Let the event handlers on the nested accordions handle it.
+    collapseEl.addEventListener('shown.bs.collapse', function() {
         if (collapseEl.querySelector('.accordion-collapse')) {
             return;
         }
@@ -26,7 +73,7 @@ accordions.forEach(function(collapseEl) {
         playerWrappers.forEach(function(wrapper, index) {
             setTimeout(function() {
                 if (wrapper.dataset.loaded === 'true' || wrapper.childElementCount > 0) {
-                    return; // Already loaded or loading
+                    return;
                 }
                 const webpageId = wrapper.dataset.webpageId;
                 if (!webpageId) return;
@@ -55,29 +102,9 @@ accordions.forEach(function(collapseEl) {
                         return response.json();
                     })
                     .then(events => {
-                        wrapper.innerHTML = '';
-                        if (!Array.isArray(events) || events.length === 0) {
-                            wrapper.innerHTML = '<p class="text-center text-muted">No recording data available.</p>';
-                            return;
-                        }
-                        const container = wrapper.closest('.accordion-body');
-                        if (container) {
-                            const containerWidth = container.clientWidth * 0.9;
-                            const screenRatio = window.innerHeight / window.innerWidth;
-                            const calculatedHeight = containerWidth * screenRatio;
-                            
-                            const PlayerClass = (typeof rrwebPlayer === 'object' && rrwebPlayer.default) ? rrwebPlayer.default : rrwebPlayer;
-                            
-                            new PlayerClass({
-                                target: wrapper,
-                                props: {
-                                    events: events,
-                                    autoPlay: false,
-                                    width: containerWidth,
-                                    height: calculatedHeight,
-                                    UNSAFE_replayCanvas: true,
-                                },
-                            });
+                        const instance = createPlayer(wrapper, events);
+                        if (instance) {
+                            loadedPlayers.set(wrapper, { events, instance });
                         }
                     })
                     .catch(error => {
@@ -87,7 +114,21 @@ accordions.forEach(function(collapseEl) {
                     .finally(() => {
                         if (parentContainer) parentContainer.classList.add('bg-light');
                     });
-            }, index * 100); // 200ms delay between each request
+            }, index * 100);
         });
     });
 });
+
+window.addEventListener('resize', debounce(() => {
+    loadedPlayers.forEach((data, wrapper) => {
+        if (wrapper.offsetParent !== null) {
+            if (data.instance && typeof data.instance.$destroy === 'function') {
+                data.instance.$destroy();
+            }
+            const newInstance = createPlayer(wrapper, data.events);
+            if (newInstance) {
+                data.instance = newInstance;
+            }
+        }
+    });
+}, 250));

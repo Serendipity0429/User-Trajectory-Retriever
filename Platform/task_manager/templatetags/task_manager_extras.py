@@ -47,3 +47,14 @@ def format_duration(duration):
     seconds = duration.total_seconds()
     minutes = seconds / 60
     return f"{minutes:.1f} minutes"
+
+@register.filter
+def format_duration_short(duration):
+    if duration is None:
+        return ""
+    seconds = int(duration.total_seconds())
+    if seconds < 60:
+        return f"{seconds} s"
+    else:
+        minutes = round(seconds / 60)
+        return f"{minutes} m"

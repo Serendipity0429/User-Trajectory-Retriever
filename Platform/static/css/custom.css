@@ -19,6 +19,11 @@ p {
 }
 
 a {
+    color: inherit;
+}
+
+
+a.btn:not(.btn-outline-primary, .btn-outline-secondary) {
     color: #fff;
 }
 

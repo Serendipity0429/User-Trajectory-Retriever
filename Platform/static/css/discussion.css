@@ -278,3 +278,88 @@ textarea.form-control {
 .EasyMDEContainer .CodeMirror-fullscreen {
     z-index: 1051; /* Bootstrap's navbar is 1030, modals are 1050 */
 }
+
+/* 
+ * New Discussion Category Styles 
+ * A modern, subtle color palette that matches the bulletin style.
+ */
+
+/* Purple Category */
+.badge-discussion-purple {
+    color: #6f42c1;
+    background-color: rgba(111, 66, 193, 0.1);
+    border: 1px solid rgba(111, 66, 193, 0.2);
+}
+.btn-outline-discussion-purple {
+    color: #6f42c1;
+    border-color: #6f42c1;
+}
+.btn-outline-discussion-purple:hover, .btn-discussion-purple {
+    color: #fff;
+    background-color: #6f42c1;
+    border-color: #6f42c1;
+}
+
+/* Pink Category */
+.badge-discussion-pink {
+    color: #d63384;
+    background-color: rgba(214, 51, 132, 0.1);
+    border: 1px solid rgba(214, 51, 132, 0.2);
+}
+.btn-outline-discussion-pink {
+    color: #d63384;
+    border-color: #d63384;
+}
+.btn-outline-discussion-pink:hover, .btn-discussion-pink {
+    color: #fff;
+    background-color: #d63384;
+    border-color: #d63384;
+}
+
+/* Teal Category */
+.badge-discussion-teal {
+    color: #20c997;
+    background-color: rgba(32, 201, 151, 0.1);
+    border: 1px solid rgba(32, 201, 151, 0.2);
+}
+.btn-outline-discussion-teal {
+    color: #20c997;
+    border-color: #20c997;
+}
+.btn-outline-discussion-teal:hover, .btn-discussion-teal {
+    color: #fff;
+    background-color: #20c997;
+    border-color: #20c997;
+}
+
+/* Lime Category */
+.badge-discussion-lime {
+    color: #73b317;
+    background-color: rgba(115, 179, 23, 0.15);
+    border: 1px solid rgba(115, 179, 23, 0.25);
+}
+.btn-outline-discussion-lime {
+    color: #73b317;
+    border-color: #73b317;
+}
+.btn-outline-discussion-lime:hover, .btn-discussion-lime {
+    color: #fff;
+    background-color: #73b317;
+    border-color: #73b317;
+}
+
+/* Orange Category */
+.badge-discussion-orange {
+    color: #fd7e14;
+    background-color: rgba(253, 126, 20, 0.1);
+    border: 1px solid rgba(253, 126, 20, 0.2);
+}
+.btn-outline-discussion-orange {
+    color: #fd7e14;
+    border-color: #fd7e14;
+}
+.btn-outline-discussion-orange:hover, .btn-discussion-orange {
+    color: #fff;
+    background-color: #fd7e14;
+    border-color: #fd7e14;
+}

@@ -96,37 +96,43 @@
             </div>
         </div>
         
-        <div class="d-flex justify-content-between align-items-start mt-4">
-            <div class="d-flex align-items-start gap-4 justify-content-center">
-                {% if form.pinned %}
-                <div class="form-check form-switch me-3">
-                    <input type="checkbox" name="{{ form.pinned.name }}" class="form-check-input {% if form.pinned.errors %}is-invalid{% endif %}" id="{{ form.pinned.id_for_label }}" {% if form.pinned.value %}checked{% endif %}>
-                    <label class="form-check-label" for="{{ form.pinned.id_for_label }}">Pin to top</label>
-                    {% if form.pinned.errors %}
-                        <div class="invalid-feedback">
-                            {{ form.pinned.errors.as_text }}
+        <div class="post-actions mt-4">
+            <div class="row gy-3 align-items-center">
+                <div class="col-lg-8">
+                    <div class="d-flex flex-wrap align-items-center gap-3">
+                        {% if form.pinned %}
+                        <div class="form-check form-switch">
+                            <input type="checkbox" name="{{ form.pinned.name }}" class="form-check-input {% if form.pinned.errors %}is-invalid{% endif %}" id="{{ form.pinned.id_for_label }}" {% if form.pinned.value %}checked{% endif %}>
+                            <label class="form-check-label" for="{{ form.pinned.id_for_label }}">Pin to top</label>
+                            {% if form.pinned.errors %}
+                                <div class="invalid-feedback">
+                                    {{ form.pinned.errors.as_text }}
+                                </div>
+                            {% endif %}
                         </div>
-                    {% endif %}
-                </div>
-                {% endif %}
-                {% if form.is_private %}
-                <div class="form-check form-switch">
-                    <input type="checkbox" name="{{ form.is_private.name }}" class="form-check-input {% if form.is_private.errors %}is-invalid{% endif %}" id="{{ form.is_private.id_for_label }}" {% if form.is_private.value %}checked{% endif %}>
-                    <label class="form-check-label" for="{{ form.is_private.id_for_label }}">
-                        <i class="bi bi-shield-lock-fill"></i> Make Post Private
-                        <i class="bi bi-question-circle-fill text-muted ms-1" data-bs-toggle="tooltip" title="Only you and administrators will be able to see this post."></i>
-                    </label>
-                    {% if form.is_private.errors %}
-                        <div class="invalid-feedback">
-                            {{ form.is_private.errors.as_text }}
+                        {% endif %}
+                        {% if form.is_private %}
+                        <div class="form-check form-switch">
+                            <input type="checkbox" name="{{ form.is_private.name }}" class="form-check-input {% if form.is_private.errors %}is-invalid{% endif %}" id="{{ form.is_private.id_for_label }}" {% if form.is_private.value %}checked{% endif %}>
+                            <label class="form-check-label" for="{{ form.is_private.id_for_label }}">
+                                <i class="bi bi-shield-lock-fill"></i> Make Post Private
+                                <i class="bi bi-question-circle-fill text-muted ms-1" data-bs-toggle="tooltip" title="Only you and administrators will be able to see this post."></i>
+                            </label>
+                            {% if form.is_private.errors %}
+                                <div class="invalid-feedback">
+                                    {{ form.is_private.errors.as_text }}
+                                </div>
+                            {% endif %}
                         </div>
-                    {% endif %}
+                        {% endif %}
+                    </div>
                 </div>
-                {% endif %}
-            </div>
-            <div>
-                <button type="submit" class="btn btn-primary me-2">Save Changes</button>
-                <a href="javascript:history.back()" class="btn btn-secondary">Cancel</a>
+                <div class="col-lg-4">
+                    <div class="d-flex justify-content-center justify-content-lg-end gap-2">
+                        <button type="submit" class="btn btn-primary flex-grow-1 flex-lg-grow-0">Save Changes</button>
+                        <a href="javascript:history.back()" class="btn btn-secondary flex-grow-1 flex-lg-grow-0">Cancel</a>
+                    </div>
+                </div>
             </div>
         </div>
     </form>

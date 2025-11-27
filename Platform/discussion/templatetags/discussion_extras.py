@@ -42,6 +42,35 @@ def category_badge_class(category):
     }.get(category, 'badge-general-custom')
 
 @register.filter
+def category_badge_subtle_class(category):
+    return {
+        'Warning': 'bg-dark-subtle text-dark-emphasis border border-dark-subtle',
+        'Bugs & Issues': 'bg-warning-subtle text-warning-emphasis border border-warning-subtle',
+        'Important': 'bg-danger-subtle text-danger-emphasis border border-danger-subtle',
+        'System Update': 'bg-primary-subtle text-primary-emphasis border border-primary-subtle',
+        'Feedback & Suggestions': 'bg-success-subtle text-success-emphasis border border-success-subtle',
+    }.get(category, 'bg-secondary-subtle text-secondary-emphasis border border-secondary-subtle')
+
+@register.filter
+def category_button_class(category):
+    return {
+        'Warning': 'discussion-orange',
+        'Bugs & Issues': 'discussion-pink',
+        'Important': 'discussion-purple',
+        'System Update': 'discussion-teal',
+        'Feedback & Suggestions': 'discussion-lime',
+    }.get(category, 'secondary')
+
+@register.filter
+def discussion_category_badge_subtle_class(category):
+    return {
+        'Warning': 'badge-discussion-orange',
+        'Bugs & Issues': 'badge-discussion-pink',
+        'Important': 'badge-discussion-purple',
+        'System Update': 'badge-discussion-teal',
+        'Feedback & Suggestions': 'badge-discussion-lime',
+    }.get(category, 'bg-secondary-subtle text-secondary-emphasis border border-secondary-subtle')
+@register.filter
 def to_outline_badge(badge_class):
     return badge_class.replace('badge-', 'badge-outline-')
 

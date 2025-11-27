@@ -166,7 +166,7 @@ def discussion_home(request):
         'pinned_posts': pinned_posts,
         'posts': posts,
         'post_page_range': post_page_range,
-        'categories': [category[0] for category in categories],
+        'categories': categories,
         'post_limit_reached': post_limit_reached,
     })
 

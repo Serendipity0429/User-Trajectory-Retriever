@@ -11,8 +11,8 @@
     </div>
 
     <div class="card my-4">
-        <div class="card-header d-flex justify-content-between align-items-center">
-            Bulletin
+        <div class="card-header d-flex flex-column flex-lg-row justify-content-between align-items-center">
+            <span class="mb-2 mb-lg-0">Bulletin</span>
             {% if user.is_staff %}
                 <a href="{% url 'manage_bulletin' %}" class="btn btn-outline-secondary btn-sm">Manage Announcements</a>
             {% endif %}
@@ -23,7 +23,7 @@
                     <div class="d-flex justify-content-between align-items-center">
                         <h5 class="mb-0">
                             {% if bulletin.pinned %}<i class="bi bi-pin-angle-fill"></i>{% endif %}
-                            <span class="badge {{ bulletin.get_category_display|category_color_class }} me-2">{{ bulletin.get_category_display }}</span>
+                            <span class="badge {{ bulletin.get_category_display|category_badge_subtle_class }} me-2">{{ bulletin.get_category_display }}</span>
                             <a href="{% url 'bulletin_detail' bulletin.pk %}" class="text-decoration-none text-dark fw-bold">{{ bulletin.title }}</a>
                         </h5>
                         <small class="text-muted">{{ bulletin.updated_at|date:"Y-m-d" }} {% if bulletin|was_updated %}(edited){% endif %}
@@ -37,7 +37,7 @@
                     <div class="d-flex justify-content-between align-items-center">
                         <h5 class="mb-0">
                             {% if bulletin.pinned %}<i class="bi bi-pin-angle-fill"></i>{% endif %}
-                            <span class="badge {{ bulletin.get_category_display|category_color_class }} me-2">{{ bulletin.get_category_display }}</span>
+                            <span class="badge {{ bulletin.get_category_display|category_badge_subtle_class }} me-2">{{ bulletin.get_category_display }}</span>
                             <a href="{% url 'bulletin_detail' bulletin.pk %}" class="text-decoration-none text-dark fw-bold">{{ bulletin.title }}</a>
                         </h5>
                         <small class="text-muted">{{ bulletin.updated_at|date:"Y-m-d" }} {% if bulletin|was_updated %}(edited){% endif %}
@@ -76,37 +76,39 @@
     </div>
 
     <div class="card my-4">
-        <div class="card-header d-flex justify-content-between align-items-center">
-            <div class="d-flex align-items-center">
+        <div class="card-header d-flex flex-column flex-lg-row justify-content-between align-items-center">
+            <div class="d-flex align-items-center mb-2 mb-lg-0">
                 <h5 class="mb-0">Discussions</h5>
             </div>
-            <div class="category-filters">
-                <a href="{% url 'discussion_home' %}" class="btn btn-sm {% if not request.GET.category %}btn-primary{% else %}btn-outline-primary{% endif %}">All</a>
-                {% for category in categories %}
-                    {% with badge_class=category|category_badge_class %}
-                        <a href="?category={{ category }}" data-badge-class="{{ badge_class }}" class="btn btn-sm {% if request.GET.category == category %}{{ badge_class }}{% else %}{{ badge_class|to_outline_badge }}{% endif %}">{{ category }}</a>
-                    {% endwith %}
-                {% endfor %}
+            <div class="category-filters mt-2 mt-lg-0 d-flex flex-wrap justify-content-center">
+                <a href="{% url 'discussion_home' %}" class="btn btn-sm {% if not request.GET.category %}btn-primary{% else %}btn-outline-primary{% endif %} m-1" data-button-class="primary">All</a>
+    {% for category in categories %}
+        {% with button_class=category.1|category_button_class %}
+        <a href="?category={{ category.0 }}" class="btn btn-sm m-1 {% if active_category == category.0|stringformat:"s" %}btn-{{ button_class }}{% else %}btn-outline-{{ button_class }}{% endif %}" data-button-class="{{ button_class }}">
+            {{ category.1 }}
+        </a>
+        {% endwith %}
+    {% endfor %}
             </div>
         </div>
         <div class="card-body">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <div>
+            <div class="d-flex flex-column mb-3">
+                <div id="utility-buttons" class="d-flex flex-wrap justify-content-center justify-content-lg-start align-items-center">
                     {% if user.is_staff or not post_limit_reached %}
-                        <a href="{% url 'create_post' %}" class="btn btn-primary">Create New Post</a>
+                        <a href="{% url 'create_post' %}" class="btn btn-primary m-1">Create New Post</a>
                     {% else %}
-                        <button class="btn btn-primary" disabled data-bs-toggle="tooltip" title="You have reached your post limit for today.">Create New Post</button>
+                        <button class="btn btn-primary m-1" disabled data-bs-toggle="tooltip" title="You have reached your post limit for today.">Create New Post</button>
                     {% endif %}
-                    <a href="{% url 'discussion_home' %}" class="btn btn-outline-secondary {% if not request.GET.show %}active{% endif %}">All Posts</a>
-                    <a href="?show=my_posts" class="btn btn-outline-secondary {% if request.GET.show == 'my_posts' %}active{% endif %}">My Posts</a>
-                    <a href="?show=open" class="btn btn-outline-success {% if request.GET.show == 'open' %}active{% endif %}">Open</a>
-                    <a href="?show=closed" class="btn btn-outline-danger {% if request.GET.show == 'closed' %}active{% endif %}">Closed</a>
+                    <a href="{% url 'discussion_home' %}" class="btn btn-outline-secondary m-1 {% if not request.GET.show %}active{% endif %}">All Posts</a>
+                    <a href="?show=my_posts" class="btn btn-outline-secondary m-1 {% if request.GET.show == 'my_posts' %}active{% endif %}">My Posts</a>
+                    <a href="?show=open" class="btn btn-outline-success m-1 {% if request.GET.show == 'open' %}active{% endif %}">Open</a>
+                    <a href="?show=closed" class="btn btn-outline-danger m-1 {% if request.GET.show == 'closed' %}active{% endif %}">Closed</a>
                     {% if user.is_staff %}
-                        <a href="?show=hidden" class="btn btn-outline-warning {% if request.GET.show == 'hidden' %}active{% endif %}">Hidden Posts</a>
-                        <a href="{% url 'discussion_settings' %}" class="btn btn-outline-secondary"><i class="bi bi-gear-fill"></i></a>
+                        <a href="?show=hidden" class="btn btn-outline-warning m-1 {% if request.GET.show == 'hidden' %}active{% endif %}">Hidden Posts</a>
+                        <a href="{% url 'discussion_settings' %}" class="btn btn-outline-secondary m-1"><i class="bi bi-gear-fill"></i></a>
                     {% endif %}
                 </div>
-                <form action="{% url 'discussion_home' %}" method="get" class="d-flex flex-grow-1 ms-3">
+                <form action="{% url 'discussion_home' %}" method="get" class="d-flex w-100 mt-3">
                     <div class="input-group">
                         <input type="search" class="form-control" placeholder="Search discussions..." aria-label="Search" name="q" value="{{ request.GET.q | default:'' }}">
                         <button class="btn btn-outline-primary" type="submit"><i class="bi bi-search"></i></button>
@@ -147,26 +149,16 @@ $(document).ready(function() {
         // Reset all buttons to their inactive (outline) state.
         $('.category-filters a').each(function() {
             var $link = $(this);
-            var badgeClass = $link.data('badge-class');
-            
-            if (badgeClass) {
-                // This is a category button.
-                var outlineClass = badgeClass.replace('badge-', 'badge-outline-');
-                $link.removeClass(badgeClass).addClass(outlineClass);
-            } else {
-                // This is the "All" button.
-                $link.removeClass('btn-primary').addClass('btn-outline-primary');
+            var buttonClass = $link.data('button-class');
+            if (buttonClass) {
+                $link.removeClass('btn-' + buttonClass).addClass('btn-outline-' + buttonClass);
             }
         });
 
         // Activate the clicked button.
-        var clickedBadgeClass = $clickedLink.data('badge-class');
-        if (clickedBadgeClass) {
-            var outlineClass = clickedBadgeClass.replace('badge-', 'badge-outline-');
-            $clickedLink.removeClass(outlineClass).addClass(clickedBadgeClass);
-        } else {
-            // This is the "All" button.
-            $clickedLink.removeClass('btn-outline-primary').addClass('btn-primary');
+        var clickedButtonClass = $clickedLink.data('button-class');
+        if (clickedButtonClass) {
+            $clickedLink.removeClass('btn-outline-' + clickedButtonClass).addClass('btn-' + clickedButtonClass);
         }
 
         var url = $(this).attr('href');

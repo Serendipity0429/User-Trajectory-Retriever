@@ -6,16 +6,19 @@
             <div class="d-flex w-100 justify-content-between">
                 <h5 class="mb-1">
                     {% if post.is_closed %}
-                        <i class="bi bi-lock-fill text-danger"></i>
+                        <i class="bi bi-check-circle text-danger me-2"></i>
                     {% else %}
-                        <i class="bi bi-envelope-open-fill text-success"></i>
+                        <i class="bi bi-chat-dots text-success me-2"></i>
                     {% endif %}
                     <i class="bi bi-pin-angle-fill"></i> {{ post.title }} 
                     {% if post.is_private %}<i class="bi bi-shield-lock-fill"></i>{% endif %} 
                 </h5>
                 <small>{{ post.updated_at|timesince }} ago {% if post|was_updated %}(edited){% endif %}</small>
             </div>
-            <p class="mb-1">By {{ post.author.username }} in <span class="badge {{ post.get_category_display|category_color_class }}">{{ post.get_category_display }}</span></p>
+            <p class="mb-1 d-flex align-items-center">
+                <span class="me-1">By {{ post.author.username }} in</span>
+                <span class="badge {{ post.get_category_display|discussion_category_badge_subtle_class }}">{{ post.get_category_display }}</span>
+            </p>
             <p class="mb-1">
                 {% for label in post.labels.all %}
                     <span class="badge discussion-label">#{{ label }}</span>
@@ -28,16 +31,19 @@
             <div class="d-flex w-100 justify-content-between">
                 <h5 class="mb-1">
                     {% if post.is_closed %}
-                        <i class="bi bi-lock-fill text-danger"></i>
+                        <i class="bi bi-check-circle text-danger me-2"></i>
                     {% else %}
-                        <i class="bi bi-envelope-open-fill text-success"></i>
+                        <i class="bi bi-chat-dots text-success me-2"></i>
                     {% endif %}
                     {{ post.title }} 
                     {% if post.is_private %}<i class="bi bi-shield-lock-fill"></i>{% endif %} 
                 </h5>
                 <small>{{ post.updated_at|timesince }} ago {% if post|was_updated %}(edited){% endif %}</small>
             </div>
-            <p class="mb-1">By {{ post.author.username }} in <span class="badge {{ post.get_category_display|category_color_class }}">{{ post.get_category_display }}</span></p>
+            <p class="mb-1 d-flex align-items-center">
+                <span class="me-1">By {{ post.author.username }} in</span>
+                <span class="badge {{ post.get_category_display|discussion_category_badge_subtle_class }}">{{ post.get_category_display }}</span>
+            </p>
             <p class="mb-1">
                 {% for label in post.labels.all %}
                     <span class="badge discussion-label">#{{ label }}</span>

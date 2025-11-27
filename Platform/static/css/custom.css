@@ -224,6 +224,21 @@ ul ul a {
 }                    
                      
                      
+/* Custom styles for message popover */
+.dropdown-menu[aria-labelledby="messageDropdown"] {
+    width: 350px;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.dropdown-menu[aria-labelledby="messageDropdown"] .dropdown-item {
+    white-space: normal; /* Allow text to wrap */
+}
+
+.dropdown-menu[aria-labelledby="messageDropdown"] .dropdown-item:hover {
+    background-color: #f8f9fa;
+}
+                     
 /* ---------------------------------------------------                                                         
     MEDIAQUERIES     
 ----------------------------------------------------- */                                                       
@@ -231,14 +246,21 @@ ul ul a {
     #sidebar {
         width: 200px;
         left: -200px;
+        z-index: 1050; /* Ensure sidebar is above other content but below modals */
     }
 
     #sidebar.active {
         left: 0;
     }
 
+    #content {
+        margin-left: 0;
+        transition: margin-left 0.3s;
+    }
+
     #sidebar.active ~ #content {
-        margin-left: 200px;
+        /* On small screens, the sidebar should overlay the content, not push it. */
+        margin-left: 0;
     }
 
     #sidebar-backdrop {
@@ -246,6 +268,7 @@ ul ul a {
         opacity: 0;
         visibility: hidden;
         transition: opacity 0.3s, visibility 0.3s;
+        z-index: 1040; /* Lower than sidebar */
     }
 
     #sidebar.active ~ #sidebar-backdrop {
@@ -253,9 +276,12 @@ ul ul a {
         visibility: visible;
     }
 
-    #content {
-        margin-left: 0;
-        transition: margin-left 0.3s;
+    #messageDropdown {
+        max-width: 240px;
+    }
+
+    .dropdown-menu[aria-labelledby="messageDropdown"] {
+        width: 240px;
     }
 }                     
                      
@@ -297,11 +323,7 @@ h2.text-success {
 .form-range::-moz-range-thumb {                                                                                
     background-color: var(--custom-dark-blue);                                                                                 
 }                    
-                     
-.form-check-input:checked {                                                                                    
-    background-color: var(--custom-dark-blue);                                                                                 
-    border-color: var(--custom-dark-blue);                                                                                     
-}                         
+                                     
                
 .btn-view-task   {   
     background-color: #0d6efd !important;                                                                      
@@ -428,7 +450,7 @@ h2.text-success {
     }
 }
 
-@media (max-width: 768px) {
+@media (max-width: 900px) {
     #sidebarCollapse .sidebar-toggle-text {
         display: none !important;
     }
@@ -516,7 +538,6 @@ body.EasyMDE-fullscreen .card {
 .form-check-input {
     vertical-align: middle;
 }
-
 
 .login-error-message {
     border: solid 2px red;
@@ -784,21 +805,6 @@ button.remove-source:hover {
     display: none !important;
 }
 
-/* Custom styles for message popover */
-.dropdown-menu[aria-labelledby="messageDropdown"] {
-    width: 350px;
-    max-height: 400px;
-    overflow-y: auto;
-}
-
-.dropdown-menu[aria-labelledby="messageDropdown"] .dropdown-item {
-    white-space: normal; /* Allow text to wrap */
-}
-
-.dropdown-menu[aria-labelledby="messageDropdown"] .dropdown-item:hover {
-    background-color: #f8f9fa;
-}
-
 body.EasyMDE-fullscreen #content {
     transition: none !important;
 }
@@ -816,5 +822,32 @@ body.EasyMDE-fullscreen #content {
 body.EasyMDE-fullscreen .card {
     transition: none !important;
     transform: none !important;
+}
+
+.navbar-center-content {
+    min-width: 0;
+    flex: 1;
+}
+
+@media (max-width: 768px) {
+    .btn-group-responsive {
+        flex-wrap: wrap;
+    }
+    .btn-group-responsive > label {
+        margin: 5px;
+    }
+}
+
+
+.task-filter-toggle {
+    background-color: #f8f9fa; /* Or any other color you prefer */
+    opacity: 1 !important;
+}
+
+
+.task-filter-toggle[aria-expanded="true"] {
+    background-color: #e9ecef !important;
+    color: #000 !important;
+    border-color: #ced4da !important;
 }
 

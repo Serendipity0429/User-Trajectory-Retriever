@@ -12,7 +12,7 @@
                         {% endif %}
                     </a>
                 </th>
-                <th scope="col">
+                <th scope="col" class="d-none d-md-table-cell">
                     <a href="?{% url_replace user_sort_by='email' user_sort_dir=next_user_sort_dirs.email %}">
                         Email
                         {% if user_sort_by == 'email' %}
@@ -30,13 +30,13 @@
                 </th>
                 <th scope="col">
                     <a href="?{% url_replace user_sort_by='is_superuser' user_sort_dir=next_user_sort_dirs.is_superuser %}">
-                        Is Superuser
+                        Level
                         {% if user_sort_by == 'is_superuser' %}
                             <i class="bi bi-arrow-{% if user_sort_dir == 'asc' %}up{% else %}down{% endif %}"></i>
                         {% endif %}
                     </a>
                 </th>
-                <th scope="col">
+                <th scope="col" class="d-none d-md-table-cell">
                     <a href="?{% url_replace user_sort_by='last_login' user_sort_dir=next_user_sort_dirs.last_login %}">
                         Last Login
                         {% if user_sort_by == 'last_login' %}
@@ -52,40 +52,63 @@
             <tr>
                 <th scope="row">{{ forloop.counter0 | add:users.start_index }}</th>
                 <td>{{ user.username }}</td>
-                <td>{{ user.email }}</td>
+                <td class="d-none d-md-table-cell">{{ user.email }}</td>
                 <td>{{ user.profile.name }}</td>
                 <td>
                     {% if user.is_primary_superuser %}
                         <span class="badge bg-primary">Primary</span>
                     {% elif user.is_superuser %}
-                        <span class="badge bg-success">Yes</span>
+                        <span class="badge bg-success">Superuser</span>
                     {% else %}
-                        <span class="badge bg-secondary">No</span>
+                        <span class="badge bg-secondary">Normal</span>
                     {% endif %}
                 </td>
-                <td>{{ user.last_login|date:"Y-m-d H:i:s" }}</td>
-                <td>
-                    <form action="{% url 'user_system:delete_user' user.id %}" method="post" onsubmit="return confirm('Are you sure you want to delete this user?');" style="display: inline;">
-                        {% csrf_token %}
-                        <button type="submit" class="btn btn-danger btn-sm" {% if user.id == request.user.id %}disabled{% endif %}>Delete</button>
-                    </form>
-                    {% if request.user.is_primary_superuser %}
-                    <form action="{% url 'user_system:toggle_superuser' user.id %}" method="post" style="display: inline;">
-                        {% csrf_token %}
-                        <button type="submit" class="btn btn-primary btn-sm" style="color: white;" {% if user.id == request.user.id %}disabled{% endif %}>
-                            {% if user.is_superuser %}
-                                Demote
-                            {% else %}
-                                Promote
-                            {% endif %}
-                        </button>
-                    </form>
-                    {% endif %}
-                    <form action="{% url 'user_system:login_as_user' user.id %}" method="post" style="display: inline;">
-                        {% csrf_token %}
-                        <button type="submit" class="btn btn-secondary btn-sm" {% if user.id == request.user.id or user.is_primary_superuser %}disabled{% endif %}>Login As</button>
-                    </form>
-                    <a href="{% url 'user_system:view_user_info' user.id %}" class="btn btn-dark btn-sm">View</a>
+                <td class="d-none d-md-table-cell">{{ user.last_login|date:"Y-m-d H:i:s" }}</td>
+                <td class="user-actions">
+                    <div class="btn-group" role="group">
+                        <a href="{% url 'user_system:view_user_info' user.id %}" class="btn btn-outline-dark btn-sm" title="View">
+                            <i class="bi bi-eye"></i>
+                        </a>
+                        <div class="btn-group" role="group">
+                            <button id="btnGroupDrop-{{ user.id }}" type="button" class="btn btn-outline-secondary btn-sm dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" title="More Actions">
+                                <i class="bi bi-three-dots-vertical"></i>
+                            </button>
+                            <ul class="dropdown-menu" aria-labelledby="btnGroupDrop-{{ user.id }}">
+                                <li>
+                                    <form action="{% url 'user_system:login_as_user' user.id %}" method="post" class="d-inline">
+                                        {% csrf_token %}
+                                        <button type="submit" class="dropdown-item" {% if user.id == request.user.id or user.is_primary_superuser %}disabled{% endif %}>
+                                            <i class="bi bi-person-bounding-box me-2"></i>Login As
+                                        </button>
+                                    </form>
+                                </li>
+                                {% if request.user.is_primary_superuser %}
+                                <li>
+                                    <button type="button" class="dropdown-item user-action-btn"
+                                            data-action-url="{% url 'user_system:toggle_superuser' user.id %}"
+                                            data-action-method="POST"
+                                            {% if user.id == request.user.id %}disabled{% endif %}>
+                                        {% if user.is_superuser %}
+                                            <i class="bi bi-person-dash me-2"></i>Demote
+                                        {% else %}
+                                            <i class="bi bi-person-plus me-2"></i>Promote
+                                        {% endif %}
+                                    </button>
+                                </li>
+                                {% endif %}
+                                <li><hr class="dropdown-divider"></li>
+                                <li>
+                                    <button type="button" class="dropdown-item text-danger user-action-btn"
+                                            data-action-url="{% url 'user_system:delete_user' user.id %}"
+                                            data-action-method="POST"
+                                            data-confirm="Are you sure you want to delete this user?"
+                                            {% if user.id == request.user.id %}disabled{% endif %}>
+                                        <i class="bi bi-trash me-2"></i>Delete
+                                    </button>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
                 </td>
             </tr>
             {% empty %}

@@ -1,5 +1,5 @@
 Structure.md
-db.sqlite3
+db.sqlite3*
 THUIRChromeExtension
 __pycache__
 *.ipynb
@@ -16,3 +16,5 @@ media
 GEMINI.md
 benchmark_graphs
 Platform/staticfiles/
+NQ-open.train.jsonl
+hard_questions.jsonl

@@ -23,6 +23,11 @@ class Command(BaseCommand):
             help='Deletes the user and data created for the test.',
         )
         parser.add_argument(
+            '--no-cleanup',
+            action='store_true',
+            help='Do not automatically clean up user and data after the test.',
+        )
+        parser.add_argument(
             '--user-only',
             action='store_true',
             help='Only creates the test user without running the test.',
@@ -54,6 +59,7 @@ class Command(BaseCommand):
 
     def _generate_pseudo_data(self, payload_size_kb):
         """Generates a dictionary of pseudo-data with a large rrweb_record."""
+        random.seed(42) # Seed for reproducibility
         start_time = time.time()
         dwell_time = random.randint(5000, 60000) # 5 seconds to 1 minute
         end_time = start_time + (dwell_time / 1000)
@@ -114,7 +120,7 @@ class Command(BaseCommand):
         username = 'pressure_test_user'
         password = 'password'
 
-        if options['cleanup']:
+        if options.get('cleanup'):
             self.cleanup(User, username)
             return
 
@@ -127,6 +133,8 @@ class Command(BaseCommand):
             return
 
         self.setup_and_run_test(User, username, password, options)
+        if not options['no_cleanup']:
+            self.cleanup(User, username)
 
     def create_user(self, User, username, password):
         try:
@@ -191,9 +199,10 @@ class Command(BaseCommand):
         url_encoded_data = quote_plus(base64_encoded_data)
 
         # 3. Create a temporary file for the POST data
-        with tempfile.NamedTemporaryFile(mode='w+', delete=True) as tmpfile:
+        tmpfile = tempfile.NamedTemporaryFile(mode='w+', delete=False)
+        try:
             tmpfile.write(f'message={url_encoded_data}')
-            tmpfile.flush() # Ensure data is written to disk before ab reads it
+            tmpfile.close()  # Close the file so 'ab' can access it on all OSes
 
             # 4. Run the pressure test
             self.stdout.write(self.style.SUCCESS('=' * 50))
@@ -206,7 +215,7 @@ class Command(BaseCommand):
                 'ab',
                 '-n', str(num_requests),
                 '-c', str(concurrency),
-                '-p', tmpfile.name, # Use the temporary file's name
+                '-p', tmpfile.name,  # Use the temporary file's name
                 '-T', 'application/x-www-form-urlencoded',
                 '-H', f'Authorization: Bearer {access_token}',
                 'http://127.0.0.1:8000/task/data/'
@@ -214,7 +223,7 @@ class Command(BaseCommand):
 
             try:
                 result = subprocess.run(
-                    command, capture_output=True, text=True, check=True
+                    command, capture_output=True, text=True, check=True, timeout=600
                 )
                 self.stdout.write(result.stdout)
                 if result.stderr:
@@ -227,19 +236,29 @@ class Command(BaseCommand):
                 self.stdout.write(self.style.ERROR(f"Error executing 'ab': {e}"))
                 self.stdout.write(e.stdout)
                 self.stdout.write(e.stderr)
+        finally:
+            os.remove(tmpfile.name)  # Manually clean up the temporary file
 
         self.stdout.write(self.style.SUCCESS('=' * 50))
-        self.stdout.write(self.style.WARNING('Run --cleanup when you are finished.'))
 
 
     def cleanup(self, User, username):
         try:
             user = User.objects.get(username=username)
+            # Explicitly delete all related data to be absolutely certain
+            from task_manager.models import Webpage, Task
+            Webpage.objects.filter(user=user).delete()
+            Task.objects.filter(user=user).delete()
+            
             # This will cascade delete related tasks, webpages, etc.
             user.delete()
+            
             # Also clean up the dataset if it exists
-            TaskDataset.objects.filter(name='pressure_test_dataset').delete()
-            self.stdout.write(self.style.SUCCESS(f'Successfully cleaned up user and all related data for {username}'))
+            dataset = TaskDataset.objects.filter(name='pressure_test_dataset')
+            if dataset.exists():
+                TaskDatasetEntry.objects.filter(belong_dataset=dataset.first()).delete()
+                dataset.delete()
+
+            self.stdout.write(self.style.SUCCESS(f'Successfully and explicitly cleaned up user and all related data for {username}'))
         except User.DoesNotExist:
             self.stdout.write(self.style.WARNING(f'User {username} not found, nothing to clean up.'))
-

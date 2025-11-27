@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-import os
+from decouple import config
 from openai import OpenAI
 from rest_framework.response import Response
 from django.http import HttpResponse
@@ -281,33 +281,35 @@ def check_answer_llm(question, authentic_answers, user_answer):
     """
     Checks if the user's answer is correct using an LLM-as-a-judge.
     """
-    base_url = os.environ.get("LLM_BASE_URL")
-    api_key = os.environ.get("LLM_API_KEY")
-    model = os.environ.get("LLM_MODEL", "gpt-3.5-turbo")
+    base_url = config("LLM_BASE_URL", default=None)
+    api_key = config("LLM_API_KEY", default=None)
+    model = config("LLM_MODEL", default="gpt-3.5-turbo")
 
     if not base_url or not api_key:
         raise ValueError("LLM_BASE_URL and LLM_API_KEY environment variables must be set.")
 
     client = OpenAI(base_url=base_url, api_key=api_key)
 
-    prompt = f"""You are a meticulous and strict evaluator. Your sole task is to compare a `User's Answer` to an `Authentic Answer` for a given `Question` and determine if the user's answer is correct.
+    authentic_answers_formatted = "\n- ".join(authentic_answers)
+    prompt = f"""You are a meticulous and fair evaluator. Your task is to compare a `User's Answer` to a list of `Authentic Answers` for a given `Question` and determine if it is correct.
 
 **Instructions:**
-1.  **Strictly Adhere to Provided Information:** Base your judgment *only* on the text provided in the `Authentic Answer`. Do not use any external knowledge or make assumptions.
-2.  **Semantic Equivalence:** The `User's Answer` is considered correct if it is semantically equivalent to the `Authentic Answer`. This means it conveys the same meaning, even if the wording is different.
-3.  **Completeness:** The `User's Answer` must be complete. A partially correct answer is considered incorrect.
-4.  **Output Format:** Your response must be a single word: either `yes` or `no`. Do not provide any explanation or other text.
+1.  **Correctness Criteria:** The `User's Answer` is correct if it is semantically equivalent to **any one** of the answers in the `Authentic Answers` list.
+2.  **Tolerances:** Your comparison must be case-insensitive. You should ignore minor differences in punctuation (e.g., commas, periods) and whitespace. For example, "New York NY" should be considered a match for "New York, NY".
+3.  **Completeness:** The user's answer must not be missing essential information. For example, if an authentic answer is "Michael Jordan", "Jordan" would be considered incorrect because it is incomplete.
+4.  **Strict Adherence:** Base your judgment *only* on the provided text. Do not use external knowledge.
+5.  **Output Format:** Your response must be a single word: `yes` or `no`.
 
 **Evaluation Task:**
 
 **Question:** "{question}"
 
-**Authentic Answer:** "{"; ".join(authentic_answers)}"
+**Authentic Answers (any of the following are correct):**
+- {authentic_answers_formatted}
 
 **User's Answer:** "{user_answer}"
 
-Is the user's answer correct?
-"""
+Is the user's answer correct?"""
 
     completion = client.chat.completions.create(
         model=model,

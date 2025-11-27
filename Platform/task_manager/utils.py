@@ -338,7 +338,13 @@ def check_answer(entry, user_answer, llm = True):
 from django.shortcuts import render
 
 def close_window():
-    return HttpResponse('<html><body><script>window.close()</script></body></html>')
+    # This script sends a message to our `close_helper.js` content script,
+    # which then securely communicates with the background script to close the tab.
+    return HttpResponse("""
+        <html><body><script>
+            window.postMessage({ type: "UTR_CLOSE_WINDOW_REQUEST" }, "*");
+        </script>Please wait, this page will close automatically.</body></html>
+    """)
 
 def render_status_page(request, title, message, alert_type='info'):
     context = {

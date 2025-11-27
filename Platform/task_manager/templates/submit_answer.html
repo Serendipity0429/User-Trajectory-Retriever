@@ -35,6 +35,20 @@
         display: inline-block;
         animation: spin 1s linear infinite;
     }
+    @media (max-width: 767px) {
+        .relevance-annotation, .justification-controls {
+            flex-direction: column;
+            align-items: flex-start !important;
+        }
+        .relevance-annotation > div {
+            margin-left: 0 !important;
+            margin-bottom: 10px;
+        }
+        .justification-controls > div:last-child {
+            margin-top: 10px;
+            align-self: flex-end;
+        }
+    }
 </style>
 {% endblock %}
 
@@ -59,7 +73,7 @@
                                     {% for webpage in webpages %}
                                     <div class="d-flex flex-column align-items-center mb-5 p-4 border rounded shadow-sm bg-light">
                                         <p class="h5"><a href="{{ webpage.url }}" target="_blank">{{ webpage.title }}</a></p>
-                                        <div class="rrweb-player-wrapper" id="rrweb-player-{{ webpage.id }}" data-webpage-id="{{ webpage.id }}" style="margin-top: 20px;"></div>
+                                        <div class="rrweb-player-wrapper" id="rrweb-player-{{ webpage.id }}" data-webpage-id="{{ webpage.id }}" data-webpage-width="{{ webpage.width }}" data-webpage-height="{{ webpage.height }}" style="margin-top: 20px;"></div>
                                     </div>
                                     {% endfor %}
                                 </div>
@@ -166,7 +180,7 @@
                         <div class="mb-4 p-3 border rounded">
                             <h5><strong>3. Confidence</strong></h5>
                             <p>How confident are you in your answer?</p>
-                            <div class="btn-group w-100" role="group" aria-label="Confidence">
+                            <div class="btn-group w-100 btn-group-responsive" role="group" aria-label="Confidence">
                                 {% for value, text in confidence_choices %}
                                 <input type="radio" class="btn-check" name="confidence_radio" id="c{{ forloop.counter }}" value="{{ value }}" autocomplete="off" required>
                                 <label class="btn btn-outline-primary" for="c{{ forloop.counter }}">
@@ -447,7 +461,7 @@ document.addEventListener('DOMContentLoaded', function() {
             <p class="mb-1"><strong>Title:</strong> ${j.page_title || 'No title found'}</p>
             <p class="mb-1"><strong>URL:</strong> <a href="${j.url}" target="_blank" title="${j.url}" class="justification-url">${displayUrl}</a></p>
             ${contentEl.outerHTML}
-            <div class="d-flex justify-content-between align-items-center mt-3">
+            <div class="d-flex justify-content-between align-items-center mt-3 justification-controls">
                 ${relevanceHtml}
                 ${buttonsHtml}
             </div>

@@ -56,19 +56,38 @@
         opacity: 0.6;
     }
 </style>
+<style>
+    /* Mobile-specific adjustments for the timeline */
+    @media (max-width: 576px) {
+        .timeline {
+            padding-left: 1.5rem;
+        }
+        .timeline-item:before {
+            left: -2rem;
+        }
+    }
+    @media (max-width: 767px) {
+        .relevance-credibility-display {
+            flex-direction: column;
+            gap: 0 !important;
+        }
+        .relevance-credibility-display .me-3 {
+            margin-bottom: 0.5rem !important;
+        }
+    }
+</style>
 {% endblock %}
 
 {% block content %}
 <div class="container-fluid">
     <!-- Task Header -->
-    <div class="d-flex justify-content-between align-items-center mb-4">
+    <div class="d-flex flex-column flex-sm-row justify-content-sm-between align-items-sm-center mb-4">
         <div>
             <h1 class="h3 mb-0">Task Details</h1>
             <p class="text-muted">A detailed breakdown of the annotation process.</p>
         </div>
-        <a href="/task/home" class="btn btn-outline-secondary"><i class="bi bi-arrow-left"></i> Back to Task List</a>
+        <a href="/task/home" class="btn btn-outline-secondary mt-2 mt-sm-0"><i class="bi bi-arrow-left"></i> Back to Task List</a>
     </div>
-
     <div class="row">
         <!-- Left Sidebar -->
         <div class="col-lg-4">
@@ -147,7 +166,11 @@
                         <div id="heading-trial-{{ trial.num_trial }}-main" class="card-header d-flex justify-content-between align-items-center collapsed" data-bs-toggle="collapse" data-bs-target="#collapse-trial-{{ trial.num_trial }}-main" aria-expanded="false" aria-controls="collapse-trial-{{ trial.num_trial }}-main" style="cursor: pointer;">
                             <h5 class="mb-0">Trial {{ trial.num_trial }}</h5>
                             <div class="d-flex align-items-center">
-                                <span class="text-muted me-3 fw-normal"><i class="bi bi-stopwatch me-1"></i> {{ trial.duration|format_duration }}</span>
+                                <span class="text-muted me-3 fw-normal">
+                                    <i class="bi bi-stopwatch me-1"></i>
+                                    <span class="d-none d-sm-inline">{{ trial.duration|format_duration }}</span>
+                                    <span class="d-sm-none">{{ trial.duration|format_duration_short }}</span>
+                                </span>
                                 {% if trial.is_correct %}
                                 <span class="badge bg-success"><i class="bi bi-check-circle-fill me-1"></i> Correct</span>
                                 {% else %}
@@ -162,7 +185,12 @@
                                     <div class="accordion-item">
                                         <h2 class="accordion-header" id="heading-trial-{{ trial.num_trial }}">
                                             <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-trial-{{ trial.num_trial }}" aria-expanded="false" aria-controls="collapse-trial-{{ trial.num_trial }}">
-                                                <i class="bi bi-display me-2"></i> <strong>Session Replay</strong>&nbsp;(Click to expand)
+                                                <i class="bi bi-display me-2"></i>
+                                                <strong>
+                                                    <span class="d-sm-none">Replay</span>
+                                                    <span class="d-none d-sm-inline">Session Replay</span>
+                                                </strong>
+                                                <span class="d-none d-sm-inline">&nbsp;(Click to expand)</span>
                                             </button>
                                         </h2>
                                         <div id="collapse-trial-{{ trial.num_trial }}" class="accordion-collapse collapse" aria-labelledby="heading-trial-{{ trial.num_trial }}" data-bs-parent="#accordion-trial-{{ trial.num_trial }}">
@@ -170,7 +198,7 @@
                                                 {% for webpage in trial.webpages %}
                                                 <div class="d-flex flex-column align-items-center mb-5 p-4 border rounded shadow-sm bg-light">
                                                     <p class="h5"><a href="{{ webpage.url }}" target="_blank">{{ webpage.title }}</a></p>
-                                                    <div class="rrweb-player-wrapper" id="rrweb-player-trial{{trial.num_trial}}-{{ webpage.id }}" data-webpage-id="{{ webpage.id }}"></div>
+                                                    <div class="rrweb-player-wrapper" id="rrweb-player-trial{{trial.num_trial}}-{{ webpage.id }}" data-webpage-id="{{ webpage.id }}" data-webpage-width="{{ webpage.width }}" data-webpage-height="{{ webpage.height }}"></div>
 
                                                 </div>
                                                 {% empty %}
@@ -229,7 +257,7 @@
                                                                             <blockquote class="blockquote mb-1 text-muted" style="font-size: 0.9rem;">
                                                                                 <i class="bi bi-quote"></i> {{ justification.text }}
                                                                             </blockquote>
-                                                                            <div class="d-flex gap-4">
+                                                                            <div class="d-flex gap-4 relevance-credibility-display">
                                                                                 <p class="mb-0 small me-3"><strong>Relevance:</strong> 
                                                                                     {% if justification.relevance == 3 %} <span class="badge bg-success">High</span>
                                                                                     {% elif justification.relevance == 2 %} <span class="badge bg-warning text-dark">Medium</span>
@@ -271,7 +299,7 @@
                                                                             {% if justification.evidence_image %}
                                                                                 <img src="{{ justification.evidence_image.url }}" class="img-fluid rounded evidence-image" alt="Evidence Image">
                                                                             {% endif %}
-                                                                            <div class="d-flex mt-2">
+                                                                            <div class="d-flex mt-2 relevance-credibility-display">
                                                                                 <p class="mb-0 small me-3"><strong>Relevance:</strong> 
                                                                                     {% if justification.relevance == 3 %} <span class="badge bg-success">High</span>
                                                                                     {% elif justification.relevance == 2 %} <span class="badge bg-warning text-dark">Medium</span>
@@ -325,7 +353,8 @@
                                                         <div class="accordion-item">
                                                             <h2 class="accordion-header" id="abandoned-evidence-heading-{{ trial.num_trial }}">
                                                                 <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-abandoned-evidence-{{ trial.num_trial }}" aria-expanded="false" aria-controls="collapse-abandoned-evidence-{{ trial.num_trial }}">
-                                                                    Abandoned Justifications
+                                                                    <span class="d-sm-none">Abandoned</span>
+                                                                    <span class="d-none d-sm-inline">Abandoned Justifications</span>
                                                                 </button>
                                                             </h2>
                                                             <div id="collapse-abandoned-evidence-{{ trial.num_trial }}" class="accordion-collapse collapse" aria-labelledby="abandoned-evidence-heading-{{ trial.num_trial }}">
@@ -408,9 +437,17 @@
                 <div class="timeline-item success">
                     <div class="card shadow-sm">
                         <div class="card-header d-flex justify-content-between align-items-center collapsed" data-bs-toggle="collapse" data-bs-target="#collapse-final-annotation" aria-expanded="false" aria-controls="collapse-final-annotation" style="cursor: pointer;">
-                            <h5 class="mb-0"><i class="bi bi-award-fill me-2"></i>Final Annotation</h5>
+                            <h5 class="mb-0">
+                                <i class="bi bi-award-fill me-2"></i>
+                                <span class="d-sm-none">Final</span>
+                                <span class="d-none d-sm-inline">Final Annotation</span>
+                            </h5>
                             <div class="d-flex align-items-center">
-                                <span class="text-muted me-3 fw-normal"><i class="bi bi-stopwatch me-1"></i> {{ total_duration|format_duration }} in total</span>
+                                <span class="text-muted me-3 fw-normal">
+                                    <i class="bi bi-stopwatch me-1"></i>
+                                    <span class="d-none d-sm-inline">{{ total_duration|format_duration }} in total</span>
+                                    <span class="d-sm-none">{{ total_duration|format_duration_short }}</span>
+                                </span>
                                 <span class="badge bg-success"><i class="bi bi-check-circle-fill me-1"></i> Successful</span>
                             </div>
                         </div>
@@ -443,9 +480,17 @@
                 <div class="timeline-item danger">
                     <div class="card shadow-sm">
                         <div class="card-header d-flex justify-content-between align-items-center collapsed" data-bs-toggle="collapse" data-bs-target="#collapse-cancel-annotation" aria-expanded="false" aria-controls="collapse-cancel-annotation" style="cursor: pointer;">
-                            <h5 class="mb-0"><i class="bi bi-exclamation-triangle-fill me-2"></i>Task Cancelled</h5>
+                            <h5 class="mb-0">
+                                <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                                <span class="d-sm-none">Cancelled</span>
+                                <span class="d-none d-sm-inline">Task Cancelled</span>
+                            </h5>
                             <div class="d-flex align-items-center">
-                                <span class="text-muted me-3 fw-normal"><i class="bi bi-stopwatch me-1"></i> {{ total_duration|format_duration }} in total</span>
+                                <span class="text-muted me-3 fw-normal">
+                                    <i class="bi bi-stopwatch me-1"></i>
+                                    <span class="d-none d-sm-inline">{{ total_duration|format_duration }} in total</span>
+                                    <span class="d-sm-none">{{ total_duration|format_duration_short }} total</span>
+                                </span>
                                 <span class="badge bg-danger"><i class="bi bi-x-circle-fill me-1"></i> Cancelled</span>
                             </div>
                         </div>

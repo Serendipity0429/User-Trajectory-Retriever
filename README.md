@@ -23,13 +23,14 @@ The system is composed of two main parts:
 
 ## Recent Updates
 
+- **UI Modernization and Responsiveness:** The entire user interface has been overhauled with a more modern aesthetic, improved layouts, and significantly enhanced responsiveness for mobile and tablet devices.
+- **Enhanced Admin Dashboard:** The administrator dashboard is now more powerful and user-friendly, featuring collapsible filter sections and dropdown menus for a cleaner experience.
+- **Benchmarking as Django Commands:** The performance benchmarking scripts have been refactored into Django management commands (`pressure_test` and `llm_judge_benchmark`) for easier and more integrated execution.
 - **UI Enhancements:** The user interface has been updated to include a new messaging dropdown in the navigation bar, providing easy access to unread messages.
 - **Messaging System:** A new private messaging system has been integrated, replacing the previous reliance on Django's built-in messaging framework.
 - **Discussion Forum:** A new discussion forum has been added to the platform, allowing users to interact with each other, ask questions, and share their findings.
 - **UI Enhancements:** The user interface has been updated for a more modern look and feel, including the addition of a dark mode.
 - **Performance Improvements:** The rrweb player is now lazy-loaded, improving the initial page load time.
-- **Improved Mobile Responsiveness:** The UI has been optimized for a better experience on mobile and tablet devices.
-- **Benchmarking as Django Commands:** The benchmarking scripts have been refactored into Django management commands for easier execution and integration.
 
 ## System Architecture
 

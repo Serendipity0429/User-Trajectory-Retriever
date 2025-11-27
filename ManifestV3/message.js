@@ -10,6 +10,8 @@ class Message {
         this.start_timestamp = 0;
         this.end_timestamp = 0;
         this.dwell_time = 0;
+        this.width = 0;
+        this.height = 0;
         this.page_switch_record = [];
         this.type = "msg_from_content";
         this.url = "";

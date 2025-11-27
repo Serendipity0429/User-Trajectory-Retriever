@@ -96,11 +96,24 @@ input {
     accent-color: #021e4d;
 }
 
-@media (max-width: 480px) {
-    .btn-group {
-        flex-wrap: wrap;
+/* Responsive button groups */
+@media (max-width: 991px) {
+    .btn-group-responsive {
+        flex-direction: column;
+    }
+    .btn-group-responsive .btn, .btn-group-responsive > label {
+        margin-left: 0; /* Remove bootstrap's default horizontal margin */
+        margin-bottom: 5px; /* Space out buttons */
+        width: 100%;
+        border-radius: var(--bs-border-radius) !important;
     }
 }
+@media (min-width: 992px) {
+    .btn-group-responsive .btn, .btn-group-responsive > label {
+        margin: 0;
+    }
+}
+
 
 .form-check-input:checked {                                                                                    
     background-color: var(--custom-dark-blue);                                                                                 

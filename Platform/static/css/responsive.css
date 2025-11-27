@@ -23,6 +23,14 @@ h1, .h1 {
   display: none;
 }
 
+.message-body-preview {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* Small tablets */
 @media (min-width: 576px) {
   h1, .h1 {

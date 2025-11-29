@@ -118,7 +118,7 @@ const getTaskInfo = throttleManager.get('getTaskInfo', async (task_id) => {
     }
 }, 10000);
 
-const throttledCheckActiveTaskID = throttleManager.get('checkActiveTaskID', async () => {
+async function checkActiveTask() {
     await initializeConfig();
     printDebug("background", "Checking active task ID...");
     const { logged_in } = await _get_session('logged_in');
@@ -131,9 +131,9 @@ const throttledCheckActiveTaskID = throttleManager.get('checkActiveTaskID', asyn
         const old_task_id = await getCurrentTask();
         const config = getConfig();
         const extension_version = chrome.runtime.getManifest().version;
-        
+
         const response = await makeApiRequest(() => _post(config.urls.active_task, { extension_version }));
-        
+
         if (response.update_required) {
             broadcastToTabs({
                 command: 'display_message',
@@ -142,7 +142,7 @@ const throttledCheckActiveTaskID = throttleManager.get('checkActiveTaskID', asyn
                     title: 'Extension Update Required',
                     message: `A new version (${response.latest_version}) is available. Please update to continue. <a href="${response.update_link}" target="_blank" style="color: white; text-decoration: underline;">Update Now</a>.`,
                     type: 'error',
-                    duration: 0 
+                    duration: 0
                 }
             });
             await _set_session({ 'update_required': true, 'update_info': response });
@@ -193,7 +193,9 @@ const throttledCheckActiveTaskID = throttleManager.get('checkActiveTaskID', asyn
         }
         return -2;
     }
-}, 10000);
+}
+
+const throttledCheckActiveTaskID = throttleManager.get('checkActiveTaskID', checkActiveTask, 10000);
 
 const hasPendingAnnotation = throttleManager.get('hasPendingAnnotation', async () => {
     try {
@@ -222,9 +224,8 @@ async function closeAllIrrelevantTabs() {
             .filter(tab => tab.url && !_is_server_page(tab.url) && !_is_extension_page(tab.url))
             .map(tab => tab.id);
 
-        await chrome.tabs.create({ url: config.urls.initial_page, active: false });
-
         if (irrelevant_tab_ids.length > 0) {
+            await chrome.tabs.create({ url: config.urls.initial_page, active: false });
             await chrome.tabs.remove(irrelevant_tab_ids);
         }
     } catch (error) {
@@ -772,7 +773,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 const tabs = await chrome.tabs.query({ windowId: sender.tab.windowId });
                 if (tabs.length <= 1 && tabs[0].id === sender.tab.id) {
                     // This is the last tab in the window. Create a new one before closing.
-                    await chrome.tabs.create({ url: config.urls.home });
+                    await chrome.tabs.create({ url: config.urls.initial_page, active: true });
                     await chrome.tabs.remove(sender.tab.id);
                 } else {
                     // Not the last tab, just close it.
@@ -817,4 +818,26 @@ chrome.tabs.onRemoved.addListener(async (tabId, removeInfo) => {
     await initializeConfig();
     printDebug("background", `Tab ${tabId} was closed. Forcing a check for active task status.`);
     throttledCheckActiveTaskID();
+});
+
+chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
+    if (changeInfo.status === 'complete' && tab.url) {
+        await initializeConfig();
+        const config = getConfig();
+        if (_is_server_page(tab.url)) {
+            const url = new URL(tab.url);
+            const path = url.pathname;
+
+            const taskChangePatterns = [
+                /^\/task\/pre_task_annotation\/$/,
+                /^\/task\/submit_answer\/\d+\/$/,
+                /^\/task\/cancel_annotation\/\d+\/$/,
+            ];
+
+            if (taskChangePatterns.some(pattern => pattern.test(path))) {
+                printDebug("background", `Detected URL change that might affect task status: ${path}. Forcing task check.`);
+                await checkActiveTask();
+            }
+        }
+    }
 });

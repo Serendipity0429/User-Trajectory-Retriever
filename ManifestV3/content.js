@@ -119,7 +119,6 @@ async function displayQuestionBox(question) {
     `;
 
     const css = `
-        max-width: 25vw;
         line-height: 1.5;
         transition: opacity 0.3s ease-in-out;
     `;
@@ -423,12 +422,13 @@ chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
 function applyMessageBoxStyle(style) {
     const questionBox = document.getElementById('task-question-box');
     if (questionBox) {
-        const sizeMap = {
-            small: { width: '15vw', minHeight: '10vh', fontSize: '0.8vw', maxWidth: 'none' },
-            medium: { width: '22.5vw', minHeight: '15vh', fontSize: '1.2vw', maxWidth: 'none' },
-            large: { width: '30vw', minHeight: '20vh', fontSize: '1.6vw', maxWidth: 'none' }
-        };
+        // Handle size
+        if (style.size) {
+            questionBox.classList.remove('size-small', 'size-medium', 'size-large');
+            questionBox.classList.add(`size-${style.size}`);
+        }
 
+        // Handle position
         const positionMap = {
             'top-left': { top: '10px', left: '10px', right: 'auto', bottom: 'auto', transform: 'none' },
             'top-center': { top: '10px', left: '50%', right: 'auto', bottom: 'auto', transform: 'translateX(-50%)' },
@@ -440,10 +440,6 @@ function applyMessageBoxStyle(style) {
             'bottom-center': { bottom: '10px', left: '50%', top: 'auto', right: 'auto', transform: 'translateX(-50%)' },
             'bottom-right': { bottom: '10px', right: '10px', top: 'auto', left: 'auto', transform: 'none' }
         };
-
-        if (style.size && sizeMap[style.size]) {
-            Object.assign(questionBox.style, sizeMap[style.size]);
-        }
 
         if (style.position && positionMap[style.position]) {
             Object.assign(questionBox.style, positionMap[style.position]);

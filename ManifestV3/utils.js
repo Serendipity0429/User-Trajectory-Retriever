@@ -366,6 +366,48 @@ const hoverableMessageBoxManager = {
     }
 };
 
+function injectMessageBoxStylesheet() {
+    const styleId = 'utr-message-box-styles';
+    if (document.getElementById(styleId)) return;
+    const style = document.createElement('style');
+    style.id = styleId;
+    style.innerHTML = `
+        .utr-message-box {
+            position: fixed;
+            z-index: 2147483647;
+            border-left: 5px solid;
+            opacity: 0;
+            transition: opacity 0.5s ease-in-out, width 0.3s ease, height 0.3s ease, top 0.3s ease, left 0.3s ease;
+            font-family: 'Noto Sans SC', sans-serif !important;
+            word-wrap: break-word;
+            box-sizing: border-box;
+            border-radius: 8px;
+            box-shadow: 0 10px 20px rgba(0,0,0,.15);
+        }
+        .utr-message-box.hoverable { pointer-events: none; }
+        .utr-message-box.type-info { border-color: #021e4d; background-color: #f8f9fa; color: #212529; }
+        .utr-message-box.type-warning { border-color: #ffc107; background-color: #fff3cd; color: #856404; }
+        .utr-message-box.type-error { border-color: #dc3545; background-color: #f8d7da; color: #721c24; }
+
+        .utr-message-box.size-small { min-width: 10vw; max-width: 20vw; padding: 1.0vw; font-size: 0.8vw; }
+        .utr-message-box.size-medium { min-width: 15vw; max-width: 25vw; padding: 1.2vw; font-size: 1.2vw; }
+        .utr-message-box.size-large { min-width: 20vw; max-width: 30vw; padding: 1.4vw; font-size: 1.6vw; }
+
+        #task-question-box.utr-message-box { min-width: 15vw; max-width: 25vw; padding: 1.2vw; font-size: 1.2vw; line-height: 1.5; }
+
+        @media (max-width: 768px) {
+            .utr-message-box, #task-question-box.utr-message-box {
+                width: 90vw !important;
+                max-width: 300px !important;
+            }
+            .utr-message-box.size-small { font-size: 0.9rem !important; padding: 1rem !important; }
+            .utr-message-box.size-medium, #task-question-box.utr-message-box { font-size: 1rem !important; padding: 1.2rem !important; }
+            .utr-message-box.size-large { font-size: 1.1rem !important; padding: 1.4rem !important; }
+        }
+    `;
+    document.head.appendChild(style);
+}
+
 async function displayMessageBox(options) {
     const { message, innerHTML, title = '', type = 'info', duration = 3000, id = null, css = '', hoverable = true } = options;
     
@@ -375,6 +417,8 @@ async function displayMessageBox(options) {
 
     const config = getConfig();
     if (!config || window.location.href.startsWith(config.urls.base)) return;
+    
+    injectMessageBoxStylesheet();
 
     const settings = await new Promise((resolve) => {
         chrome.storage.local.get(['messageBoxSize', 'messageBoxPosition'], resolve);
@@ -384,37 +428,18 @@ async function displayMessageBox(options) {
     const boxPosition = options.position || settings.messageBoxPosition || 'top-right';
 
     const box = document.createElement('div');
-    box.className = 'rr-ignore loaded-box rr-block';
+    box.className = `rr-ignore loaded-box rr-block utr-message-box type-${type}`;
+    if(id !== 'task-question-box'){
+        box.classList.add(`size-${boxSize}`);
+    }
+
     if (id) {
         box.id = id;
     }
-    
-    let borderColor, backgroundColor, color;
-    switch (type) {
-        case 'warning':
-            borderColor = '#ffc107';
-            backgroundColor = '#fff3cd';
-            color = '#856404';
-            break;
-        case 'error':
-            borderColor = '#dc3545';
-            backgroundColor = '#f8d7da';
-            color = '#721c24';
-            break;
-        case 'info':
-        default:
-            borderColor = '#021e4d';
-            backgroundColor = '#f8f9fa';
-            color = '#212529';
-            break;
+    if(hoverable){
+        box.classList.add('hoverable');
     }
-
-    const sizeMap = {
-        small: { minWidth: '10vw', maxWidth: '20vw', padding: '1.0vw', fontSize: '0.8vw' },
-        medium: { minWidth: '15vw', maxWidth: '25vw', padding: '1.2vw', fontSize: '1.2vw' },
-        large: { minWidth: '20vw', maxWidth: '30vw', padding: '1.4vw', fontSize: '1.6vw' }
-    };
-
+    
     const positionMap = {
         'top-left': { top: '10px', left: '10px', right: 'auto', bottom: 'auto', transform: 'none' },
         'top-center': { top: '10px', left: '50%', right: 'auto', bottom: 'auto', transform: 'translateX(-50%)' },
@@ -427,27 +452,14 @@ async function displayMessageBox(options) {
         'bottom-right': { bottom: '10px', right: '10px', top: 'auto', left: 'auto', transform: 'none' }
     };
 
-    box.style.cssText = `
-        position: fixed;
-        background-color: ${backgroundColor};
-        color: ${color};
-        padding: 1.0vw;
-        border-radius: 0.25vw;
-        z-index: 2147483647;
-        box-shadow: 0 0.6vw 1.2vw rgba(0,0,0,.15);
-        border-left: 5px solid ${borderColor};
-        opacity: 0;
-        transition: opacity 0.5s ease-in-out, width 0.3s ease, height 0.3s ease, top 0.3s ease, left 0.3s ease;
-        font-family: 'Noto Sans SC', sans-serif !important;
-        word-wrap: break-word;
-        ${hoverable ? 'pointer-events: none;' : ''}
-        ${css}
-    `;
+    box.style.opacity = '0';
+    if (css) {
+        box.style.cssText += css;
+    }
 
     if (id === 'task-question-box') {
-        const sizeStyles = sizeMap[boxSize] || sizeMap.medium;
         const positionStyles = positionMap[boxPosition] || positionMap['top-right'];
-        Object.assign(box.style, sizeStyles, positionStyles);
+        Object.assign(box.style, positionStyles);
     } else {
         // Temporary notification box, use stacking logic
         let topPosition = 10;
@@ -456,8 +468,6 @@ async function displayMessageBox(options) {
         });
         box.style.top = `${topPosition}px`;
         box.style.right = '10px';
-        const sizeStyles = sizeMap[boxSize] || sizeMap['small']; // notifications are always small
-        Object.assign(box.style, sizeStyles);
     }
 
     if (innerHTML) {

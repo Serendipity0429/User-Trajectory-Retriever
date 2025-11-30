@@ -187,11 +187,24 @@ DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 
 # CSRF and CORS
 CORS_ALLOW_CREDENTIALS = True
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:8080",
-    "http://127.0.0.1:8000",
-    "http://101.6.41.59:32904",
-]
+
+if DEBUG:
+    CORS_ORIGIN_ALLOW_ALL = True
+    CORS_ALLOWED_ORIGIN_REGEXES = [
+        r"^http://localhost:\d+$",
+        r"^http://127.0.0.1:\d+$",
+        r"^chrome-extension://.*$",
+    ]
+else:
+    CORS_ALLOWED_ORIGINS = [
+        "http://localhost:8080",
+        "http://127.0.0.1:8000",
+        "http://101.6.41.59:32904",
+    ]
+    CORS_ALLOWED_ORIGIN_REGEXES = [
+        r"^chrome-extension://.*$",
+    ]
+
 CSRF_TRUSTED_ORIGINS = [
     "http://localhost:8080",
     "http://127.0.0.1:8000",
@@ -199,9 +212,6 @@ CSRF_TRUSTED_ORIGINS = [
     "chrome-extension://bbjnmhakmlafhniehkjmpcgfalppcjmf",
 ]
 CSRF_TRUSTED_ORIGINS_REGEXES = [
-    r"^chrome-extension://.*$",
-]
-CORS_ALLOWED_ORIGIN_REGEXES = [
     r"^chrome-extension://.*$",
 ]
 

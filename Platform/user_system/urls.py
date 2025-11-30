@@ -26,6 +26,7 @@ urlpatterns = [
         "reset_password/<str:token_str>/", views.reset_password, name="reset_password"
     ),
     path("forget_password/", views.forget_password, name="forget_password"),
+    path("admin/statistics/", views.admin_statistics_api, name="admin_statistics_api"),
     path("admin/", views.admin_page, name="admin_page"),
     path("admin/delete/<int:user_id>/", views.delete_user, name="delete_user"),
     path(

@@ -23,6 +23,12 @@ The system is composed of two main parts:
 -   **Discussion Forum:** A platform for users to ask questions, share insights, and engage in discussions related to their research and tasks, fostering a collaborative community.
 -   **Extension Version Management:** Administrators can manage different versions of the browser extension, view version history, and control which version is active.
 -   **AJAX-powered Admin Page:** The admin page uses AJAX for filtering and sorting users and tasks, providing a seamless and responsive experience without page reloads.
+-   **Advanced Data Analysis:** The admin dashboard features a comprehensive data analysis section with a variety of charts to visualize user and task data. These include:
+    -   **User Demographics:** Distributions of gender, occupation, education, and proficiency levels.
+    -   **User Activity:** New user signups and task creations over time.
+    -   **Task Metrics:** Distributions for task familiarity, difficulty, effort, and completion times.
+    -   **User Feedback:** Visualizations for user confidence, "aha moments", and reasons for task cancellation or reflection failures.
+    -   **Behavioral Analysis:** Histograms and box plots for task and trial completion times, as well as dwell time on pages.
 
 ## Recent Updates
 

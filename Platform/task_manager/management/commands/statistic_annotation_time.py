@@ -1,11 +1,11 @@
 import csv
+import datetime
 from django.core.management.base import BaseCommand
-from django.db.models import Sum
 from user_system.models import User
-from task_manager.models import Task, PreTaskAnnotation, PostTaskAnnotation, CancelAnnotation, ReflectionAnnotation, TaskTrial
+from task_manager.models import Task
 
 class Command(BaseCommand):
-    help = "Calculates and prints the total annotation time for each user. Can also save to CSV."
+    help = "Calculates and prints the total effort time for each user by summing up the duration of all their tasks."
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -13,7 +13,7 @@ class Command(BaseCommand):
             type=str,
             help='Save the output to a CSV file at the specified path.',
             nargs='?',
-            const='annotation_time_stats.csv',
+            const='total_effort_time.csv',
             default=None,
         )
 
@@ -22,33 +22,26 @@ class Command(BaseCommand):
         results = []
 
         for user in users:
-            total_duration = 0
-
-            # Get all tasks for the user
-            tasks = Task.objects.filter(user=user)
-
-            # Pre-task, Post-task, and Cancel annotations
-            pre_task_duration = PreTaskAnnotation.objects.filter(belong_task__in=tasks).aggregate(Sum('duration'))['duration__sum'] or 0
-            post_task_duration = PostTaskAnnotation.objects.filter(belong_task__in=tasks).aggregate(Sum('duration'))['duration__sum'] or 0
-            cancel_task_duration = CancelAnnotation.objects.filter(belong_task__in=tasks).aggregate(Sum('duration'))['duration__sum'] or 0
+            total_effort_duration = datetime.timedelta(0)
             
-            total_duration += pre_task_duration
-            total_duration += post_task_duration
-            total_duration += cancel_task_duration
+            # Get all tasks for the user that are completed or cancelled
+            tasks = Task.objects.filter(user=user, active=False)
 
-            # Reflection annotations
-            task_trials = TaskTrial.objects.filter(belong_task__in=tasks)
-            reflection_duration = ReflectionAnnotation.objects.filter(belong_task_trial__in=task_trials).aggregate(Sum('duration'))['duration__sum'] or 0
-            total_duration += reflection_duration
-
-            # Always print to console
-            self.stdout.write(f"User: {user.username}, Total annotation time: {total_duration} seconds")
-            results.append([user.username, total_duration])
+            for task in tasks:
+                if task.start_timestamp and task.end_timestamp:
+                    duration = task.end_timestamp - task.start_timestamp
+                    total_effort_duration += duration
+            
+            total_seconds = total_effort_duration.total_seconds()
+            self.stdout.write(f"User: {user.username}, Total Effort Time: {total_seconds/60:.2f} minutes")
+            results.append([user.username, total_seconds])
 
         if options['save']:
             file_path = options['save']
             with open(file_path, 'w', newline='') as csvfile:
                 writer = csv.writer(csvfile)
-                writer.writerow(['Username', 'Total Annotation Time (seconds)'])
-                writer.writerows(results)
+                writer.writerow(['Username', 'Total Effort Time (seconds)'])
+                # Format to 2 decimal places for consistency
+                formatted_results = [[res[0], f"{res[1]:.2f}"] for res in results]
+                writer.writerows(formatted_results)
             self.stdout.write(self.style.SUCCESS(f"Successfully saved statistics to {file_path}"))

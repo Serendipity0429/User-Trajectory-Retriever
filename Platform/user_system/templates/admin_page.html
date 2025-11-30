@@ -170,6 +170,345 @@
         </div>
     </div>
 
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow-sm mb-4">
+                <div class="card-header" data-bs-toggle="collapse" href="#userDataAnalysisCollapse" role="button" aria-expanded="true" aria-controls="userDataAnalysisCollapse">
+                    <i class="bi bi-graph-up me-2"></i>
+                    User Data Analysis
+                </div>
+                <div class="collapse show" id="userDataAnalysisCollapse">
+                    <div class="card-body">
+                        <div class="analysis-loader d-flex flex-column justify-content-center align-items-center" style="min-height: 400px;">
+                            <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <h5 class="mt-3 fw-bold">Loading Analysis Data...</h5>
+                            <p class="text-muted">Please wait while we fetch the latest statistics.</p>
+                        </div>
+                        <div class="analysis-content" style="display: none;">
+                            <h5 class="text-muted fw-bold mb-3 border-bottom pb-2">Growth Metrics</h5>
+                            <div class="row">
+                                <div class="col-lg-6 mb-4">
+                                    <div class="card h-100 shadow-sm">
+                                        <div class="card-header bg-light d-flex align-items-center">
+                                            <i class="bi bi-graph-up me-2 text-primary"></i>
+                                            <h6 class="mb-0 fw-bold">New User Signups (Last 30 Days)</h6>
+                                        </div>
+                                        <div class="card-body d-flex align-items-center justify-content-center p-2">
+                                            <div class="w-100" style="height: 220px;"><canvas id="userSignupsChart"></canvas></div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-lg-6 mb-4">
+                                    <div class="card h-100 shadow-sm">
+                                        <div class="card-header bg-light d-flex align-items-center">
+                                            <i class="bi bi-graph-up-arrow me-2 text-danger"></i>
+                                            <h6 class="mb-0 fw-bold">New Task Creations (Last 30 Days)</h6>
+                                        </div>
+                                        <div class="card-body d-flex align-items-center justify-content-center p-2">
+                                            <div class="w-100" style="height: 220px;"><canvas id="taskCreationsChart"></canvas></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <h5 class="text-muted fw-bold my-3 border-bottom pb-2">User Demographics</h5>
+                            <div class="row">
+                                <div class="col-lg-4 mb-4">
+                                    <div class="card h-100 shadow-sm">
+                                        <div class="card-header bg-light d-flex align-items-center">
+                                            <i class="bi bi-pie-chart-fill me-2 text-info"></i>
+                                            <h6 class="mb-0 fw-bold">Gender Distribution</h6>
+                                        </div>
+                                        <div class="card-body d-flex align-items-center justify-content-center p-2">
+                                            <div class="w-100" style="height: 200px;"><canvas id="genderDistributionChart"></canvas></div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-lg-4 mb-4">
+                                    <div class="card h-100 shadow-sm">
+                                        <div class="card-header bg-light d-flex align-items-center">
+                                            <i class="bi bi-pie-chart-fill me-2 text-info"></i>
+                                            <h6 class="mb-0 fw-bold">Occupation Distribution</h6>
+                                        </div>
+                                        <div class="card-body d-flex align-items-center justify-content-center p-2">
+                                            <div class="w-100" style="height: 200px;"><canvas id="occupationDistributionChart"></canvas></div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-lg-4 mb-4">
+                                    <div class="card h-100 shadow-sm">
+                                        <div class="card-header bg-light d-flex align-items-center">
+                                            <i class="bi bi-pie-chart-fill me-2 text-info"></i>
+                                            <h6 class="mb-0 fw-bold">Education Distribution</h6>
+                                        </div>
+                                        <div class="card-body d-flex align-items-center justify-content-center p-2">
+                                            <div class="w-100" style="height: 200px;"><canvas id="educationDistributionChart"></canvas></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <h5 class="text-muted fw-bold my-3 border-bottom pb-2">User Skills & Preferences</h5>
+                            <div class="row">
+                                <div class="col-lg-4 mb-4">
+                                    <div class="card h-100 shadow-sm">
+                                        <div class="card-header bg-light d-flex align-items-center">
+                                            <i class="bi bi-bar-chart-fill me-2 text-success"></i>
+                                            <h6 class="mb-0 fw-bold">LLM Frequency</h6>
+                                        </div>
+                                        <div class="card-body d-flex align-items-center justify-content-center p-2">
+                                            <div class="w-100" style="height: 200px;"><canvas id="llmFrequencyChart"></canvas></div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-lg-4 mb-4">
+                                    <div class="card h-100 shadow-sm">
+                                        <div class="card-header bg-light d-flex align-items-center">
+                                            <i class="bi bi-bar-chart-fill me-2 text-success"></i>
+                                            <h6 class="mb-0 fw-bold">English Proficiency</h6>
+                                        </div>
+                                        <div class="card-body d-flex align-items-center justify-content-center p-2">
+                                            <div class="w-100" style="height: 200px;"><canvas id="englishProficiencyChart"></canvas></div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-lg-4 mb-4">
+                                    <div class="card h-100 shadow-sm">
+                                        <div class="card-header bg-light d-flex align-items-center">
+                                            <i class="bi bi-bar-chart-fill me-2 text-success"></i>
+                                            <h6 class="mb-0 fw-bold">Web Search Proficiency</h6>
+                                        </div>
+                                        <div class="card-body d-flex align-items-center justify-content-center p-2">
+                                            <div class="w-100" style="height: 200px;"><canvas id="webSearchProficiencyChart"></canvas></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-12">
+            <div class="card shadow-sm mb-4">
+                <div class="card-header" data-bs-toggle="collapse" href="#taskDataAnalysisCollapse" role="button" aria-expanded="true" aria-controls="taskDataAnalysisCollapse">
+                    <i class="bi bi-bar-chart-line-fill me-2"></i>
+                    Task Data Analysis
+                </div>
+                <div class="collapse show" id="taskDataAnalysisCollapse">
+                    <div class="card-body">
+                        <div class="analysis-loader d-flex flex-column justify-content-center align-items-center" style="min-height: 400px;">
+                            <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <h5 class="mt-3 fw-bold">Loading Analysis Data...</h5>
+                            <p class="text-muted">Please wait while we fetch the latest statistics.</p>
+                        </div>
+                        <div class="analysis-content" style="display: none;">
+                            <h5 class="text-muted fw-bold mb-3 border-bottom pb-2">Task Sentiment & Difficulty</h5>
+                            <div class="row">
+                                <div class="col-lg-3 mb-4">
+                                    <div class="card h-100 shadow-sm">
+                                        <div class="card-header bg-light d-flex align-items-center">
+                                            <i class="bi bi-pie-chart-fill me-2 text-warning"></i>
+                                            <h6 class="mb-0 fw-bold">Task Familiarity</h6>
+                                        </div>
+                                        <div class="card-body d-flex align-items-center justify-content-center p-2">
+                                            <div class="w-100" style="height: 200px;"><canvas id="taskFamiliarityChart"></canvas></div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-lg-3 mb-4">
+                                    <div class="card h-100 shadow-sm">
+                                        <div class="card-header bg-light d-flex align-items-center">
+                                            <i class="bi bi-pie-chart-fill me-2 text-warning"></i>
+                                            <h6 class="mb-0 fw-bold">Pre-Task Difficulty</h6>
+                                        </div>
+                                        <div class="card-body d-flex align-items-center justify-content-center p-2">
+                                            <div class="w-100" style="height: 200px;"><canvas id="preTaskDifficultyChart"></canvas></div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-lg-3 mb-4">
+                                    <div class="card h-100 shadow-sm">
+                                        <div class="card-header bg-light d-flex align-items-center">
+                                            <i class="bi bi-pie-chart-fill me-2 text-warning"></i>
+                                            <h6 class="mb-0 fw-bold">Post-Task Difficulty</h6>
+                                        </div>
+                                        <div class="card-body d-flex align-items-center justify-content-center p-2">
+                                            <div class="w-100" style="height: 200px;"><canvas id="postTaskDifficultyChart"></canvas></div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-lg-3 mb-4">
+                                    <div class="card h-100 shadow-sm">
+                                        <div class="card-header bg-light d-flex align-items-center">
+                                            <i class="bi bi-pie-chart-fill me-2 text-info"></i>
+                                            <h6 class="mb-0 fw-bold">Effort Distribution</h6>
+                                        </div>
+                                        <div class="card-body d-flex align-items-center justify-content-center p-2">
+                                            <div class="w-100" style="height: 200px;"><canvas id="effortDistributionChart"></canvas></div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-lg-12 mb-4">
+                                    <div class="card h-100 shadow-sm">
+                                        <div class="card-header bg-light d-flex align-items-center">
+                                            <i class="bi bi-bar-chart-fill me-2 text-primary"></i>
+                                            <h6 class="mb-0 fw-bold">Confidence Distribution</h6>
+                                        </div>
+                                        <div class="card-body d-flex align-items-center justify-content-center p-2">
+                                            <div class="w-100" style="height: 220px;"><canvas id="confidenceDistributionChart"></canvas></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <h5 class="text-muted fw-bold my-3 border-bottom pb-2">Task Outcomes</h5>
+                            <div class="row">
+                                <div class="col-lg-4 mb-4">
+                                    <div class="card h-100 shadow-sm">
+                                        <div class="card-header bg-light d-flex align-items-center">
+                                            <i class="bi bi-pie-chart-fill me-2 text-success"></i>
+                                            <h6 class="mb-0 fw-bold">Trial Correctness</h6>
+                                        </div>
+                                        <div class="card-body d-flex align-items-center justify-content-center p-2">
+                                            <div class="w-100" style="height: 200px;"><canvas id="trialCorrectnessChart"></canvas></div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-lg-4 mb-4">
+                                    <div class="card h-100 shadow-sm">
+                                        <div class="card-header bg-light d-flex align-items-center">
+                                            <i class="bi bi-bar-chart-fill me-2 text-secondary"></i>
+                                            <h6 class="mb-0 fw-bold">Top Cancellation Reasons</h6>
+                                        </div>
+                                        <div class="card-body d-flex align-items-center justify-content-center p-2">
+                                            <div class="w-100" style="height: 200px;"><canvas id="cancellationReasonsChart"></canvas></div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-lg-4 mb-4">
+                                    <div class="card h-100 shadow-sm">
+                                        <div class="card-header bg-light d-flex align-items-center">
+                                            <i class="bi bi-bar-chart-fill me-2 text-secondary"></i>
+                                            <h6 class="mb-0 fw-bold">Top Reflection Failure Categories</h6>
+                                        </div>
+                                        <div class="card-body d-flex align-items-center justify-content-center p-2">
+                                            <div class="w-100" style="height: 200px;"><canvas id="reflectionFailuresChart"></canvas></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <h5 class="text-muted fw-bold my-3 border-bottom pb-2">User Behavior Analysis</h5>
+                            <div class="row">
+                                <div class="col-lg-4 mb-4">
+                                    <div class="card h-100 shadow-sm">
+                                        <div class="card-header bg-light d-flex align-items-center">
+                                            <i class="bi bi-lightbulb-fill me-2 text-warning"></i>
+                                            <h6 class="mb-0 fw-bold">Aha! Moment Types</h6>
+                                        </div>
+                                        <div class="card-body d-flex align-items-center justify-content-center p-2">
+                                            <div class="w-100" style="height: 200px;"><canvas id="ahaMomentChart"></canvas></div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-lg-4 mb-4">
+                                    <div class="card h-100 shadow-sm">
+                                        <div class="card-header bg-light d-flex align-items-center">
+                                            <i class="bi bi-card-text me-2 text-secondary"></i>
+                                            <h6 class="mb-0 fw-bold">Answer Formulation</h6>
+                                        </div>
+                                        <div class="card-body d-flex align-items-center justify-content-center p-2">
+                                            <div class="w-100" style="height: 200px;"><canvas id="answerFormulationChart"></canvas></div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-lg-4 mb-4">
+                                    <div class="card h-100 shadow-sm">
+                                        <div class="card-header bg-light d-flex align-items-center">
+                                            <i class="bi bi-file-earmark-text-fill me-2 text-danger"></i>
+                                            <h6 class="mb-0 fw-bold">Evidence Types</h6>
+                                        </div>
+                                        <div class="card-body d-flex align-items-center justify-content-center p-2">
+                                            <div class="w-100" style="height: 200px;"><canvas id="evidenceTypeChart"></canvas></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <h5 class="text-muted fw-bold my-3 border-bottom pb-2">Time & Trial Analysis</h5>
+                            <div class="row">
+                                <div class="col-lg-6 mb-4">
+                                    <div class="card h-100 shadow-sm">
+                                        <div class="card-header bg-light d-flex align-items-center">
+                                            <i class="bi bi-bar-chart-alt-2 me-2 text-info"></i>
+                                            <h6 class="mb-0 fw-bold">Task Time (Histogram)</h6>
+                                        </div>
+                                        <div class="card-body p-2">
+                                            <div id="taskTimeHistogramChart" style="height: 220px;"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-lg-6 mb-4">
+                                    <div class="card h-100 shadow-sm">
+                                        <div class="card-header bg-light d-flex align-items-center">
+                                            <i class="bi bi-box-seam me-2 text-primary"></i>
+                                            <h6 class="mb-0 fw-bold">Task Time (Box Plot)</h6>
+                                        </div>
+                                        <div class="card-body p-2">
+                                            <div id="taskTimeBoxPlotChart" style="height: 220px;"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-lg-12 mb-4">
+                                    <div class="card h-100 shadow-sm">
+                                        <div class="card-header bg-light d-flex align-items-center">
+                                            <i class="bi bi-clock-history me-2 text-info"></i>
+                                            <h6 class="mb-0 fw-bold">Dwell Time (Histogram)</h6>
+                                        </div>
+                                        <div class="card-body p-2">
+                                            <div id="dwellTimeHistogramChart" style="height: 220px;"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row mt-2">
+                                <div class="col-12 mb-4">
+                                    <div class="card h-100 shadow-sm">
+                                        <div class="card-header bg-light d-flex align-items-center">
+                                            <i class="bi bi-distribute-vertical me-2 text-success"></i>
+                                            <h6 class="mb-0 fw-bold">Trial Time Distribution (Box Plot Series)</h6>
+                                        </div>
+                                        <div class="card-body p-2">
+                                            <div id="trialTimeBoxPlotChart" style="height: 300px;"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row mt-2">
+                                <div class="col-12 mb-4">
+                                    <div class="card h-100 shadow-sm">
+                                        <div class="card-header bg-light d-flex align-items-center">
+                                            <i class="bi bi-list-ol me-2 text-warning"></i>
+                                            <h6 class="mb-0 fw-bold">Task Trial Count Distribution</h6>
+                                        </div>
+                                        <div class="card-body p-2">
+                                            <div id="trialCountDistributionChart" style="height: 220px;"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="card shadow-sm mb-4">
         <div class="card-header" data-bs-toggle="collapse" href="#consentManagementCollapse" role="button" aria-expanded="true" aria-controls="consentManagementCollapse">
             <i class="bi bi-shield-check me-2"></i>
@@ -316,4 +655,317 @@
     </div>
 </div>
 <script src="{% static 'js/admin.js' %}" defer></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const loaders = document.querySelectorAll('.analysis-loader');
+    const contents = document.querySelectorAll('.analysis-content');
+
+    fetch("{% url 'user_system:admin_statistics_api' %}")
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(statistics => {
+            loaders.forEach(loader => loader.remove());
+            contents.forEach(content => content.style.display = 'block');
+            
+            const CHART_COLORS = {
+                red: 'rgb(255, 99, 132)',
+                orange: 'rgb(255, 159, 64)',
+                yellow: 'rgb(255, 205, 86)',
+                green: 'rgb(75, 192, 192)',
+                blue: 'rgb(54, 162, 235)',
+                purple: 'rgb(153, 102, 255)',
+                grey: 'rgb(201, 203, 207)'
+            };
+            const chartColorsArray = Object.values(CHART_COLORS);
+
+            // --- Enhanced Chart Configurations ---
+            const chartJsDefaultOptions = {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { labels: { font: { size: 14 } } }
+                },
+                scales: {
+                    x: {
+                        ticks: { font: { size: 14 } },
+                        title: { display: true, font: { size: 16 } }
+                    },
+                    y: {
+                        ticks: { font: { size: 14 } },
+                        title: { display: true, font: { size: 16 } }
+                    }
+                }
+            };
+
+            const doughnutPieOptions = {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'top', labels: { font: { size: 14 } } }
+                }
+            };
+            
+            const plotlyLayout = {
+                margin: { l: 80, r: 50, b: 80, t: 50 },
+                paper_bgcolor: 'rgba(0,0,0,0)',
+                plot_bgcolor: 'rgba(0,0,0,0)',
+                xaxis: { 
+                    gridcolor: '#e0e0e0',
+                    title: { font: { size: 18 } },
+                    tickfont: { size: 14 }
+                },
+                yaxis: { 
+                    gridcolor: '#e0e0e0',
+                    title: { font: { size: 18 } },
+                    tickfont: { size: 14 }
+                },
+                legend: { font: { size: 14 } }
+            };
+
+
+            // --- Chart.js Instances ---
+            new Chart(document.getElementById('userSignupsChart'), {
+                type: 'line',
+                data: {
+                    labels: statistics.user_signups.labels,
+                    datasets: [{ label: 'New Users', data: statistics.user_signups.data, borderColor: CHART_COLORS.blue, tension: 0.1, fill: false }]
+                },
+                options: chartJsDefaultOptions
+            });
+
+            new Chart(document.getElementById('genderDistributionChart'), {
+                type: 'doughnut',
+                data: {
+                    labels: statistics.gender_distribution.labels,
+                    datasets: [{ data: statistics.gender_distribution.data, backgroundColor: chartColorsArray }]
+                },
+                options: doughnutPieOptions
+            });
+            
+            new Chart(document.getElementById('occupationDistributionChart'), {
+                type: 'doughnut',
+                data: {
+                    labels: statistics.occupation_distribution.labels,
+                    datasets: [{ data: statistics.occupation_distribution.data, backgroundColor: chartColorsArray }]
+                },
+                options: doughnutPieOptions
+            });
+
+            new Chart(document.getElementById('educationDistributionChart'), {
+                type: 'doughnut',
+                data: {
+                    labels: statistics.education_distribution.labels,
+                    datasets: [{ data: statistics.education_distribution.data, backgroundColor: chartColorsArray }]
+                },
+                options: doughnutPieOptions
+            });
+
+            new Chart(document.getElementById('llmFrequencyChart'), {
+                type: 'bar',
+                data: {
+                    labels: statistics.llm_frequency_distribution.labels,
+                    datasets: [{ label: 'LLM Frequency', data: statistics.llm_frequency_distribution.data, backgroundColor: CHART_COLORS.purple }]
+                },
+                options: chartJsDefaultOptions
+            });
+
+            new Chart(document.getElementById('englishProficiencyChart'), {
+                type: 'bar',
+                data: {
+                    labels: statistics.english_proficiency_distribution.labels,
+                    datasets: [{ label: 'English Proficiency', data: statistics.english_proficiency_distribution.data, backgroundColor: CHART_COLORS.green }]
+                },
+                options: { ...chartJsDefaultOptions, indexAxis: 'y' }
+            });
+
+            new Chart(document.getElementById('webSearchProficiencyChart'), {
+                type: 'bar',
+                data: {
+                    labels: statistics.web_search_proficiency_distribution.labels,
+                    datasets: [{ label: 'Web Search Proficiency', data: statistics.web_search_proficiency_distribution.data, backgroundColor: CHART_COLORS.orange }]
+                },
+                options: { ...chartJsDefaultOptions, indexAxis: 'y' }
+            });
+
+            new Chart(document.getElementById('taskCreationsChart'), {
+                type: 'line',
+                data: {
+                    labels: statistics.task_creations.labels,
+                    datasets: [{ label: 'New Tasks', data: statistics.task_creations.data, borderColor: CHART_COLORS.red, tension: 0.1, fill: false }]
+                },
+                options: chartJsDefaultOptions
+            });
+
+            new Chart(document.getElementById('taskFamiliarityChart'), {
+                type: 'pie',
+                data: {
+                    labels: statistics.familiarity_distribution.labels,
+                    datasets: [{ data: statistics.familiarity_distribution.data, backgroundColor: chartColorsArray }]
+                },
+                options: doughnutPieOptions
+            });
+
+            new Chart(document.getElementById('preTaskDifficultyChart'), {
+                type: 'pie',
+                data: {
+                    labels: statistics.pre_task_difficulty_distribution.labels,
+                    datasets: [{ data: statistics.pre_task_difficulty_distribution.data, backgroundColor: chartColorsArray }]
+                },
+                options: doughnutPieOptions
+            });
+
+            new Chart(document.getElementById('postTaskDifficultyChart'), {
+                type: 'pie',
+                data: {
+                    labels: statistics.post_task_difficulty_distribution.labels,
+                    datasets: [{ data: statistics.post_task_difficulty_distribution.data, backgroundColor: chartColorsArray }]
+                },
+                options: doughnutPieOptions
+            });
+            
+            new Chart(document.getElementById('cancellationReasonsChart'), {
+                type: 'bar',
+                data: {
+                    labels: statistics.cancellation_reasons.labels,
+                    datasets: [{ label: 'Count', data: statistics.cancellation_reasons.data, backgroundColor: CHART_COLORS.yellow }]
+                },
+                options: { ...chartJsDefaultOptions, indexAxis: 'y' }
+            });
+
+            new Chart(document.getElementById('reflectionFailuresChart'), {
+                type: 'bar',
+                data: {
+                    labels: statistics.reflection_failures.labels,
+                    datasets: [{ label: 'Count', data: statistics.reflection_failures.data, backgroundColor: CHART_COLORS.grey }]
+                },
+                options: { ...chartJsDefaultOptions, indexAxis: 'y' }
+            });
+
+            // --- Plotly.js Instances ---
+            // Task Time Histogram
+            if (statistics.task_time_distribution && statistics.task_time_distribution.length > 0) {
+                const layout = { ...plotlyLayout, xaxis: { ...plotlyLayout.xaxis, title: 'Time (seconds)' }, yaxis: { ...plotlyLayout.yaxis, title: 'Count' }};
+                Plotly.newPlot('taskTimeHistogramChart', [{
+                    x: statistics.task_time_distribution,
+                    type: 'histogram',
+                    marker: { color: CHART_COLORS.blue }
+                }], layout);
+            }
+
+            // Task Time Box Plot
+            if (statistics.task_time_distribution && statistics.task_time_distribution.length > 0) {
+                const layout = { ...plotlyLayout, yaxis: { ...plotlyLayout.yaxis, title: 'Time (seconds)' }};
+                Plotly.newPlot('taskTimeBoxPlotChart', [{
+                    y: statistics.task_time_distribution,
+                    type: 'box',
+                    name: 'Task Time',
+                    marker: { color: CHART_COLORS.purple }
+                }], layout);
+            }
+
+            // Trial Time Box Plot Series
+            if (statistics.trial_time_distribution_detail && statistics.trial_time_distribution_detail.data.length > 0) {
+                const trialData = statistics.trial_time_distribution_detail.labels.map((label, i) => ({
+                    y: statistics.trial_time_distribution_detail.data[i],
+                    type: 'box',
+                    name: label
+                }));
+                const layout = { ...plotlyLayout, yaxis: { ...plotlyLayout.yaxis, title: 'Time (seconds)' }};
+                Plotly.newPlot('trialTimeBoxPlotChart', trialData, layout);
+            }
+
+            // Task Trial Count Distribution
+            if (statistics.trial_count_distribution && statistics.trial_count_distribution.data.length > 0) {
+                const layout = { ...plotlyLayout, xaxis: { ...plotlyLayout.xaxis, title: 'Number of Trials' }, yaxis: { ...plotlyLayout.yaxis, title: 'Number of Tasks' }};
+                Plotly.newPlot('trialCountDistributionChart', [{
+                    x: statistics.trial_count_distribution.labels,
+                    y: statistics.trial_count_distribution.data,
+                    type: 'bar',
+                    marker: { color: CHART_COLORS.orange }
+                }], layout);
+            }
+
+            // --- New Charts ---
+            new Chart(document.getElementById('effortDistributionChart'), {
+                type: 'pie',
+                data: {
+                    labels: statistics.effort_distribution.labels,
+                    datasets: [{ data: statistics.effort_distribution.data, backgroundColor: chartColorsArray }]
+                },
+                options: doughnutPieOptions
+            });
+
+            new Chart(document.getElementById('trialCorrectnessChart'), {
+                type: 'pie',
+                data: {
+                    labels: statistics.trial_correctness_distribution.labels,
+                    datasets: [{ data: statistics.trial_correctness_distribution.data, backgroundColor: [CHART_COLORS.green, CHART_COLORS.red, CHART_COLORS.grey] }]
+                },
+                options: doughnutPieOptions
+            });
+
+            new Chart(document.getElementById('confidenceDistributionChart'), {
+                type: 'bar',
+                data: {
+                    labels: statistics.confidence_distribution.labels,
+                    datasets: [{ label: 'Confidence', data: statistics.confidence_distribution.data, backgroundColor: CHART_COLORS.blue }]
+                },
+                options: { ...chartJsDefaultOptions, indexAxis: 'y' }
+            });
+
+            new Chart(document.getElementById('ahaMomentChart'), {
+                type: 'bar',
+                data: {
+                    labels: statistics.aha_moment_distribution.labels,
+                    datasets: [{ label: 'Count', data: statistics.aha_moment_distribution.data, backgroundColor: CHART_COLORS.yellow }]
+                },
+                options: { ...chartJsDefaultOptions, indexAxis: 'y' }
+            });
+
+            new Chart(document.getElementById('answerFormulationChart'), {
+                type: 'bar',
+                data: {
+                    labels: statistics.answer_formulation_method_distribution.labels,
+                    datasets: [{ label: 'Count', data: statistics.answer_formulation_method_distribution.data, backgroundColor: CHART_COLORS.purple }]
+                },
+                options: { ...chartJsDefaultOptions, indexAxis: 'y' }
+            });
+
+            new Chart(document.getElementById('evidenceTypeChart'), {
+                type: 'pie',
+                data: {
+                    labels: statistics.evidence_type_distribution.labels,
+                    datasets: [{ data: statistics.evidence_type_distribution.data, backgroundColor: chartColorsArray }]
+                },
+                options: doughnutPieOptions
+            });
+
+            if (statistics.dwell_time_distribution && statistics.dwell_time_distribution.length > 0) {
+                const dwellTimeLayout = { ...plotlyLayout, xaxis: { ...plotlyLayout.xaxis, title: 'Dwell Time (seconds)' }, yaxis: { ...plotlyLayout.yaxis, title: 'Count' }};
+                Plotly.newPlot('dwellTimeHistogramChart', [{
+                    x: statistics.dwell_time_distribution,
+                    type: 'histogram',
+                    marker: { color: CHART_COLORS.green }
+                }], dwellTimeLayout);
+            }
+
+        })
+        .catch(error => {
+            console.error('Error fetching statistics:', error);
+            const errorMsg = `
+                <div class="text-danger text-center">
+                    <i class="bi bi-exclamation-triangle-fill" style="font-size: 3rem;"></i>
+                    <h5 class="mt-3 fw-bold">Failed to Load Statistics</h5>
+                    <p class="text-muted">Could not fetch analysis data. Please try again later.</p>
+                </div>`;
+            document.querySelectorAll('.card-body .analysis-loader').forEach(loader => {
+                loader.innerHTML = errorMsg;
+            });
+        });
+});
+</script>
 {% endblock %}

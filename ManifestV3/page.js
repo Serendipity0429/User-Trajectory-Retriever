@@ -173,7 +173,7 @@ class ViewState {
                     this.flush();
                 } else {
                     this.pageManager.pageInteract();
-                    this.pageManager.initialize(); // If this is unset, the start timestamp will not update!
+                    this.initialize(); // If this is unset, the start timestamp will not update!
                     if (rrweb) {
                         this.startRecording();
                     }
@@ -186,7 +186,6 @@ class ViewState {
             window.addEventListener('mousemove', (e) => this.mMove(e));
             window.addEventListener('scroll', () => this.mScroll());
             window.addEventListener('focus', () => this.pageInteract());
-            window.addEventListener('blur', () => this.pageManager.pageLeave());
             window.addEventListener('beforeunload', () => this.flush());
             this._are_event_listeners_added = true;
         }
@@ -291,8 +290,6 @@ class ViewState {
         }
 
         this.sendMessage(false);
-        this.initialize();
-        // Re-initialized rrweb when the user re-enter the page
     }
 }
 

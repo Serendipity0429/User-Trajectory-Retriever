@@ -3,7 +3,6 @@
 
 import logging
 import random
-from datetime import datetime
 from django.utils import timezone
 from django.db import transaction
 from django.shortcuts import render
@@ -42,11 +41,38 @@ from .models import (
     Justification,
     ExtensionVersion,
 )
-from .mappings import *
+from .mappings import (
+    FAMILIARITY_MAP,
+    DIFFICULTY_MAP,
+    EFFORT_MAP,
+    EXPECTED_SOURCES_MAP,
+    FAMILIARITY_EXPLANATION_MAP,
+    DIFFICULTY_EXPLANATION_MAP,
+    EFFORT_EXPLANATION_MAP,
+    AHA_MOMENT_MAP,
+    UNHELPFUL_PATHS_MAP,
+    STRATEGY_SHIFT_MAP,
+    AHA_MOMENT_EXPLANATION_MAP,
+    UNHELPFUL_PATHS_EXPLANATION_MAP,
+    STRATEGY_SHIFT_EXPLANATION_MAP,
+    MISSING_RESOURCES_MAP,
+    CANCEL_CATEGORY_MAP,
+    FAILURE_CATEGORY_MAP,
+    CORRECTIVE_PLAN_MAP,
+    CONFIDENCE_MAP,
+    ANSWER_FORMULATION_MAP,
+    CANCEL_CATEGORY_EXPLANATION_MAP,
+    MISSING_RESOURCES_EXPLANATION_MAP,
+    FAILURE_CATEGORY_EXPLANATION_MAP,
+    CORRECTIVE_ACTION_EXPLANATION_MAP,
+)
 from user_system.decorators import consent_exempt
-from rest_framework.decorators import api_view, permission_classes, authentication_classes
+from rest_framework.decorators import (
+    api_view,
+    permission_classes,
+    authentication_classes,
+)
 from rest_framework.permissions import IsAuthenticated
-from rest_framework.authentication import SessionAuthentication
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework_simplejwt.tokens import AccessToken
 from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
@@ -57,10 +83,6 @@ from django.views.decorators.csrf import (
 )  # Add ensure_csrf_cookie here
 from django.urls import reverse
 
-try:
-    import simplejson as json
-except ImportError:
-    import json
 from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
 from django.contrib.auth import login
 
@@ -80,7 +102,6 @@ def get_choices_for_template(choice_map_config):
 
 @consent_exempt
 @api_view(["POST"])
-@authentication_classes([JWTAuthentication])
 @permission_classes([IsAuthenticated])
 def stop_annotation_api(request):
     """
@@ -88,11 +109,18 @@ def stop_annotation_api(request):
     """
     user = request.user
     annotation_id = request.data.get("annotation_id")
-    print_debug(f"Received stop annotation signal for user {user.username} with ID {annotation_id}.")
+    print_debug(
+        f"Received stop annotation signal for user {user.username} with ID {annotation_id}."
+    )
     if stop_annotating(request, annotation_id):
-        return JsonResponse({"status": "success", "message": "Annotation stopped."}, status=200)
+        return JsonResponse(
+            {"status": "success", "message": "Annotation stopped."}, status=200
+        )
     else:
-        return JsonResponse({"status": "error", "message": "Annotation ID mismatch or not found."}, status=400)
+        return JsonResponse(
+            {"status": "error", "message": "Annotation ID mismatch or not found."},
+            status=400,
+        )
 
 
 # Redirect after authentication
@@ -124,7 +152,9 @@ def auth_redirect(request):
         # 2. Log the user into a Django session
         # This will set the session cookie in the user's browser
         if user.is_active:
-            user.backend = 'django.contrib.auth.backends.ModelBackend'  # Explicitly set backend
+            user.backend = (
+                "django.contrib.auth.backends.ModelBackend"  # Explicitly set backend
+            )
             login(request, user)
             # 3. Redirect to the intended page
             response = HttpResponseRedirect(redirect_path)
@@ -151,11 +181,13 @@ def data(request):
         store_data(request, message, user)
         return JsonResponse({"status": "success"})
     except (zlib.error, json.JSONDecodeError, UnicodeDecodeError) as e:
-        logger.error(f"Failed to process incoming data for user {request.user.username}: {e}")
-        return JsonResponse({"status": "error", "message": "Invalid or corrupt data received."}, status=400)
-
-
-
+        logger.error(
+            f"Failed to process incoming data for user {request.user.username}: {e}"
+        )
+        return JsonResponse(
+            {"status": "error", "message": "Invalid or corrupt data received."},
+            status=400,
+        )
 
 
 # Pre-Task Annotation Fetcher
@@ -176,7 +208,12 @@ def pre_task_annotation(request):
         entry_id = int(request.POST.get("entry_id"))
         entry = TaskDatasetEntry.objects.filter(id=entry_id).first()
         if entry is None:
-            return render_status_page(request, 'Not Found', f"No entry found with entry_id={entry_id}", 'danger')
+            return render_status_page(
+                request,
+                "Not Found",
+                f"No entry found with entry_id={entry_id}",
+                "danger",
+            )
         entry.num_associated_tasks += 1
         task.content = entry
         entry.save()
@@ -189,7 +226,9 @@ def pre_task_annotation(request):
         pre_annotation.effort = request.POST.get("effort")
         pre_annotation.first_search_query = request.POST.get("first_search_query")
         pre_annotation.initial_guess = request.POST.get("initial_guess")
-        pre_annotation.initial_guess_unknown = request.POST.get("initial_guess_unknown") == "on"
+        pre_annotation.initial_guess_unknown = (
+            request.POST.get("initial_guess_unknown") == "on"
+        )
         pre_annotation.expected_source = request.POST.getlist("expected_source")
         pre_annotation.expected_source_other = request.POST.get("expected_source_other")
         pre_annotation.duration = request.POST.get("duration")
@@ -201,18 +240,24 @@ def pre_task_annotation(request):
 
     else:
         if Task.objects.filter(user=user, active=True).exists():
-            return render_status_page(request, 'Ongoing Task!', 'You already have an active task. Please complete or cancel it before starting a new one.', 'warning')
+            return render_status_page(
+                request,
+                "Ongoing Task!",
+                "You already have an active task. Please complete or cancel it before starting a new one.",
+                "warning",
+            )
 
         # Randomly choose a task from the dataset
         dataset = get_active_task_dataset(user)
         if dataset is None:
-            return render_status_page(request, 'Not Found', 'No active dataset found.', 'danger')
-        
+            return render_status_page(
+                request, "Not Found", "No active dataset found.", "danger"
+            )
+
         # Get IDs of entries the user has already interacted with
         interacted_entry_ids = Task.objects.filter(
-            user=user,
-            content__belong_dataset=dataset
-        ).values_list('content_id', flat=True)
+            user=user, content__belong_dataset=dataset
+        ).values_list("content_id", flat=True)
 
         # Filter for entries in the dataset that haven't been interacted with
         available_entries = TaskDatasetEntry.objects.filter(
@@ -236,12 +281,12 @@ def pre_task_annotation(request):
             # This could mean either the dataset is empty, or the user has completed all tasks.
             if not TaskDatasetEntry.objects.filter(belong_dataset=dataset).exists():
                 message = f"No entry found in dataset id={dataset.id}"
-                title = 'Not Found'
-                alert_type = 'danger'
+                title = "Not Found"
+                alert_type = "danger"
             else:
                 message = "You have completed all available tasks. Thank you!"
-                title = 'All Tasks Completed'
-                alert_type = 'success'
+                title = "All Tasks Completed"
+                alert_type = "success"
             return render_status_page(request, title, message, alert_type)
         print_debug(f"[Question] {entry.question}")
         print_debug(f"[Answer] {entry.answer}")
@@ -249,23 +294,31 @@ def pre_task_annotation(request):
         is_tutorial = False
         total_tutorial_tasks = 0
         current_tutorial_step = 0
-        
+
         is_formal = False
         total_formal_tasks = 0
         current_formal_step = 0
 
         if dataset and dataset.name == "tutorial":
             is_tutorial = True
-            total_tutorial_tasks = TaskDatasetEntry.objects.filter(belong_dataset=dataset).count()
-            tutorial_tasks_objs = Task.objects.filter(user=user, content__belong_dataset__name="tutorial")
+            total_tutorial_tasks = TaskDatasetEntry.objects.filter(
+                belong_dataset=dataset
+            ).count()
+            tutorial_tasks_objs = Task.objects.filter(
+                user=user, content__belong_dataset__name="tutorial"
+            )
             completed_tutorial_tasks = tutorial_tasks_objs.filter(active=False).count()
             current_tutorial_step = completed_tutorial_tasks + 1
             if current_tutorial_step > total_tutorial_tasks:
                 current_tutorial_step = total_tutorial_tasks
         elif dataset:
             is_formal = True
-            total_formal_tasks = TaskDatasetEntry.objects.filter(belong_dataset=dataset).count()
-            formal_tasks_objs = Task.objects.filter(user=user, content__belong_dataset=dataset)
+            total_formal_tasks = TaskDatasetEntry.objects.filter(
+                belong_dataset=dataset
+            ).count()
+            formal_tasks_objs = Task.objects.filter(
+                user=user, content__belong_dataset=dataset
+            )
             completed_formal_tasks = formal_tasks_objs.filter(active=False).count()
             current_formal_step = completed_formal_tasks + 1
             if current_formal_step > total_formal_tasks:
@@ -315,9 +368,13 @@ def post_task_annotation(request, task_id):
             post_annotation.aha_moment_type = request.POST.get("aha_moment_type")
             post_annotation.aha_moment_other = request.POST.get("aha_moment_other")
             post_annotation.unhelpful_paths = request.POST.getlist("unhelpful_paths")
-            post_annotation.unhelpful_paths_other = request.POST.get("unhelpful_paths_other")
+            post_annotation.unhelpful_paths_other = request.POST.get(
+                "unhelpful_paths_other"
+            )
             post_annotation.strategy_shift = request.POST.getlist("strategy_shift")
-            post_annotation.strategy_shift_other = request.POST.get("strategy_shift_other")
+            post_annotation.strategy_shift_other = request.POST.get(
+                "strategy_shift_other"
+            )
             post_annotation.belong_task = task
             post_annotation.duration = request.POST.get("duration")
             post_annotation.save()
@@ -335,36 +392,62 @@ def post_task_annotation(request, task_id):
         # Fetch task and relevant webpages
         task = Task.objects.filter(id=task_id, user=user).first()
         if task is None:
-            return render_status_page(request, 'Task Not Found', f"No task found with task_id={task_id}", 'danger')
+            return render_status_page(
+                request,
+                "Task Not Found",
+                f"No task found with task_id={task_id}",
+                "danger",
+            )
 
         if task.cancelled:
-            return render_status_page(request, 'Task Cancelled', 'This task has been cancelled and can no longer be annotated.', 'warning')
+            return render_status_page(
+                request,
+                "Task Cancelled",
+                "This task has been cancelled and can no longer be annotated.",
+                "warning",
+            )
 
         # Check if annotation already exists
         if PostTaskAnnotation.objects.filter(belong_task=task).exists():
-            return render_status_page(request, 'Annotation Already Completed!', 'You have already submitted the annotation for this task.', 'success')
+            return render_status_page(
+                request,
+                "Annotation Already Completed!",
+                "You have already submitted the annotation for this task.",
+                "success",
+            )
 
-        latest_trial = TaskTrial.objects.filter(belong_task=task).order_by('-num_trial').first()
+        latest_trial = (
+            TaskTrial.objects.filter(belong_task=task).order_by("-num_trial").first()
+        )
         if not latest_trial or latest_trial.is_correct is not True:
-            return render_status_page(request, 'Annotation Not Ready!', 'This annotation cannot be completed yet. Please complete the previous steps of the task first.', 'warning')
+            return render_status_page(
+                request,
+                "Annotation Not Ready!",
+                "This annotation cannot be completed yet. Please complete the previous steps of the task first.",
+                "warning",
+            )
 
         # Fetch trials and their relevant webpages
-        trials = TaskTrial.objects.filter(belong_task=task).order_by('num_trial')
+        trials = TaskTrial.objects.filter(belong_task=task).order_by("num_trial")
         for trial in trials:
             trial.webpages = Webpage.objects.filter(
                 belong_task_trial=trial, is_redirected=False, during_annotation=False
-            ).order_by('start_timestamp')
+            ).order_by("start_timestamp")
 
         question = task.content.question
         answer = json.loads(task.content.answer)
         print_debug(answer)
 
         # Get the user's answer from the latest trial
-        latest_trial = TaskTrial.objects.filter(belong_task=task).order_by('-num_trial').first()
+        latest_trial = (
+            TaskTrial.objects.filter(belong_task=task).order_by("-num_trial").first()
+        )
         user_answer = latest_trial.answer if latest_trial else ""
 
         last_trial_duration = latest_trial.end_timestamp - latest_trial.start_timestamp
-        total_duration = task.end_timestamp - task.start_timestamp if task.end_timestamp else None
+        total_duration = (
+            task.end_timestamp - task.start_timestamp if task.end_timestamp else None
+        )
 
         annotation_id = start_annotating(request, "post_task_annotation")
         return render(
@@ -386,8 +469,12 @@ def post_task_annotation(request, task_id):
                 "STRATEGY_SHIFT_MAP": get_choices_for_template(STRATEGY_SHIFT_MAP),
                 "DIFFICULTY_EXPLANATION_MAP": DIFFICULTY_EXPLANATION_MAP["mapping"],
                 "AHA_MOMENT_EXPLANATION_MAP": AHA_MOMENT_EXPLANATION_MAP["mapping"],
-                "UNHELPFUL_PATHS_EXPLANATION_MAP": UNHELPFUL_PATHS_EXPLANATION_MAP["mapping"],
-                "STRATEGY_SHIFT_EXPLANATION_MAP": STRATEGY_SHIFT_EXPLANATION_MAP["mapping"],
+                "UNHELPFUL_PATHS_EXPLANATION_MAP": UNHELPFUL_PATHS_EXPLANATION_MAP[
+                    "mapping"
+                ],
+                "STRATEGY_SHIFT_EXPLANATION_MAP": STRATEGY_SHIFT_EXPLANATION_MAP[
+                    "mapping"
+                ],
             },
         )
 
@@ -403,15 +490,17 @@ def active_task(request):
 
     # Version check
     extension_version = request.data.get("extension_version")
-    latest_version = ExtensionVersion.objects.order_by('-id').first()
+    latest_version = ExtensionVersion.objects.order_by("-id").first()
 
     if latest_version and extension_version != latest_version.version:
-        return JsonResponse({
-            "update_required": True,
-            "latest_version": latest_version.version,
-            "update_link": latest_version.update_link,
-            "description": latest_version.description,
-        })
+        return JsonResponse(
+            {
+                "update_required": True,
+                "latest_version": latest_version.version,
+                "update_link": latest_version.update_link,
+                "description": latest_version.description,
+            }
+        )
 
     task = Task.objects.filter(user=user, active=True).first()
     if task is None:
@@ -435,6 +524,7 @@ def initialize(request):
         return HttpResponse(tasks.first().id)
     return HttpResponse(-1)
 
+
 @login_required
 @permission_classes([IsAuthenticated])
 @wait_until_data_stored
@@ -447,37 +537,39 @@ def task_home(request):
     is_tutorial = False
     total_tutorial_tasks = 0
     current_tutorial_step = 0
-    
+
     is_formal = False
     total_formal_tasks = 0
     current_formal_step = 0
 
     active_dataset = get_active_task_dataset(user)
-    
+
     if active_dataset:
         if active_dataset.name == "tutorial":
             is_tutorial = True
-            total_tutorial_tasks = TaskDatasetEntry.objects.filter(belong_dataset=active_dataset).count()
-            
+            total_tutorial_tasks = TaskDatasetEntry.objects.filter(
+                belong_dataset=active_dataset
+            ).count()
+
             tutorial_tasks = Task.objects.filter(
-                user=user, 
-                content__belong_dataset__name="tutorial"
+                user=user, content__belong_dataset__name="tutorial"
             )
             completed_tutorial_tasks = tutorial_tasks.filter(active=False).count()
-            
+
             current_tutorial_step = completed_tutorial_tasks + 1
             if current_tutorial_step > total_tutorial_tasks:
                 current_tutorial_step = total_tutorial_tasks
         else:
             is_formal = True
-            total_formal_tasks = TaskDatasetEntry.objects.filter(belong_dataset=active_dataset).count()
-            
+            total_formal_tasks = TaskDatasetEntry.objects.filter(
+                belong_dataset=active_dataset
+            ).count()
+
             formal_tasks_objs = Task.objects.filter(
-                user=user, 
-                content__belong_dataset=active_dataset
+                user=user, content__belong_dataset=active_dataset
             )
             completed_formal_tasks = formal_tasks_objs.filter(active=False).count()
-            
+
             current_formal_step = completed_formal_tasks + 1
             if current_formal_step > total_formal_tasks:
                 current_formal_step = total_formal_tasks
@@ -499,26 +591,27 @@ def task_home(request):
         },
     )
 
+
 @login_required
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def annotation_home(request):
 
     user = request.user
-    
+
     unannotated_tasks = sorted(
         Task.objects.filter(user=user, active=True), key=lambda task: -task.id
     )
     annotated_tasks = sorted(
         Task.objects.filter(user=user, active=False), key=lambda task: -task.id
     )
-    
+
     def get_webpages(tasks):
         tasks_to_webpages = []
         for task in tasks:
             tasks_to_webpages.append(
                 (
-                    task, 
+                    task,
                     sorted(
                         Webpage.objects.filter(
                             user=user,
@@ -533,43 +626,67 @@ def annotation_home(request):
         return tasks_to_webpages
 
     # Split unannotated
-    tut_unannotated = [t for t in unannotated_tasks if t.content and t.content.belong_dataset.name == 'tutorial']
-    formal_unannotated = [t for t in unannotated_tasks if not (t.content and t.content.belong_dataset.name == 'tutorial')]
-    
+    tut_unannotated = [
+        t
+        for t in unannotated_tasks
+        if t.content and t.content.belong_dataset.name == "tutorial"
+    ]
+    formal_unannotated = [
+        t
+        for t in unannotated_tasks
+        if not (t.content and t.content.belong_dataset.name == "tutorial")
+    ]
+
     # Split annotated
-    tut_annotated = [t for t in annotated_tasks if t.content and t.content.belong_dataset.name == 'tutorial']
-    formal_annotated = [t for t in annotated_tasks if not (t.content and t.content.belong_dataset.name == 'tutorial')]
-    
+    tut_annotated = [
+        t
+        for t in annotated_tasks
+        if t.content and t.content.belong_dataset.name == "tutorial"
+    ]
+    formal_annotated = [
+        t
+        for t in annotated_tasks
+        if not (t.content and t.content.belong_dataset.name == "tutorial")
+    ]
+
     tut_unannotated_webpages = get_webpages(tut_unannotated)
     formal_unannotated_webpages = get_webpages(formal_unannotated)
     tut_annotated_webpages = get_webpages(tut_annotated)
     formal_annotated_webpages = get_webpages(formal_annotated)
 
     pending_annotation_url = get_pending_annotation(user)
-    
+
     is_tutorial = False
     total_tutorial_tasks = 0
     current_tutorial_step = 0
-    
+
     is_formal = False
     total_formal_tasks = 0
     current_formal_step = 0
 
     active_dataset = get_active_task_dataset(user)
-    
+
     if active_dataset:
         if active_dataset.name == "tutorial":
             is_tutorial = True
-            total_tutorial_tasks = TaskDatasetEntry.objects.filter(belong_dataset=active_dataset).count()
-            tutorial_tasks_objs = Task.objects.filter(user=user, content__belong_dataset__name="tutorial")
+            total_tutorial_tasks = TaskDatasetEntry.objects.filter(
+                belong_dataset=active_dataset
+            ).count()
+            tutorial_tasks_objs = Task.objects.filter(
+                user=user, content__belong_dataset__name="tutorial"
+            )
             completed_tutorial_tasks = tutorial_tasks_objs.filter(active=False).count()
             current_tutorial_step = completed_tutorial_tasks + 1
             if current_tutorial_step > total_tutorial_tasks:
                 current_tutorial_step = total_tutorial_tasks
         else:
             is_formal = True
-            total_formal_tasks = TaskDatasetEntry.objects.filter(belong_dataset=active_dataset).count()
-            formal_tasks_objs = Task.objects.filter(user=user, content__belong_dataset=active_dataset)
+            total_formal_tasks = TaskDatasetEntry.objects.filter(
+                belong_dataset=active_dataset
+            ).count()
+            formal_tasks_objs = Task.objects.filter(
+                user=user, content__belong_dataset=active_dataset
+            )
             completed_formal_tasks = formal_tasks_objs.filter(active=False).count()
             current_formal_step = completed_formal_tasks + 1
             if current_formal_step > total_formal_tasks:
@@ -593,6 +710,7 @@ def annotation_home(request):
             "total_formal_tasks": total_formal_tasks,
         },
     )
+
 
 # Helper function to map lists of keys to lists of values
 def map_json_list(json_string, mapping):
@@ -628,7 +746,7 @@ def _get_processed_cancel_annotation(task):
         cancel_annotation = task.cancelannotation
     except CancelAnnotation.DoesNotExist:
         cancel_annotation = None
-        
+
     cancel_categories = []
     cancel_missing_resources = []
     if cancel_annotation:
@@ -637,12 +755,15 @@ def _get_processed_cancel_annotation(task):
         )
         if cancel_annotation.category:
             category_json = json.dumps(cancel_annotation.category)
-            cancel_categories = map_json_list(category_json, CANCEL_CATEGORY_MAP["mapping"])
+            cancel_categories = map_json_list(
+                category_json, CANCEL_CATEGORY_MAP["mapping"]
+            )
     return {
         "annotation": cancel_annotation,
         "categories": cancel_categories,
         "missing_resources": cancel_missing_resources,
     }
+
 
 def _get_processed_post_task_annotation(task):
     """Fetches and processes the post-task annotation for a given task."""
@@ -655,40 +776,50 @@ def _get_processed_post_task_annotation(task):
 
     if post_task_annotation:
         post_task_annotation.unhelpful_paths_display = map_json_list(
-            json.dumps(post_task_annotation.unhelpful_paths), UNHELPFUL_PATHS_MAP["mapping"]
+            json.dumps(post_task_annotation.unhelpful_paths),
+            UNHELPFUL_PATHS_MAP["mapping"],
         )
         post_task_annotation.strategy_shift_display = map_json_list(
-            json.dumps(post_task_annotation.strategy_shift), STRATEGY_SHIFT_MAP["mapping"]
+            json.dumps(post_task_annotation.strategy_shift),
+            STRATEGY_SHIFT_MAP["mapping"],
         )
     return post_task_annotation
+
 
 def _get_processed_trials(task):
     """Fetches and processes all trials for a given task."""
     task_trials = sorted(task.tasktrial_set.all(), key=lambda t: t.num_trial)
     for trial in task_trials:
-        trial.webpages = sorted(trial.webpage_set.filter(is_redirected=False, during_annotation=False), key=lambda w: w.start_timestamp)
-        
-        active_justifications = trial.justifications.filter(status='active')
-        abandoned_justifications = trial.justifications.filter(status='abandoned')
+        trial.webpages = sorted(
+            trial.webpage_set.filter(is_redirected=False, during_annotation=False),
+            key=lambda w: w.start_timestamp,
+        )
+
+        active_justifications = trial.justifications.filter(status="active")
+        abandoned_justifications = trial.justifications.filter(status="abandoned")
 
         text_justifications = []
         image_justifications = []
         element_justifications = []
 
         for j in active_justifications:
-            if j.evidence_type == 'text_selection':
+            if j.evidence_type == "text_selection":
                 text_justifications.append(j)
-            elif j.evidence_type == 'element':
+            elif j.evidence_type == "element":
                 try:
-                    details = json.loads(j.element_details) if isinstance(j.element_details, str) and j.element_details else j.element_details
-                    if details and details.get('tagName', '').upper() == 'IMG':
+                    details = (
+                        json.loads(j.element_details)
+                        if isinstance(j.element_details, str) and j.element_details
+                        else j.element_details
+                    )
+                    if details and details.get("tagName", "").upper() == "IMG":
                         image_justifications.append(j)
                     else:
                         j.element_details = details
                         element_justifications.append(j)
                 except (json.JSONDecodeError, TypeError):
                     element_justifications.append(j)
-        
+
         trial.text_justifications = text_justifications
         trial.image_justifications = image_justifications
         trial.element_justifications = element_justifications
@@ -698,25 +829,32 @@ def _get_processed_trials(task):
             trial.duration = trial.end_timestamp - trial.start_timestamp
         else:
             trial.duration = None
-            
-        if hasattr(trial, 'reflectionannotation') and trial.reflectionannotation:
+
+        if hasattr(trial, "reflectionannotation") and trial.reflectionannotation:
             trial.reflectionannotation.failure_category_display = map_json_list(
-                trial.reflectionannotation.failure_category, FAILURE_CATEGORY_MAP['mapping']
+                trial.reflectionannotation.failure_category,
+                FAILURE_CATEGORY_MAP["mapping"],
             )
             trial.reflectionannotation.future_plan_actions_display = map_json_list(
-                trial.reflectionannotation.future_plan_actions, CORRECTIVE_PLAN_MAP['mapping']
+                trial.reflectionannotation.future_plan_actions,
+                CORRECTIVE_PLAN_MAP["mapping"],
             )
             if isinstance(trial.reflectionannotation.failure_category, str):
                 try:
-                    trial.reflectionannotation.failure_category = json.loads(trial.reflectionannotation.failure_category)
+                    trial.reflectionannotation.failure_category = json.loads(
+                        trial.reflectionannotation.failure_category
+                    )
                 except json.JSONDecodeError:
                     trial.reflectionannotation.failure_category = []
             if isinstance(trial.reflectionannotation.future_plan_actions, str):
                 try:
-                    trial.reflectionannotation.future_plan_actions = json.loads(trial.reflectionannotation.future_plan_actions)
+                    trial.reflectionannotation.future_plan_actions = json.loads(
+                        trial.reflectionannotation.future_plan_actions
+                    )
                 except json.JSONDecodeError:
                     trial.reflectionannotation.future_plan_actions = []
     return task_trials
+
 
 def _get_processed_pre_task_annotation(task):
     """Fetches and processes the pre-task annotation for a given task."""
@@ -727,7 +865,8 @@ def _get_processed_pre_task_annotation(task):
 
     if pre_task_annotation:
         pre_task_annotation.expected_source_display = map_json_list(
-            json.dumps(pre_task_annotation.expected_source), EXPECTED_SOURCES_MAP["mapping"]
+            json.dumps(pre_task_annotation.expected_source),
+            EXPECTED_SOURCES_MAP["mapping"],
         )
     return pre_task_annotation
 
@@ -743,20 +882,30 @@ def show_task(request, task_id):
     Allows access to the task owner or any superuser.
     """
     user = request.user
-    
+
     # Fetch the task by ID.
-    task = Task.objects.select_related('content').prefetch_related(
-        'pretaskannotation',
-        'posttaskannotation',
-        'cancelannotation',
-        'tasktrial_set__webpage_set',
-        'tasktrial_set__justifications',
-        'tasktrial_set__reflectionannotation'
-    ).filter(id=task_id).first()
+    task = (
+        Task.objects.select_related("content")
+        .prefetch_related(
+            "pretaskannotation",
+            "posttaskannotation",
+            "cancelannotation",
+            "tasktrial_set__webpage_set",
+            "tasktrial_set__justifications",
+            "tasktrial_set__reflectionannotation",
+        )
+        .filter(id=task_id)
+        .first()
+    )
 
     # Check if the task exists and if the user has permission to view it.
     if task is None or (task.user != user and not user.is_superuser):
-        return render_status_page(request, 'Access Denied', f"No task found with task_id={task_id} or you do not have permission to view it.", 'danger')
+        return render_status_page(
+            request,
+            "Access Denied",
+            f"No task found with task_id={task_id} or you do not have permission to view it.",
+            "danger",
+        )
 
     # 1. Fetch general task information
     task_question = task.content.question
@@ -841,10 +990,12 @@ def tool_use(request):
 def cancel_annotation(request, task_id):
     print_debug("function cancel_annotation")
     user = request.user
-    
+
     # Initial check (read-only) to fail fast if task doesn't exist
     if not Task.objects.filter(id=task_id, user=user).exists():
-        return render_status_page(request, 'Task Not Found', f"No task found with task_id={task_id}", 'danger')
+        return render_status_page(
+            request, "Task Not Found", f"No task found with task_id={task_id}", "danger"
+        )
 
     if request.method == "POST":
         with transaction.atomic():
@@ -868,11 +1019,13 @@ def cancel_annotation(request, task_id):
                 ).first()
                 if last_task_trial:
                     try:
-                        reflection = ReflectionAnnotation.objects.get(belong_task_trial=last_task_trial)
+                        reflection = ReflectionAnnotation.objects.get(
+                            belong_task_trial=last_task_trial
+                        )
                         start_timestamp = reflection.submission_timestamp
                     except ReflectionAnnotation.DoesNotExist:
                         start_timestamp = last_task_trial.end_timestamp
-            
+
             current_trial_num = task.num_trial + 1
             task_trial, created = TaskTrial.objects.get_or_create(
                 belong_task=task,
@@ -895,7 +1048,7 @@ def cancel_annotation(request, task_id):
             task.cancelled = True
             task.active = False
             task.end_timestamp = task_trial.end_timestamp
-            
+
             task.save()
             cancel_annotation = CancelAnnotation()
             cancel_annotation.belong_task = task
@@ -909,70 +1062,90 @@ def cancel_annotation(request, task_id):
             )
             cancel_annotation.duration = request.POST.get("duration")
             cancel_annotation.save()
-            
+
             stop_annotating(request)
             return close_window()
 
     else:
         task = Task.objects.filter(id=task_id, user=user).first()
         if task is None:
-             return render_status_page(request, 'Task Not Found', f"No task found with task_id={task_id}", 'danger')
+            return render_status_page(
+                request,
+                "Task Not Found",
+                f"No task found with task_id={task_id}",
+                "danger",
+            )
 
         if CancelAnnotation.objects.filter(belong_task=task).exists():
-            return render_status_page(request, 'Annotation Already Completed!', 'You have already submitted the annotation for this task.', 'success')
+            return render_status_page(
+                request,
+                "Annotation Already Completed!",
+                "You have already submitted the annotation for this task.",
+                "success",
+            )
 
         task.end_timestamp = timezone.now()
         # NOTICE: Give user change to reconsider cancellation
-        # So only after the form is submitted, the task is marked as cancelled  
+        # So only after the form is submitted, the task is marked as cancelled
 
         entry = task.content
         question = entry.question
         # answer = json.loads(entry.answer)
 
         # Fetch completed trials and their webpages
-        trials = list(TaskTrial.objects.filter(belong_task=task).order_by('num_trial'))
+        trials = list(TaskTrial.objects.filter(belong_task=task).order_by("num_trial"))
         for trial in trials:
             trial.webpages = Webpage.objects.filter(
                 belong_task_trial=trial, is_redirected=False, during_annotation=False
-            ).order_by('start_timestamp')
+            ).order_by("start_timestamp")
 
         # Fetch webpages for the current (uncompleted) trial
         current_webpages = Webpage.objects.filter(
             belong_task=task,
             belong_task_trial__isnull=True,
             is_redirected=False,
-            during_annotation=False
-        ).order_by('start_timestamp')
+            during_annotation=False,
+        ).order_by("start_timestamp")
 
         # If there are webpages for the current trial, associate them with the correct trial object
         if current_webpages.exists():
             current_trial_num = task.num_trial + 1
             # Check if a placeholder trial already exists
-            current_trial_obj = next((t for t in trials if t.num_trial == current_trial_num), None)
+            current_trial_obj = next(
+                (t for t in trials if t.num_trial == current_trial_num), None
+            )
 
             if current_trial_obj:
                 # Add webpages to the existing placeholder trial
                 # Ensure webpages are combined and sorted if necessary
                 existing_webpages = list(current_trial_obj.webpages)
                 new_webpages = list(current_webpages)
-                all_webpages = sorted(existing_webpages + new_webpages, key=lambda w: w.start_timestamp)
+                all_webpages = sorted(
+                    existing_webpages + new_webpages, key=lambda w: w.start_timestamp
+                )
                 current_trial_obj.webpages = all_webpages
             else:
                 # Create a new pseudo-trial object if no placeholder exists
                 current_trial = SimpleNamespace(
-                    num_trial=current_trial_num,
-                    webpages=current_webpages
+                    num_trial=current_trial_num, webpages=current_webpages
                 )
                 trials.append(current_trial)
 
         last_trial_duration = None
         total_duration = None
-        completed_trials = [t for t in trials if hasattr(t, 'end_timestamp') and t.end_timestamp]
+        completed_trials = [
+            t for t in trials if hasattr(t, "end_timestamp") and t.end_timestamp
+        ]
         if completed_trials:
             last_completed_trial = completed_trials[-1]
-            last_trial_duration = last_completed_trial.end_timestamp - last_completed_trial.start_timestamp
-            total_duration = sum([t.end_timestamp - t.start_timestamp for t in completed_trials], timezone.timedelta(0))
-
+            last_trial_duration = (
+                last_completed_trial.end_timestamp
+                - last_completed_trial.start_timestamp
+            )
+            total_duration = sum(
+                [t.end_timestamp - t.start_timestamp for t in completed_trials],
+                timezone.timedelta(0),
+            )
 
         annotation_id = start_annotating(request, "cancel_annotation")
         return render(
@@ -988,9 +1161,15 @@ def cancel_annotation(request, task_id):
                 "last_trial_duration": last_trial_duration,
                 "total_duration": total_duration,
                 "CANCEL_CATEGORY_MAP": get_choices_for_template(CANCEL_CATEGORY_MAP),
-                "MISSING_RESOURCES_MAP": get_choices_for_template(MISSING_RESOURCES_MAP),
-                "CANCEL_CATEGORY_EXPLANATION_MAP": CANCEL_CATEGORY_EXPLANATION_MAP["mapping"],
-                "MISSING_RESOURCES_EXPLANATION_MAP": MISSING_RESOURCES_EXPLANATION_MAP["mapping"],
+                "MISSING_RESOURCES_MAP": get_choices_for_template(
+                    MISSING_RESOURCES_MAP
+                ),
+                "CANCEL_CATEGORY_EXPLANATION_MAP": CANCEL_CATEGORY_EXPLANATION_MAP[
+                    "mapping"
+                ],
+                "MISSING_RESOURCES_EXPLANATION_MAP": MISSING_RESOURCES_EXPLANATION_MAP[
+                    "mapping"
+                ],
             },
         )
 
@@ -1002,21 +1181,35 @@ def reflection_annotation(request, task_trial_id):
     user = request.user
     task_trial = TaskTrial.objects.filter(id=task_trial_id).first()
     if task_trial is None:
-        return render_status_page(request, 'Not Found', f"No trial found with id={task_trial_id}", 'danger')
+        return render_status_page(
+            request, "Not Found", f"No trial found with id={task_trial_id}", "danger"
+        )
 
     task = task_trial.belong_task
     if task.user != user and not user.is_superuser:
-        return render_status_page(request, 'Access Denied', 'You do not have permission to view this page.', 'danger')
+        return render_status_page(
+            request,
+            "Access Denied",
+            "You do not have permission to view this page.",
+            "danger",
+        )
 
     if task_trial.is_correct is not False:
-        return render_status_page(request, 'Annotation Not Ready!', 'This annotation cannot be completed yet. Please complete the previous steps of the task first.', 'warning')
+        return render_status_page(
+            request,
+            "Annotation Not Ready!",
+            "This annotation cannot be completed yet. Please complete the previous steps of the task first.",
+            "warning",
+        )
 
     entry = task.content
     question = entry.question
 
     if request.method == "POST":
         if ReflectionAnnotation.objects.filter(belong_task_trial=task_trial).exists():
-            print_debug(f"ReflectionAnnotation for trial {task_trial.id} already exists.")
+            print_debug(
+                f"ReflectionAnnotation for trial {task_trial.id} already exists."
+            )
             stop_annotating(request)
             return close_window()
 
@@ -1038,10 +1231,14 @@ def reflection_annotation(request, task_trial_id):
 
     else:
         if ReflectionAnnotation.objects.filter(belong_task_trial=task_trial).exists():
-            return render_status_page(request, 'Annotation Already Completed!', 'You have already submitted the annotation for this task.', 'success')
+            return render_status_page(
+                request,
+                "Annotation Already Completed!",
+                "You have already submitted the annotation for this task.",
+                "success",
+            )
 
         # Filter the webpage whose timestamp is within the range of start_timestamp and timestamp
-        end_datetime = task_trial.end_timestamp
         webpages = Webpage.objects.filter(
             belong_task_trial=task_trial,
             is_redirected=False,
@@ -1073,8 +1270,12 @@ def reflection_annotation(request, task_trial_id):
                 "EFFORT_MAP": get_choices_for_template(EFFORT_MAP),
                 "EFFORT_EXPLANATION_MAP": EFFORT_EXPLANATION_MAP["mapping"],
                 "DIFFICULTY_EXPLANATION_MAP": DIFFICULTY_EXPLANATION_MAP["mapping"],
-                "FAILURE_CATEGORY_EXPLANATION_MAP": FAILURE_CATEGORY_EXPLANATION_MAP["mapping"],
-                "CORRECTIVE_ACTION_EXPLANATION_MAP": CORRECTIVE_ACTION_EXPLANATION_MAP["mapping"],
+                "FAILURE_CATEGORY_EXPLANATION_MAP": FAILURE_CATEGORY_EXPLANATION_MAP[
+                    "mapping"
+                ],
+                "CORRECTIVE_ACTION_EXPLANATION_MAP": CORRECTIVE_ACTION_EXPLANATION_MAP[
+                    "mapping"
+                ],
             },
         )
 
@@ -1093,9 +1294,19 @@ def submit_answer(request, task_id):
             try:
                 task = Task.objects.select_for_update().get(id=task_id, user=user)
                 if task.cancelled:
-                    return render_status_page(request, 'Task Cancelled', 'This task has been cancelled and no new answers can be submitted.', 'warning')
+                    return render_status_page(
+                        request,
+                        "Task Cancelled",
+                        "This task has been cancelled and no new answers can be submitted.",
+                        "warning",
+                    )
             except Task.DoesNotExist:
-                return render_status_page(request, 'Task Not Found', f"No task found with task_id={task_id}", 'danger')
+                return render_status_page(
+                    request,
+                    "Task Not Found",
+                    f"No task found with task_id={task_id}",
+                    "danger",
+                )
 
             start_timestamp = task.start_timestamp
             num_trial = task.num_trial
@@ -1105,14 +1316,16 @@ def submit_answer(request, task_id):
                 ).first()
                 if last_task_trial:
                     try:
-                        reflection = ReflectionAnnotation.objects.get(belong_task_trial=last_task_trial)
+                        reflection = ReflectionAnnotation.objects.get(
+                            belong_task_trial=last_task_trial
+                        )
                         start_timestamp = reflection.submission_timestamp
                     except ReflectionAnnotation.DoesNotExist:
                         start_timestamp = last_task_trial.end_timestamp
-            
+
             answer = request.POST.get("answer")
             answer = answer if answer else ""
-            
+
             confidence = request.POST.get("confidence")
             answer_formulation_method = request.POST.get("answer_formulation_method")
 
@@ -1145,8 +1358,8 @@ def submit_answer(request, task_id):
             )
 
             for key, value in request.POST.items():
-                if key.startswith('relevance_'):
-                    justification_id = key.split('_')[1]
+                if key.startswith("relevance_"):
+                    justification_id = key.split("_")[1]
                     try:
                         justification = Justification.objects.get(id=justification_id)
                         if justification.belong_task_trial.belong_task.user == user:
@@ -1154,8 +1367,8 @@ def submit_answer(request, task_id):
                             justification.save()
                     except (Justification.DoesNotExist, ValueError):
                         pass
-                elif key.startswith('credibility_'):
-                    justification_id = key.split('_')[1]
+                elif key.startswith("credibility_"):
+                    justification_id = key.split("_")[1]
                     try:
                         justification = Justification.objects.get(id=justification_id)
                         if justification.belong_task_trial.belong_task.user == user:
@@ -1167,15 +1380,31 @@ def submit_answer(request, task_id):
             response = None
             if is_correct:
                 if PostTaskAnnotation.objects.filter(belong_task=task).exists():
-                    response = render_status_page(request, 'Annotation Already Completed!', 'You have already submitted the annotation for this task.', 'success')
-                else:
-                    response = HttpResponseRedirect(reverse("task_manager:post_task_annotation", args=[task_id]))
-            else:
-                if ReflectionAnnotation.objects.filter(belong_task_trial=task_trial).exists():
-                    response = render_status_page(request, 'Annotation Already Completed!', 'You have already submitted the annotation for this task.', 'success')
+                    response = render_status_page(
+                        request,
+                        "Annotation Already Completed!",
+                        "You have already submitted the annotation for this task.",
+                        "success",
+                    )
                 else:
                     response = HttpResponseRedirect(
-                        reverse("task_manager:reflection_annotation", args=[task_trial.id])
+                        reverse("task_manager:post_task_annotation", args=[task_id])
+                    )
+            else:
+                if ReflectionAnnotation.objects.filter(
+                    belong_task_trial=task_trial
+                ).exists():
+                    response = render_status_page(
+                        request,
+                        "Annotation Already Completed!",
+                        "You have already submitted the annotation for this task.",
+                        "success",
+                    )
+                else:
+                    response = HttpResponseRedirect(
+                        reverse(
+                            "task_manager:reflection_annotation", args=[task_trial.id]
+                        )
                     )
 
             for webpage in all_webpages:
@@ -1187,11 +1416,21 @@ def submit_answer(request, task_id):
     else:
         task = Task.objects.filter(id=task_id, user=user).first()
         if task is None:
-            return render_status_page(request, 'Task Not Found', f"No task found with task_id={task_id}", 'danger')
-        
+            return render_status_page(
+                request,
+                "Task Not Found",
+                f"No task found with task_id={task_id}",
+                "danger",
+            )
+
         if task.cancelled:
-            return render_status_page(request, 'Task Cancelled', 'This task has been cancelled and can no longer be annotated.', 'warning')
-        
+            return render_status_page(
+                request,
+                "Task Cancelled",
+                "This task has been cancelled and can no longer be annotated.",
+                "warning",
+            )
+
         question = task.content.question
         start_timestamp = task.start_timestamp
         num_trial = task.num_trial
@@ -1206,8 +1445,8 @@ def submit_answer(request, task_id):
             belong_task=task,
             belong_task_trial__isnull=True,
             is_redirected=False,
-            during_annotation=False
-        ).order_by('start_timestamp')
+            during_annotation=False,
+        ).order_by("start_timestamp")
 
         annotation_id = start_annotating(request, "submit_answer")
         return render(
@@ -1221,10 +1460,11 @@ def submit_answer(request, task_id):
                 "num_trial": num_trial + 1,
                 "annotation_id": annotation_id,
                 "confidence_choices": get_choices_for_template(CONFIDENCE_MAP),
-                "answer_formulation_choices": get_choices_for_template(ANSWER_FORMULATION_MAP),
+                "answer_formulation_choices": get_choices_for_template(
+                    ANSWER_FORMULATION_MAP
+                ),
             },
         )
-
 
 
 @permission_classes([IsAuthenticated])
@@ -1257,20 +1497,30 @@ def add_justification(request):
 
     # Input validation
     if not all([task_id, url]):
-        return JsonResponse({"status": "error", "message": "Missing required fields."}, status=400)
+        return JsonResponse(
+            {"status": "error", "message": "Missing required fields."}, status=400
+        )
 
     if page_title and len(page_title) > 255:
-        return JsonResponse({"status": "error", "message": "Page title is too long."}, status=400)
+        return JsonResponse(
+            {"status": "error", "message": "Page title is too long."}, status=400
+        )
 
     if text and len(text) > 10000:
-        return JsonResponse({"status": "error", "message": "Text is too long."}, status=400)
+        return JsonResponse(
+            {"status": "error", "message": "Text is too long."}, status=400
+        )
 
     if dom_position and len(dom_position) > 1000:
-        return JsonResponse({"status": "error", "message": "DOM position is too long."}, status=400)
+        return JsonResponse(
+            {"status": "error", "message": "DOM position is too long."}, status=400
+        )
 
     try:
         with transaction.atomic():
-            task = Task.objects.select_for_update().get(id=task_id, user=user, active=True)
+            task = Task.objects.select_for_update().get(
+                id=task_id, user=user, active=True
+            )
 
             # The trial being annotated is always the next one after the last completed trial.
             trial_num_to_get = task.num_trial + 1
@@ -1288,15 +1538,15 @@ def add_justification(request):
                 text=text,
                 dom_position=dom_position,
                 evidence_type=evidence_type,
-                element_details=element_details
+                element_details=element_details,
             )
 
             if element_details:
-                image_data = element_details.get('attributes', {}).get('imageData')
+                image_data = element_details.get("attributes", {}).get("imageData")
                 if image_data:
                     try:
-                        format, imgstr = image_data.split(';base64,')
-                        ext = format.split('/')[-1]
+                        format, imgstr = image_data.split(";base64,")
+                        ext = format.split("/")[-1]
                         filename = f"{uuid.uuid4()}.{ext}"
                         data = ContentFile(base64.b64decode(imgstr), name=filename)
                         justification.evidence_image.save(filename, data, save=True)
@@ -1305,14 +1555,17 @@ def add_justification(request):
 
         return JsonResponse({"status": "success"})
     except Task.DoesNotExist:
-        return JsonResponse({"status": "error", "message": "Active task not found."}, status=404)
+        return JsonResponse(
+            {"status": "error", "message": "Active task not found."}, status=404
+        )
     except Exception as e:
         logger.error(f"Error adding justification: {e}")
-        return JsonResponse({"status": "error", "message": "An internal error occurred."}, status=500)
+        return JsonResponse(
+            {"status": "error", "message": "An internal error occurred."}, status=500
+        )
 
 
 @api_view(["POST"])
-@authentication_classes([JWTAuthentication])
 @permission_classes([IsAuthenticated])
 def update_justification_status(request, justification_id):
     """
@@ -1323,21 +1576,26 @@ def update_justification_status(request, justification_id):
         justification = Justification.objects.get(id=justification_id)
         # Check if the user has permission to update this justification
         if justification.belong_task_trial.belong_task.user != user:
-            return JsonResponse({"status": "error", "message": "Permission denied."}, status=403)
+            return JsonResponse(
+                {"status": "error", "message": "Permission denied."}, status=403
+            )
 
         new_status = request.data.get("status")
-        if new_status in ['active', 'abandoned']:
+        if new_status in ["active", "abandoned"]:
             justification.status = new_status
             justification.save()
             return JsonResponse({"status": "success", "new_status": new_status})
         else:
-            return JsonResponse({"status": "error", "message": "Invalid status."}, status=400)
+            return JsonResponse(
+                {"status": "error", "message": "Invalid status."}, status=400
+            )
     except Justification.DoesNotExist:
-        return JsonResponse({"status": "error", "message": "Justification not found."}, status=404)
+        return JsonResponse(
+            {"status": "error", "message": "Justification not found."}, status=404
+        )
 
 
 @api_view(["GET"])
-@authentication_classes([JWTAuthentication])
 @permission_classes([IsAuthenticated])
 def get_justifications(request, task_id):
     """
@@ -1346,35 +1604,52 @@ def get_justifications(request, task_id):
     user = request.user
     task = Task.objects.filter(id=task_id, user=user).first()
     if not task:
-        return JsonResponse({"status": "error", "message": "Active task not found."}, status=404)
+        return JsonResponse(
+            {"status": "error", "message": "Active task not found."}, status=404
+        )
 
     trial_num_to_get = task.num_trial + 1
-    trial = TaskTrial.objects.filter(belong_task=task, num_trial=trial_num_to_get).first()
+    trial = TaskTrial.objects.filter(
+        belong_task=task, num_trial=trial_num_to_get
+    ).first()
 
     if not trial:
-        return JsonResponse({"status": "success", "justifications": [], "trial_num": trial_num_to_get})
+        return JsonResponse(
+            {"status": "success", "justifications": [], "trial_num": trial_num_to_get}
+        )
 
     justifications = Justification.objects.filter(belong_task_trial=trial)
     justifications_data = []
     for j in justifications:
-        justifications_data.append({
-            'id': j.id,
-            'url': j.url,
-            'page_title': j.page_title,
-            'text': j.text,
-            'status': j.status,
-            'evidence_type': j.evidence_type,
-            'element_details': j.element_details,
-            'relevance': j.relevance,
-            'credibility': j.credibility,
-            'evidence_image_url': j.evidence_image.url if j.evidence_image else None,
-        })
-    return JsonResponse({"status": "success", "justifications": justifications_data, "trial_num": trial.num_trial})
+        justifications_data.append(
+            {
+                "id": j.id,
+                "url": j.url,
+                "page_title": j.page_title,
+                "text": j.text,
+                "status": j.status,
+                "evidence_type": j.evidence_type,
+                "element_details": j.element_details,
+                "relevance": j.relevance,
+                "credibility": j.credibility,
+                "evidence_image_url": (
+                    j.evidence_image.url if j.evidence_image else None
+                ),
+            }
+        )
+    return JsonResponse(
+        {
+            "status": "success",
+            "justifications": justifications_data,
+            "trial_num": trial.num_trial,
+        }
+    )
+
 
 def status_page(request):
-    title = request.GET.get('title', 'Notice')
-    message = request.GET.get('message', 'Something happened.')
-    alert_type = request.GET.get('alert_type', 'info')
+    title = request.GET.get("title", "Notice")
+    message = request.GET.get("message", "Something happened.")
+    alert_type = request.GET.get("alert_type", "info")
     return render_status_page(request, title, message, alert_type)
 
 
@@ -1387,13 +1662,15 @@ def get_rrweb_record(request, webpage_id):
     user = request.user
     try:
         # Using select_related for efficiency
-        webpage = Webpage.objects.select_related('belong_task__user').get(id=webpage_id)
+        webpage = Webpage.objects.select_related("belong_task__user").get(id=webpage_id)
         task_user = webpage.belong_task.user
-        
+
         # Security check: ensure the user owns the task or is a superuser
         if task_user != user and not user.is_superuser:
-            return JsonResponse({"status": "error", "message": "Permission denied."}, status=403)
-            
+            return JsonResponse(
+                {"status": "error", "message": "Permission denied."}, status=403
+            )
+
         # The rrweb_record might be stored as a JSON string within the JSONField.
         # We need to parse it to ensure JsonResponse sends a proper JSON array.
         record_data = webpage.rrweb_record
@@ -1402,12 +1679,19 @@ def get_rrweb_record(request, webpage_id):
 
         return JsonResponse(record_data, safe=False)
     except Webpage.DoesNotExist:
-        return JsonResponse({"status": "error", "message": "Webpage not found."}, status=404)
+        return JsonResponse(
+            {"status": "error", "message": "Webpage not found."}, status=404
+        )
     except json.JSONDecodeError:
-        return JsonResponse({"status": "error", "message": "Failed to parse recording data."}, status=500)
+        return JsonResponse(
+            {"status": "error", "message": "Failed to parse recording data."},
+            status=500,
+        )
     except Exception as e:
         logger.error(f"Error fetching rrweb record for webpage {webpage_id}: {e}")
-        return JsonResponse({"status": "error", "message": "An internal error occurred."}, status=500)
+        return JsonResponse(
+            {"status": "error", "message": "An internal error occurred."}, status=500
+        )
 
 
 @consent_exempt
@@ -1420,7 +1704,9 @@ def check_pending_annotations(request):
     """
     user = request.user
     pending_annotation_url = get_pending_annotation(user)
-    print_debug(f"Pending annotation URL for user {user.username}: {pending_annotation_url}")
+    print_debug(
+        f"Pending annotation URL for user {user.username}: {pending_annotation_url}"
+    )
     if pending_annotation_url:
         return JsonResponse({"pending": True, "url": pending_annotation_url})
     else:
@@ -1434,5 +1720,5 @@ def dataset_qa_list(request):
     """
     Lists all dataset questions and answers for admin review.
     """
-    datasets = TaskDataset.objects.prefetch_related('taskdatasetentry_set').all()
-    return render(request, 'dataset_qa_list.html', {'datasets': datasets})
+    datasets = TaskDataset.objects.prefetch_related("taskdatasetentry_set").all()
+    return render(request, "dataset_qa_list.html", {"datasets": datasets})

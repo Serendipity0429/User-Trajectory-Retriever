@@ -7,13 +7,14 @@ from .models import Message, MessageRecipient
 from .forms import MessageForm, ReplyMessageForm
 from user_system.models import User
 
+
 class CreateMessageView(LoginRequiredMixin, UserPassesTestMixin, View):
     def test_func(self):
         return self.request.user.is_superuser
 
     def get(self, request):
         form = MessageForm()
-        return render(request, 'create_message.html', {'form': form})
+        return render(request, "create_message.html", {"form": form})
 
     def post(self, request):
         form = MessageForm(request.POST)
@@ -23,55 +24,63 @@ class CreateMessageView(LoginRequiredMixin, UserPassesTestMixin, View):
             message.sender = sender
             message.save()
 
-            is_pinned = form.cleaned_data.get('is_pinned', False)
+            is_pinned = form.cleaned_data.get("is_pinned", False)
 
-            if form.cleaned_data['send_to_all']:
+            if form.cleaned_data["send_to_all"]:
                 recipients = User.objects.exclude(pk=sender.pk)
             else:
-                recipients = form.cleaned_data['recipients']
+                recipients = form.cleaned_data["recipients"]
 
             for recipient in recipients:
                 MessageRecipient.objects.create(
-                    message=message, 
-                    user=recipient, 
-                    is_pinned=is_pinned
+                    message=message, user=recipient, is_pinned=is_pinned
                 )
-            
-            return redirect('msg_system:sent_message_list')
-        return render(request, 'create_message.html', {'form': form})
+
+            return redirect("msg_system:sent_message_list")
+        return render(request, "create_message.html", {"form": form})
+
 
 class SentMessageListView(LoginRequiredMixin, UserPassesTestMixin, ListView):
     model = Message
-    template_name = 'sent_message_list.html'
-    context_object_name = 'messages'
+    template_name = "sent_message_list.html"
+    context_object_name = "messages"
 
     def test_func(self):
         return self.request.user.is_superuser
 
     def get_queryset(self):
-        return Message.objects.filter(sender=self.request.user).prefetch_related('recipients').order_by('-timestamp')
+        return (
+            Message.objects.filter(sender=self.request.user)
+            .prefetch_related("recipients")
+            .order_by("-timestamp")
+        )
+
 
 class MessageListView(LoginRequiredMixin, ListView):
     model = Message
-    template_name = 'message_list.html'
-    context_object_name = 'messages'
+    template_name = "message_list.html"
+    context_object_name = "messages"
 
     def get_queryset(self):
         user = self.request.user
         # Get the MessageRecipient status for the current user
         recipient_status = MessageRecipient.objects.filter(
-            message=OuterRef('pk'),
-            user=user
+            message=OuterRef("pk"), user=user
         )
-        return Message.objects.filter(recipients=user).annotate(
-            is_pinned_for_user=Exists(recipient_status.filter(is_pinned=True)),
-            is_read_for_user=Exists(recipient_status.filter(is_read=True)),
-        ).order_by('-is_pinned_for_user', '-timestamp')
+        return (
+            Message.objects.filter(recipients=user)
+            .annotate(
+                is_pinned_for_user=Exists(recipient_status.filter(is_pinned=True)),
+                is_read_for_user=Exists(recipient_status.filter(is_read=True)),
+            )
+            .order_by("-is_pinned_for_user", "-timestamp")
+        )
+
 
 class MessageDetailView(LoginRequiredMixin, DetailView):
     model = Message
-    template_name = 'message_detail.html'
-    context_object_name = 'message'
+    template_name = "message_detail.html"
+    context_object_name = "message"
 
     def get_queryset(self):
         user = self.request.user
@@ -81,29 +90,33 @@ class MessageDetailView(LoginRequiredMixin, DetailView):
         context = super().get_context_data(**kwargs)
         user = self.request.user
         message = self.get_object()
-        
+
         if user in message.recipients.all():
-            status, created = MessageRecipient.objects.get_or_create(message=message, user=user)
+            status, created = MessageRecipient.objects.get_or_create(
+                message=message, user=user
+            )
             if not status.is_read:
                 status.is_read = True
                 status.save()
-            context['recipient_status'] = status
-        
+            context["recipient_status"] = status
+
         # Build conversation thread
         root = message
         while root.parent:
             root = root.parent
-        
+
         conversation_messages = []
+
         def collect_descendants(node, message_list):
             message_list.append(node)
-            for child in node.replies.order_by('timestamp'):
+            for child in node.replies.order_by("timestamp"):
                 collect_descendants(child, message_list)
 
         collect_descendants(root, conversation_messages)
-        context['conversation_messages'] = conversation_messages
+        context["conversation_messages"] = conversation_messages
 
         return context
+
 
 class PinMessageView(LoginRequiredMixin, View):
     def post(self, request, pk):
@@ -111,7 +124,8 @@ class PinMessageView(LoginRequiredMixin, View):
         status = get_object_or_404(MessageRecipient, message=message, user=request.user)
         status.is_pinned = not status.is_pinned
         status.save()
-        return redirect('msg_system:message_list')
+        return redirect("msg_system:message_list")
+
 
 class DeleteMessageView(LoginRequiredMixin, View):
     def post(self, request, pk):
@@ -121,15 +135,22 @@ class DeleteMessageView(LoginRequiredMixin, View):
         # Optional: If the message has no other recipients, delete the message itself
         if not message.messagerecipient_set.exists():
             message.delete()
-        return redirect('msg_system:message_list')
+        return redirect("msg_system:message_list")
+
 
 class ReplyMessageView(LoginRequiredMixin, View):
     def get(self, request, pk):
         original_message = get_object_or_404(Message, pk=pk, recipients=request.user)
-        form = ReplyMessageForm(initial={
-            'subject': f"Re: {original_message.subject}",
-        })
-        return render(request, 'reply_message.html', {'form': form, 'original_message': original_message})
+        form = ReplyMessageForm(
+            initial={
+                "subject": f"Re: {original_message.subject}",
+            }
+        )
+        return render(
+            request,
+            "reply_message.html",
+            {"form": form, "original_message": original_message},
+        )
 
     def post(self, request, pk):
         original_message = get_object_or_404(Message, pk=pk, recipients=request.user)
@@ -140,5 +161,9 @@ class ReplyMessageView(LoginRequiredMixin, View):
             reply.parent = original_message
             reply.save()
             MessageRecipient.objects.create(message=reply, user=original_message.sender)
-            return redirect('msg_system:message_detail', pk=pk)
-        return render(request, 'reply_message.html', {'form': form, 'original_message': original_message})
+            return redirect("msg_system:message_detail", pk=pk)
+        return render(
+            request,
+            "reply_message.html",
+            {"form": form, "original_message": original_message},
+        )

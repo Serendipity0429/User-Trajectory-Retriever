@@ -4,11 +4,14 @@ from django.core.exceptions import ValidationError
 
 
 class DiscussionSettings(models.Model):
-    post_limit_per_day = models.PositiveIntegerField(default=5, help_text="The maximum number of posts a non-staff user can create per day.")
+    post_limit_per_day = models.PositiveIntegerField(
+        default=5,
+        help_text="The maximum number of posts a non-staff user can create per day.",
+    )
 
     def save(self, *args, **kwargs):
         if not self.pk and DiscussionSettings.objects.exists():
-            raise ValidationError('There can be only one DiscussionSettings instance.')
+            raise ValidationError("There can be only one DiscussionSettings instance.")
         return super(DiscussionSettings, self).save(*args, **kwargs)
 
     @classmethod
@@ -19,19 +22,21 @@ class DiscussionSettings(models.Model):
     def __str__(self):
         return "Discussion Settings"
 
+
 def get_attachment_upload_path(instance, filename):
     if instance.post:
-        return f'attachments/post_{instance.post.pk}/{filename}'
+        return f"attachments/post_{instance.post.pk}/{filename}"
     elif instance.bulletin:
-        return f'attachments/bulletin_{instance.bulletin.pk}/{filename}'
-    return f'attachments/misc/{filename}'
+        return f"attachments/bulletin_{instance.bulletin.pk}/{filename}"
+    return f"attachments/misc/{filename}"
+
 
 class Bulletin(models.Model):
     BULLETIN_CATEGORIES = [
-        ('General', 'General'),
-        ('System Update', 'System Update'),
-        ('Important', 'Important'),
-        ('Warning', 'Warning'),
+        ("General", "General"),
+        ("System Update", "System Update"),
+        ("Important", "Important"),
+        ("Warning", "Warning"),
     ]
     title = models.CharField(max_length=200)
     content = models.TextField()
@@ -39,18 +44,23 @@ class Bulletin(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     pinned = models.BooleanField(default=False)
-    category = models.CharField(max_length=50, choices=BULLETIN_CATEGORIES, default='General')
+    category = models.CharField(
+        max_length=50, choices=BULLETIN_CATEGORIES, default="General"
+    )
     send_notification = models.BooleanField(default=True)
-    expiry_date = models.DateTimeField(null=True, blank=True, help_text="The bulletin will be hidden after this date.")
+    expiry_date = models.DateTimeField(
+        null=True, blank=True, help_text="The bulletin will be hidden after this date."
+    )
 
     def __str__(self):
         return self.title
 
+
 class Post(models.Model):
     POST_CATEGORIES = [
-        ('General', 'General'),
-        ('Feedback & Suggestions', 'Feedback & Suggestions'),
-        ('Bugs & Issues', 'Bugs & Issues'),
+        ("General", "General"),
+        ("Feedback & Suggestions", "Feedback & Suggestions"),
+        ("Bugs & Issues", "Bugs & Issues"),
     ]
     title = models.CharField(max_length=200)
     content = models.TextField()
@@ -58,8 +68,10 @@ class Post(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     author = models.ForeignKey(User, on_delete=models.CASCADE)
-    category = models.CharField(max_length=50, choices=POST_CATEGORIES, default='General')
-    labels = models.ManyToManyField('Label', blank=True)
+    category = models.CharField(
+        max_length=50, choices=POST_CATEGORIES, default="General"
+    )
+    labels = models.ManyToManyField("Label", blank=True)
     pinned = models.BooleanField(default=False)
     is_private = models.BooleanField(default=False)
     is_hidden = models.BooleanField(default=False)
@@ -68,8 +80,9 @@ class Post(models.Model):
     def __str__(self):
         return self.title
 
+
 class Comment(models.Model):
-    post = models.ForeignKey(Post, related_name='comments', on_delete=models.CASCADE)
+    post = models.ForeignKey(Post, related_name="comments", on_delete=models.CASCADE)
     author = models.ForeignKey(User, on_delete=models.CASCADE)
     content = models.TextField()
     raw_content = models.TextField(blank=True)
@@ -78,16 +91,28 @@ class Comment(models.Model):
     is_hidden = models.BooleanField(default=False)
 
     def __str__(self):
-        return f'Comment by {self.author} on {self.post}'
+        return f"Comment by {self.author} on {self.post}"
+
 
 class Attachment(models.Model):
-    post = models.ForeignKey(Post, related_name='attachments', on_delete=models.CASCADE, null=True, blank=True)
-    bulletin = models.ForeignKey(Bulletin, related_name='attachments', on_delete=models.CASCADE, null=True, blank=True)
+    post = models.ForeignKey(
+        Post,
+        related_name="attachments",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+    )
+    bulletin = models.ForeignKey(
+        Bulletin,
+        related_name="attachments",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+    )
     file = models.FileField(upload_to=get_attachment_upload_path)
 
     def __str__(self):
         return self.file.name
-
 
 
 class Label(models.Model):
@@ -96,10 +121,11 @@ class Label(models.Model):
     def __str__(self):
         return self.name
 
+
 class BulletinReadStatus(models.Model):
     bulletin = models.ForeignKey(Bulletin, on_delete=models.CASCADE)
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     read_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        unique_together = ('bulletin', 'user')
+        unique_together = ("bulletin", "user")

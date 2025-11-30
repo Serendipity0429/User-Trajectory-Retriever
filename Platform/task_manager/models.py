@@ -5,8 +5,6 @@ from django.db import models
 
 from user_system.models import User
 
-import json
- 
 
 # Task Dataset
 class TaskDataset(models.Model):
@@ -22,7 +20,9 @@ class TaskDatasetEntry(models.Model):
     question = models.TextField()
     answer = models.JSONField()
 
-    num_associated_tasks = models.IntegerField(default=0)  # number of tasks associated with this entry
+    num_associated_tasks = models.IntegerField(
+        default=0
+    )  # number of tasks associated with this entry
 
 
 # Task
@@ -56,12 +56,13 @@ class PreTaskAnnotation(models.Model):
         on_delete=models.CASCADE,
     )
 
-
     familiarity = models.IntegerField(null=True)  # 0->4, unfamiliar -> familiar
     difficulty = models.IntegerField(null=True)  # 0->4, easy -> hard
     effort = models.IntegerField(null=True)  # 0->5, time effort category
-    
-    first_search_query = models.TextField(null=True)  # initial strategy to solve the task
+
+    first_search_query = models.TextField(
+        null=True
+    )  # initial strategy to solve the task
 
     initial_guess = models.TextField(null=True, blank=True)
     initial_guess_unknown = models.BooleanField(default=False)
@@ -70,23 +71,31 @@ class PreTaskAnnotation(models.Model):
     submission_timestamp = models.DateTimeField(auto_now_add=True, null=True)
     duration = models.IntegerField(null=True)  # time spent on annotation in seconds
 
+
 # Reflection annotation
 class ReflectionAnnotation(models.Model):
     belong_task_trial = models.OneToOneField(
-        'TaskTrial',
+        "TaskTrial",
         on_delete=models.CASCADE,
     )
 
-    failure_category_other = models.TextField() # reason for failure
-    failure_category = models.JSONField(null=True)  # category of failure, e.g. "lack of resources", "lack of knowledge", etc.
+    failure_category_other = models.TextField()  # reason for failure
+    failure_category = models.JSONField(
+        null=True
+    )  # category of failure, e.g. "lack of resources", "lack of knowledge", etc.
     future_plan_actions = models.JSONField(null=True)  # actions to take in the future
     future_plan_other = models.TextField(null=True)  # other future plan actions
     estimated_time = models.IntegerField()  # 0->5, time effort category
-    adjusted_difficulty = models.IntegerField(null=True) # user's adjusted difficulty of the task
+    adjusted_difficulty = models.IntegerField(
+        null=True
+    )  # user's adjusted difficulty of the task
 
-    additional_reflection = models.TextField(null=True)  # additional reflection on the task
+    additional_reflection = models.TextField(
+        null=True
+    )  # additional reflection on the task
     submission_timestamp = models.DateTimeField(auto_now_add=True, null=True)
     duration = models.IntegerField(null=True)  # time spent on annotation in seconds
+
 
 # Post-task annotation
 class PostTaskAnnotation(models.Model):
@@ -96,11 +105,15 @@ class PostTaskAnnotation(models.Model):
     )
 
     difficulty_actual = models.IntegerField(null=True)  # 0->4, easy -> hard
-    
-    aha_moment_type = models.CharField(max_length=100, null=True)  # type of aha moment, e.g. "insight", "realization", etc.
+
+    aha_moment_type = models.CharField(
+        max_length=100, null=True
+    )  # type of aha moment, e.g. "insight", "realization", etc.
     aha_moment_other = models.TextField(null=True)  # other type of aha moment
 
-    unhelpful_paths = models.JSONField(null=True)  # paths that were not helpful, e.g. ["path1", "path2"]
+    unhelpful_paths = models.JSONField(
+        null=True
+    )  # paths that were not helpful, e.g. ["path1", "path2"]
     unhelpful_paths_other = models.TextField(null=True)  # other unhelpful paths
 
     strategy_shift = models.JSONField(null=True)  # strategy shift during the task
@@ -118,7 +131,9 @@ class CancelAnnotation(models.Model):
 
     category = models.JSONField(null=True)  # refer to post_task_annotation.html
     reason = models.TextField(null=True)  # reason for cancellation
-    missing_resources = models.JSONField(null=True)  # missing resources that led to cancellation
+    missing_resources = models.JSONField(
+        null=True
+    )  # missing resources that led to cancellation
     missing_resources_other = models.TextField(null=True)  # other missing resources
     submission_timestamp = models.DateTimeField(auto_now_add=True, null=True)
     duration = models.IntegerField(null=True)  # time spent on annotation in seconds
@@ -130,12 +145,14 @@ class TaskTrial(models.Model):
     end_timestamp = models.DateTimeField(null=True)
     num_trial = models.IntegerField()  # number of trials
 
-    answer = models.CharField(max_length=1000, default='undefined')
+    answer = models.CharField(max_length=1000, default="undefined")
     is_correct = models.BooleanField(null=True)
-    
+
     confidence = models.IntegerField(default=-1)  # confidence level, 0->4, low -> high
-    answer_formulation_method = models.CharField(max_length=100, default='undefined')  # reasoning method used, e.g. "deductive", "inductive", etc.
-    
+    answer_formulation_method = models.CharField(
+        max_length=100, default="undefined"
+    )  # reasoning method used, e.g. "deductive", "inductive", etc.
+
     belong_task = models.ForeignKey(
         Task,
         on_delete=models.CASCADE,
@@ -144,18 +161,24 @@ class TaskTrial(models.Model):
 
 # Justification
 class Justification(models.Model):
-    belong_task_trial = models.ForeignKey(TaskTrial, on_delete=models.CASCADE, related_name='justifications')
+    belong_task_trial = models.ForeignKey(
+        TaskTrial, on_delete=models.CASCADE, related_name="justifications"
+    )
     url = models.URLField(max_length=2048)
     page_title = models.CharField(max_length=255, blank=True, null=True)
     text = models.TextField(blank=True, null=True)
     dom_position = models.TextField(blank=True, null=True)
-    status = models.CharField(max_length=10, default='active')  # 'active' or 'abandoned'
-    evidence_type = models.CharField(max_length=20, default='text_selection')
+    status = models.CharField(
+        max_length=10, default="active"
+    )  # 'active' or 'abandoned'
+    evidence_type = models.CharField(max_length=20, default="text_selection")
     element_details = models.JSONField(null=True, blank=True)
     relevance = models.IntegerField(default=0)
     credibility = models.IntegerField(default=0)
     timestamp = models.DateTimeField(auto_now_add=True)
-    evidence_image = models.ImageField(upload_to='evidence_images/', null=True, blank=True)
+    evidence_image = models.ImageField(
+        upload_to="evidence_images/", null=True, blank=True
+    )
 
     def __str__(self):
         return f"Justification for Trial {self.belong_task_trial.id} - {self.evidence_type}"
@@ -185,14 +208,22 @@ class Webpage(models.Model):
     dwell_time = models.IntegerField(null=True)
     width = models.IntegerField(null=True)
     height = models.IntegerField(null=True)
-    page_switch_record = models.JSONField(null=True) # page switch record in JSON format
+    page_switch_record = models.JSONField(
+        null=True
+    )  # page switch record in JSON format
     mouse_moves = models.JSONField()  # mouse move data in JSON format
     event_list = models.JSONField()  # list of events in JSON format
     rrweb_record = models.JSONField()  # rrweb record in JSON forma
-    
-    is_redirected = models.BooleanField(default=False)  # whether the webpage is redirected
-    during_annotation = models.BooleanField(default=False)  # whether the webpage is during annotation
-    annotation_name = models.CharField(max_length=100, null=True)  # name of the annotation, e.g. "pre_task", "post_task", etc.
+
+    is_redirected = models.BooleanField(
+        default=False
+    )  # whether the webpage is redirected
+    during_annotation = models.BooleanField(
+        default=False
+    )  # whether the webpage is during annotation
+    annotation_name = models.CharField(
+        max_length=100, null=True
+    )  # name of the annotation, e.g. "pre_task", "post_task", etc.
 
 
 # Annotation of certain behaviors
@@ -209,10 +240,10 @@ class EventAnnotation(models.Model):
     target = models.CharField(max_length=50)
     timestamp = models.DateTimeField()
     detail = models.CharField(max_length=1000)  # description of the event
-    is_key_event = models.BooleanField(default=False)  # whether this event is a key event
+    is_key_event = models.BooleanField(
+        default=False
+    )  # whether this event is a key event
     remarks = models.CharField(max_length=1000)  # remarks of the event
-
-
 
 
 class ExtensionVersion(models.Model):
@@ -222,5 +253,3 @@ class ExtensionVersion(models.Model):
 
     def __str__(self):
         return self.version
-
-

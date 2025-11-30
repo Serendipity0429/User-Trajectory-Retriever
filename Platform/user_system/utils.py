@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from .models import User, ResetPasswordRequest, user_group_list
+from .models import User, user_group_list
 from django.http import HttpResponseRedirect
 from django.http import HttpRequest
 from django.core.mail import EmailMultiAlternatives
@@ -14,17 +14,19 @@ logger = logging.getLogger(__name__)
 
 def print_debug(*args, **kwargs):
     if settings.DEBUG:
-        message = " ".join(map(str, args)) + " ".join(f"{k}={v}" for k, v in kwargs.items())
+        message = " ".join(map(str, args)) + " ".join(
+            f"{k}={v}" for k, v in kwargs.items()
+        )
         logger.info(message)
 
 
 def get_user_from_request(req):
-    user = User.objects.get(username=req.session['username'])
+    user = User.objects.get(username=req.session["username"])
     return user
 
 
 def authenticate(username, password):
-    '''
+    """
     :param username: username
     :param password: password
     :return: error_code and authenticated User object
@@ -32,40 +34,40 @@ def authenticate(username, password):
     0   success
     1   no such user
     2   password is wrong
-    '''
+    """
     try:
         user = User.objects.get(username=username)
         if user.check_password(password):
             return 0, user
         else:
             return 2, None
-    except User.DoesNotExist as e:
+    except User.DoesNotExist:
         return 1, None
 
 
 def store_in_session(request, user):
     request.session.delete_test_cookie()
-    request.session['username'] = user.username
+    request.session["username"] = user.username
     request.session.set_expiry(0)
 
 
 def redirect_to_prev_page(request, default_url):
-    if 'prev_page' not in request.session:
+    if "prev_page" not in request.session:
         return HttpResponseRedirect(default_url)
     else:
-        prev_page = request.session['prev_page']
-        del request.session['prev_page']
+        prev_page = request.session["prev_page"]
+        del request.session["prev_page"]
         return HttpResponseRedirect(prev_page)
 
 
-def login_redirect(request, login_url='/user/login/'):
-    request.session['prev_page'] = request.get_full_path()
+def login_redirect(request, login_url="/user/login/"):
+    request.session["prev_page"] = request.get_full_path()
     request.session.set_expiry(0)
     return HttpResponseRedirect(login_url)
 
 
 def auth_failed_redirect(request, missing_group):
-    return HttpResponseRedirect('/user/auth_failed/%s/' % missing_group)
+    return HttpResponseRedirect("/user/auth_failed/%s/" % missing_group)
 
 
 def require_login(func):
@@ -73,15 +75,16 @@ def require_login(func):
         req = args[0]
         # print the request value
         assert isinstance(req, HttpRequest)
-        if 'username' not in req.session:
+        if "username" not in req.session:
             print(req.session.keys())
             return login_redirect(req)
         try:
-            user = User.objects.get(username=req.session['username'])
+            user = User.objects.get(username=req.session["username"])
             args = [user] + list(args)
             return func(*args)
-        except User.DoesNotExist as e:
+        except User.DoesNotExist:
             return login_redirect(req)
+
     return ret
 
 
@@ -92,10 +95,10 @@ def require_auth(user_groups):
         def ret(*args):
             req = args[0]
             assert isinstance(req, HttpRequest)
-            if 'username' not in req.session:
+            if "username" not in req.session:
                 return login_redirect(req)
             try:
-                user = User.objects.get(username=req.session['username'])
+                user = User.objects.get(username=req.session["username"])
                 # check if all the user group requirements are satisfied
                 # if no, show auth failed page
                 for g in user_groups:
@@ -105,7 +108,7 @@ def require_auth(user_groups):
                 # if yes, pass the user as first parm
                 args = [user] + list(args)
                 return func(*args)
-            except User.DoesNotExist as e:
+            except User.DoesNotExist:
                 return login_redirect(req)
 
         return ret
@@ -114,17 +117,17 @@ def require_auth(user_groups):
 
 
 def get_user_groups_string(user_groups):
-    return u' | '.join([val for key, val in user_group_list if key in user_groups])
+    return " | ".join([val for key, val in user_group_list if key in user_groups])
 
 
 def send_reset_password_email(domain, reset_req):
     """
     Sends a password reset email to the user with a professional and informative message.
     """
-    subject = 'Password Reset Request for THUIR Annotation Platform'
+    subject = "Password Reset Request for THUIR Annotation Platform"
     user = reset_req.user
-    host = 'http://' + domain
-    reset_url = host + '/user/reset_password/%s/' % reset_req.token
+    host = "http://" + domain
+    reset_url = host + "/user/reset_password/%s/" % reset_req.token
 
     # Plain text message
     text_content = f"""
@@ -252,7 +255,3 @@ The THU-IR Annotation Platform Team
         msg.send()
     except smtplib.SMTPException as e:
         print(f"Failed to send email: {e}")
-
-
-
-

@@ -3,42 +3,72 @@
 from django.urls import path
 from . import views
 
-app_name = 'task_manager'
+app_name = "task_manager"
 
 urlpatterns = [
-    path('home/', views.task_home, name='home'),
-    path('data/', views.data, name='data'),
-    path('annotation/', views.annotation_home, name='annotation_home'),
-    path('active_task/', views.active_task, name='active_task'),
-    path('get_task_info/', views.get_task_info, name='get_task_info'),
-    path('initialize/', views.initialize, name='initialize'),
-    path('show_tool_use_page/', views.show_tool_use_page, name='show_tool_use_page'), # Show tool use page
-    path('tool_use/', views.tool_use, name='tool_use'), # Tool use
-    path('stop_annotation/', views.stop_annotation_api, name='stop_annotation'), # Stop annotation API
-    path('auth_redirect/', views.auth_redirect, name='auth_redirect'), # Auth redirect  
-    path('check_pending_annotations/', views.check_pending_annotations, name='check_pending_annotations'),
-    
-    path('pre_task_annotation/', views.pre_task_annotation, name='pre_task_annotation'), # Preliminary task annotation
+    path("home/", views.task_home, name="home"),
+    path("data/", views.data, name="data"),
+    path("annotation/", views.annotation_home, name="annotation_home"),
+    path("active_task/", views.active_task, name="active_task"),
+    path("get_task_info/", views.get_task_info, name="get_task_info"),
+    path("initialize/", views.initialize, name="initialize"),
+    path(
+        "show_tool_use_page/", views.show_tool_use_page, name="show_tool_use_page"
+    ),  # Show tool use page
+    path("tool_use/", views.tool_use, name="tool_use"),  # Tool use
+    path(
+        "stop_annotation/", views.stop_annotation_api, name="stop_annotation"
+    ),  # Stop annotation API
+    path("auth_redirect/", views.auth_redirect, name="auth_redirect"),  # Auth redirect
+    path(
+        "check_pending_annotations/",
+        views.check_pending_annotations,
+        name="check_pending_annotations",
+    ),
+    path(
+        "pre_task_annotation/", views.pre_task_annotation, name="pre_task_annotation"
+    ),  # Preliminary task annotation
     path(
         "reflection_annotation/<int:task_trial_id>/",
         views.reflection_annotation,
         name="reflection_annotation",
     ),
-    path('post_task_annotation/<int:task_id>/', views.post_task_annotation, name='post_task_annotation'), # Post task annotation
-    path('show_task/<int:task_id>/', views.show_task, name='show_task'), # Show task
-    path('submit_answer/<int:task_id>/', views.submit_answer, name='submit_answer'), # Submit answer
-    path('cancel_annotation/<int:task_id>/', views.cancel_annotation, name='cancel_annotation'), # Cancel annotation
-    path('remove_task/<int:task_id>/', views.remove_task, name='remove_task'), # Remove task
-
+    path(
+        "post_task_annotation/<int:task_id>/",
+        views.post_task_annotation,
+        name="post_task_annotation",
+    ),  # Post task annotation
+    path("show_task/<int:task_id>/", views.show_task, name="show_task"),  # Show task
+    path(
+        "submit_answer/<int:task_id>/", views.submit_answer, name="submit_answer"
+    ),  # Submit answer
+    path(
+        "cancel_annotation/<int:task_id>/",
+        views.cancel_annotation,
+        name="cancel_annotation",
+    ),  # Cancel annotation
+    path(
+        "remove_task/<int:task_id>/", views.remove_task, name="remove_task"
+    ),  # Remove task
     # Justification URLs
-    path('justification/add/', views.add_justification, name='add_justification'),
-    path('justification/update/<int:justification_id>/', views.update_justification_status, name='update_justification_status'),
-    path('justification/get/<int:task_id>/', views.get_justifications, name='get_justifications'),
-    path('status_page/', views.status_page, name='status_page'),
-    
+    path("justification/add/", views.add_justification, name="add_justification"),
+    path(
+        "justification/update/<int:justification_id>/",
+        views.update_justification_status,
+        name="update_justification_status",
+    ),
+    path(
+        "justification/get/<int:task_id>/",
+        views.get_justifications,
+        name="get_justifications",
+    ),
+    path("status_page/", views.status_page, name="status_page"),
     # Dataset QA List
-    path('dataset_qa_list/', views.dataset_qa_list, name='dataset_qa_list'),
-
+    path("dataset_qa_list/", views.dataset_qa_list, name="dataset_qa_list"),
     # API for dynamic data loading
-    path('api/get_rrweb_record/<int:webpage_id>/', views.get_rrweb_record, name='get_rrweb_record'),
+    path(
+        "api/get_rrweb_record/<int:webpage_id>/",
+        views.get_rrweb_record,
+        name="get_rrweb_record",
+    ),
 ]

@@ -27,34 +27,41 @@ else:
 WORK_DIR: Path = Path(__file__).parent.resolve()
 MANAGE_PY: Path = WORK_DIR / "manage.py"
 
+
 # --- ANSI Color Codes for Console Output ---
 class Colors:
     """ANSI color codes for styling terminal output."""
-    HEADER = '\033[95m'
-    OKBLUE = '\033[94m'
-    OKCYAN = '\033[96m'
-    OKGREEN = '\033[92m'
-    WARNING = '\033[93m'
-    FAIL = '\033[91m'
-    ENDC = '\033[0m'
-    BOLD = '\033[1m'
-    UNDERLINE = '\033[4m'
+
+    HEADER = "\033[95m"
+    OKBLUE = "\033[94m"
+    OKCYAN = "\033[96m"
+    OKGREEN = "\033[92m"
+    WARNING = "\033[93m"
+    FAIL = "\033[91m"
+    ENDC = "\033[0m"
+    BOLD = "\033[1m"
+    UNDERLINE = "\033[4m"
+
 
 def print_header(message: str) -> None:
     """Prints a formatted header message to the console."""
     print(f"\n{Colors.HEADER}{Colors.BOLD}--- {message} ---" + Colors.ENDC)
 
+
 def print_success(message: str) -> None:
     """Prints a success message."""
     print(f"{Colors.OKGREEN}{message}{Colors.ENDC}")
+
 
 def print_warning(message: str, end="\n") -> None:
     """Prints a warning message."""
     print(f"{Colors.WARNING}{message}{Colors.ENDC}", end=end)
 
+
 def print_info(message: str) -> None:
     """Prints an informational message."""
     print(f"{Colors.OKCYAN}{message}{Colors.ENDC}")
+
 
 def run_command(command: List[Union[str, Path]], check: bool = True) -> None:
     """
@@ -66,14 +73,24 @@ def run_command(command: List[Union[str, Path]], check: bool = True) -> None:
     """
     print_info(f"Running command: {' '.join(map(str, command))}")
     try:
-        subprocess.run(command, check=check, cwd=WORK_DIR, text=True,
-                       stdout=sys.stdout, stderr=sys.stderr)
+        subprocess.run(
+            command,
+            check=check,
+            cwd=WORK_DIR,
+            text=True,
+            stdout=sys.stdout,
+            stderr=sys.stderr,
+        )
     except subprocess.CalledProcessError as e:
         print(f"{Colors.FAIL}Error running command: {e}{Colors.ENDC}", file=sys.stderr)
         sys.exit(1)
     except FileNotFoundError:
-        print(f"{Colors.FAIL}Error: '{command[0]}' not found. Is it in your PATH?{Colors.ENDC}", file=sys.stderr)
+        print(
+            f"{Colors.FAIL}Error: '{command[0]}' not found. Is it in your PATH?{Colors.ENDC}",
+            file=sys.stderr,
+        )
         sys.exit(1)
+
 
 def run_manage_py_command(subcommand: str, *args: str) -> None:
     """
@@ -83,8 +100,11 @@ def run_manage_py_command(subcommand: str, *args: str) -> None:
         subcommand: The manage.py command to run (e.g., 'migrate').
         *args: Additional arguments for the command.
     """
-    command: List[Union[str, Path]] = [sys.executable, MANAGE_PY, subcommand] + list(args)
+    command: List[Union[str, Path]] = [sys.executable, MANAGE_PY, subcommand] + list(
+        args
+    )
     run_command(command)
+
 
 def clean_project() -> None:
     """
@@ -116,6 +136,7 @@ def clean_project() -> None:
 
     print_success("--- Cleaning complete ---")
 
+
 def setup_development_data() -> None:
     """
     Loads initial data and creates test users for a development environment.
@@ -125,14 +146,12 @@ def setup_development_data() -> None:
     # Load dataset.
     run_manage_py_command(
         "load_nq_dataset",
-        "./task_manager/dataset/hard_questions_refined.jsonl",
-        "nq_hard_questions"
+        "./data/hard_questions_refined.jsonl",
+        "nq_hard_questions",
     )
 
     run_manage_py_command(
-        "load_nq_dataset",
-        "./task_manager/dataset/tutorial_questions.jsonl",
-        "tutorial"
+        "load_nq_dataset", "./data/tutorial_questions.jsonl", "tutorial"
     )
 
     # Create test users.
@@ -169,12 +188,14 @@ def main() -> None:
         while RETYPE_CNT > 0:
             RETYPE_CNT -= 1
             print_warning("Are you sure you want to clean the project?")
-            print_warning("This will delete the database and media files. (y/n): ", end="")
-            if input().strip().lower() != 'y':
+            print_warning(
+                "This will delete the database and media files. (y/n): ", end=""
+            )
+            if input().strip().lower() != "y":
                 print_info("Aborting clean.")
                 sys.exit(0)
         clean_project()
-        
+
     # Apply database migrations.
     print_header("Running database migrations")
     for app in ["task_manager", "user_system", "discussion"]:
@@ -195,13 +216,13 @@ def main() -> None:
         print_info("Collecting static files...")
         run_manage_py_command("collectstatic", "--noinput")
         print_success("--- Static files collected ---")
-        
+
         # Construct and run the Gunicorn command.
         gunicorn_command = [
             "gunicorn",
             "--bind",
             BIND_ADDRESS,
-            "annotation_platform.wsgi:application"
+            "annotation_platform.wsgi:application",
         ]
         run_command(gunicorn_command)
 

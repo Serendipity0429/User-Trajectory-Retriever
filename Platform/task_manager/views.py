@@ -46,6 +46,7 @@ from .mappings import *
 from user_system.decorators import consent_exempt
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.authentication import SessionAuthentication
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework_simplejwt.tokens import AccessToken
 from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
@@ -79,6 +80,7 @@ def get_choices_for_template(choice_map_config):
 
 @consent_exempt
 @api_view(["POST"])
+@authentication_classes([JWTAuthentication])
 @permission_classes([IsAuthenticated])
 def stop_annotation_api(request):
     """
@@ -138,6 +140,7 @@ def auth_redirect(request):
 # Store data
 @csrf_exempt
 @api_view(["POST"])
+@authentication_classes([JWTAuthentication])
 @permission_classes([IsAuthenticated])
 def data(request):
     try:
@@ -150,6 +153,9 @@ def data(request):
     except (zlib.error, json.JSONDecodeError, UnicodeDecodeError) as e:
         logger.error(f"Failed to process incoming data for user {request.user.username}: {e}")
         return JsonResponse({"status": "error", "message": "Invalid or corrupt data received."}, status=400)
+
+
+
 
 
 # Pre-Task Annotation Fetcher
@@ -599,6 +605,7 @@ def map_json_list(json_string, mapping):
 
 @consent_exempt
 @api_view(["GET"])
+@authentication_classes([JWTAuthentication])
 @permission_classes([IsAuthenticated])
 def get_task_info(request):
     user = request.user
@@ -617,7 +624,11 @@ def get_task_info(request):
 # =============================================
 def _get_processed_cancel_annotation(task):
     """Fetches and processes the cancel annotation for a given task."""
-    cancel_annotation = task.cancelannotation_set.first()
+    try:
+        cancel_annotation = task.cancelannotation
+    except CancelAnnotation.DoesNotExist:
+        cancel_annotation = None
+        
     cancel_categories = []
     cancel_missing_resources = []
     if cancel_annotation:
@@ -637,7 +648,11 @@ def _get_processed_post_task_annotation(task):
     """Fetches and processes the post-task annotation for a given task."""
     if task.cancelled:
         return None
-    post_task_annotation = task.posttaskannotation_set.first()
+    try:
+        post_task_annotation = task.posttaskannotation
+    except PostTaskAnnotation.DoesNotExist:
+        post_task_annotation = None
+
     if post_task_annotation:
         post_task_annotation.unhelpful_paths_display = map_json_list(
             json.dumps(post_task_annotation.unhelpful_paths), UNHELPFUL_PATHS_MAP["mapping"]
@@ -705,7 +720,11 @@ def _get_processed_trials(task):
 
 def _get_processed_pre_task_annotation(task):
     """Fetches and processes the pre-task annotation for a given task."""
-    pre_task_annotation = task.pretaskannotation_set.first()
+    try:
+        pre_task_annotation = task.pretaskannotation
+    except PreTaskAnnotation.DoesNotExist:
+        pre_task_annotation = None
+
     if pre_task_annotation:
         pre_task_annotation.expected_source_display = map_json_list(
             json.dumps(pre_task_annotation.expected_source), EXPECTED_SOURCES_MAP["mapping"]
@@ -727,9 +746,9 @@ def show_task(request, task_id):
     
     # Fetch the task by ID.
     task = Task.objects.select_related('content').prefetch_related(
-        'pretaskannotation_set',
-        'posttaskannotation_set',
-        'cancelannotation_set',
+        'pretaskannotation',
+        'posttaskannotation',
+        'cancelannotation',
         'tasktrial_set__webpage_set',
         'tasktrial_set__justifications',
         'tasktrial_set__reflectionannotation'
@@ -1220,6 +1239,7 @@ def remove_task(request, task_id):
 
 @csrf_exempt
 @api_view(["POST"])
+@authentication_classes([JWTAuthentication])
 @permission_classes([IsAuthenticated])
 def add_justification(request):
     """
@@ -1292,6 +1312,7 @@ def add_justification(request):
 
 
 @api_view(["POST"])
+@authentication_classes([JWTAuthentication])
 @permission_classes([IsAuthenticated])
 def update_justification_status(request, justification_id):
     """
@@ -1316,6 +1337,7 @@ def update_justification_status(request, justification_id):
 
 
 @api_view(["GET"])
+@authentication_classes([JWTAuthentication])
 @permission_classes([IsAuthenticated])
 def get_justifications(request, task_id):
     """
@@ -1390,6 +1412,7 @@ def get_rrweb_record(request, webpage_id):
 
 @consent_exempt
 @api_view(["GET"])
+@authentication_classes([JWTAuthentication])
 @permission_classes([IsAuthenticated])
 def check_pending_annotations(request):
     """

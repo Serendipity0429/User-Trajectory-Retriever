@@ -238,6 +238,7 @@ class ViewState {
         message.height = window.innerHeight;
         message.start_timestamp = this.pageManager.start_timestamp;
         message.referrer = _content_vars.referrer_now;
+        message.title = this.unitPage.getTitle();
 
         message.rrweb_record = JSON.stringify(this.unitPage.getRRWebEvents());
         message.event_list = JSON.stringify(this.unitPage.getEventList());
@@ -248,7 +249,6 @@ class ViewState {
             message.end_timestamp = this.pageManager.end_timestamp;
             message.dwell_time = this.pageManager.dwell_time;
             message.page_switch_record = JSON.stringify(this.pageManager.page_switch_record);
-            message.title = this.unitPage.getTitle();
             message.sent_when_active = this.sent_when_active;
         }
 

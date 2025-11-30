@@ -199,6 +199,7 @@ def admin_page(request):
 
 
 @csrf_exempt
+@consent_exempt
 def token_login(request):
     if request.method != 'POST':
         return JsonResponse({'error': 'Only POST method is allowed'}, status=405)

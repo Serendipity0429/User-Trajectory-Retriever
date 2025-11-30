@@ -45,7 +45,6 @@ def get_annotation_state(user_id):
     
     # Set defaults for any missing keys
     state.setdefault('is_annotating', False)
-    state.setdefault('is_storing_data', False)
     state.setdefault('annotation_name', 'none')
     state.setdefault('annotation_start_time', None)
     state.setdefault('annotation_id', None)
@@ -111,111 +110,112 @@ def stop_annotating(request, annotation_id=None):
     print_debug("Stopped annotating.")
     return True
     
+def append_json_data(existing_json_str, new_json_str):
+    if not existing_json_str or existing_json_str in ('[]', '{}'):
+        return new_json_str
+    if not new_json_str or new_json_str in ('[]', '{}'):
+        return existing_json_str
+    
+    try:
+        existing_data = json.loads(existing_json_str)
+        new_data = json.loads(new_json_str)
+        
+        if isinstance(existing_data, list) and isinstance(new_data, list):
+            existing_data.extend(new_data)
+            return json.dumps(existing_data)
+    except json.JSONDecodeError:
+        # Handle cases where one of the strings is not valid JSON
+        return existing_json_str # Or some other fallback
+    
+    # Fallback for non-list JSON or other structures, though lists are expected
+    return existing_json_str
+
 def store_data(request, message, user):
     user_id = user.id
-    state = get_annotation_state(user_id)
-    state['is_storing_data'] = True
-    set_annotation_state(user_id, state)
-    
-    print_json_debug(message)
-    if message['url'].startswith(settings.IP_TO_LAUNCH):
-        print_debug("Skipping storing data for local URL:", message['url'])
-        state['is_storing_data'] = False
-        set_annotation_state(user_id, state)
-        return
+    lock_key = f"data_store_lock:{user_id}"
+    redis_client.set(lock_key, 1, ex=30)  # Lock with a 30-second timeout
+
+    try:
+        state = get_annotation_state(user_id)
         
-    task = Task.objects.filter(user=user, active=True).first()
-    if not task:
-        print_debug("No active task found for user", user.username)
-        state['is_storing_data'] = False
-        set_annotation_state(user_id, state)
-        return
+        print_json_debug(message)
+        if message['url'].startswith(settings.IP_TO_LAUNCH):
+            print_debug("Skipping storing data for local URL:", message['url'])
+            return
+            
+        task = Task.objects.filter(user=user, active=True).first()
+        if not task:
+            print_debug("No active task found for user", user.username)
+            return
 
-    def append_json_data_strings(existing_json_str, new_json_str):
-        if not existing_json_str or existing_json_str in ('[]', '{}'):
-            return new_json_str
-        if not new_json_str or new_json_str in ('[]', '{}'):
-            return existing_json_str
-        # Efficiently combine two JSON array strings
-        return existing_json_str[:-1] + ',' + new_json_str[1:]
-
-    last_webpage_id = state.get('last_webpage_id')
-    last_webpage_url = state.get('last_webpage_url')
-    
-    webpage = None
-    if last_webpage_id and last_webpage_url == message['url']:
-        try:
-            webpage = Webpage.objects.get(id=last_webpage_id, belong_task=task)
-        except Webpage.DoesNotExist:
-            pass  # Will create a new one
-
-    is_routine_update = message.get('is_routine_update', False)
-
-    if webpage:
-        # MERGE CASE: Append data to existing webpage record
-        print_debug(f"Merging data for URL: {message['url']}")
+        last_webpage_id = state.get('last_webpage_id')
+        last_webpage_url = state.get('last_webpage_url')
         
+        webpage = None
+        if last_webpage_id and last_webpage_url == message['url']:
+            try:
+                webpage = Webpage.objects.get(id=last_webpage_id, belong_task=task)
+            except Webpage.DoesNotExist:
+                pass  # Will create a new one
+
+        is_new_webpage = not webpage
+        
+        if is_new_webpage:
+            print_debug(f"Creating new webpage entry for URL: {message['url']}")
+            webpage = Webpage()
+            webpage.user = user
+            webpage.belong_task = task
+            webpage.url = message['url']
+            webpage.title = message.get('title')
+            webpage.referrer = message.get('referrer')
+
+            start_ts = message.get('start_timestamp')
+            webpage.start_timestamp = timezone.make_aware(datetime.fromtimestamp(start_ts / 1000)) if start_ts else timezone.now()
+            webpage.end_timestamp = webpage.start_timestamp
+            
+            webpage.dwell_time = 0
+            webpage.page_switch_record = '[]'
+            webpage.mouse_moves = '[]'
+            webpage.event_list = '[]'
+            webpage.rrweb_record = '[]'
+            
+            sent_when_active = message.get('sent_when_active', False)
+            webpage.during_annotation = state.get('is_annotating', False) and not sent_when_active
+            webpage.annotation_name = state.get('annotation_name', 'none') if webpage.during_annotation else 'none'
+        else:
+            print_debug(f"Merging data for URL: {message['url']}")
+
+        # Common logic for both CREATE and MERGE
         raw_rrweb = message.get('rrweb_record', '[]')
         new_rrweb_record = raw_rrweb.replace("</script>", "<\\/script>")
-        
-        webpage.rrweb_record = append_json_data_strings(webpage.rrweb_record, new_rrweb_record)
-        webpage.event_list = append_json_data_strings(webpage.event_list, message.get('event_list', '[]'))
-        webpage.mouse_moves = append_json_data_strings(webpage.mouse_moves, message.get('mouse_moves', '[]'))
+        webpage.rrweb_record = append_json_data(webpage.rrweb_record, new_rrweb_record)
+        webpage.event_list = append_json_data(webpage.event_list, message.get('event_list', '[]'))
+        webpage.mouse_moves = append_json_data(webpage.mouse_moves, message.get('mouse_moves', '[]'))
 
+        is_routine_update = message.get('is_routine_update', False)
         if not is_routine_update:
-            # This is a final message, so update all metadata.
-            webpage.title = message.get('title') or webpage.title
-            webpage.referrer = message.get('referrer') or webpage.referrer
-            
             if message.get('end_timestamp'):
                 webpage.end_timestamp = timezone.make_aware(datetime.fromtimestamp(message['end_timestamp'] / 1000))
             
             webpage.dwell_time = message.get('dwell_time', webpage.dwell_time)
             webpage.page_switch_record = message.get('page_switch_record', webpage.page_switch_record)
             
-            sent_when_active = message.get('sent_when_active', False)
-            webpage.during_annotation = state.get('is_annotating', False) and not sent_when_active
-            webpage.annotation_name = state.get('annotation_name', 'none') if webpage.during_annotation else 'none'
-            
             if check_is_redirected_page(webpage):
                 webpage.is_redirected = True
-
+        
         webpage.save()
-
-    else: # First Time
-        # CREATE CASE: Create a new webpage record
-        print_debug(f"Creating new webpage entry for URL: {message['url']}")
-        webpage = Webpage()
-        webpage.user = user
-        webpage.belong_task = task
-        webpage.url = message['url']
         
-        webpage.title = message.get('title')
-        webpage.referrer = message.get('referrer')
+        if is_new_webpage:
+            state['last_webpage_id'] = webpage.id
+            state['last_webpage_url'] = webpage.url
+            set_annotation_state(user_id, state)
 
-        start_ts = message.get('start_timestamp')
-        webpage.start_timestamp = timezone.make_aware(datetime.fromtimestamp(start_ts / 1000)) if start_ts else timezone.now()
-        
-        end_ts = message.get('end_timestamp')
-        webpage.end_timestamp = timezone.make_aware(datetime.fromtimestamp(end_ts / 1000)) if end_ts else webpage.start_timestamp
-
-        webpage.dwell_time = message.get('dwell_time', 0)
-        webpage.page_switch_record = message.get('page_switch_record', '[]')
-        webpage.mouse_moves = message.get('mouse_moves', '[]')
-        webpage.event_list = message.get('event_list', '[]')
-        
-        raw_rrweb = message.get('rrweb_record', '[]')
-        webpage.rrweb_record = raw_rrweb.replace("</script>", "<\\/script>")
-        webpage.save()
-        state['last_webpage_id'] = webpage.id
-        state['last_webpage_url'] = webpage.url
-
-    state['is_storing_data'] = False
-    set_annotation_state(user_id, state)
+    finally:
+        redis_client.delete(lock_key)  # Always release the lock
     
 def check_is_redirected_page(webpage):
-    # A page is considered a redirect if the dwell time is very short (< 1000ms) or if there's no user interaction.
-    return webpage.dwell_time < 1000 or (webpage.mouse_moves == [] and webpage.rrweb_record == [] and webpage.event_list == []) or webpage.title == '' or (webpage.title and 'redirect' in webpage.title.lower())
+    # A page is considered a redirect if the dwell time is very short (< 500ms) or if there's no user interaction.
+    return webpage.dwell_time < 500 or (webpage.mouse_moves == '[]' and webpage.event_list == '[]') or webpage.title == ''
 
 def wait_until_data_stored(func):
     def wrapper(*args, **kwargs):
@@ -228,13 +228,23 @@ def wait_until_data_stored(func):
         
         if request:
             user_id = request.user.id
+            lock_key = f"data_store_lock:{user_id}"
+            
             # Sleep for a short duration to ensure the backend receives the data
             time.sleep(0.3)
-            state = get_annotation_state(user_id)
-            while state.get('is_storing_data', False):
+            
+            wait_time = 0
+            max_wait_time = 30  # Max wait 30 seconds to prevent infinite loops
+
+          
+            while redis_client.exists(lock_key):
+                if wait_time >= max_wait_time:
+                    logger.error(f"Data store lock wait timeout for user {user_id}")
+                    break
+                
                 print_debug("Waiting for data to be stored...")
                 time.sleep(0.5)
-                state = get_annotation_state(user_id)  # Re-fetch state
+                wait_time += 0.5
         
         return func(*args, **kwargs)
     return wrapper

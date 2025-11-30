@@ -145,7 +145,7 @@ async function showUserTab(task_id, task_info) {
         updateBtn.style.display = 'block';
 
         updateBtn.onclick = () => {
-            window.open(update_info.update_link);
+            chrome.tabs.create({ url: update_info.update_link, active: true });
         };
 
         showAlert(`A new version (${update_info.latest_version}) is available. Please update to continue. <a href="${update_info.update_link}" target="_blank">Update Now</a>.`, "Update Required");
@@ -313,15 +313,27 @@ async function openTaskWindow(path, is_new_window = false) {
     const config = getConfig();
     const encodedPath = encodeURIComponent(path);
     const url = `${config.urls.base}/task/auth_redirect/?token=${access_token}&next=${encodedPath}`;
-    const window_options = 'height=1000,width=1200,top=0,left=0,toolbar=no,menubar=no,scrollbars=no,resizable=no,location=no,status=no';
-    window.open(url, is_new_window ? 'newwindow' : '_blank', is_new_window ? window_options : undefined);
+
+    if (is_new_window) {
+        chrome.windows.getCurrent(async (win) => {
+            await chrome.windows.create({
+                url: url,
+                type: 'popup',
+                height: 1000,
+                width: 1200,
+                incognito: win.incognito
+            });
+        });
+    } else {
+        await chrome.tabs.create({ url: url, active: true });
+    }
 }
 
 // --- EVENT HANDLERS ---
 
 function handleRegister() {
     const config = getConfig();
-    window.open(config.urls.register);
+    chrome.tabs.create({ url: config.urls.register, active: true });
 }
 
 async function handleLoginAttempt(force = false) {
@@ -397,7 +409,7 @@ async function handleFeedback() {
     const confirmed = await showConfirm("You are about to go to the task homepage. If you are in the middle of a task, this might interrupt your workflow. Continue?");
     if (confirmed) {
         const config = getConfig();
-        window.open(config.urls.home);
+        chrome.tabs.create({ url: config.urls.home, active: true });
     }
 }
 
@@ -405,7 +417,7 @@ async function handleFeedbackUnlogged() {
     const confirmed = await showConfirm("You are about to go to the task homepage. Continue?");
     if (confirmed) {
         const config = getConfig();
-        window.open(config.urls.home);
+        chrome.tabs.create({ url: config.urls.home, active: true });
     }
 }
 

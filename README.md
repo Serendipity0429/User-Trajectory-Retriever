@@ -128,6 +128,23 @@ The extension is located in the `ManifestV3/` directory.
 4.  The extension will automatically start recording user trajectories on specified websites once a task is initiated from the platform.
 5.  After completing a task, the recorded data can be viewed and replayed from the user's dashboard on the web platform.
 
+## Privacy and Incognito Mode
+
+For the best experience and to ensure your privacy, we recommend using the extension in **Incognito Mode**. This helps isolate the recording session and prevents interference from other browser extensions or cached data.
+
+**We respect your privacy.** The recording script, powered by `rrweb`, is configured to **exclude password inputs** and other sensitive fields. However, we still recommend that you avoid interacting with personal or sensitive information while the extension is active.
+
+## Disabling the Extension When Not in Use
+
+To protect your privacy, we strongly recommend that you **disable or uninstall the extension when you are not actively working on a task**.
+
+You can manage the extension by following these steps:
+
+1.  Open Google Chrome and navigate to `chrome://extensions`.
+2.  Locate the **User-Trajectory-Retriever** extension.
+3.  **To temporarily disable it** (recommended between tasks), toggle the switch to the off position.
+4.  **To permanently remove it**, click the **Remove** button.
+
 ## Directory Structure
 
 ```

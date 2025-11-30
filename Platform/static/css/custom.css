@@ -24,7 +24,7 @@ a {
 
 
 a.btn:not(.btn-outline-primary, .btn-outline-secondary, .btn-outline-success, .btn-outline-danger, .btn-outline-warning, .btn-outline-info, .btn-outline-dark,
-.btn-outline-discussion-lime, .btn-outline-discussion-pink) {
+.btn-outline-discussion-lime, .btn-outline-discussion-pink, .btn-link) {
     color: #fff;
 }
 
@@ -96,8 +96,8 @@ a, a:hover, a:focus {
 }
 
 #sidebar ul li a {
-    padding: 10px 15px;
-    font-size: 1em;
+    padding: 15px 20px;
+    font-size: 1.2em;
     display: block;
 }
 
@@ -778,6 +778,8 @@ body.EasyMDE-fullscreen .card {
 .page-settings-text-button .page-settings-text {
     display: none !important;
 }
+
+
 
 /* --- Small tablets (576px and up) --- */
 @media (min-width: 576px) {

@@ -1224,6 +1224,8 @@ def reflection_annotation(request, task_trial_id):
             duration=request.POST.get("duration"),
         )
         ref_annotation.save()
+        
+        
 
         stop_annotating(request)
 

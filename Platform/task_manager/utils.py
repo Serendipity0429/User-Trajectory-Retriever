@@ -401,3 +401,36 @@ def get_pending_annotation(user):
         return None
 
     return None
+
+
+import random
+
+def shuffle_choices(choices_map):
+    """
+    Shuffles the choices for a given map, keeping special keys at the end.
+    """
+    special_keys = ['other', 'no_change', 'no_major_roadblocks']
+    
+    # Convert dict items to a list
+    items = list(choices_map.items())
+    
+    # Separate special items
+    special_items = []
+    regular_items = []
+    
+    for key, value in items:
+        if key in special_keys:
+            special_items.append((key, value))
+        else:
+            regular_items.append((key, value))
+            
+    # Shuffle regular items
+    random.shuffle(regular_items)
+    
+    # Combine shuffled regular items with special items at the end
+    # Sort special items to have a consistent order (e.g., 'no_change', 'no_major_roadblocks', 'other')
+    special_items.sort(key=lambda x: special_keys.index(x[0]))
+    
+    shuffled_items = regular_items + special_items
+    
+    return shuffled_items

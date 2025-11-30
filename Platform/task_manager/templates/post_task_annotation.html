@@ -109,7 +109,7 @@
                             <h5><strong>2. Overall Difficulty</strong></h5>
                             <p>How would you rate the actual difficulty of the search process you completed?</p>
                             <div class="btn-group w-100 btn-group-responsive btn-group-responsive btn-group-responsive" role="group" aria-label="Difficulty">
-                                {% for key, value in DIFFICULTY_MAP.items %}
+                                {% for key, value in DIFFICULTY_MAP %}
                                 <input type="radio" class="btn-check" name="difficulty_actual" id="difficulty{{ key }}" value="{{ key }}" autocomplete="off" required>
                                 <label class="btn btn-outline-primary" for="difficulty{{ key }}" data-bs-toggle="tooltip" data-bs-placement="top" title="{{ DIFFICULTY_EXPLANATION_MAP|get_item:key }}">
                                     <strong>{{ key }}</strong><br>{{ value|split:" - "|slice:"1:"|join:" - " }}
@@ -124,7 +124,7 @@
                             <h5><strong>3. The "Aha!" Moment</strong></h5>
                             <p>What type of information was most critical to solving this task? <strong>Please select only one answer</strong></p>
                             <div class="w-100" role="group" aria-label="Aha! Moment">
-                                {% for key, value in AHA_MOMENT_MAP.items %}
+                                {% for key, value in AHA_MOMENT_MAP %}
                                 <div class="d-flex mb-2">
                                     <input type="radio" class="btn-check" name="aha_moment_type" id="aha{{ key }}" value="{{ key }}" autocomplete="off" required>
                                     <label class="btn btn-outline-primary {% if key != 'other' %}w-100{% endif %} text-start" for="aha{{ key }}" data-bs-toggle="tooltip" data-bs-placement="top" title="{{ AHA_MOMENT_EXPLANATION_MAP|get_item:key }}">{{ value }}</label>
@@ -143,7 +143,7 @@
                             <h5><strong>4. Unhelpful Paths</strong></h5>
                             <p>Which of these roadblocks did you encounter? <small class="text-muted fw-bold">Check all that apply</small></p>
                             <div class="w-100" role="group" aria-label="Unhelpful Paths">
-                                {% for key, value in UNHELPFUL_PATHS_MAP.items %}
+                                {% for key, value in UNHELPFUL_PATHS_MAP %}
                                 {% if key == 'no_major_roadblocks' %}
                                 <div class="d-flex mb-2">
                                     <input type="checkbox" class="btn-check" name="unhelpful_paths" id="unhelpful{{ key }}" value="{{ key }}" autocomplete="off">
@@ -152,7 +152,7 @@
                                 <hr>
                                 {% endif %}
                                 {% endfor %}
-                                {% for key, value in UNHELPFUL_PATHS_MAP.items %}
+                                {% for key, value in UNHELPFUL_PATHS_MAP %}
                                 {% if key != 'no_major_roadblocks' %}
                                 <div class="d-flex mb-2">
                                     <input type="checkbox" class="btn-check" name="unhelpful_paths" id="unhelpful{{ key }}" value="{{ key }}" autocomplete="off">
@@ -171,7 +171,7 @@
                             <h5><strong>5. Strategic Shift</strong></h5>
                             <p>How did your successful strategy evolve from your initial plan? <small class="text-muted fw-bold">Check all that apply</small></p>
                             <div class="w-100" role="group" aria-label="Strategic Shift">
-                                {% for key, value in STRATEGY_SHIFT_MAP.items %}
+                                {% for key, value in STRATEGY_SHIFT_MAP %}
                                 {% if key == 'no_change' %}
                                 <div class="d-flex mb-2">
                                     <input type="checkbox" class="btn-check" name="strategy_shift" id="strategy{{ key }}" value="{{ key }}" autocomplete="off">
@@ -180,7 +180,7 @@
                                 <hr>
                                 {% endif %}
                                 {% endfor %}
-                                {% for key, value in STRATEGY_SHIFT_MAP.items %}
+                                {% for key, value in STRATEGY_SHIFT_MAP %}
                                 {% if key != 'no_change' %}
                                 <div class="d-flex mb-2">
                                     <input type="checkbox" class="btn-check" name="strategy_shift" id="strategy{{ key }}" value="{{ key }}" autocomplete="off">

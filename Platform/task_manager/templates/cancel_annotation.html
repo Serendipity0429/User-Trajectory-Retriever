@@ -101,7 +101,7 @@
                             <h5><span class="fw-bold">2. Cancellation Reason</span></h5>
                             <p>Select the reasons you are unable to complete this task. <strong>Check all that apply</strong></p>
                             <div class="w-100" role="group" aria-label="Cancellation Reason">
-                                {% for key, value in CANCEL_CATEGORY_MAP.items %}
+                                {% for key, value in CANCEL_CATEGORY_MAP %}
                                 <div class="d-flex mb-2">
                                     <input class="btn-check" type="checkbox" name="cancel_category" id="cancel_{{ key }}" value="{{ key }}" autocomplete="off">
                                     <label class="btn btn-outline-primary {% if key != 'other' %}w-100{% endif %} text-start" for="cancel_{{ key }}">{{ value|safe }}</label>
@@ -119,7 +119,7 @@
                             <div id="selected-resources-list" class="sortable-list list-group mb-2"></div>
                             <hr id="selection-separator" style="display: none;">
                             <div id="unselected-resources-list" class="list-group">
-                                {% for key, value in MISSING_RESOURCES_MAP.items %}
+                                {% for key, value in MISSING_RESOURCES_MAP %}
                                 <div class="list-group-item drag-option d-flex align-items-center mb-2" data-value="{{ key }}">
                                     <input class="form-check-input me-2 flex-shrink-0" type="checkbox" name="cancel_missing_resources" value="{{ key }}">
                                     <span class="drag-handle me-2"><i class="bi bi-grip-vertical"></i></span>

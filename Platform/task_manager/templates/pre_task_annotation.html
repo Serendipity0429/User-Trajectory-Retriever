@@ -143,7 +143,7 @@
                             <h5><strong>3. Your Familiarity with the Topic</strong></h5>
                             <p>How familiar are you with the subject of this question?</p>
                             <div class="btn-group w-100 btn-group-responsive btn-group-responsive btn-group-responsive" role="group" aria-label="Familiarity">
-                                {% for key, value in FAMILIARITY_MAP.items %}
+                                {% for key, value in FAMILIARITY_MAP %}
                                 <input type="radio" class="btn-check" name="familiarity" id="familiarity{{ key }}" value="{{ key }}" autocomplete="off" required>
                                 <label class="btn btn-outline-custom-dark-blue" for="familiarity{{ key }}" data-bs-toggle="tooltip" data-bs-placement="top" title="{{ FAMILIARITY_EXPLANATION_MAP|get_item:key }}">
                                     <strong>{{ key }}</strong><br>{{ value|split:" - "|slice:"1:"|join:" - " }}
@@ -158,7 +158,7 @@
                             <h5><strong>4. Perceived Task Difficulty</strong></h5>
                             <p>How difficult do you think this task will be?</p>
                             <div class="btn-group w-100 btn-group-responsive btn-group-responsive btn-group-responsive" role="group" aria-label="Difficulty">
-                                {% for key, value in DIFFICULTY_MAP.items %}
+                                {% for key, value in DIFFICULTY_MAP %}
                                 <input type="radio" class="btn-check" name="difficulty" id="difficulty{{ key }}" value="{{ key }}" autocomplete="off" required>
                                 <label class="btn btn-outline-custom-dark-blue" for="difficulty{{ key }}" data-bs-toggle="tooltip" data-bs-placement="top" title="{{ DIFFICULTY_EXPLANATION_MAP|get_item:key }}">
                                     <strong>{{ key }}</strong><br>{{ value|split:" - "|slice:"1:"|join:" - " }}
@@ -173,7 +173,7 @@
                             <h5><strong>5. Estimated Time Commitment</strong></h5>
                             <p>Estimate the time you'll need for this task. This helps us understand the complexity of the task.</p>
                             <div class="btn-group w-100 btn-group-responsive btn-group-responsive btn-group-responsive" role="group" aria-label="Effort">
-                                {% for key, value in EFFORT_MAP.items %}
+                                {% for key, value in EFFORT_MAP %}
                                 <input type="radio" class="btn-check" name="effort" id="effort{{ key }}" value="{{ key }}" autocomplete="off" required>
                                 <label class="btn btn-outline-custom-dark-blue" for="effort{{ key }}" data-bs-toggle="tooltip" data-bs-placement="top" title="{{ EFFORT_EXPLANATION_MAP|get_item:key }}">
                                     {{ value }}
@@ -210,7 +210,7 @@
                             <h5><strong>8. Expected Source of Answer</strong></h5>
                             <p>Where do you think you will find the answer? <strong>You can select multiple options</strong></p>
                             <div class="btn-group flex-wrap" role="group" aria-label="Expected Source">
-                                {% for key, value in EXPECTED_SOURCES_MAP.items %}
+                                {% for key, value in EXPECTED_SOURCES_MAP %}
                                 <input type="checkbox" class="btn-check" name="expected_source" id="source_{{ key }}" value="{{ key }}" autocomplete="off">
                                 <label class="btn btn-outline-custom-dark-blue mb-2 me-2" for="source_{{ key }}">{{ value }}</label>
                                 {% endfor %}

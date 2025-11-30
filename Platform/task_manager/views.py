@@ -27,6 +27,7 @@ from .utils import (
     check_answer,
     get_pending_annotation,
     render_status_page,
+    shuffle_choices,
 )
 from .models import (
     TaskDataset,
@@ -63,6 +64,17 @@ from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
 from django.contrib.auth import login
 
 logger = logging.getLogger(__name__)
+
+
+def get_choices_for_template(choice_map_config):
+    """
+    Returns choices for a template, shuffling them if the randomize flag is True.
+    """
+    mapping = choice_map_config["mapping"]
+    if choice_map_config["random"]:
+        return shuffle_choices(mapping)
+    else:
+        return mapping.items()
 
 
 @consent_exempt
@@ -254,29 +266,26 @@ def pre_task_annotation(request):
                 current_formal_step = total_formal_tasks
 
         annotation_id = start_annotating(request, "pre_task_annotation")
-        return render(
-            request,
-            "pre_task_annotation.html",
-            {
-                "cur_user": user,
-                "question": entry.question,
-                "entry_id": entry.id,
-                "annotation_id": annotation_id,
-                "FAMILIARITY_MAP": FAMILIARITY_MAP,
-                "DIFFICULTY_MAP": DIFFICULTY_MAP,
-                "EFFORT_MAP": EFFORT_MAP,
-                "FAMILIARITY_EXPLANATION_MAP": FAMILIARITY_EXPLANATION_MAP,
-                "DIFFICULTY_EXPLANATION_MAP": DIFFICULTY_EXPLANATION_MAP,
-                "EFFORT_EXPLANATION_MAP": EFFORT_EXPLANATION_MAP,
-                "EXPECTED_SOURCES_MAP": EXPECTED_SOURCES_MAP,
-                "is_tutorial": is_tutorial,
-                "current_tutorial_step": current_tutorial_step,
-                "total_tutorial_tasks": total_tutorial_tasks,
-                "is_formal": is_formal,
-                "current_formal_step": current_formal_step,
-                "total_formal_tasks": total_formal_tasks,
-            },
-        )
+        context = {
+            "cur_user": user,
+            "question": entry.question,
+            "entry_id": entry.id,
+            "annotation_id": annotation_id,
+            "FAMILIARITY_MAP": get_choices_for_template(FAMILIARITY_MAP),
+            "DIFFICULTY_MAP": get_choices_for_template(DIFFICULTY_MAP),
+            "EFFORT_MAP": get_choices_for_template(EFFORT_MAP),
+            "EXPECTED_SOURCES_MAP": get_choices_for_template(EXPECTED_SOURCES_MAP),
+            "FAMILIARITY_EXPLANATION_MAP": FAMILIARITY_EXPLANATION_MAP["mapping"],
+            "DIFFICULTY_EXPLANATION_MAP": DIFFICULTY_EXPLANATION_MAP["mapping"],
+            "EFFORT_EXPLANATION_MAP": EFFORT_EXPLANATION_MAP["mapping"],
+            "is_tutorial": is_tutorial,
+            "current_tutorial_step": current_tutorial_step,
+            "total_tutorial_tasks": total_tutorial_tasks,
+            "is_formal": is_formal,
+            "current_formal_step": current_formal_step,
+            "total_formal_tasks": total_formal_tasks,
+        }
+        return render(request, "pre_task_annotation.html", context)
 
 
 # Post-Task Annotation Fetcher
@@ -365,14 +374,14 @@ def post_task_annotation(request, task_id):
                 "annotation_id": annotation_id,
                 "last_trial_duration": last_trial_duration,
                 "total_duration": total_duration,
-                "DIFFICULTY_MAP": DIFFICULTY_MAP,
-                "AHA_MOMENT_MAP": AHA_MOMENT_MAP,
-                "UNHELPFUL_PATHS_MAP": UNHELPFUL_PATHS_MAP,
-                "STRATEGY_SHIFT_MAP": STRATEGY_SHIFT_MAP,
-                "DIFFICULTY_EXPLANATION_MAP": DIFFICULTY_EXPLANATION_MAP,
-                "AHA_MOMENT_EXPLANATION_MAP": AHA_MOMENT_EXPLANATION_MAP,
-                "UNHELPFUL_PATHS_EXPLANATION_MAP": UNHELPFUL_PATHS_EXPLANATION_MAP,
-                "STRATEGY_SHIFT_EXPLANATION_MAP": STRATEGY_SHIFT_EXPLANATION_MAP,
+                "DIFFICULTY_MAP": get_choices_for_template(DIFFICULTY_MAP),
+                "AHA_MOMENT_MAP": get_choices_for_template(AHA_MOMENT_MAP),
+                "UNHELPFUL_PATHS_MAP": get_choices_for_template(UNHELPFUL_PATHS_MAP),
+                "STRATEGY_SHIFT_MAP": get_choices_for_template(STRATEGY_SHIFT_MAP),
+                "DIFFICULTY_EXPLANATION_MAP": DIFFICULTY_EXPLANATION_MAP["mapping"],
+                "AHA_MOMENT_EXPLANATION_MAP": AHA_MOMENT_EXPLANATION_MAP["mapping"],
+                "UNHELPFUL_PATHS_EXPLANATION_MAP": UNHELPFUL_PATHS_EXPLANATION_MAP["mapping"],
+                "STRATEGY_SHIFT_EXPLANATION_MAP": STRATEGY_SHIFT_EXPLANATION_MAP["mapping"],
             },
         )
 
@@ -606,43 +615,46 @@ def get_task_info(request):
 # =============================================
 # =        Updated show_task Function         =
 # =============================================
-@api_view(["GET"])
-@permission_classes([IsAuthenticated])
-@wait_until_data_stored
-def show_task(request, task_id):
-    """
-    Fetches all data related to a specific task and renders it in a detail view.
-    This function gathers the pre-task survey, all trials with their respective
-    webpages, submitted answers, reflections, and the post-task or cancellation survey.
-    Allows access to the task owner or any superuser.
-    """
-    user = request.user
-    
-    # Fetch the task by ID.
-    task = Task.objects.filter(id=task_id).first()
+def _get_processed_cancel_annotation(task):
+    """Fetches and processes the cancel annotation for a given task."""
+    cancel_annotation = task.cancelannotation_set.first()
+    cancel_categories = []
+    cancel_missing_resources = []
+    if cancel_annotation:
+        cancel_missing_resources = map_json_list(
+            cancel_annotation.missing_resources, MISSING_RESOURCES_MAP["mapping"]
+        )
+        if cancel_annotation.category:
+            category_json = json.dumps(cancel_annotation.category)
+            cancel_categories = map_json_list(category_json, CANCEL_CATEGORY_MAP["mapping"])
+    return {
+        "annotation": cancel_annotation,
+        "categories": cancel_categories,
+        "missing_resources": cancel_missing_resources,
+    }
 
-    # Check if the task exists and if the user has permission to view it.
-    if task is None or (task.user != user and not user.is_superuser):
-        return render_status_page(request, 'Access Denied', f"No task found with task_id={task_id} or you do not have permission to view it.", 'danger')
+def _get_processed_post_task_annotation(task):
+    """Fetches and processes the post-task annotation for a given task."""
+    if task.cancelled:
+        return None
+    post_task_annotation = task.posttaskannotation_set.first()
+    if post_task_annotation:
+        post_task_annotation.unhelpful_paths_display = map_json_list(
+            json.dumps(post_task_annotation.unhelpful_paths), UNHELPFUL_PATHS_MAP["mapping"]
+        )
+        post_task_annotation.strategy_shift_display = map_json_list(
+            json.dumps(post_task_annotation.strategy_shift), STRATEGY_SHIFT_MAP["mapping"]
+        )
+    return post_task_annotation
 
-    # 1. Fetch general task information
-    task_question = task.content.question
-    task_answer = json.loads(task.content.answer) if task.content.answer else {}
-
-    # 2. Fetch Pre-Task Annotation
-    pre_task_annotation = PreTaskAnnotation.objects.filter(belong_task=task).first()
-
-    # 3. Fetch all trials and related data
-    task_trials = TaskTrial.objects.filter(belong_task=task).order_by("num_trial")
+def _get_processed_trials(task):
+    """Fetches and processes all trials for a given task."""
+    task_trials = sorted(task.tasktrial_set.all(), key=lambda t: t.num_trial)
     for trial in task_trials:
-        trial.webpages = Webpage.objects.filter(
-            belong_task_trial=trial, is_redirected=False, during_annotation=False
-        ).order_by("start_timestamp")
+        trial.webpages = sorted(trial.webpage_set.filter(is_redirected=False, during_annotation=False), key=lambda w: w.start_timestamp)
         
-        justifications = trial.justifications.all()
-        
-        active_justifications = [j for j in justifications if j.status == 'active']
-        abandoned_justifications = [j for j in justifications if j.status == 'abandoned']
+        active_justifications = trial.justifications.filter(status='active')
+        abandoned_justifications = trial.justifications.filter(status='abandoned')
 
         text_justifications = []
         image_justifications = []
@@ -671,7 +683,14 @@ def show_task(request, task_id):
             trial.duration = trial.end_timestamp - trial.start_timestamp
         else:
             trial.duration = None
+            
         if hasattr(trial, 'reflectionannotation') and trial.reflectionannotation:
+            trial.reflectionannotation.failure_category_display = map_json_list(
+                trial.reflectionannotation.failure_category, FAILURE_CATEGORY_MAP['mapping']
+            )
+            trial.reflectionannotation.future_plan_actions_display = map_json_list(
+                trial.reflectionannotation.future_plan_actions, CORRECTIVE_PLAN_MAP['mapping']
+            )
             if isinstance(trial.reflectionannotation.failure_category, str):
                 try:
                     trial.reflectionannotation.failure_category = json.loads(trial.reflectionannotation.failure_category)
@@ -682,30 +701,61 @@ def show_task(request, task_id):
                     trial.reflectionannotation.future_plan_actions = json.loads(trial.reflectionannotation.future_plan_actions)
                 except json.JSONDecodeError:
                     trial.reflectionannotation.future_plan_actions = []
+    return task_trials
 
-    # 4. Fetch Post-Task or Cancellation Annotation
-    post_task_annotation = None
-    cancel_annotation = None
+def _get_processed_pre_task_annotation(task):
+    """Fetches and processes the pre-task annotation for a given task."""
+    pre_task_annotation = task.pretaskannotation_set.first()
+    if pre_task_annotation:
+        pre_task_annotation.expected_source_display = map_json_list(
+            json.dumps(pre_task_annotation.expected_source), EXPECTED_SOURCES_MAP["mapping"]
+        )
+    return pre_task_annotation
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+@wait_until_data_stored
+def show_task(request, task_id):
+    """
+    Fetches all data related to a specific task and renders it in a detail view.
+    This function gathers the pre-task survey, all trials with their respective
+    webpages, submitted answers, reflections, and the post-task or cancellation survey.
+    Allows access to the task owner or any superuser.
+    """
+    user = request.user
+    
+    # Fetch the task by ID.
+    task = Task.objects.select_related('content').prefetch_related(
+        'pretaskannotation_set',
+        'posttaskannotation_set',
+        'cancelannotation_set',
+        'tasktrial_set__webpage_set',
+        'tasktrial_set__justifications',
+        'tasktrial_set__reflectionannotation'
+    ).filter(id=task_id).first()
+
+    # Check if the task exists and if the user has permission to view it.
+    if task is None or (task.user != user and not user.is_superuser):
+        return render_status_page(request, 'Access Denied', f"No task found with task_id={task_id} or you do not have permission to view it.", 'danger')
+
+    # 1. Fetch general task information
+    task_question = task.content.question
+    task_answer = json.loads(task.content.answer) if task.content.answer else {}
+
+    # 2. Fetch and process annotations using helper functions
+    pre_task_annotation = _get_processed_pre_task_annotation(task)
+    task_trials = _get_processed_trials(task)
+    post_task_annotation = _get_processed_post_task_annotation(task)
+    cancel_data = _get_processed_cancel_annotation(task)
+    cancel_annotation = cancel_data["annotation"]
+    cancel_categories = cancel_data["categories"]
+    cancel_missing_resources = cancel_data["missing_resources"]
+
+    # 3. Calculate total duration
     total_duration = None
     if task.end_timestamp and task.start_timestamp:
         total_duration = task.end_timestamp - task.start_timestamp
-    if task.cancelled:
-        cancel_annotation = CancelAnnotation.objects.filter(belong_task=task).first()
-    else:
-        post_task_annotation = PostTaskAnnotation.objects.filter(belong_task=task).first()
-
-    cancel_missing_resources = []
-    cancel_categories = []
-    if cancel_annotation:
-        cancel_missing_resources = map_json_list(
-            cancel_annotation.missing_resources, MISSING_RESOURCES_MAP
-        )
-        if cancel_annotation.category:
-            # Ensure category is treated as a JSON string for map_json_list
-            category_json = json.dumps(cancel_annotation.category)
-            cancel_categories = map_json_list(category_json, CANCEL_CATEGORY_MAP)
-
-    # 5. Assemble the final context and render the template
     context = {
         "cur_user": user,
         "task_id": task.id,
@@ -719,19 +769,19 @@ def show_task(request, task_id):
         "cancel_missing_resources": cancel_missing_resources,
         "task": task,
         "total_duration": total_duration,
-        "FAMILIARITY_MAP": FAMILIARITY_MAP,
-        "DIFFICULTY_MAP": DIFFICULTY_MAP,
-        "EFFORT_MAP": EFFORT_MAP,
-        "CONFIDENCE_MAP": CONFIDENCE_MAP,
-        "ANSWER_FORMULATION_MAP": ANSWER_FORMULATION_MAP,
-        "FAILURE_CATEGORY_MAP": FAILURE_CATEGORY_MAP,
-        "CORRECTIVE_PLAN_MAP": CORRECTIVE_PLAN_MAP,
-        "AHA_MOMENT_MAP": AHA_MOMENT_MAP,
-        "UNHELPFUL_PATHS_MAP": UNHELPFUL_PATHS_MAP,
-        "STRATEGY_SHIFT_MAP": STRATEGY_SHIFT_MAP,
-        "CANCEL_CATEGORY_MAP": CANCEL_CATEGORY_MAP,
-        "MISSING_RESOURCES_MAP": MISSING_RESOURCES_MAP,
-        "EXPECTED_SOURCES_MAP": EXPECTED_SOURCES_MAP,
+        "FAMILIARITY_MAP": FAMILIARITY_MAP["mapping"],
+        "DIFFICULTY_MAP": DIFFICULTY_MAP["mapping"],
+        "EFFORT_MAP": EFFORT_MAP["mapping"],
+        "CONFIDENCE_MAP": CONFIDENCE_MAP["mapping"],
+        "ANSWER_FORMULATION_MAP": ANSWER_FORMULATION_MAP["mapping"],
+        "FAILURE_CATEGORY_MAP": FAILURE_CATEGORY_MAP["mapping"],
+        "CORRECTIVE_PLAN_MAP": CORRECTIVE_PLAN_MAP["mapping"],
+        "AHA_MOMENT_MAP": AHA_MOMENT_MAP["mapping"],
+        "UNHELPFUL_PATHS_MAP": UNHELPFUL_PATHS_MAP["mapping"],
+        "STRATEGY_SHIFT_MAP": STRATEGY_SHIFT_MAP["mapping"],
+        "CANCEL_CATEGORY_MAP": CANCEL_CATEGORY_MAP["mapping"],
+        "MISSING_RESOURCES_MAP": MISSING_RESOURCES_MAP["mapping"],
+        "EXPECTED_SOURCES_MAP": EXPECTED_SOURCES_MAP["mapping"],
     }
     return render(request, "show_task.html", context)
 
@@ -918,10 +968,10 @@ def cancel_annotation(request, task_id):
                 "annotation_id": annotation_id,
                 "last_trial_duration": last_trial_duration,
                 "total_duration": total_duration,
-                "CANCEL_CATEGORY_MAP": CANCEL_CATEGORY_MAP,
-                "MISSING_RESOURCES_MAP": MISSING_RESOURCES_MAP,
-                "CANCEL_CATEGORY_EXPLANATION_MAP": CANCEL_CATEGORY_EXPLANATION_MAP,
-                "MISSING_RESOURCES_EXPLANATION_MAP": MISSING_RESOURCES_EXPLANATION_MAP,
+                "CANCEL_CATEGORY_MAP": get_choices_for_template(CANCEL_CATEGORY_MAP),
+                "MISSING_RESOURCES_MAP": get_choices_for_template(MISSING_RESOURCES_MAP),
+                "CANCEL_CATEGORY_EXPLANATION_MAP": CANCEL_CATEGORY_EXPLANATION_MAP["mapping"],
+                "MISSING_RESOURCES_EXPLANATION_MAP": MISSING_RESOURCES_EXPLANATION_MAP["mapping"],
             },
         )
 
@@ -998,14 +1048,14 @@ def reflection_annotation(request, task_trial_id):
                 "user_answer": user_answer,
                 "trial_duration": trial_duration,
                 "annotation_id": annotation_id,
-                "FAILURE_CATEGORY_MAP": FAILURE_CATEGORY_MAP,
-                "CORRECTIVE_PLAN_MAP": CORRECTIVE_PLAN_MAP,
-                "DIFFICULTY_MAP": DIFFICULTY_MAP,
-                "EFFORT_MAP": EFFORT_MAP,
-                "EFFORT_EXPLANATION_MAP": EFFORT_EXPLANATION_MAP,
-                "DIFFICULTY_EXPLANATION_MAP": DIFFICULTY_EXPLANATION_MAP,
-                "FAILURE_CATEGORY_EXPLANATION_MAP": FAILURE_CATEGORY_EXPLANATION_MAP,
-                "CORRECTIVE_ACTION_EXPLANATION_MAP": CORRECTIVE_ACTION_EXPLANATION_MAP,
+                "FAILURE_CATEGORY_MAP": get_choices_for_template(FAILURE_CATEGORY_MAP),
+                "CORRECTIVE_PLAN_MAP": get_choices_for_template(CORRECTIVE_PLAN_MAP),
+                "DIFFICULTY_MAP": get_choices_for_template(DIFFICULTY_MAP),
+                "EFFORT_MAP": get_choices_for_template(EFFORT_MAP),
+                "EFFORT_EXPLANATION_MAP": EFFORT_EXPLANATION_MAP["mapping"],
+                "DIFFICULTY_EXPLANATION_MAP": DIFFICULTY_EXPLANATION_MAP["mapping"],
+                "FAILURE_CATEGORY_EXPLANATION_MAP": FAILURE_CATEGORY_EXPLANATION_MAP["mapping"],
+                "CORRECTIVE_ACTION_EXPLANATION_MAP": CORRECTIVE_ACTION_EXPLANATION_MAP["mapping"],
             },
         )
 
@@ -1151,8 +1201,8 @@ def submit_answer(request, task_id):
                 "webpages": webpages,
                 "num_trial": num_trial + 1,
                 "annotation_id": annotation_id,
-                "confidence_choices": CONFIDENCE_MAP.items(),
-                "answer_formulation_choices": ANSWER_FORMULATION_MAP.items(),
+                "confidence_choices": get_choices_for_template(CONFIDENCE_MAP),
+                "answer_formulation_choices": get_choices_for_template(ANSWER_FORMULATION_MAP),
             },
         )
 

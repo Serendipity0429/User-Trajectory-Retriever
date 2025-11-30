@@ -81,7 +81,7 @@
                             <div id="selected-failure-categories" class="sortable-list list-group mb-2"></div>
                             <hr id="failure-separator" style="display: none;">
                             <div id="unselected-failure-categories" class="list-group">
-                                {% for key, value in FAILURE_CATEGORY_MAP.items %}
+                                {% for key, value in FAILURE_CATEGORY_MAP %}
                                 <div class="list-group-item drag-option d-flex align-items-center mb-2" data-value="{{ key }}">
                                     <input class="form-check-input me-2 flex-shrink-0" type="checkbox" name="failure_category" value="{{ key }}">
                                     <span class="drag-handle me-2"><i class="bi bi-grip-vertical"></i></span>
@@ -108,7 +108,7 @@
                             <div id="selected-corrective-actions" class="sortable-list list-group mb-2"></div>
                             <hr id="corrective-separator" style="display: none;">
                             <div id="unselected-corrective-actions" class="list-group">
-                                {% for key, value in CORRECTIVE_PLAN_MAP.items %}
+                                {% for key, value in CORRECTIVE_PLAN_MAP %}
                                 <div class="list-group-item drag-option d-flex align-items-center mb-2" data-value="{{ key }}">
                                     <input class="form-check-input me-2 flex-shrink-0" type="checkbox" name="future_plan_actions" value="{{ key }}">
                                     <span class="drag-handle me-2"><i class="bi bi-grip-vertical"></i></span>
@@ -133,7 +133,7 @@
                             <h5><strong>5. Estimated Time Left</strong></h5>
                             <p>Please estimate how much more time you think you'll need to complete this task.</p>
                             <div class="btn-group w-100 btn-group-responsive btn-group-responsive btn-group-responsive" role="group" aria-label="Effort">
-                                {% for key, value in EFFORT_MAP.items %}
+                                {% for key, value in EFFORT_MAP %}
                                 <input type="radio" class="btn-check" name="estimated_time" id="effort{{ key }}" value="{{ key }}" autocomplete="off" required>
                                 <label class="btn btn-outline-primary" for="effort{{ key }}" data-bs-toggle="tooltip" data-bs-placement="top" title="{{ EFFORT_EXPLANATION_MAP|get_item:key }}">
                                     {{ value }}
@@ -147,7 +147,7 @@
                             <h5><strong>6. Adjusted Difficulty</strong></h5>
                             <p>After this attempt, how would you rate the difficulty of the task?</p>
                             <div class="btn-group w-100 btn-group-responsive btn-group-responsive btn-group-responsive" role="group" aria-label="Adjusted Difficulty">
-                                {% for key, value in DIFFICULTY_MAP.items %}
+                                {% for key, value in DIFFICULTY_MAP %}
                                 <input type="radio" class="btn-check" name="adjusted_difficulty" id="adjusted_difficulty{{ key }}" value="{{ key }}" autocomplete="off" required>
                                 <label class="btn btn-outline-primary" for="adjusted_difficulty{{ key }}" data-bs-toggle="tooltip" data-bs-placement="top" title="{{ DIFFICULTY_EXPLANATION_MAP|get_item:key }}">
                                     <strong>{{ key }}</strong><br>{{ value|split:" - "|slice:"1:"|join:" - " }}

@@ -35,3 +35,4 @@ django-redis==5.4.0
 gunicorn
 matplotlib
 numpy
+psycopg2-binary

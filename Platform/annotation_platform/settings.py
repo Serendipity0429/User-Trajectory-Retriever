@@ -117,13 +117,27 @@ WSGI_APPLICATION = "annotation_platform.wsgi.application"
 # SECURITY WARNING: While SQLite is convenient for development, it is not recommended for production
 # due to its limitations with concurrent requests. For a production environment, consider using a more
 # robust database such as PostgreSQL or MySQL.
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": os.path.join(BASE_DIR, "db.sqlite3"),
-        "timeout": 30,
+DATABASE_TYPE = config("DATABASE_TYPE", default="sqlite")
+
+if DATABASE_TYPE == "postgres":
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": config("POSTGRES_DB"),
+            "USER": config("POSTGRES_USER"),
+            "PASSWORD": config("POSTGRES_PASSWORD"),
+            "HOST": config("POSTGRES_HOST", default="localhost"),
+            "PORT": config("POSTGRES_PORT", default="5432"),
+        }
     }
-}
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": os.path.join(BASE_DIR, "db.sqlite3"),
+            "timeout": 30,
+        }
+    }
 
 
 # Redis Configuration

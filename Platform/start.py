@@ -108,7 +108,7 @@ def run_manage_py_command(subcommand: str, *args: str) -> None:
 
 def clean_project() -> None:
     """
-    Removes migration files, the database, and media assets for a clean start.
+    Removes migration files, flushes the database, and clears media assets for a clean start.
     """
     print_header("Cleaning project for a fresh start")
 
@@ -117,7 +117,6 @@ def clean_project() -> None:
         WORK_DIR / "task_manager" / "migrations",
         WORK_DIR / "user_system" / "migrations",
         WORK_DIR / "discussion" / "migrations",
-        WORK_DIR / "db.sqlite3",
         WORK_DIR / "media" / "attachments",
         WORK_DIR / "media" / "evidence_images",
         WORK_DIR / "staticfiles",
@@ -133,6 +132,9 @@ def clean_project() -> None:
                 path.unlink()
         except FileNotFoundError:
             print_warning(f"Path not found, skipping: {path}")
+
+    print_info("Flushing the database...")
+    run_manage_py_command("flush", "--no-input")
 
     print_success("--- Cleaning complete ---")
 

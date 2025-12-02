@@ -56,6 +56,7 @@ INSTALLED_APPS = [
     "discussion",
     "msg_system",
     "captcha",
+    "benchmark",
 ]
 
 # Captcha Configuration
@@ -140,7 +141,7 @@ else:
     }
 
 
-# Redis Configuration
+# -- Redis Configuration --
 REDIS_HOST = config("REDIS_HOST", default="127.0.0.1")
 REDIS_PORT = config("REDIS_PORT", default=6379, cast=int)
 REDIS_DB = config("REDIS_DB", default=0, cast=int)

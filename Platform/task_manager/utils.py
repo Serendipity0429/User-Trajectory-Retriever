@@ -329,33 +329,34 @@ def check_answer_rule(question, authentic_answers, user_answer):
 
     # Fallback to original normalization logic
     normalized_user_answer = _normalize(user_answer)
-    print_debug(f"Normalized User Answer: '{normalized_user_answer}'")
+    # print_debug(f"Normalized User Answer: '{normalized_user_answer}'")
 
     for answer in authentic_answers:
         normalized_correct_answer = _normalize(answer)
-        print_debug(
-            f"Comparing with normalized correct answer: '{normalized_correct_answer}'"
-        )
+        # print_debug(
+        #     f"Comparing with normalized correct answer: '{normalized_correct_answer}'"
+        # )
         if normalized_user_answer == normalized_correct_answer:
             return True
 
     return False
 
 
-def check_answer_llm(question, authentic_answers, user_answer):
+def check_answer_llm(question, authentic_answers, user_answer, client = None, model=None):
     """
     Checks if the user's answer is correct using an LLM-as-a-judge.
     """
-    base_url = config("LLM_BASE_URL", default=None)
-    api_key = config("LLM_API_KEY", default=None)
-    model = config("LLM_MODEL", default="gpt-3.5-turbo")
+    if not client:
+        base_url = config("LLM_BASE_URL", default=None)
+        api_key = config("LLM_API_KEY", default=None)
+        model = config("LLM_MODEL", default="gpt-3.5-turbo")
 
-    if not base_url or not api_key:
-        raise ValueError(
-            "LLM_BASE_URL and LLM_API_KEY environment variables must be set."
-        )
+        if not base_url or not api_key:
+            raise ValueError(
+                "LLM_BASE_URL and LLM_API_KEY environment variables must be set."
+            )
 
-    client = OpenAI(base_url=base_url, api_key=api_key)
+        client = OpenAI(base_url=base_url, api_key=api_key)
 
     authentic_answers_formatted = "\n- ".join(authentic_answers)
     prompt = f"""You are a meticulous and fair evaluator. Your task is to compare a `User's Answer` to a list of `Authentic Answers` for a given `Question` and determine if it is correct.

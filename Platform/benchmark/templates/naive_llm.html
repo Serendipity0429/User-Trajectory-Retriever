@@ -1,0 +1,668 @@
+{% extends "base.html" %}
+
+{% block title %}Naive LLM Benchmark{% endblock %}
+
+{% block content %}
+<div class="container mt-5 px-lg-4">
+    <div class="pb-3 mb-4 border-bottom">
+        <h1 class="h2"><i class="bi bi-robot me-2"></i>Naive LLM Benchmark</h1>
+        <p class="text-muted mb-0">Run the model against the full QA pipeline and evaluate its performance with rule-based and LLM-based validation.</p>
+    </div>
+
+    <div class="row justify-content-center">
+        <!-- Control & Saved Runs -->
+        <div class="col-md-6">
+            <div class="card shadow-sm mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-play-circle me-2"></i>Control Panel</h5>
+                </div>
+                <div class="card-body">
+                    <p>Run the model against the 'hard_questions_refined.jsonl' dataset ({{ total_questions }} questions).</p>
+                    <form id="pipeline-form" data-total-questions="{{ total_questions }}">
+                        {% csrf_token %}
+                        <input type="hidden" name="mode" value="qa_pipeline">
+                        <div class="d-grid gap-2">
+                            <button type="button" id="run-pipeline-btn" class="btn btn-primary">Run QA Pipeline</button>
+                            <button type="button" id="stop-pipeline-btn" class="btn btn-danger" style="display: none;">Stop</button>
+                        </div>
+                    </form>
+                    <div id="progress-container" class="mt-4" style="display: none;">
+                        <h6>Progress:</h6>
+                        <div class="progress">
+                            <div id="progress-bar" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
+                        </div>
+                    </div>
+                    <div id="run-actions-container" class="mt-3 text-center">
+                        <button type="button" id="save-run-btn" class="btn btn-success" disabled><i class="bi bi-save me-1"></i> Save Run</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card shadow-sm mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-archive me-2"></i>Saved Runs</h5>
+                </div>
+                <div class="card-body">
+                    <p>Load and view the results of a previously saved run.</p>
+                    <div id="saved-runs-list" class="list-group mb-3">
+                        <!-- Runs will be dynamically inserted here -->
+                    </div>
+                    <div id="no-runs-message" class="text-center text-muted" style="display: none;">
+                        No saved runs found.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- LLM Configuration Card -->
+    <div class="row justify-content-center">
+        <div class="col-md-12">
+            <div class="card shadow-sm mb-4">
+                <div class="card-header" id="headingConfig" data-bs-toggle="collapse" data-bs-target="#collapseConfig" aria-expanded="false" aria-controls="collapseConfig" style="cursor: pointer;">
+                    <h5 class="mb-0"><i class="bi bi-gear me-2"></i>LLM Configuration</h5>
+                </div>
+                <div id="collapseConfig" class="collapse">
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="llm_base_url" class="form-label">Base URL</label>
+                                <input type="text" class="form-control" id="llm_base_url" placeholder="Optional: e.g., http://localhost:11434/v1" value="{{ llm_base_url|safe }}">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="llm_model" class="form-label">Model Name</label>
+                                <input type="text" class="form-control" id="llm_model" placeholder="e.g., gpt-4o" value="{{ llm_model|safe }}">
+                            </div>
+                            <div class="col-md-12">
+                                <label for="llm_api_key" class="form-label">API Key</label>
+                                <input type="text" class="form-control" id="llm_api_key" placeholder="Enter your API Key" value="{{ llm_api_key|safe }}">
+                            </div>
+                        </div>
+                        <hr>
+                        <div class="d-flex justify-content-end">
+                            <button type="button" class="btn btn-outline-primary me-2" id="save-settings-btn"><i class="bi bi-save me-1"></i> Save</button>
+                            <button type="button" class="btn btn-outline-secondary" id="restore-defaults-btn"><i class="bi bi-server me-1"></i> Load .env</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Results Table -->
+    <div id="pipeline-results-container" class="mt-4" style="display: none;">
+        <h4>
+            <span id="results-header-text">QA Pipeline Results</span>
+            <span id="running-spinner" class="ms-2" style="display: none;">
+                <i class="bi bi-arrow-repeat spin"></i>
+            </span>
+        </h4>
+
+        <!-- Summary Stats -->
+        <div class="row my-4" id="summary-container">
+            <div class="col-lg-6 mb-4 mb-lg-0">
+                <h5 class="mb-3 text-center text-muted">Rule-Based Evaluation</h5>
+                <div class="row">
+                    <div class="col-4">
+                        <div class="card text-center text-white bg-success summary-card h-100">
+                            <div class="card-body">
+                                <h5 class="card-title" id="rule-correct-count">0</h5>
+                                <p class="card-text text-white small">Correct</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="card text-center text-white bg-danger summary-card h-100">
+                            <div class="card-body">
+                                <h5 class="card-title" id="rule-incorrect-count">0</h5>
+                                <p class="card-text text-white small">Incorrect</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="card text-center text-white bg-primary summary-card h-100">
+                            <div class="card-body">
+                                <h5 class="card-title" id="rule-accuracy-rate">0.00%</h5>
+                                <p class="card-text text-white small">Accuracy</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-6">
+                <h5 class="mb-3 text-center text-muted">LLM Judge Evaluation</h5>
+                <div class="row">
+                    <div class="col-4">
+                        <div class="card text-center text-white bg-success summary-card h-100">
+                            <div class="card-body">
+                                <h5 class="card-title" id="llm-correct-count">0</h5>
+                                <p class="card-text text-white small">Correct</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="card text-center text-white bg-danger summary-card h-100">
+                            <div class="card-body">
+                                <h5 class="card-title" id="llm-incorrect-count">0</h5>
+                                <p class="card-text text-white small">Incorrect</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="card text-center text-white bg-primary summary-card h-100">
+                            <div class="card-body">
+                                <h5 class="card-title" id="llm-accuracy-rate">0.00%</h5>
+                                <p class="card-text text-white small">Accuracy</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="row justify-content-center">
+            <div class="col-md-4">
+                <div class="card text-center summary-card m-3">
+                    <div class="card-body">
+                        <h5 class="card-title" id="processed-count">0</h5>
+                        <p class="card-text text-muted">Total Processed</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card text-center text-white bg-secondary summary-card m-3">
+                    <div class="card-body">
+                        <h5 class="card-title" id="agreement-rate">0.00%</h5>
+                        <p class="card-text text-white">Agreement Rate</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm">
+            <div class="card-body p-3">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light text-uppercase small fw-bold text-muted">
+                            <tr>
+                                <th class="px-4 py-3" style="width: 5%;">#</th>
+                                <th class="px-4 py-3" style="width: 25%;">Question</th>
+                                <th class="px-4 py-3" style="width: 25%;">Model Answer</th>
+                                <th class="px-4 py-3" style="width: 20%;">Ground Truths</th>
+                                <th class="px-4 py-3 text-center" style="width: 10%;">Rule-based</th>
+                                <th class="px-4 py-3 text-center" style="width: 10%;">LLM Judge</th>
+                                <th class="px-4 py-3 text-center" style="width: 5%;">Agreement</th>
+                            </tr>
+                        </thead>
+                        <tbody id="pipeline-results-body">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.compact-cell {
+    max-height: 150px;
+    overflow-y: auto;
+    display: block;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+.table-success-light {
+    --bs-table-bg: #e6f5e6;
+}
+.table-danger-light {
+    --bs-table-bg: #fdeeee;
+}
+.text-success-dark {
+    color: #146c43;
+    font-weight: 500;
+}
+.text-danger-dark {
+    color: #b02a37;
+    font-weight: 500;
+}
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+.spin {
+    animation: spin 1s linear infinite;
+    display: inline-block;
+}
+.summary-card {
+    transition: transform 0.2s ease-in-out;
+}
+.summary-card:hover {
+    transform: translateY(-5px);
+}
+</style>
+
+<script>
+let pipelineController;
+let currentRunResults = [];
+
+// --- Core UI Rendering Logic ---
+function renderResults(data, resultsBody) {
+    let resultHtml;
+    if (data.error) {
+        resultHtml = `<tr class="table-warning"><td colspan="7">Error: ${data.error}</td></tr>`;
+    } else {
+        const ruleCorrect = data.rule_result;
+        const llmCorrect = data.llm_result;
+        const textColorClass = ruleCorrect ? 'text-success-dark' : 'text-danger-dark';
+
+        const ruleBadge = ruleCorrect ? `<span class="badge bg-success">Correct</span>` : `<span class="badge bg-danger">Incorrect</span>`;
+        const llmBadge = llmCorrect === null ? `<span class="badge bg-secondary">Error</span>` : (llmCorrect ? `<span class="badge bg-success">Correct</span>` : `<span class="badge bg-danger">Incorrect</span>`);
+        const agreementIcon = (llmCorrect !== null && ruleCorrect === llmCorrect)
+            ? `<i class="bi bi-check-circle-fill text-success fs-5"></i>`
+            : `<i class="bi bi-x-circle-fill text-danger fs-5"></i>`;
+
+        const groundTruthsArray = data.ground_truths;
+        const remainingCount = groundTruthsArray.length - 3;
+        let groundTruthsHtml = `<ul class="list-unstyled mb-0" data-expanded="false" data-remaining="${remainingCount}">`;
+        groundTruthsArray.forEach((gt, index) => {
+            const isHidden = index >= 3;
+            groundTruthsHtml += `<li class="text-secondary small ground-truth-item" ${isHidden ? 'style="display:none;"' : ''}><i class="bi bi-dot me-1 text-muted"></i>${gt}</li>`;
+        });
+        if (groundTruthsArray.length > 3) {
+            groundTruthsHtml += `<li class="show-more-item"><a href="#" class="toggle-answers-link small text-decoration-none">... Show ${remainingCount} more</a></li>`;
+        }
+        groundTruthsHtml += '</ul>';
+
+        resultHtml = `<tr class="${ruleCorrect ? 'table-success-light' : 'table-danger-light'}">
+            <td class="px-4 fw-bold text-muted small"></td>
+            <td class="px-4"><div class="compact-cell fw-bold ${textColorClass}">${data.question}</div></td>
+            <td class="px-4"><div class="compact-cell ${textColorClass}">${data.answer}</div></td>
+            <td class="px-4">${groundTruthsHtml}</td>
+            <td class="px-4 text-center align-middle">${ruleBadge}</td>
+            <td class="px-4 text-center align-middle">${llmBadge}</td>
+            <td class="px-4 text-center align-middle">${agreementIcon}</td>
+        </tr>`;
+    }
+    resultsBody.insertAdjacentHTML('afterbegin', resultHtml);
+    return { ruleCorrect: data.rule_result, llmCorrect: data.llm_result };
+}
+
+function updateSummary(stats) {
+    const ruleAccuracy = stats.total > 0 ? (stats.ruleCorrect / stats.total) * 100 : 0;
+    const llmEvalCount = stats.total - stats.llmErrors;
+    const llmAccuracy = llmEvalCount > 0 ? (stats.llmCorrect / llmEvalCount) * 100 : 0;
+    const agreement = llmEvalCount > 0 ? (stats.agreements / llmEvalCount) * 100 : 0;
+
+    document.getElementById('processed-count').textContent = stats.total;
+    document.getElementById('agreement-rate').textContent = `${agreement.toFixed(2)}%`;
+    document.getElementById('rule-correct-count').textContent = stats.ruleCorrect;
+    document.getElementById('rule-incorrect-count').textContent = stats.total - stats.ruleCorrect;
+    document.getElementById('rule-accuracy-rate').textContent = `${ruleAccuracy.toFixed(2)}%`;
+    document.getElementById('llm-correct-count').textContent = stats.llmCorrect;
+    document.getElementById('llm-incorrect-count').textContent = llmEvalCount - stats.llmCorrect;
+    document.getElementById('llm-accuracy-rate').textContent = `${llmAccuracy.toFixed(2)}%`;
+}
+
+// --- Configuration Management ---
+function saveSettings() {
+    const data = {
+        llm_base_url: document.getElementById('llm_base_url').value,
+        llm_api_key: document.getElementById('llm_api_key').value,
+        llm_model: document.getElementById('llm_model').value,
+    };
+    const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
+
+    fetch("{% url 'benchmark:save_llm_settings' %}", {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrfToken
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'ok') {
+            const btn = document.getElementById('save-settings-btn');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<i class="bi bi-check-lg me-1"></i> Saved!';
+            btn.classList.add('btn-success');
+            btn.classList.remove('btn-outline-primary');
+            setTimeout(() => {
+                btn.innerHTML = originalText;
+                btn.classList.remove('btn-success');
+                btn.classList.add('btn-outline-primary');
+            }, 1500);
+        } else {
+            alert('Error saving settings: ' + (data.message || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('An network error occurred while saving settings.');
+    });
+}
+
+function restoreDefaults() {
+    fetch("{% url 'benchmark:get_llm_env_vars' %}")
+        .then(response => response.json())
+        .then(data => {
+            if(data.error) {
+                alert('Error loading .env variables: ' + data.error);
+            } else {
+                document.getElementById('llm_base_url').value = data.llm_base_url;
+                document.getElementById('llm_api_key').value = data.llm_api_key;
+                document.getElementById('llm_model').value = data.llm_model;
+                saveSettings(); // Automatically save the loaded settings
+            }
+        });
+}
+
+// --- Event Listeners ---
+document.addEventListener('DOMContentLoaded', function() {
+    loadSavedRuns();
+
+    // --- Save/Load/Delete Run Functions ---
+    function loadSavedRuns() {
+        const savedRunsList = document.getElementById('saved-runs-list');
+        const noRunsMessage = document.getElementById('no-runs-message');
+        savedRunsList.innerHTML = ''; // Clear existing list
+
+        fetch("{% url 'benchmark:list_runs' %}")
+            .then(response => response.json())
+            .then(data => {
+                if (data.runs && data.runs.length > 0) {
+                    noRunsMessage.style.display = 'none';
+                    savedRunsList.style.display = 'block';
+                    data.runs.forEach(runFile => {
+                        const runItem = document.createElement('div');
+                        runItem.className = 'list-group-item list-group-item-action d-flex justify-content-between align-items-center';
+                        
+                        const runNameContainer = document.createElement('div');
+                        runNameContainer.style.cursor = 'pointer';
+                        runNameContainer.className = 'flex-grow-1';
+                        runNameContainer.onclick = () => loadRun(runFile);
+
+                        const runName = document.createElement('span');
+                        runName.textContent = runFile.replace('.jsonl', '');
+                        runNameContainer.appendChild(runName);
+
+                        const deleteBtn = document.createElement('button');
+                        deleteBtn.className = 'btn btn-sm btn-outline-danger ms-2';
+                        deleteBtn.innerHTML = '<i class="bi bi-trash"></i>';
+                        deleteBtn.title = 'Delete run';
+                        deleteBtn.onclick = (e) => {
+                            e.stopPropagation(); // prevent loading the run
+                            deleteRun(runFile);
+                        };
+
+                        runItem.appendChild(runNameContainer);
+                        runItem.appendChild(deleteBtn);
+                        savedRunsList.appendChild(runItem);
+                    });
+                } else {
+                    noRunsMessage.style.display = 'block';
+                    savedRunsList.style.display = 'none';
+                }
+            });
+    }
+
+    function loadRun(runFile) {
+        const resultsBody = document.getElementById('pipeline-results-body');
+        resultsBody.innerHTML = ''; // Clear current results
+        document.getElementById('pipeline-results-container').style.display = 'block';
+        document.getElementById('progress-container').style.display = 'none';
+        document.getElementById('results-header-text').textContent = `Results for: ${runFile.replace('.jsonl', '')}`;
+        document.getElementById('running-spinner').style.display = 'none';
+        document.getElementById('save-run-btn').disabled = true;
+
+        currentRunResults = [];
+        let stats = { total: 0, ruleCorrect: 0, llmCorrect: 0, llmErrors: 0, agreements: 0 };
+        updateSummary(stats);
+
+        fetch(`/benchmark/api/load_run/${runFile}/`)
+            .then(response => {
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+
+                function push() {
+                    reader.read().then(({ done, value }) => {
+                        if (done) { updateSummary(stats); return; }
+                        
+                        const chunk = decoder.decode(value, { stream: true });
+                        const jsonObjects = chunk.split('\n').filter(s => s.trim());
+
+                        jsonObjects.forEach(jsonStr => {
+                            try {
+                                const data = JSON.parse(jsonStr);
+                                currentRunResults.push(data); // Also load into memory
+                                const { ruleCorrect, llmCorrect } = renderResults(data, resultsBody);
+                                
+                                stats.total++;
+                                if (ruleCorrect) stats.ruleCorrect++;
+                                if (llmCorrect) stats.llmCorrect++;
+                                if (llmCorrect === null) stats.llmErrors++;
+                                if (llmCorrect !== null && ruleCorrect === llmCorrect) stats.agreements++;
+
+                            } catch (e) {
+                                console.error("Failed to parse JSON chunk:", e, jsonStr);
+                            }
+                        });
+                        updateSummary(stats);
+                        push();
+                    }).catch(error => console.error('Error processing stream:', error));
+                }
+                push();
+            })
+            .catch(error => {
+                console.error('Error loading run:', error);
+                alert(`Failed to load run file: ${runFile}.`);
+            });
+    }
+
+    function deleteRun(runFile) {
+        if (!confirm(`Are you sure you want to delete the run "${runFile.replace('.jsonl', '')}"? This action cannot be undone.`)) {
+            return;
+        }
+
+        const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
+        fetch(`/benchmark/api/delete_run/${runFile}/`, {
+            method: 'DELETE',
+            headers: { 'X-CSRFToken': csrfToken }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'ok') {
+                loadSavedRuns();
+            } else {
+                alert('Error deleting run: ' + (data.message || 'Unknown error'));
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An network error occurred while deleting the run.');
+        });
+    }
+    
+    document.getElementById('save-run-btn').addEventListener('click', function() {
+        const defaultName = `Run ${new Date().toISOString().slice(0, 19).replace('T', ' ')}`;
+        const runName = prompt("Please enter a name for this run:", defaultName);
+        
+        if (runName && currentRunResults.length > 0) {
+            const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
+            fetch(`/benchmark/api/save_run/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
+                },
+                body: JSON.stringify({ name: runName, data: currentRunResults })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'ok') {
+                    const btn = document.getElementById('save-run-btn');
+                    const originalText = btn.innerHTML;
+                    btn.innerHTML = '<i class="bi bi-check-lg me-1"></i> Saved!';
+                    btn.classList.add('btn-outline-success');
+                    btn.classList.remove('btn-success');
+                    setTimeout(() => {
+                        btn.innerHTML = originalText;
+                        btn.classList.remove('btn-outline-success');
+                        btn.classList.add('btn-success');
+                    }, 1500);
+                    loadSavedRuns();
+                } else {
+                    alert('Error saving run: ' + (data.message || 'Unknown error'));
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('An network error occurred while saving the run.');
+            });
+        }
+    });
+
+    // --- Pipeline Execution ---
+    document.getElementById('run-pipeline-btn').addEventListener('click', function() {
+        const apiKey = document.getElementById('llm_api_key').value;
+        const modelName = document.getElementById('llm_model').value;
+
+        if (!apiKey.trim() || !modelName.trim()) {
+            alert('Please set your LLM API Key and Model Name in the LLM Configuration section before running the benchmark.');
+            const configCollapseEl = document.getElementById('collapseConfig');
+            const configCollapse = new bootstrap.Collapse(configCollapseEl, { toggle: false });
+            configCollapse.show();
+            return;
+        }
+
+        pipelineController = new AbortController();
+        const signal = pipelineController.signal;
+        const totalQuestions = parseInt(document.getElementById('pipeline-form').dataset.totalQuestions, 10);
+        const resultsBody = document.getElementById('pipeline-results-body');
+        
+        // Reset UI
+        currentRunResults = [];
+        resultsBody.innerHTML = '';
+        document.getElementById('pipeline-results-container').style.display = 'block';
+        document.getElementById('progress-container').style.display = 'block';
+        document.getElementById('save-run-btn').disabled = true;
+        document.getElementById('running-spinner').style.display = 'inline-block';
+        document.getElementById('results-header-text').textContent = 'Live QA Pipeline Results';
+        document.getElementById('run-pipeline-btn').style.display = 'none';
+        document.getElementById('stop-pipeline-btn').style.display = 'block';
+
+        let stats = { total: 0, ruleCorrect: 0, llmCorrect: 0, llmErrors: 0, agreements: 0 };
+        updateSummary(stats);
+
+        const formData = new FormData(document.getElementById('pipeline-form'));
+        formData.append('llm_base_url', document.getElementById('llm_base_url').value);
+        formData.append('llm_api_key', document.getElementById('llm_api_key').value);
+        formData.append('llm_model', document.getElementById('llm_model').value);
+        
+        fetch("{% url 'benchmark:naive_llm' %}", { method: 'POST', body: formData, signal })
+            .then(response => {
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+
+                function push() {
+                    reader.read().then(({ done, value }) => {
+                        if (done) {
+                            document.getElementById('running-spinner').style.display = 'none';
+                            document.getElementById('run-pipeline-btn').style.display = 'block';
+                            document.getElementById('stop-pipeline-btn').style.display = 'none';
+                            if (currentRunResults.length > 0) {
+                                document.getElementById('save-run-btn').disabled = false;
+                            }
+                            return;
+                        }
+
+                        const chunk = decoder.decode(value, { stream: true });
+                        const jsonObjects = chunk.split('\n').filter(s => s.trim());
+
+                        jsonObjects.forEach(jsonStr => {
+                            try {
+                                const data = JSON.parse(jsonStr);
+                                currentRunResults.push(data); // Store result
+                                const { ruleCorrect, llmCorrect } = renderResults(data, resultsBody);
+                                
+                                stats.total++;
+                                if (ruleCorrect) stats.ruleCorrect++;
+                                if (llmCorrect) stats.llmCorrect++;
+                                if (llmCorrect === null) stats.llmErrors++;
+                                if (llmCorrect !== null && ruleCorrect === llmCorrect) stats.agreements++;
+
+                                const progress = (stats.total / totalQuestions) * 100;
+                                const progressBar = document.getElementById('progress-bar');
+                                progressBar.style.width = `${progress}%`;
+                                progressBar.textContent = `${Math.round(progress)}%`;
+                                progressBar.setAttribute('aria-valuenow', progress);
+                                updateSummary(stats);
+
+                            } catch (e) {
+                                console.error("Failed to parse JSON chunk:", e, jsonStr);
+                            }
+                        });
+                        push();
+                    }).catch(error => {
+                        if (error.name === 'AbortError') {
+                            console.log('Fetch aborted by user.');
+                             if (currentRunResults.length > 0) {
+                                document.getElementById('save-run-btn').disabled = false;
+                            }
+                        } else {
+                            console.error('Fetch error:', error);
+                        }
+                        document.getElementById('running-spinner').style.display = 'none';
+                        document.getElementById('run-pipeline-btn').style.display = 'block';
+                        document.getElementById('stop-pipeline-btn').style.display = 'none';
+                    });
+                }
+                push();
+            })
+            .catch(error => {
+                console.error('Error starting the pipeline:', error);
+                alert('Failed to start the pipeline. Check the console for details.');
+                document.getElementById('running-spinner').style.display = 'none';
+                document.getElementById('run-pipeline-btn').style.display = 'block';
+                document.getElementById('stop-pipeline-btn').style.display = 'none';
+            });
+    });
+
+    document.getElementById('stop-pipeline-btn').addEventListener('click', function() {
+        if (pipelineController) {
+            pipelineController.abort();
+        }
+    });
+
+    // Config buttons
+    document.getElementById('save-settings-btn').addEventListener('click', saveSettings);
+    document.getElementById('restore-defaults-btn').addEventListener('click', restoreDefaults);
+
+    // Delegated event listener for toggling ground truths
+    document.getElementById('pipeline-results-body').addEventListener('click', function(e) {
+        if (e.target && e.target.classList.contains('toggle-answers-link')) {
+            e.preventDefault();
+            const link = e.target;
+            const listItem = link.parentNode;
+            const list = listItem.parentNode;
+            const isExpanded = list.dataset.expanded === 'true';
+            const remainingCount = parseInt(list.dataset.remaining, 10);
+            const items = list.querySelectorAll('.ground-truth-item');
+
+            list.dataset.expanded = !isExpanded;
+            link.textContent = isExpanded ? `... Show ${remainingCount} more` : '... Show less';
+
+            items.forEach((item, index) => {
+                if (index >= 3) { // Only toggle items beyond the initial 3
+                    item.style.display = isExpanded ? 'none' : 'list-item';
+                }
+            });
+        }
+    });
+});
+</script>
+
+{% endblock %}

@@ -30,6 +30,7 @@ class EnforceConsentMiddleware:
 
     def process_view(self, request, view_func, view_args, view_kwargs):
         from django.shortcuts import redirect
+        from django.urls import reverse
         from .models import InformedConsent
 
         if getattr(view_func, "consent_exempt", False):
@@ -46,8 +47,6 @@ class EnforceConsentMiddleware:
                     request.user.agreed_consent_version != latest_consent
                     or not request.user.consent_agreed
                 ):
-                    # Store the current path to redirect back after consent
-                    request.session["prev_page"] = request.get_full_path()
-                    # Redirect the user to the consent page
-                    return redirect("user_system:informed_consent")
+                    consent_url = reverse("user_system:informed_consent")
+                    return redirect(f'{consent_url}?next={request.get_full_path()}')
         return None

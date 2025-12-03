@@ -1,3 +1,4 @@
+from django.db import models
 from django.views.decorators.http import require_POST, require_http_methods
 from django.views.decorators.csrf import csrf_exempt
 import re
@@ -15,7 +16,7 @@ import httpx
 from task_manager.utils import check_answer_rule, check_answer_llm
 
 from datetime import datetime
-from .models import LLMSettings, BenchmarkSession, BenchmarkTrial
+from .models import LLMSettings, InteractiveSession, InteractiveTrial, AdhocRun, AdhocSessionResult, InteractiveSessionGroup
 
 
 def qa_pipeline_stream(base_url, api_key, model, questions_data=None):
@@ -68,62 +69,90 @@ Answer:"""
                 yield process_line(line)
 
 @admin_required
-def naive_llm_ad_hoc(request):
+def adhoc_llm(request):
     if request.method == 'POST':
         try:
-            pipeline_base_url = request.POST.get('llm_base_url') or config("LLM_BASE_URL", default=None)
-            pipeline_api_key = request.POST.get('llm_api_key') or config("LLM_API_KEY", default=None)
-            pipeline_model = request.POST.get('llm_model') or config("LLM_MODEL", default='gpt-3.5-turbo')
+            # This logic is now for saving the results of a run
+            data = json.loads(request.body)
+            run_name = data.get('name')
+            results = data.get('results')
+            
+            if not run_name or not results:
+                return JsonResponse({'error': 'Run name and results are required.'}, status=400)
 
-            if not pipeline_api_key:
-                return JsonResponse({'error': 'An API Key is required to run the benchmark.'}, status=400)
+            settings = LLMSettings.load()
+            
+            total_questions = len(results)
+            correct_answers_llm = sum(1 for r in results if r.get('llm_result'))
 
-            questions_to_retry_json = request.POST.get('questions')
-            questions_to_retry = json.loads(questions_to_retry_json) if questions_to_retry_json else None
+            run = AdhocRun.objects.create(
+                name=run_name,
+                settings=settings,
+                total_questions=total_questions,
+                correct_answers=correct_answers_llm,
+                accuracy=(correct_answers_llm / total_questions * 100) if total_questions > 0 else 0
+            )
 
-            return StreamingHttpResponse(qa_pipeline_stream(pipeline_base_url, pipeline_api_key, pipeline_model, questions_data=questions_to_retry), content_type='application/json')
+            for result in results:
+                AdhocSessionResult.objects.create(
+                    run=run,
+                    question=result.get('question', ''),
+                    ground_truths=result.get('ground_truths', []),
+                    answer=result.get('answer', ''),
+                    is_correct_rule=result.get('rule_result', False),
+                    is_correct_llm=result.get('llm_result', False)
+                )
+            
+            return JsonResponse({'status': 'ok', 'run_id': run.id})
         except Exception as e:
             return JsonResponse({'error': str(e)}, status=500)
-    
+
     # GET request logic
-    try:
-        settings_obj = LLMSettings.load()
-        if not settings_obj.llm_api_key and not settings_obj.llm_model:
+    runs = AdhocRun.objects.all().prefetch_related('settings')
+    selected_run = None
+    run_results = []
+    run_id = request.GET.get('run_id')
+
+    if run_id:
+        try:
+            selected_run = get_object_or_404(AdhocRun, pk=run_id)
+            # Serialize the results to pass as JSON to the template
+            run_results = list(selected_run.results.values(
+                'question', 'answer', 'ground_truths', 'is_correct_rule', 'is_correct_llm'
+            ))
+        except (ValueError, TypeError):
+            pass # Ignore invalid run_id
+
+    settings_obj = LLMSettings.load()
+
+    # If the settings are empty, try to populate from .env file
+    if not settings_obj.llm_api_key and not settings_obj.llm_model:
+        try:
             llm_api_key_env = config('LLM_API_KEY', default=None)
             llm_model_env = config('LLM_MODEL', default=None)
-            
             if llm_api_key_env or llm_model_env:
                 settings_obj.llm_base_url = config('LLM_BASE_URL', default='')
                 settings_obj.llm_api_key = llm_api_key_env or ''
-                settings_obj.llm_model = llm_model_env or 'gpt-3.5-turbo'
+                settings_obj.llm_model = llm_model_env or ''
                 settings_obj.save()
-
-        context = {
-            'llm_base_url': settings_obj.llm_base_url,
-            'llm_api_key': settings_obj.llm_api_key,
-            'llm_model': settings_obj.llm_model,
-        }
-    except OperationalError:
-        context = {
-            'llm_base_url': config('LLM_BASE_URL', default=''),
-            'llm_api_key': config('LLM_API_KEY', default=''),
-            'llm_model': config('LLM_MODEL', default='gpt-3.5-turbo'),
-        }
-
-    try:
-        file_path = os.path.join(os.path.dirname(__file__), '..', 'data', 'hard_questions_refined.jsonl')
-        with open(file_path, 'r') as f:
-            context['total_questions'] = sum(1 for line in f)
-    except FileNotFoundError:
-        context['total_questions'] = 0
-
-    return render(request, 'naive_llm_ad_hoc.html', context)
+        except OperationalError:
+            # This can happen if migrations haven't been run yet.
+            # We can't save, but we can still pass the .env values to the context.
+            pass
+    
+    context = {
+        'runs': runs,
+        'selected_run': selected_run,
+        'run_results_json': json.dumps(run_results),
+        'llm_settings': settings_obj
+    }
+    return render(request, 'adhoc_llm.html', context)
 
 
 @admin_required
 def list_runs(request):
     try:
-        runs = BenchmarkSession.objects.filter(run_tag__isnull=False).values_list('run_tag', flat=True).distinct().order_by('-run_tag')
+        runs = InteractiveSession.objects.filter(run_tag__isnull=False).values_list('run_tag', flat=True).distinct().order_by('-run_tag')
         return JsonResponse({'runs': list(runs)})
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
@@ -131,7 +160,7 @@ def list_runs(request):
 @admin_required
 def load_run(request, run_tag):
     def stream_run_from_db(run_tag):
-        sessions = BenchmarkSession.objects.filter(run_tag=run_tag).prefetch_related('trials')
+        sessions = InteractiveSession.objects.filter(run_tag=run_tag).prefetch_related('trials')
         for session in sessions:
             trial = session.trials.first() # Assuming one trial per session for ad-hoc runs
             if trial:
@@ -180,7 +209,7 @@ def batch_delete_sessions(request):
         except (ValueError, TypeError):
             return JsonResponse({'status': 'error', 'message': 'Invalid session ID format.'}, status=400)
 
-        sessions_to_delete = BenchmarkSession.objects.filter(id__in=session_ids)
+        sessions_to_delete = InteractiveSession.objects.filter(id__in=session_ids)
         deleted_count = sessions_to_delete.count()
         deleted_ids = list(sessions_to_delete.values_list('id', flat=True))
         
@@ -243,7 +272,7 @@ from django.views.decorators.http import require_http_methods
 import re
 
 @admin_required
-def multi_turn_llm(request):
+def interactive_llm(request):
     # Load questions from the file
     questions = []
     try:
@@ -255,36 +284,58 @@ def multi_turn_llm(request):
         # Handle case where file doesn't exist
         pass
 
-    # Load all sessions for the sidebar
-    sessions = BenchmarkSession.objects.order_by('-created_at').all()
+    # Load sessions and group them
+    groups = InteractiveSessionGroup.objects.prefetch_related(
+        models.Prefetch('sessions', queryset=InteractiveSession.objects.order_by('-created_at'))
+    ).order_by('-created_at')
+    
+    individual_sessions = InteractiveSession.objects.filter(group__isnull=True).order_by('-created_at')
 
     context = {
         'questions': questions,
-        'sessions': sessions,
+        'groups': groups,
+        'individual_sessions': individual_sessions,
         'llm_settings': LLMSettings.load()
     }
-    return render(request, 'multi_turn_llm.html', context)
+    return render(request, 'interactive_llm.html', context)
 
-@admin_required
+@csrf_exempt
+@require_POST
+def create_session_group(request):
+    try:
+        data = json.loads(request.body)
+        name = data.get('name', f"Pipeline Run - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        group = InteractiveSessionGroup.objects.create(name=name)
+        return JsonResponse({'group_id': group.id, 'group_name': group.name})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+@csrf_exempt
 @require_POST
 def create_session(request):
     try:
         data = json.loads(request.body)
         question_text = data.get('question')
         ground_truths = data.get('ground_truths')
+        group_id = data.get('group_id')
 
         if not question_text or not ground_truths:
             return JsonResponse({'error': 'Question and ground truths are required.'}, status=400)
 
         settings = LLMSettings.load()
         
-        session = BenchmarkSession.objects.create(
-            settings=settings,
-            question=question_text,
-            ground_truths=ground_truths
-        )
+        session_data = {
+            "settings": settings,
+            "question": question_text,
+            "ground_truths": ground_truths
+        }
         
-        trial = BenchmarkTrial.objects.create(
+        if group_id:
+            session_data['group'] = get_object_or_404(InteractiveSessionGroup, pk=group_id)
+
+        session = InteractiveSession.objects.create(**session_data)
+        
+        trial = InteractiveTrial.objects.create(
             session=session,
             trial_number=1,
             status='processing'
@@ -297,7 +348,7 @@ def create_session(request):
 
 @admin_required
 def get_session(request, session_id):
-    session = get_object_or_404(BenchmarkSession, pk=session_id)
+    session = get_object_or_404(InteractiveSession, pk=session_id)
     trials = list(session.trials.values('id', 'trial_number', 'answer', 'feedback', 'is_correct', 'created_at', 'status'))
     return JsonResponse({
         'session': {
@@ -319,7 +370,7 @@ def retry_session(request, trial_id):
         feedback = data.get('feedback')
         is_correct = data.get('is_correct')
 
-        original_trial = get_object_or_404(BenchmarkTrial, pk=trial_id)
+        original_trial = get_object_or_404(InteractiveTrial, pk=trial_id)
         original_trial.feedback = feedback
         original_trial.is_correct = is_correct
         original_trial.save()
@@ -336,7 +387,7 @@ def retry_session(request, trial_id):
             session.save()
             return JsonResponse({'status': 'max_retries_reached', 'session_id': session.id})
 
-        new_trial = BenchmarkTrial.objects.create(
+        new_trial = InteractiveTrial.objects.create(
             session=session,
             trial_number=original_trial.trial_number + 1,
             status='processing'
@@ -352,7 +403,7 @@ import traceback
 @admin_required
 def run_trial(request, trial_id):
     try:
-        trial = get_object_or_404(BenchmarkTrial, pk=trial_id)
+        trial = get_object_or_404(InteractiveTrial, pk=trial_id)
         session = trial.session
         db_settings = session.settings
 
@@ -430,7 +481,7 @@ Answer:"""
 @require_http_methods(["DELETE"])
 def delete_session(request, session_id):
     try:
-        session = get_object_or_404(BenchmarkSession, pk=session_id)
+        session = get_object_or_404(InteractiveSession, pk=session_id)
         session.delete()
         return JsonResponse({'status': 'ok'})
     except Exception as e:
@@ -438,7 +489,7 @@ def delete_session(request, session_id):
 
 @admin_required
 def export_session(request, session_id):
-    session = get_object_or_404(BenchmarkSession, pk=session_id)
+    session = get_object_or_404(InteractiveSession, pk=session_id)
     trials = list(session.trials.values('trial_number', 'answer', 'feedback', 'is_correct', 'created_at'))
     
     export_data = {
@@ -483,14 +534,14 @@ def save_run(request):
             if not result.get('question'):
                 continue
 
-            session = BenchmarkSession.objects.create(
+            session = InteractiveSession.objects.create(
                 settings=settings,
                 question=result.get('question'),
                 ground_truths=result.get('ground_truths'),
                 run_tag=run_name,
                 is_completed=True 
             )
-            BenchmarkTrial.objects.create(
+            InteractiveTrial.objects.create(
                 session=session,
                 trial_number=1,
                 answer=result.get('answer'),
@@ -505,7 +556,60 @@ def save_run(request):
 @require_http_methods(["DELETE"])
 def delete_run(request, run_tag):
     try:
-        BenchmarkSession.objects.filter(run_tag=run_tag).delete()
-        return JsonResponse({"status": "ok", "filename": run_tag})
+        InteractiveSession.objects.filter(run_tag=run_tag).delete()
+        return JsonResponse({"status": "ok", "filename": run_name})
     except Exception as e:
         return JsonResponse({"status": "error", "message": str(e)}, status=500)
+
+@admin_required
+def run_adhoc_pipeline(request):
+    try:
+        pipeline_base_url = request.GET.get('llm_base_url') or config("LLM_BASE_URL", default=None)
+        pipeline_api_key = request.GET.get('llm_api_key') or config("LLM_API_KEY", default=None)
+        pipeline_model = request.GET.get('llm_model') or config("LLM_MODEL", default='gpt-3.5-turbo')
+
+        if not pipeline_api_key:
+            return JsonResponse({'error': 'An API Key is required to run the benchmark.'}, status=400)
+
+        return StreamingHttpResponse(qa_pipeline_stream(pipeline_base_url, pipeline_api_key, pipeline_model), content_type='application/json')
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+@admin_required
+def list_adhoc_runs(request):
+    try:
+        runs = AdhocRun.objects.values('id', 'name', 'created_at', 'accuracy').order_by('-created_at')
+        return JsonResponse({'runs': list(runs)})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+@admin_required
+def get_adhoc_run(request, run_id):
+    try:
+        run = get_object_or_404(AdhocRun, pk=run_id)
+        results = list(run.results.values('question', 'answer', 'ground_truths', 'is_correct_rule', 'is_correct_llm'))
+        run_data = {
+            'id': run.id,
+            'name': run.name,
+            'created_at': run.created_at,
+            'accuracy': run.accuracy,
+            'total_questions': run.total_questions,
+            'correct_answers': run.correct_answers,
+            'settings': {
+                'llm_model': run.settings.llm_model if run.settings else 'N/A'
+            },
+            'results': results
+        }
+        return JsonResponse(run_data)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+@admin_required
+@require_http_methods(["DELETE"])
+def delete_adhoc_run(request, run_id):
+    try:
+        run = get_object_or_404(AdhocRun, pk=run_id)
+        run.delete()
+        return JsonResponse({'status': 'ok'})
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)

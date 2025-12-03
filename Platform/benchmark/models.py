@@ -27,11 +27,25 @@ class LLMSettings(models.Model):
     def __str__(self):
         return "LLM Settings"
 
-class BenchmarkSession(models.Model):
+class InteractiveSessionGroup(models.Model):
+    """
+    Represents a group of benchmark sessions, typically from a single pipeline run.
+    """
+    name = models.CharField(max_length=255, default='Pipeline Run')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Session Group from {self.created_at.strftime('%Y-%m-%d %H:%M')}"
+
+class InteractiveSession(models.Model):
     """
     Represents a multi-turn conversation session for benchmarking.
     """
     settings = models.ForeignKey(LLMSettings, on_delete=models.CASCADE)
+    group = models.ForeignKey(InteractiveSessionGroup, related_name='sessions', on_delete=models.CASCADE, null=True, blank=True)
     question = models.TextField()
     ground_truths = models.JSONField(default=list)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -41,7 +55,7 @@ class BenchmarkSession(models.Model):
     def __str__(self):
         return f"Session for: {self.question[:50]}..."
 
-class BenchmarkTrial(models.Model):
+class InteractiveTrial(models.Model):
     """
     Represents a single trial (turn) within a benchmark session.
     """
@@ -50,7 +64,7 @@ class BenchmarkTrial(models.Model):
         ('completed', 'Completed'),
         ('error', 'Error'),
     ]
-    session = models.ForeignKey(BenchmarkSession, related_name='trials', on_delete=models.CASCADE)
+    session = models.ForeignKey(InteractiveSession, related_name='trials', on_delete=models.CASCADE)
     trial_number = models.PositiveIntegerField()
     answer = models.TextField(blank=True, null=True)
     feedback = models.TextField(blank=True, null=True)
@@ -64,3 +78,37 @@ class BenchmarkTrial(models.Model):
 
     def __str__(self):
         return f"Trial {self.trial_number} for Session {self.session.id}"
+
+
+class AdhocRun(models.Model):
+    """
+    Represents a single, complete run of the ad-hoc QA pipeline.
+    """
+    name = models.CharField(max_length=255, unique=True, help_text="A unique name for this benchmark run, e.g., 'gpt-4o-2025-12-02'")
+    created_at = models.DateTimeField(auto_now_add=True)
+    settings = models.ForeignKey(LLMSettings, on_delete=models.SET_NULL, null=True, blank=True)
+    
+    # Aggregate statistics
+    total_questions = models.IntegerField(default=0)
+    correct_answers = models.IntegerField(default=0)
+    accuracy = models.FloatField(default=0.0)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return self.name
+
+class AdhocSessionResult(models.Model):
+    """
+    Stores the result of a single question-answer session within an AdhocRun.
+    """
+    run = models.ForeignKey(AdhocRun, related_name='results', on_delete=models.CASCADE)
+    question = models.TextField()
+    ground_truths = models.JSONField(default=list)
+    answer = models.TextField()
+    is_correct_rule = models.BooleanField(default=False)
+    is_correct_llm = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f"Result for '{self.question[:50]}...' in run {self.run.name}"

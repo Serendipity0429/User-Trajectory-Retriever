@@ -117,6 +117,7 @@ def clean_project() -> None:
         WORK_DIR / "task_manager" / "migrations",
         WORK_DIR / "user_system" / "migrations",
         WORK_DIR / "discussion" / "migrations",
+        WORK_DIR / "benchmark" / "migrations",
         WORK_DIR / "media" / "attachments",
         WORK_DIR / "media" / "evidence_images",
         WORK_DIR / "staticfiles",

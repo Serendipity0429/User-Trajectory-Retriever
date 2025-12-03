@@ -38,7 +38,8 @@
                         <hr>
                         <div class="d-flex justify-content-end">
                             <button type="button" class="btn btn-outline-primary me-2" id="save-settings-btn"><i class="bi bi-save me-1"></i> Save</button>
-                            <button type="button" class="btn btn-outline-info" id="test-connection-btn"><i class="bi bi-person-check me-1"></i> Test Connection</button>
+                            <button type="button" class="btn btn-outline-info me-2" id="test-connection-btn"><i class="bi bi-person-check me-1"></i> Test Connection</button>
+                            <button type="button" class="btn btn-outline-secondary" id="restore-defaults-btn"><i class="bi bi-server me-1"></i> Load .env</button>
                         </div>
                         <div id="test-connection-result" class="mt-3"></div>
                     </div>
@@ -52,7 +53,10 @@
                 </div>
                 <div class="card-body">
                     <p class="card-text">Run all questions through the LLM and get aggregate results.</p>
-                    <button id="run-pipeline-btn" class="btn btn-success w-100">Run QA Pipeline</button>
+                    <div class="d-grid gap-2">
+                        <button id="run-pipeline-btn" class="btn btn-success">Run QA Pipeline</button>
+                        <button id="stop-pipeline-btn" class="btn btn-danger" style="display: none;">Stop Pipeline</button>
+                    </div>
                     <div id="pipeline-progress" class="mt-3" style="display: none;">
                         <div class="progress">
                             <div id="pipeline-progress-bar" class="progress-bar" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
@@ -63,52 +67,52 @@
             </div>
 
             <!-- Statistics -->
-            <div id="statistics-container" class="card shadow-sm mb-4" style="display: none;">
-                <div class="card-header">
-                    <h5 class="mb-0"><i class="bi bi-bar-chart-line me-2"></i>Pipeline Results</h5>
-                </div>
-                <div class="card-body">
-                    <div class="row">
-                        <div class="col-md-4 text-center">
-                            <div class="card h-100">
-                                <div class="card-body">
-                                    <h6 class="card-title">Overall Accuracy</h6>
-                                    <p id="stats-accuracy" class="card-text fs-4 fw-bold">0%</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-4 text-center">
-                            <div class="card h-100">
-                                <div class="card-body">
-                                    <h6 class="card-title">Avg. Trials</h6>
-                                    <p id="stats-avg-trials" class="card-text fs-4 fw-bold">0</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-4 text-center">
-                             <div class="card h-100">
-                                <div class="card-body">
-                                    <h6 class="card-title">Total Questions</h6>
-                                    <p id="stats-total-questions" class="card-text fs-4 fw-bold">0</p>
-                                </div>
+            <div id="statistics-container" class="my-4" style="display: none;">
+                <h4 id="results-header-text">Pipeline Results</h4>
+                <!-- Summary Stats -->
+                <div class="row my-4" id="summary-container">
+                    <div class="col-lg-4 mb-4 mb-lg-0">
+                        <div class="card text-center text-white bg-primary summary-card h-100">
+                            <div class="card-body">
+                                <h5 class="card-title" id="stats-accuracy">0.00%</h5>
+                                <p class="card-text text-white small">Overall Accuracy</p>
                             </div>
                         </div>
                     </div>
-                    <hr>
-                    <h6>Result Details:</h6>
-                    <div id="stats-details-table-container" style="max-height: 400px; overflow-y: auto;">
-                        <table class="table table-sm table-striped">
-                            <thead>
-                                <tr>
-                                    <th scope="col">#</th>
-                                    <th scope="col">Question</th>
-                                    <th scope="col">Result</th>
-                                    <th scope="col">Trials</th>
-                                </tr>
-                            </thead>
-                            <tbody id="stats-details-tbody">
-                            </tbody>
-                        </table>
+                    <div class="col-lg-4 mb-4 mb-lg-0">
+                        <div class="card text-center text-dark bg-light summary-card h-100">
+                            <div class="card-body">
+                                <h5 class="card-title" id="stats-avg-trials">0.00</h5>
+                                <p class="card-text text-muted small">Avg. Trials</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-4">
+                        <div class="card text-center text-dark bg-light summary-card h-100">
+                            <div class="card-body">
+                                <h5 class="card-title" id="stats-total-questions">0</h5>
+                                <p class="card-text text-muted small">Total Questions</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+        
+                <div class="card shadow-sm">
+                    <div class="card-body p-3">
+                        <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead class="table-light text-uppercase small fw-bold text-muted">
+                                    <tr>
+                                        <th class="px-4 py-3" style="width: 5%;">#</th>
+                                        <th class="px-4 py-3" style="width: 70%;">Question</th>
+                                        <th class="px-4 py-3 text-center" style="width: 15%;">Result</th>
+                                        <th class="px-4 py-3 text-center" style="width: 10%;">Trials</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="stats-details-tbody">
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -226,6 +230,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const questions = {{ questions|safe }};
     let activeSessionId = null;
     let sessionTrials = [];
+    let pipelineController = { aborted: false };
 
     const startBtn = document.getElementById('start-session-btn');
     const questionSelect = document.getElementById('question-select');
@@ -360,7 +365,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 noSessionSelected.style.display = 'none';
 
                 if (initialTrialId) {
-                    executeTrial(initialTrialId);
+                    executeTrial(initialTrialId, sessionId);
                 } else {
                     const lastTrial = data.trials[data.trials.length - 1];
                     const session = data.session;
@@ -376,7 +381,7 @@ document.addEventListener('DOMContentLoaded', function() {
             });
     }
 
-    function executeTrial(trialId) {
+    function executeTrial(trialId, sessionId) {
         fetch(`/benchmark/api/interactive/run_trial/${trialId}/`)
             .then(res => res.json())
             .then(data => {
@@ -384,11 +389,15 @@ document.addEventListener('DOMContentLoaded', function() {
                     alert(`Error in trial #${trialId}: ${data.error}`);
                 }
                 // Reload the session to get the updated trial data
-                loadSession(activeSessionId);
+                if (sessionId) {
+                    loadSession(sessionId);
+                }
             })
             .catch(err => {
                 alert(`A network error occurred while running trial #${trialId}.`);
-                loadSession(activeSessionId);
+                if (sessionId) {
+                    loadSession(sessionId);
+                }
             });
     }
 
@@ -500,7 +509,7 @@ document.addEventListener('DOMContentLoaded', function() {
             loadSession(activeSessionId);
 
             if (data.status === 'retrying') {
-                executeTrial(data.new_trial_id);
+                executeTrial(data.new_trial_id, activeSessionId);
             }
         });
     }
@@ -571,7 +580,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    document.getElementById('save-settings-btn').addEventListener('click', function() {
+    function saveSettings() {
         const data = {
             llm_base_url: document.getElementById('llm_base_url').value,
             llm_api_key: document.getElementById('llm_api_key').value,
@@ -586,17 +595,53 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(res => res.json())
         .then(data => {
             if(data.status === 'ok') {
-                alert('Settings saved!');
+                const btn = document.getElementById('save-settings-btn');
+                const originalText = btn.innerHTML;
+                btn.innerHTML = '<i class="bi bi-check-lg me-1"></i> Saved!';
+                btn.classList.add('btn-success');
+                btn.classList.remove('btn-outline-primary');
+                setTimeout(() => {
+                    btn.innerHTML = originalText;
+                    btn.classList.remove('btn-success');
+                    btn.classList.add('btn-outline-primary');
+                }, 1500);
             } else {
-                alert('Error saving settings: ' + data.message);
+                alert('Error saving settings: ' + (data.message || 'Unknown error'));
             }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An network error occurred while saving settings.');
         });
-    });
+    }
 
+    function restoreDefaults() {
+        fetch("{% url 'benchmark:get_llm_env_vars' %}")
+            .then(response => response.json())
+            .then(data => {
+                if(data.error) {
+                    alert('Error loading .env variables: ' + data.error);
+                } else {
+                    document.getElementById('llm_base_url').value = data.llm_base_url;
+                    document.getElementById('llm_api_key').value = data.llm_api_key;
+                    document.getElementById('llm_model').value = data.llm_model;
+                    saveSettings(); // Automatically save the loaded settings
+                }
+            });
+    }
+
+    document.getElementById('save-settings-btn').addEventListener('click', saveSettings);
     document.getElementById('test-connection-btn').addEventListener('click', testConnection);
+    document.getElementById('restore-defaults-btn').addEventListener('click', restoreDefaults);
+
 
     // --- QA Pipeline ---
     document.getElementById('run-pipeline-btn').addEventListener('click', runQAPipeline);
+    document.getElementById('stop-pipeline-btn').addEventListener('click', () => {
+        if (pipelineController) {
+            pipelineController.aborted = true;
+        }
+    });
 
     function addNewSessionToList(sessionId, questionData, groupId = null, groupName = null) {
         // If this is the first session ever, remove "no sessions" and add select-all header
@@ -675,23 +720,24 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         const { session_id, trial_id } = createData;
 
-        // Kick off the trial execution by loading the session with the initial trial ID.
-        // This will render the session in a "processing" state and return immediately.
-        loadSession(session_id, trial_id); 
+        // Load the session UI to show it's processing, then kick off the trial
+        loadSession(session_id, trial_id);
 
         return new Promise((resolve, reject) => {
             const poll = setInterval(async () => {
+                if (pipelineController.aborted) {
+                    clearInterval(poll);
+                    return reject(new Error("Pipeline aborted by user."));
+                }
                 try {
                     const sessionResponse = await fetch(`/benchmark/api/interactive/get_session/${session_id}/`);
                     if (!sessionResponse.ok) {
-                        throw new Error(`HTTP error! status: ${sessionResponse.status}`);
+                        // Stop polling if the session can't be fetched
+                        clearInterval(poll);
+                        return reject(new Error(`HTTP error! status: ${sessionResponse.status}`));
                     }
                     const sessionData = await sessionResponse.json();
                     
-                    // The UI is updated via the retry-logic in loadSession, but for long-running single trials,
-                    // this polling ensures the user sees updates if the session state changes on the backend.
-                    loadSession(session_id);
-
                     if (sessionData.session.is_completed) {
                         clearInterval(poll);
                         const lastTrial = sessionData.trials[sessionData.trials.length - 1];
@@ -707,7 +753,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     console.error(`Polling failed for session ${session_id}:`, error);
                     reject(error);
                 }
-            }, 3000); // Poll every 3 seconds
+            }, 3000); 
         });
     }
     
@@ -715,14 +761,14 @@ document.addEventListener('DOMContentLoaded', function() {
         const totalQuestions = results.length;
         if (totalQuestions === 0) return;
 
-        document.querySelector("#statistics-container .card-header h5").innerHTML = `<i class="bi bi-bar-chart-line me-2"></i>Results for ${groupName}`;
+        document.getElementById("results-header-text").textContent = `Results for ${groupName}`;
 
         const correctCount = results.filter(r => r.correct === true).length;
         const totalTrials = results.reduce((sum, r) => sum + (r.trials || 0), 0);
         const accuracy = (correctCount / totalQuestions) * 100;
-        const avgTrials = totalTrials / totalQuestions;
+        const avgTrials = totalTrials > 0 ? totalTrials / totalQuestions : 0;
 
-        document.getElementById('stats-accuracy').textContent = `${accuracy.toFixed(1)}%`;
+        document.getElementById('stats-accuracy').textContent = `${accuracy.toFixed(2)}%`;
         document.getElementById('stats-avg-trials').textContent = avgTrials.toFixed(2);
         document.getElementById('stats-total-questions').textContent = totalQuestions;
 
@@ -731,32 +777,43 @@ document.addEventListener('DOMContentLoaded', function() {
         results.forEach((result, index) => {
             const row = document.createElement('tr');
             row.style.cursor = "pointer";
-            row.onclick = () => loadSession(result.session_id);
+            row.onclick = () => {
+                // To avoid interrupting the user, we scroll to the session container if it's out of view.
+                const sessionContainer = document.getElementById('session-container');
+                sessionContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                loadSession(result.session_id);
+            };
+
             let resultBadge = '';
             if (result.correct === true) {
                 resultBadge = '<span class="badge bg-success">Correct</span>';
             } else if (result.correct === false) {
                 resultBadge = '<span class="badge bg-danger">Incorrect</span>';
             } else {
-                resultBadge = '<span class="badge bg-warning">Error</span>';
+                resultBadge = '<span class="badge bg-warning text-dark">Error</span>';
             }
             row.innerHTML = `
-                <th scope="row">${index + 1}</th>
-                <td><small>${result.question.substring(0, 70)}...</small></td>
-                <td>${resultBadge}</td>
-                <td>${result.trials}</td>
+                <td class="px-4 fw-bold text-muted small">${index + 1}</td>
+                <td class="px-4">${result.question}</td>
+                <td class="px-4 text-center">${resultBadge}</td>
+                <td class="px-4 text-center">${result.trials}</td>
             `;
             tbody.appendChild(row);
         });
 
         document.getElementById('statistics-container').style.display = 'block';
+        // Scroll to the results
+        document.getElementById('statistics-container').scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
     async function runQAPipeline() {
         const runBtn = document.getElementById('run-pipeline-btn');
-        runBtn.disabled = true;
-        runBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Running...';
-        
+        const stopBtn = document.getElementById('stop-pipeline-btn');
+
+        runBtn.style.display = 'none';
+        stopBtn.style.display = 'block';
+        pipelineController.aborted = false;
+
         document.getElementById('statistics-container').style.display = 'none';
         document.getElementById('pipeline-progress').style.display = 'block';
 
@@ -766,7 +823,6 @@ document.addEventListener('DOMContentLoaded', function() {
         const progressBar = document.getElementById('pipeline-progress-bar');
         const statusDiv = document.getElementById('pipeline-status');
 
-        // 1. Create a session group
         let groupId = null;
         let groupName = `Pipeline Run ${new Date().toLocaleString()}`;
         try {
@@ -781,12 +837,17 @@ document.addEventListener('DOMContentLoaded', function() {
             groupName = groupData.group_name;
         } catch (error) {
             alert('Failed to create a session group for the pipeline run.');
-            runBtn.disabled = false;
-            runBtn.innerHTML = 'Run QA Pipeline';
+            stopBtn.style.display = 'none';
+            runBtn.style.display = 'block';
             return;
         }
 
         for (const questionData of questions) {
+            if (pipelineController.aborted) {
+                statusDiv.textContent = `Pipeline stopped by user. Processed ${completedCount} questions.`;
+                break;
+            }
+
             const progress = Math.round((completedCount / questions.length) * 100);
             progressBar.style.width = `${progress}%`;
             progressBar.textContent = `${progress}%`;
@@ -796,11 +857,10 @@ document.addEventListener('DOMContentLoaded', function() {
             try {
                 const result = await processQuestion(questionData, groupId);
                 results.push(result);
-                // Dynamically add the session to the list under its group
                 addNewSessionToList(result.session_id, questionData, groupId, groupName);
             } catch (error) {
                 console.error('Failed to process question:', questionData.question, error);
-                results.push({ question: questionData.question, correct: 'error', trials: 0 });
+                results.push({ question: questionData.question, correct: 'error', trials: 0, session_id: null });
             } finally {
                 completedCount++;
             }
@@ -810,12 +870,16 @@ document.addEventListener('DOMContentLoaded', function() {
         progressBar.style.width = `${finalProgress}%`;
         progressBar.textContent = `${finalProgress}%`;
         progressBar.setAttribute('aria-valuenow', finalProgress);
-        statusDiv.textContent = `Pipeline finished. Processed ${completedCount} of ${questions.length} questions.`;
+        if (!pipelineController.aborted) {
+            statusDiv.textContent = `Pipeline finished. Processed ${completedCount} of ${questions.length} questions.`;
+        }
 
-        displayStats(results, groupName);
+        if (results.length > 0) {
+            displayStats(results, groupName);
+        }
         
-        runBtn.disabled = false;
-        runBtn.innerHTML = 'Run QA Pipeline';
+        stopBtn.style.display = 'none';
+        runBtn.style.display = 'block';
     }
 });
 </script>

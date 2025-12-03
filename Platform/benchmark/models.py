@@ -9,6 +9,7 @@ class LLMSettings(models.Model):
     llm_base_url = models.CharField(max_length=255, blank=True, help_text="Optional: e.g., http://localhost:11434/v1")
     llm_model = models.CharField(max_length=100, blank=True, help_text="e.g., gpt-4o")
     llm_api_key = models.CharField(max_length=255, blank=True, help_text="Your API Key")
+    max_retries = models.PositiveIntegerField(default=3, help_text="Maximum number of retries allowed for the LLM.")
 
     def save(self, *args, **kwargs):
         if not self.pk and LLMSettings.objects.exists():
@@ -25,3 +26,41 @@ class LLMSettings(models.Model):
 
     def __str__(self):
         return "LLM Settings"
+
+class BenchmarkSession(models.Model):
+    """
+    Represents a multi-turn conversation session for benchmarking.
+    """
+    settings = models.ForeignKey(LLMSettings, on_delete=models.CASCADE)
+    question = models.TextField()
+    ground_truths = models.JSONField(default=list)
+    created_at = models.DateTimeField(auto_now_add=True)
+    is_completed = models.BooleanField(default=False)
+    run_tag = models.CharField(max_length=255, blank=True, null=True, db_index=True)
+
+    def __str__(self):
+        return f"Session for: {self.question[:50]}..."
+
+class BenchmarkTrial(models.Model):
+    """
+    Represents a single trial (turn) within a benchmark session.
+    """
+    STATUS_CHOICES = [
+        ('processing', 'Processing'),
+        ('completed', 'Completed'),
+        ('error', 'Error'),
+    ]
+    session = models.ForeignKey(BenchmarkSession, related_name='trials', on_delete=models.CASCADE)
+    trial_number = models.PositiveIntegerField()
+    answer = models.TextField(blank=True, null=True)
+    feedback = models.TextField(blank=True, null=True)
+    is_correct = models.BooleanField(null=True, blank=True) # Can be null if not yet evaluated
+    created_at = models.DateTimeField(auto_now_add=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='processing')
+
+    class Meta:
+        unique_together = ('session', 'trial_number')
+        ordering = ['trial_number']
+
+    def __str__(self):
+        return f"Trial {self.trial_number} for Session {self.session.id}"

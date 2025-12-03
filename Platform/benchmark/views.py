@@ -465,8 +465,8 @@ Answer:"""
         trial.status = 'completed'
         trial.save()
 
-        # If the answer is correct, mark the session as completed
-        if is_correct:
+        # If the answer is correct or max retries are reached, mark the session as completed
+        if is_correct or trial.trial_number >= session.settings.max_retries:
             session.is_completed = True
             session.save()
 

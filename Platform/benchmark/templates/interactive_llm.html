@@ -45,6 +45,74 @@
                 </div>
             </div>
 
+            <!-- QA Pipeline -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-robot me-2"></i>QA Pipeline</h5>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">Run all questions through the LLM and get aggregate results.</p>
+                    <button id="run-pipeline-btn" class="btn btn-success w-100">Run QA Pipeline</button>
+                    <div id="pipeline-progress" class="mt-3" style="display: none;">
+                        <div class="progress">
+                            <div id="pipeline-progress-bar" class="progress-bar" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
+                        </div>
+                        <div id="pipeline-status" class="mt-2 text-muted small"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Statistics -->
+            <div id="statistics-container" class="card shadow-sm mb-4" style="display: none;">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-bar-chart-line me-2"></i>Pipeline Results</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4 text-center">
+                            <div class="card h-100">
+                                <div class="card-body">
+                                    <h6 class="card-title">Overall Accuracy</h6>
+                                    <p id="stats-accuracy" class="card-text fs-4 fw-bold">0%</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4 text-center">
+                            <div class="card h-100">
+                                <div class="card-body">
+                                    <h6 class="card-title">Avg. Trials</h6>
+                                    <p id="stats-avg-trials" class="card-text fs-4 fw-bold">0</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4 text-center">
+                             <div class="card h-100">
+                                <div class="card-body">
+                                    <h6 class="card-title">Total Questions</h6>
+                                    <p id="stats-total-questions" class="card-text fs-4 fw-bold">0</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <hr>
+                    <h6>Result Details:</h6>
+                    <div id="stats-details-table-container" style="max-height: 400px; overflow-y: auto;">
+                        <table class="table table-sm table-striped">
+                            <thead>
+                                <tr>
+                                    <th scope="col">#</th>
+                                    <th scope="col">Question</th>
+                                    <th scope="col">Result</th>
+                                    <th scope="col">Trials</th>
+                                </tr>
+                            </thead>
+                            <tbody id="stats-details-tbody">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
             <!-- New Session -->
             <div class="card shadow-sm mb-4">
                 <div class="card-header">
@@ -71,13 +139,40 @@
                     <button id="delete-selected-btn" class="btn btn-sm btn-danger" style="display: none;"><i class="bi bi-trash me-1"></i>Delete Selected</button>
                 </div>
                 <div id="session-list" class="list-group list-group-flush">
-                    {% if sessions %}
+                    {% if groups or individual_sessions %}
                     <div class="list-group-item bg-light" id="select-all-container">
                         <input class="form-check-input" type="checkbox" id="select-all-checkbox">
                         <label class="form-check-label ms-2" for="select-all-checkbox">Select All</label>
                     </div>
                     {% endif %}
-                    {% for session in sessions %}
+
+                    {% for group in groups %}
+                    <div class="list-group-item">
+                        <details open>
+                            <summary class="fw-bold" style="cursor: pointer;">
+                                <i class="bi bi-collection me-1"></i>
+                                {{ group.name }}
+                                <small class="text-muted">({{ group.sessions.count }} sessions)</small>
+                            </summary>
+                            <div class="list-group list-group-flush mt-2">
+                                {% for session in group.sessions.all %}
+                                <div class="list-group-item d-flex align-items-center session-item-container ps-4">
+                                    <input class="form-check-input session-checkbox" type="checkbox" value="{{ session.id }}" data-session-id="{{ session.id }}">
+                                    <div class="ms-3 flex-grow-1 session-details" data-session-id="{{ session.id }}" style="cursor: pointer;">
+                                        <div class="d-flex w-100 justify-content-between">
+                                            <h6 class="mb-1">Session #{{ session.id }}</h6>
+                                            <small class="text-muted">{{ session.created_at|date:"Y-m-d H:i" }}</small>
+                                        </div>
+                                        <p class="mb-1 small text-muted">{{ session.question|truncatechars:80 }}</p>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </details>
+                    </div>
+                    {% endfor %}
+
+                    {% for session in individual_sessions %}
                     <div class="list-group-item d-flex align-items-center session-item-container">
                         <input class="form-check-input session-checkbox" type="checkbox" value="{{ session.id }}" data-session-id="{{ session.id }}">
                         <div class="ms-3 flex-grow-1 session-details" data-session-id="{{ session.id }}" style="cursor: pointer;">
@@ -88,9 +183,11 @@
                             <p class="mb-1 small text-muted">{{ session.question|truncatechars:100 }}</p>
                         </div>
                     </div>
-                    {% empty %}
-                    <div class="list-group-item no-sessions">No sessions found.</div>
                     {% endfor %}
+
+                    {% if not groups and not individual_sessions %}
+                    <div class="list-group-item no-sessions">No sessions found.</div>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -179,7 +276,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
     
-            fetch('/benchmark/api/multi_turn/batch_delete_sessions/', {
+            fetch('/benchmark/api/interactive/batch_delete_sessions/', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
                 body: JSON.stringify({ session_ids: selectedIds })
@@ -236,35 +333,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     alert('Error starting session: ' + data.error);
                     return;
                 }
-                
-                // If this is the first session, remove "no sessions" and add select-all header
-                if (document.querySelector('.no-sessions')) {
-                    document.querySelector('.no-sessions').remove();
-                    const selectAllContainer = document.createElement('div');
-                    selectAllContainer.className = 'list-group-item bg-light';
-                    selectAllContainer.id = 'select-all-container';
-                    selectAllContainer.innerHTML = `
-                        <input class="form-check-input" type="checkbox" id="select-all-checkbox">
-                        <label class="form-check-label ms-2" for="select-all-checkbox">Select All</label>`;
-                    sessionList.prepend(selectAllContainer);
-                    getSelectAllCheckbox().addEventListener('change', selectAllHandler);
-                }
-    
-                // Add to list and load
-                const newSessionItem = document.createElement('div');
-                newSessionItem.className = 'list-group-item d-flex align-items-center session-item-container';
-                newSessionItem.innerHTML = `
-                    <input class="form-check-input session-checkbox" type="checkbox" value="${data.session_id}" data-session-id="${data.session_id}">
-                    <div class="ms-3 flex-grow-1 session-details" data-session-id="${data.session_id}" style="cursor: pointer;">
-                        <div class="d-flex w-100 justify-content-between">
-                            <h6 class="mb-1">Session #${data.session_id}</h6>
-                            <small class="text-muted">Now</small>
-                        </div>
-                        <p class="mb-1 small text-muted">${questionData.question.substring(0, 100)}...</p>
-                    </div>`;
-                const selectAllDiv = document.getElementById('select-all-container');
-                selectAllDiv.after(newSessionItem);
-                
+                addNewSessionToList(data.session_id, questionData);
                 loadSession(data.session_id, data.trial_id);
             })
             .finally(() => {
@@ -283,7 +352,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     function loadSession(sessionId, initialTrialId = null) {
         activeSessionId = sessionId;
-        fetch(`/benchmark/api/multi_turn/get_session/${sessionId}/`)
+        fetch(`/benchmark/api/interactive/get_session/${sessionId}/`)
             .then(res => res.json())
             .then(data => {
                 renderSession(data.session, data.trials);
@@ -308,7 +377,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function executeTrial(trialId) {
-        fetch(`/benchmark/api/multi_turn/run_trial/${trialId}/`)
+        fetch(`/benchmark/api/interactive/run_trial/${trialId}/`)
             .then(res => res.json())
             .then(data => {
                 if(data.error) {
@@ -401,7 +470,7 @@ document.addEventListener('DOMContentLoaded', function() {
         trialDiv.innerHTML = `
             <div class="card">
                 <div class="card-header bg-light">
-                    <h6 class="mb-0">Trial #${trial.trial_number} ${statusBadge}</h6>
+                    <h6 class="mb-0 d-flex"><div class="me-2">Trial #${trial.trial_number}</div><div>${statusBadge}</div></h6>
                 </div>
                 <div class="card-body">
                     ${trialBody}
@@ -415,7 +484,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const trial = sessionTrials.find(t => t.id === trialId);
         const feedback = trial ? trial.feedback : "";
 
-        fetch(`/benchmark/api/multi_turn/retry_session/${trialId}/`, {
+        fetch(`/benchmark/api/interactive/retry_session/${trialId}/`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}'},
             body: JSON.stringify({ feedback: feedback, is_correct: false })
@@ -439,7 +508,7 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('delete-session-btn').addEventListener('click', function() {
         if (!activeSessionId || !confirm('Are you sure you want to delete this session?')) return;
 
-        fetch(`/benchmark/api/multi_turn/delete_session/${activeSessionId}/`, {
+        fetch(`/benchmark/api/interactive/delete_session/${activeSessionId}/`, {
             method: 'DELETE',
             headers: {'X-CSRFToken': '{{ csrf_token }}'}
         })
@@ -458,7 +527,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     document.getElementById('export-session-btn').addEventListener('click', function() {
         if (!activeSessionId) return;
-        window.location.href = `/benchmark/api/multi_turn/export_session/${activeSessionId}/`;
+        window.location.href = `/benchmark/api/interactive/export_session/${activeSessionId}/`;
     });
 
     function testConnection() {
@@ -525,6 +594,229 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     document.getElementById('test-connection-btn').addEventListener('click', testConnection);
+
+    // --- QA Pipeline ---
+    document.getElementById('run-pipeline-btn').addEventListener('click', runQAPipeline);
+
+    function addNewSessionToList(sessionId, questionData, groupId = null, groupName = null) {
+        // If this is the first session ever, remove "no sessions" and add select-all header
+        if (document.querySelector('.no-sessions')) {
+            document.querySelector('.no-sessions').remove();
+            const selectAllContainer = document.createElement('div');
+            selectAllContainer.className = 'list-group-item bg-light';
+            selectAllContainer.id = 'select-all-container';
+            selectAllContainer.innerHTML = `
+                <input class="form-check-input" type="checkbox" id="select-all-checkbox">
+                <label class="form-check-label ms-2" for="select-all-checkbox">Select All</label>`;
+            sessionList.prepend(selectAllContainer);
+            getSelectAllCheckbox().addEventListener('change', selectAllHandler);
+        }
+
+        const newSessionItem = document.createElement('div');
+        newSessionItem.className = 'list-group-item d-flex align-items-center session-item-container';
+        newSessionItem.innerHTML = `
+            <input class="form-check-input session-checkbox" type="checkbox" value="${sessionId}" data-session-id="${sessionId}">
+            <div class="ms-3 flex-grow-1 session-details" data-session-id="${sessionId}" style="cursor: pointer;">
+                <div class="d-flex w-100 justify-content-between">
+                    <h6 class="mb-1">Session #${sessionId}</h6>
+                    <small class="text-muted">Now</small>
+                </div>
+                <p class="mb-1 small text-muted">${questionData.question.substring(0, 100)}...</p>
+            </div>`;
+        
+        if (groupId) {
+            let groupContainer = document.getElementById(`session-group-${groupId}`);
+            if (!groupContainer) {
+                // Create the group container if it doesn't exist
+                const groupEl = document.createElement('div');
+                groupEl.className = 'list-group-item';
+                groupEl.innerHTML = `
+                    <details open>
+                        <summary class="fw-bold" style="cursor: pointer;">
+                            <i class="bi bi-collection me-1"></i>
+                            ${groupName}
+                            <small class="text-muted" id="group-session-count-${groupId}">(1 sessions)</small>
+                        </summary>
+                        <div class="list-group list-group-flush mt-2" id="session-group-${groupId}">
+                        </div>
+                    </details>
+                `;
+                const selectAllDiv = document.getElementById('select-all-container');
+                selectAllDiv.after(groupEl);
+                groupContainer = document.getElementById(`session-group-${groupId}`);
+            }
+            newSessionItem.classList.add("ps-4");
+            groupContainer.prepend(newSessionItem);
+            
+            // Update session count
+            const countEl = document.getElementById(`group-session-count-${groupId}`);
+            const currentCount = groupContainer.children.length;
+            countEl.textContent = `(${currentCount} sessions)`;
+
+        } else {
+            const selectAllDiv = document.getElementById('select-all-container');
+            selectAllDiv.after(newSessionItem);
+        }
+    }
+
+    async function processQuestion(questionData, groupId = null) {
+        const createResponse = await fetch("{% url 'benchmark:create_session' %}", {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}'},
+            body: JSON.stringify({
+                question: questionData.question,
+                ground_truths: questionData.answer,
+                group_id: groupId
+            })
+        });
+        const createData = await createResponse.json();
+        if (createData.error) {
+            throw new Error(createData.error);
+        }
+        const { session_id, trial_id } = createData;
+
+        // Kick off the trial execution by loading the session with the initial trial ID.
+        // This will render the session in a "processing" state and return immediately.
+        loadSession(session_id, trial_id); 
+
+        return new Promise((resolve, reject) => {
+            const poll = setInterval(async () => {
+                try {
+                    const sessionResponse = await fetch(`/benchmark/api/interactive/get_session/${session_id}/`);
+                    if (!sessionResponse.ok) {
+                        throw new Error(`HTTP error! status: ${sessionResponse.status}`);
+                    }
+                    const sessionData = await sessionResponse.json();
+                    
+                    // The UI is updated via the retry-logic in loadSession, but for long-running single trials,
+                    // this polling ensures the user sees updates if the session state changes on the backend.
+                    loadSession(session_id);
+
+                    if (sessionData.session.is_completed) {
+                        clearInterval(poll);
+                        const lastTrial = sessionData.trials[sessionData.trials.length - 1];
+                        resolve({
+                            question: sessionData.session.question,
+                            correct: lastTrial.is_correct,
+                            trials: sessionData.trials.length,
+                            session_id: session_id
+                        });
+                    }
+                } catch (error) {
+                    clearInterval(poll);
+                    console.error(`Polling failed for session ${session_id}:`, error);
+                    reject(error);
+                }
+            }, 3000); // Poll every 3 seconds
+        });
+    }
+    
+    function displayStats(results, groupName) {
+        const totalQuestions = results.length;
+        if (totalQuestions === 0) return;
+
+        document.querySelector("#statistics-container .card-header h5").innerHTML = `<i class="bi bi-bar-chart-line me-2"></i>Results for ${groupName}`;
+
+        const correctCount = results.filter(r => r.correct === true).length;
+        const totalTrials = results.reduce((sum, r) => sum + (r.trials || 0), 0);
+        const accuracy = (correctCount / totalQuestions) * 100;
+        const avgTrials = totalTrials / totalQuestions;
+
+        document.getElementById('stats-accuracy').textContent = `${accuracy.toFixed(1)}%`;
+        document.getElementById('stats-avg-trials').textContent = avgTrials.toFixed(2);
+        document.getElementById('stats-total-questions').textContent = totalQuestions;
+
+        const tbody = document.getElementById('stats-details-tbody');
+        tbody.innerHTML = '';
+        results.forEach((result, index) => {
+            const row = document.createElement('tr');
+            row.style.cursor = "pointer";
+            row.onclick = () => loadSession(result.session_id);
+            let resultBadge = '';
+            if (result.correct === true) {
+                resultBadge = '<span class="badge bg-success">Correct</span>';
+            } else if (result.correct === false) {
+                resultBadge = '<span class="badge bg-danger">Incorrect</span>';
+            } else {
+                resultBadge = '<span class="badge bg-warning">Error</span>';
+            }
+            row.innerHTML = `
+                <th scope="row">${index + 1}</th>
+                <td><small>${result.question.substring(0, 70)}...</small></td>
+                <td>${resultBadge}</td>
+                <td>${result.trials}</td>
+            `;
+            tbody.appendChild(row);
+        });
+
+        document.getElementById('statistics-container').style.display = 'block';
+    }
+
+    async function runQAPipeline() {
+        const runBtn = document.getElementById('run-pipeline-btn');
+        runBtn.disabled = true;
+        runBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Running...';
+        
+        document.getElementById('statistics-container').style.display = 'none';
+        document.getElementById('pipeline-progress').style.display = 'block';
+
+        const results = [];
+        let completedCount = 0;
+        
+        const progressBar = document.getElementById('pipeline-progress-bar');
+        const statusDiv = document.getElementById('pipeline-status');
+
+        // 1. Create a session group
+        let groupId = null;
+        let groupName = `Pipeline Run ${new Date().toLocaleString()}`;
+        try {
+            const groupResponse = await fetch("{% url 'benchmark:create_session_group' %}", {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}'},
+                body: JSON.stringify({ name: groupName })
+            });
+            const groupData = await groupResponse.json();
+            if (groupData.error) throw new Error(groupData.error);
+            groupId = groupData.group_id;
+            groupName = groupData.group_name;
+        } catch (error) {
+            alert('Failed to create a session group for the pipeline run.');
+            runBtn.disabled = false;
+            runBtn.innerHTML = 'Run QA Pipeline';
+            return;
+        }
+
+        for (const questionData of questions) {
+            const progress = Math.round((completedCount / questions.length) * 100);
+            progressBar.style.width = `${progress}%`;
+            progressBar.textContent = `${progress}%`;
+            progressBar.setAttribute('aria-valuenow', progress);
+            statusDiv.textContent = `Processing question ${completedCount + 1} of ${questions.length}...`;
+
+            try {
+                const result = await processQuestion(questionData, groupId);
+                results.push(result);
+                // Dynamically add the session to the list under its group
+                addNewSessionToList(result.session_id, questionData, groupId, groupName);
+            } catch (error) {
+                console.error('Failed to process question:', questionData.question, error);
+                results.push({ question: questionData.question, correct: 'error', trials: 0 });
+            } finally {
+                completedCount++;
+            }
+        }
+        
+        const finalProgress = Math.round((completedCount / questions.length) * 100);
+        progressBar.style.width = `${finalProgress}%`;
+        progressBar.textContent = `${finalProgress}%`;
+        progressBar.setAttribute('aria-valuenow', finalProgress);
+        statusDiv.textContent = `Pipeline finished. Processed ${completedCount} of ${questions.length} questions.`;
+
+        displayStats(results, groupName);
+        
+        runBtn.disabled = false;
+        runBtn.innerHTML = 'Run QA Pipeline';
+    }
 });
 </script>
 

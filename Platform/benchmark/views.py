@@ -11,6 +11,7 @@ import json
 from user_system.decorators import admin_required
 from django.db import OperationalError
 import traceback
+from user_system.utils import print_debug
 
 import httpx
 from task_manager.utils import check_answer_rule, check_answer_llm
@@ -358,6 +359,7 @@ def get_session(request, session_id):
             'is_completed': session.is_completed,
             'created_at': session.created_at,
             'max_retries': session.settings.max_retries,
+            'group_id': session.group_id
         },
         'trials': trials
     })
@@ -454,6 +456,7 @@ Answer:"""
             messages=messages
         )
         answer = response.choices[0].message.content
+        print_debug(f"LLM Response: {answer}")
 
         trial.answer = answer
         
@@ -483,6 +486,16 @@ def delete_session(request, session_id):
     try:
         session = get_object_or_404(InteractiveSession, pk=session_id)
         session.delete()
+        return JsonResponse({'status': 'ok'})
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+
+@admin_required
+@require_http_methods(["DELETE"])
+def delete_session_group(request, group_id):
+    try:
+        group = get_object_or_404(InteractiveSessionGroup, pk=group_id)
+        group.delete()
         return JsonResponse({'status': 'ok'})
     except Exception as e:
         return JsonResponse({'status': 'error', 'message': str(e)}, status=500)

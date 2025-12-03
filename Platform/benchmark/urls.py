@@ -21,6 +21,7 @@ urlpatterns = [
     path("api/interactive/delete_session/<int:session_id>/", views.delete_session, name="delete_session"),
     path('api/interactive/export_session/<int:session_id>/', views.export_session, name='export_session'),
     path('api/interactive/batch_delete_sessions/', views.batch_delete_sessions, name='batch_delete_sessions'),
+    path('api/interactive/delete_session_group/<int:group_id>/', views.delete_session_group, name='delete_session_group'),
 
     # New Ad-hoc pipeline URL
     path('api/run_adhoc_pipeline/', views.run_adhoc_pipeline, name='run_adhoc_pipeline'),

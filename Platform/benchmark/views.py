@@ -584,6 +584,28 @@ def delete_run(request, run_tag):
         return JsonResponse({"status": "error", "message": str(e)}, status=500)
 
 @admin_required
+def load_interactive_run(request, group_id):
+    group = get_object_or_404(InteractiveSessionGroup, pk=group_id)
+    sessions = group.sessions.all().prefetch_related('trials')
+    
+    results = []
+    for session in sessions:
+        last_trial = session.trials.last()
+        if last_trial:
+            results.append({
+                'question': session.question,
+                'correct': last_trial.is_correct,
+                'trials': session.trials.count(),
+                'session_id': session.id,
+                'final_answer': last_trial.answer,
+                'ground_truths': session.ground_truths,
+                'max_retries': session.settings.max_retries
+            })
+
+    return JsonResponse({'results': results, 'group_name': group.name})
+
+
+@admin_required
 def run_adhoc_pipeline(request):
     try:
         pipeline_base_url = request.GET.get('llm_base_url') or config("LLM_BASE_URL", default=None)

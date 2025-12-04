@@ -20,6 +20,15 @@ from datetime import datetime
 from .models import LLMSettings, InteractiveSession, InteractiveTrial, AdhocRun, AdhocSessionResult, InteractiveSessionGroup
 
 
+@admin_required
+def index(request):
+    settings = LLMSettings.load()
+    context = {
+        'llm_settings': settings
+    }
+    return render(request, 'benchmark/index.html', context)
+
+
 def qa_pipeline_stream(base_url, api_key, model, questions_data=None):
     client = openai.OpenAI(base_url=base_url, api_key=api_key)
     

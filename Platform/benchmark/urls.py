@@ -4,6 +4,7 @@ from . import views
 app_name = 'benchmark'
 
 urlpatterns = [
+    path("", views.index, name="index"),
     path("interactive_llm/", views.interactive_llm, name="interactive_llm"),
     path("adhoc_llm/", views.adhoc_llm, name="adhoc_llm"),
     path("api/list_runs/", views.list_runs, name="list_runs"),

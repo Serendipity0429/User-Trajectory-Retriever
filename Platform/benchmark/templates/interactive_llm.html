@@ -185,7 +185,7 @@
             <!-- Saved Sessions -->
             <div class="card shadow-sm">
                 <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0"><i class="bi bi-archive me-2"></i>Benchmark Sessions</h5>
+                    <h5 class="mb-0"><i class="bi bi-archive me-2"></i>Benchmark Results</h5>
                     <button id="delete-selected-btn" class="btn btn-sm btn-danger" style="display: none;"><i class="bi bi-trash me-1"></i>Delete Selected</button>
                 </div>
                 <div id="session-list" class="list-group list-group-flush" style="max-height: 50vh; overflow-y: auto;">
@@ -198,7 +198,7 @@
                     {% for group in groups %}
                     <div class="list-group-item">
                         <details open>
-                            <summary class="fw-bold" style="cursor: pointer;">
+                            <summary class="fw-bold group-summary" style="cursor: pointer;" data-group-id="{{ group.id }}">
                                 <div class="d-flex justify-content-between align-items-center">
                                     <span>
                                         <input class="form-check-input group-select-checkbox" type="checkbox" data-group-id="{{ group.id }}">
@@ -450,6 +450,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 e.preventDefault();
                 const sessionId = target.dataset.sessionId;
                 loadSession(sessionId);
+            }
+
+            const groupSummary = e.target.closest('.group-summary');
+            if (groupSummary) {
+                e.preventDefault();
+                const groupId = groupSummary.dataset.groupId;
+                loadRun(groupId);
             }
 
             const deleteBtn = e.target.closest('.delete-group-btn');
@@ -809,6 +816,40 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('save-settings-btn').addEventListener('click', saveSettings);
     document.getElementById('test-connection-btn').addEventListener('click', testConnection);
     document.getElementById('restore-defaults-btn').addEventListener('click', restoreDefaults);
+
+
+    // --- Load Run ---
+    function loadRun(groupId) {
+        if (!groupId) {
+            return;
+        }
+
+        // Optional: Add some visual feedback
+        const summaryElement = document.querySelector(`.group-summary[data-group-id='${groupId}']`);
+        const originalColor = summaryElement.style.color;
+        summaryElement.style.color = 'blue';
+
+
+        fetch(`/benchmark/api/interactive/load_run/${groupId}/`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.error) {
+                    alert('Error loading run: ' + data.error);
+                    return;
+                }
+                displayStats(data.results, data.group_name);
+                const statsContainer = document.getElementById('statistics-container');
+                statsContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            })
+            .catch(err => {
+                console.error("Error loading run:", err);
+                alert("An error occurred while trying to load the run. Please check the console for details.");
+            })
+            .finally(() => {
+                // Restore original color
+                summaryElement.style.color = originalColor;
+            });
+    }
 
 
     // --- QA Pipeline ---

@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}Multi-Turn LLM Benchmark{% endblock %}
 
@@ -276,6 +277,7 @@
     </div>
 </div>
 
+<script src="{% static 'js/benchmark_common.js' %}"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const questions = {{ questions|safe }};
@@ -723,44 +725,12 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     function testConnection() {
-        const resultDiv = document.getElementById('test-connection-result');
-        const btn = document.getElementById('test-connection-btn');
-        const originalText = btn.innerHTML;
-        
-        resultDiv.innerHTML = '';
-        btn.disabled = true;
-        btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Testing...';
-
         const data = {
             llm_base_url: document.getElementById('llm_base_url').value,
             llm_api_key: document.getElementById('llm_api_key').value,
         };
-        const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
-
-        fetch("{% url 'benchmark:test_llm_connection' %}", {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': csrfToken
-            },
-            body: JSON.stringify(data)
-        })
-        .then(response => response.json().then(data => ({status: response.status, body: data})))
-        .then(({status, body}) => {
-            if (status === 200) {
-                resultDiv.innerHTML = `<div class="alert alert-success" role="alert">${body.message}</div>`;
-            } else {
-                resultDiv.innerHTML = `<div class="alert alert-danger" role="alert">${body.message}</div>`;
-            }
-        })
-        .catch(error => {
-            resultDiv.innerHTML = `<div class="alert alert-danger" role="alert">A network error occurred.</div>`;
-            console.error('Error:', error);
-        })
-        .finally(() => {
-            btn.disabled = false;
-            btn.innerHTML = originalText;
-        });
+        const csrfToken = '{{ csrf_token }}';
+        BenchmarkUtils.testConnection("{% url 'benchmark:test_llm_connection' %}", csrfToken, data, 'test-connection-result', 'test-connection-btn');
     }
 
     function saveSettings() {
@@ -770,47 +740,17 @@ document.addEventListener('DOMContentLoaded', function() {
             llm_model: document.getElementById('llm_model').value,
             max_retries: document.getElementById('max_retries').value
         };
-        fetch("{% url 'benchmark:save_llm_settings' %}", {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}'},
-            body: JSON.stringify(data)
-        })
-        .then(res => res.json())
-        .then(data => {
-            if(data.status === 'ok') {
-                const btn = document.getElementById('save-settings-btn');
-                const originalText = btn.innerHTML;
-                btn.innerHTML = '<i class="bi bi-check-lg me-1"></i> Saved!';
-                btn.classList.add('btn-success');
-                btn.classList.remove('btn-outline-primary');
-                setTimeout(() => {
-                    btn.innerHTML = originalText;
-                    btn.classList.remove('btn-success');
-                    btn.classList.add('btn-outline-primary');
-                }, 1500);
-            } else {
-                alert('Error saving settings: ' + (data.message || 'Unknown error'));
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('An network error occurred while saving settings.');
-        });
+        const csrfToken = '{{ csrf_token }}';
+        BenchmarkUtils.saveSettings("{% url 'benchmark:save_llm_settings' %}", csrfToken, data, 'save-settings-btn');
     }
 
     function restoreDefaults() {
-        fetch("{% url 'benchmark:get_llm_env_vars' %}")
-            .then(response => response.json())
-            .then(data => {
-                if(data.error) {
-                    alert('Error loading .env variables: ' + data.error);
-                } else {
-                    document.getElementById('llm_base_url').value = data.llm_base_url;
-                    document.getElementById('llm_api_key').value = data.llm_api_key;
-                    document.getElementById('llm_model').value = data.llm_model;
-                    saveSettings(); // Automatically save the loaded settings
-                }
-            });
+        BenchmarkUtils.restoreDefaults("{% url 'benchmark:get_llm_env_vars' %}", function(data) {
+            document.getElementById('llm_base_url').value = data.llm_base_url;
+            document.getElementById('llm_api_key').value = data.llm_api_key;
+            document.getElementById('llm_model').value = data.llm_model;
+            saveSettings();
+        });
     }
 
     document.getElementById('save-settings-btn').addEventListener('click', saveSettings);
@@ -1100,11 +1040,13 @@ document.addEventListener('DOMContentLoaded', function() {
     async function runQAPipeline() {
         const runBtn = document.getElementById('run-pipeline-btn');
         const stopBtn = document.getElementById('stop-pipeline-btn');
-
+        const pipelineId = BenchmarkUtils.generateUUID();
+        
         runBtn.style.display = 'none';
         stopBtn.style.display = 'block';
         pipelineController.aborted = false;
 
+        // Reset stats
         const statsContainer = document.getElementById('statistics-container');
         statsContainer.style.display = 'block';
         document.getElementById('stats-details-tbody').innerHTML = '';
@@ -1119,82 +1061,98 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('results-header-text').textContent = 'Live Pipeline Results';
 
         document.getElementById('pipeline-progress').style.display = 'block';
+        const progressBar = document.getElementById('pipeline-progress-bar');
+        const statusDiv = document.getElementById('pipeline-status');
+        
+        // Build URL
+        const baseUrl = document.getElementById('llm_base_url').value;
+        const apiKey = document.getElementById('llm_api_key').value;
+        const model = document.getElementById('llm_model').value;
+        const maxRetries = document.getElementById('max_retries').value;
+
+        const params = new URLSearchParams({
+            llm_base_url: baseUrl,
+            llm_api_key: apiKey,
+            llm_model: model,
+            max_retries: maxRetries,
+            pipeline_id: pipelineId
+        });
+
+        // Handle Stop
+        stopBtn.onclick = () => {
+            fetch("{% url 'benchmark:stop_interactive_pipeline' %}", {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}'},
+                body: JSON.stringify({ pipeline_id: pipelineId })
+            }).then(() => {
+                statusDiv.textContent = "Stopping pipeline...";
+                stopBtn.disabled = true;
+            });
+        };
 
         const results = [];
         let completedCount = 0;
+        let totalQuestions = questions.length; // Approximation, backend iterates file
         
-        const progressBar = document.getElementById('pipeline-progress-bar');
-        const statusDiv = document.getElementById('pipeline-status');
-
-        let groupId = null;
-        let groupName = `Pipeline Run ${new Date().toLocaleString()}`;
         try {
-            const groupResponse = await fetch("{% url 'benchmark:create_session_group' %}", {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}'},
-                body: JSON.stringify({ name: groupName })
-            });
-            const groupData = await groupResponse.json();
-            if (groupData.error) throw new Error(groupData.error);
-            groupId = groupData.group_id;
-            groupName = groupData.group_name;
+            const response = await fetch(`/benchmark/api/run_interactive_pipeline/?${params.toString()}`);
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop(); // Keep the last partial line
+
+                for (const line of lines) {
+                    if (!line.trim()) continue;
+                    
+                    try {
+                        const result = JSON.parse(line);
+                        if (result.error) {
+                            console.error("Error in pipeline result:", result.error);
+                             results.push({ 
+                                question: result.question || "Unknown", 
+                                correct: 'error', 
+                                trials: 0, 
+                                session_id: null,
+                                final_answer: "Error processing",
+                                ground_truths: []
+                            });
+                        } else {
+                            results.push(result);
+                            // Add to session list - using the group info from the result
+                            const qData = { question: result.question }; 
+                            addNewSessionToList(result.session_id, qData, result.group_id, result.group_name);
+                        }
+                        
+                        completedCount++;
+                        displayStats(results, result.group_name || "Current Run");
+                        
+                        // Update progress
+                        const progress = Math.round((completedCount / totalQuestions) * 100);
+                        progressBar.style.width = `${progress}%`;
+                        progressBar.textContent = `${progress}%`;
+                        statusDiv.textContent = `Processed ${completedCount} questions...`;
+
+                    } catch (e) {
+                        console.error("Error parsing JSON line:", e);
+                    }
+                }
+            }
         } catch (error) {
-            alert('Failed to create a session group for the pipeline run.');
+            console.error("Stream error:", error);
+            statusDiv.textContent = "An error occurred during the pipeline run.";
+        } finally {
             stopBtn.style.display = 'none';
             runBtn.style.display = 'block';
-            return;
+            stopBtn.disabled = false;
+            statusDiv.textContent = `Pipeline finished. Processed ${completedCount} questions.`;
         }
-
-        for (const questionData of questions) {
-            if (pipelineController.aborted) {
-                statusDiv.textContent = `Pipeline stopped by user. Processed ${completedCount} questions.`;
-                break;
-            }
-
-            const progress = Math.round((completedCount / questions.length) * 100);
-            progressBar.style.width = `${progress}%`;
-            progressBar.textContent = `${progress}%`;
-            progressBar.setAttribute('aria-valuenow', progress);
-            statusDiv.textContent = `Processing question ${completedCount + 1} of ${questions.length}...`;
-
-            try {
-                const result = await processQuestion(questionData, groupId);
-                results.push(result);
-                addNewSessionToList(result.session_id, questionData, groupId, groupName);
-            } catch (error) {
-                if (!error.message.includes("aborted")) {
-                    console.error('Failed to process question:', questionData.question, error);
-                    results.push({ 
-                        question: questionData.question, 
-                        correct: 'error', 
-                        trials: 0, 
-                        session_id: null,
-                        final_answer: "Error processing",
-                        ground_truths: questionData.answer || []
-                    });
-                }
-            } finally {
-                completedCount++;
-                if (results.length > 0) {
-                    displayStats(results, groupName);
-                }
-            }
-        }
-        
-        const finalProgress = Math.round((completedCount / questions.length) * 100);
-        progressBar.style.width = `${finalProgress}%`;
-        progressBar.textContent = `${finalProgress}%`;
-        progressBar.setAttribute('aria-valuenow', finalProgress);
-        if (!pipelineController.aborted) {
-            statusDiv.textContent = `Pipeline finished. Processed ${completedCount} of ${questions.length} questions.`;
-        }
-
-        if (results.length > 0) {
-            displayStats(results, groupName);
-        }
-        
-        stopBtn.style.display = 'none';
-        runBtn.style.display = 'block';
     }
 
     function exportResultsAsCSV() {

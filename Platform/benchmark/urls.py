@@ -1,12 +1,13 @@
 from django.urls import path
-from . import views
+from benchmark import views
 
 app_name = 'benchmark'
 
 urlpatterns = [
-    path("", views.index, name="index"),
+    path("", views.home, name="home"),
     path("interactive_llm/", views.interactive_llm, name="interactive_llm"),
     path("adhoc_llm/", views.adhoc_llm, name="adhoc_llm"),
+    path("web_search_rag/", views.web_search_rag, name="web_search_rag"),
     path("api/list_runs/", views.list_runs, name="list_runs"),
     path("api/interactive/create_session_group/", views.create_session_group, name="create_session_group"),
     path("api/interactive/create_session/", views.create_session, name="create_session"),
@@ -25,8 +26,13 @@ urlpatterns = [
     path('api/interactive/delete_session_group/<int:group_id>/', views.delete_session_group, name='delete_session_group'),
     path('api/interactive/load_run/<int:group_id>/', views.load_interactive_run, name='load_interactive_run'),
 
+    # Interactive Pipeline APIs
+    path('api/run_interactive_pipeline/', views.run_interactive_pipeline, name='run_interactive_pipeline'),
+    path('api/stop_interactive_pipeline/', views.stop_interactive_pipeline, name='stop_interactive_pipeline'),
+
     # New Ad-hoc pipeline URL
     path('api/run_adhoc_pipeline/', views.run_adhoc_pipeline, name='run_adhoc_pipeline'),
+    path('api/stop_adhoc_pipeline/', views.stop_adhoc_pipeline, name='stop_adhoc_pipeline'),
 
     # LLM Settings
     path('api/save_llm_settings/', views.save_llm_settings, name='save_llm_settings'),
@@ -35,5 +41,15 @@ urlpatterns = [
     path('api/adhoc/list_runs/', views.list_adhoc_runs, name='list_adhoc_runs'),
     path('api/adhoc/get_run/<int:run_id>/', views.get_adhoc_run, name='get_adhoc_run'),
     path('api/adhoc/delete_run/<int:run_id>/', views.delete_adhoc_run, name='delete_adhoc_run'),
+    path('api/web_search/', views.web_search, name='web_search'),
+
+    # RAG APIs
+    path('api/save_rag_settings/', views.save_rag_settings, name='save_rag_settings'),
+    path('api/run_rag_pipeline/', views.run_rag_pipeline, name='run_rag_pipeline'),
+    path('api/stop_rag_pipeline/', views.stop_rag_pipeline, name='stop_rag_pipeline'),
+    path('api/rag/list_runs/', views.list_rag_runs, name='list_rag_runs'),
+    path('api/rag/get_run/<int:run_id>/', views.get_rag_run, name='get_rag_run'),
+    path('api/rag/delete_run/<int:run_id>/', views.delete_rag_run, name='delete_rag_run'),
+    path('api/rag/get_default_prompt/', views.get_default_rag_prompt, name='get_default_rag_prompt'),
 ]
 

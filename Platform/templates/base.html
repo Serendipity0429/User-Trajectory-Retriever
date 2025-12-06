@@ -108,7 +108,7 @@
                 {% endif %}
                 {% if user.is_staff %}
                 <li>
-                    <a href="{% url 'benchmark:index' %}"><i class="bi bi-speedometer2"></i> Benchmark</a>
+                    <a href="{% url 'benchmark:home' %}"><i class="bi bi-speedometer2"></i> Benchmark</a>
                 </li>
                 {% endif %}
                 {% if request.session.original_user_token %}

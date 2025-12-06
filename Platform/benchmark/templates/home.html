@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}Benchmark Dashboard{% endblock %}
 
@@ -28,6 +29,12 @@
                             <h6 class="mb-1">Ad-hoc LLM Benchmark</h6>
                         </div>
                         <p class="mb-1 small text-muted">Run the model against the full QA pipeline and evaluate its performance.</p>
+                    </a>
+                    <a href="{% url 'benchmark:web_search_rag' %}" class="list-group-item list-group-item-action">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1">Web Search RAG Benchmark</h6>
+                        </div>
+                        <p class="mb-1 small text-muted">Evaluate RAG pipeline performance with web search.</p>
                     </a>
                 </div>
             </div>
@@ -71,47 +78,22 @@
     </div>
 </div>
 
+<script src="{% static 'js/benchmark_common.js' %}"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     function testConnection() {
-        const resultDiv = document.getElementById('test-connection-result');
-        const btn = document.getElementById('test-connection-btn');
-        const originalText = btn.innerHTML;
-        
-        resultDiv.innerHTML = '';
-        btn.disabled = true;
-        btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Testing...';
-
         const data = {
             llm_base_url: document.getElementById('llm_base_url').value,
             llm_api_key: document.getElementById('llm_api_key').value,
         };
         const csrfToken = '{{ csrf_token }}';
-
-        fetch("{% url 'benchmark:test_llm_connection' %}", {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': csrfToken
-            },
-            body: JSON.stringify(data)
-        })
-        .then(response => response.json().then(data => ({status: response.status, body: data})))
-        .then(({status, body}) => {
-            if (status === 200) {
-                resultDiv.innerHTML = `<div class="alert alert-success" role="alert">${body.message}</div>`;
-            } else {
-                resultDiv.innerHTML = `<div class="alert alert-danger" role="alert">${body.message}</div>`;
-            }
-        })
-        .catch(error => {
-            resultDiv.innerHTML = `<div class="alert alert-danger" role="alert">A network error occurred.</div>`;
-            console.error('Error:', error);
-        })
-        .finally(() => {
-            btn.disabled = false;
-            btn.innerHTML = originalText;
-        });
+        BenchmarkUtils.testConnection(
+            "{% url 'benchmark:test_llm_connection' %}",
+            csrfToken,
+            data,
+            'test-connection-result',
+            'test-connection-btn'
+        );
     }
 
     function saveSettings() {
@@ -121,47 +103,22 @@ document.addEventListener('DOMContentLoaded', function() {
             llm_model: document.getElementById('llm_model').value,
             max_retries: document.getElementById('max_retries').value
         };
-        fetch("{% url 'benchmark:save_llm_settings' %}", {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}'},
-            body: JSON.stringify(data)
-        })
-        .then(res => res.json())
-        .then(data => {
-            if(data.status === 'ok') {
-                const btn = document.getElementById('save-settings-btn');
-                const originalText = btn.innerHTML;
-                btn.innerHTML = '<i class="bi bi-check-lg me-1"></i> Saved!';
-                btn.classList.add('btn-success');
-                btn.classList.remove('btn-outline-primary');
-                setTimeout(() => {
-                    btn.innerHTML = originalText;
-                    btn.classList.remove('btn-success');
-                    btn.classList.add('btn-outline-primary');
-                }, 1500);
-            } else {
-                alert('Error saving settings: ' + (data.message || 'Unknown error'));
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('An network error occurred while saving settings.');
-        });
+        const csrfToken = '{{ csrf_token }}';
+        BenchmarkUtils.saveSettings(
+            "{% url 'benchmark:save_llm_settings' %}",
+            csrfToken,
+            data,
+            'save-settings-btn'
+        );
     }
 
     function restoreDefaults() {
-        fetch("{% url 'benchmark:get_llm_env_vars' %}")
-            .then(response => response.json())
-            .then(data => {
-                if(data.error) {
-                    alert('Error loading .env variables: ' + data.error);
-                } else {
-                    document.getElementById('llm_base_url').value = data.llm_base_url;
-                    document.getElementById('llm_api_key').value = data.llm_api_key;
-                    document.getElementById('llm_model').value = data.llm_model;
-                    saveSettings();
-                }
-            });
+        BenchmarkUtils.restoreDefaults("{% url 'benchmark:get_llm_env_vars' %}", function(data) {
+            document.getElementById('llm_base_url').value = data.llm_base_url;
+            document.getElementById('llm_api_key').value = data.llm_api_key;
+            document.getElementById('llm_model').value = data.llm_model;
+            saveSettings();
+        });
     }
 
     document.getElementById('save-settings-btn').addEventListener('click', saveSettings);

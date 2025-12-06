@@ -51,6 +51,13 @@ class InteractiveSession(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     is_completed = models.BooleanField(default=False)
     run_tag = models.CharField(max_length=255, blank=True, null=True, db_index=True)
+    
+    PIPELINE_CHOICES = [
+        ('interactive', 'Interactive'),
+        ('adhoc', 'Ad-hoc'),
+        ('rag', 'RAG'),
+    ]
+    pipeline_type = models.CharField(max_length=20, choices=PIPELINE_CHOICES, default='interactive')
 
     def __str__(self):
         return f"Session for: {self.question[:50]}..."
@@ -112,3 +119,81 @@ class AdhocSessionResult(models.Model):
 
     def __str__(self):
         return f"Result for '{self.question[:50]}...' in run {self.run.name}"
+
+class RagSettings(models.Model):
+    """
+    A singleton model to store RAG-specific settings.
+    """
+    prompt_template = models.TextField(
+        default="""Your task is to answer the following question based on the provided search results. Follow these rules strictly:
+1. Your answer must be an exact match to the correct answer found in the search results.
+2. Do not include any punctuation.
+3. Do not include any extra words or sentences.
+
+For example:
+Question: What is the capital of France?
+Correct Answer: Paris
+
+Incorrect Answers:
+- "The capital of France is Paris." (contains extra words)
+- "Paris is the capital of France." (contains extra words)
+- "Paris." (contains a period)
+
+Now, answer the following question based on the provided search results:
+Question: {question}
+
+Search Results:
+{search_results}
+
+Answer:""",
+        help_text="Template for the RAG prompt. Use {question} and {search_results} placeholders."
+    )
+
+    def save(self, *args, **kwargs):
+        if not self.pk and RagSettings.objects.exists():
+            raise ValidationError("There can be only one RagSettings instance.")
+        return super(RagSettings, self).save(*args, **kwargs)
+
+    @classmethod
+    def load(cls):
+        obj, created = cls.objects.get_or_create(pk=1)
+        return obj
+
+    def __str__(self):
+        return "RAG Settings"
+
+class RagBenchmarkRun(models.Model):
+    """
+    Represents a single, complete run of the RAG QA pipeline.
+    """
+    name = models.CharField(max_length=255, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    llm_settings = models.ForeignKey(LLMSettings, on_delete=models.SET_NULL, null=True, blank=True)
+    rag_settings = models.ForeignKey(RagSettings, on_delete=models.SET_NULL, null=True, blank=True)
+
+    # Aggregate statistics
+    total_questions = models.IntegerField(default=0)
+    correct_answers = models.IntegerField(default=0)
+    accuracy = models.FloatField(default=0.0)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return self.name
+
+class RagBenchmarkResult(models.Model):
+    """
+    Stores the result of a single question-answer session within a RagBenchmarkRun.
+    """
+    run = models.ForeignKey(RagBenchmarkRun, related_name='results', on_delete=models.CASCADE)
+    question = models.TextField()
+    ground_truths = models.JSONField(default=list)
+    answer = models.TextField()
+    is_correct_rule = models.BooleanField(default=False)
+    is_correct_llm = models.BooleanField(null=True, default=None) # Allow null for errors/uncertainty
+    num_docs_used = models.IntegerField(default=0)
+    search_results = models.JSONField(default=list)
+
+    def __str__(self):
+        return f"RAG Result for '{self.question[:50]}...' in run {self.run.name}"

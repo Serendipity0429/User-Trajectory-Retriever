@@ -1,49 +1,13 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}Ad-hoc LLM Benchmark{% endblock %}
+{% block title %}Web RAG Benchmark{% endblock %}
 
 {% block content %}
 <div class="container mt-5 px-lg-4">
     <div class="pb-3 mb-4 border-bottom">
-        <h1 class="h2"><i class="bi bi-robot me-2"></i>Ad-hoc LLM Benchmark</h1>
-        <p class="text-muted mb-0">Run the model against the full QA pipeline and evaluate its performance with rule-based and LLM-based validation.</p>
-    </div>
-
-    <!-- LLM Configuration Card -->
-    <div class="row justify-content-center">
-        <div class="col-md-12">
-            <div class="card shadow-sm mb-4">
-                <div class="card-header" id="headingConfig" data-bs-toggle="collapse" data-bs-target="#collapseConfig" aria-expanded="false" aria-controls="collapseConfig" style="cursor: pointer;">
-                    <h5 class="mb-0"><i class="bi bi-gear me-2"></i>LLM Configuration</h5>
-                </div>
-                <div id="collapseConfig" class="collapse">
-                    <div class="card-body">
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label for="llm_base_url" class="form-label">Base URL</label>
-                                <input type="text" class="form-control" id="llm_base_url" placeholder="Optional: e.g., http://localhost:11434/v1" value="{{ llm_settings.llm_base_url|safe }}">
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label for="llm_model" class="form-label">Model Name</label>
-                                <input type="text" class="form-control" id="llm_model" placeholder="e.g., gpt-4o" value="{{ llm_settings.llm_model|safe }}">
-                            </div>
-                            <div class="col-md-12">
-                                <label for="llm_api_key" class="form-label">API Key</label>
-                                <input type="text" class="form-control" id="llm_api_key" placeholder="Enter your API Key" value="{{ llm_settings.llm_api_key|safe }}">
-                            </div>
-                        </div>
-                        <hr>
-                        <div class="d-flex justify-content-end">
-                            <button type="button" class="btn btn-outline-primary me-2" id="save-settings-btn"><i class="bi bi-save me-1"></i> Save</button>
-                            <button type="button" class="btn btn-outline-info me-2" id="test-connection-btn"><i class="bi bi-person-check me-1"></i> Test Connection</button>
-                            <button type="button" class="btn btn-outline-secondary" id="restore-defaults-btn"><i class="bi bi-server me-1"></i> Load .env</button>
-                        </div>
-                        <div id="test-connection-result" class="mt-3"></div>
-                    </div>
-                </div>
-            </div>
-        </div>
+        <h1 class="h2"><i class="bi bi-search me-2"></i>Web RAG Benchmark</h1>
+        <p class="text-muted mb-0">Run a RAG pipeline using web search against the full QA dataset and evaluate its performance.</p>
     </div>
 
     <div class="row justify-content-center">
@@ -54,12 +18,12 @@
                     <h5 class="mb-0"><i class="bi bi-play-circle me-2"></i>Control Panel</h5>
                 </div>
                 <div class="card-body">
-                    <p>Run the model against the 'hard_questions_refined.jsonl' dataset ({{ total_questions }} questions).</p>
+                    <p>Run the RAG pipeline against the 'hard_questions_refined.jsonl' dataset ({{ total_questions }} questions).</p>
                     <form id="pipeline-form" data-total-questions="{{ total_questions }}">
                         {% csrf_token %}
-                        <input type="hidden" name="mode" value="qa_pipeline">
+                        <input type="hidden" name="mode" value="rag_pipeline">
                         <div class="d-grid gap-2">
-                            <button type="button" id="run-pipeline-btn" class="btn btn-primary">Run QA Pipeline</button>
+                            <button type="button" id="run-pipeline-btn" class="btn btn-primary">Run RAG Pipeline</button>
                             <button type="button" id="retry-btn" class="btn btn-secondary" style="display: none;">Retry Failed</button>
                             <button type="button" id="stop-pipeline-btn" class="btn btn-danger" style="display: none;">Stop</button>
                         </div>
@@ -94,15 +58,74 @@
         </div>
     </div>
 
+    <!-- Configuration Cards -->
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <!-- RAG Configuration Card -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header" data-bs-toggle="collapse" data-bs-target="#collapseRagConfig" aria-expanded="true" aria-controls="collapseRagConfig" style="cursor: pointer;">
+                    <h5 class="mb-0"><i class="bi bi-puzzle me-2"></i>RAG Configuration</h5>
+                </div>
+                <div id="collapseRagConfig" class="collapse">
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label for="rag-prompt-template" class="form-label">Prompt Template</label>
+                             <p class="text-muted small">Use <code>{question}</code> and <code>{search_results}</code> placeholders. Search results will be formatted as a numbered list.</p>
+                            <textarea id="rag-prompt-template" class="form-control" rows="8">{{ rag_settings.prompt_template|default:"Context from web search:\n{search_results}\n\nBased on the context above, answer the following question.\n\nQuestion: {question}\nAnswer:" }}</textarea>
+                        </div>
+                         <hr>
+                        <div class="d-flex justify-content-end">
+                            <button type="button" class="btn btn-outline-secondary me-2" id="restore-rag-defaults-btn"><i class="bi bi-arrow-clockwise me-1"></i> Restore Default Prompts</button>
+                            <button type="button" class="btn btn-outline-primary me-2" id="save-rag-settings-btn"><i class="bi bi-save me-1"></i> Save Prompt</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <!-- LLM Configuration Card -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header" data-bs-toggle="collapse" data-bs-target="#collapseLlmConfig" aria-expanded="false" aria-controls="collapseLlmConfig" style="cursor: pointer;">
+                    <h5 class="mb-0"><i class="bi bi-gear me-2"></i>LLM Configuration</h5>
+                </div>
+                <div id="collapseLlmConfig" class="collapse">
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="llm_base_url" class="form-label">Base URL</label>
+                                <input type="text" class="form-control" id="llm_base_url" placeholder="Optional: e.g., http://localhost:11434/v1" value="{{ llm_settings.llm_base_url|safe }}">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="llm_model" class="form-label">Model Name</label>
+                                <input type="text" class="form-control" id="llm_model" placeholder="e.g., gpt-4o" value="{{ llm_settings.llm_model|safe }}">
+                            </div>
+                            <div class="col-md-12">
+                                <label for="llm_api_key" class="form-label">API Key</label>
+                                <input type="text" class="form-control" id="llm_api_key" placeholder="Enter your API Key" value="{{ llm_settings.llm_api_key|safe }}">
+                            </div>
+                        </div>
+                        <hr>
+                        <div class="d-flex justify-content-end">
+                            <button type="button" class="btn btn-outline-primary me-2" id="save-llm-settings-btn"><i class="bi bi-save me-1"></i> Save</button>
+                            <button type="button" class="btn btn-outline-info me-2" id="test-connection-btn"><i class="bi bi-person-check me-1"></i> Test Connection</button>
+                            <button type="button" class="btn btn-outline-secondary" id="restore-defaults-btn"><i class="bi bi-server me-1"></i> Load .env</button>
+                        </div>
+                        <div id="test-connection-result" class="mt-3"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Single Question Run Card -->
     <div class="row justify-content-center mt-4">
         <div class="col-md-12">
             <div class="card shadow-sm mb-4">
                 <div class="card-header">
-                    <h5 class="mb-0"><i class="bi bi-chat-left-text me-2"></i>Single Question Run</h5>
+                    <h5 class="mb-0"><i class="bi bi-chat-left-text me-2"></i>Single Question RAG Run</h5>
                 </div>
                 <div class="card-body">
-                    <p>Select a question from the dataset to run it through the LLM pipeline and see the result immediately.</p>
+                    <p>Select a question from the dataset to run it through the RAG pipeline and see the result immediately.</p>
                     {{ questions|json_script:"questions-data" }}
                     <div class="mb-3">
                         <label for="question-selector" class="form-label">Select Question from Dataset</label>
@@ -123,8 +146,32 @@
                                 <p class="mb-1"><strong>Model Answer:</strong> <span id="single-result-answer"></span></p>
                                 <p class="mb-1"><strong>Rule-based Correct:</strong> <span id="single-result-rule-correct"></span></p>
                                 <p class="mb-1"><strong>LLM Judge Correct:</strong> <span id="single-result-llm-correct"></span></p>
+                                <p class="mb-1"><strong>Documents Used:</strong> <span id="single-result-docs-used"></span></p>
                                 <p class="mb-0"><strong>Details:</strong> <span id="single-result-details"></span></p>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Web Search Test Card -->
+    <div class="row justify-content-center">
+        <div class="col-md-12">
+            <div class="card shadow-sm mb-4">
+                <div class="card-header" data-bs-toggle="collapse" data-bs-target="#collapseWebSearchTest" aria-expanded="false" aria-controls="collapseWebSearchTest" style="cursor: pointer;">
+                    <h5 class="mb-0"><i class="bi bi-globe me-2"></i>Test Web Search</h5>
+                </div>
+                <div id="collapseWebSearchTest" class="collapse">
+                    <div class="card-body">
+                        <div class="input-group mb-3">
+                            <input type="text" id="web-search-query" class="form-control" placeholder="Enter search query..." aria-label="Search query">
+                            <button class="btn btn-outline-primary" type="button" id="test-web-search-btn"><i class="bi bi-search"></i> Search</button>
+                        </div>
+                        <div id="web-search-results" class="mt-3" style="display: none;">
+                            <h6>Results:</h6>
+                            <div id="web-search-results-list" class="list-group"></div>
                         </div>
                     </div>
                 </div>
@@ -135,7 +182,7 @@
     <!-- Results Table -->
     <div id="pipeline-results-container" class="mt-4" style="display: none;">
         <h4>
-            <span id="results-header-text">QA Pipeline Results</span>
+            <span id="results-header-text">RAG Pipeline Results</span>
             <span id="running-spinner" class="ms-2" style="display: none;">
                 <i class="bi bi-arrow-repeat spin"></i>
             </span>
@@ -143,7 +190,28 @@
 
         <!-- Summary Stats -->
         <div class="row my-4" id="summary-container">
-            <div class="col-lg-6 mb-4 mb-lg-0">
+             <div class="col-lg-4 mb-4 mb-lg-0">
+                <h5 class="mb-3 text-center text-muted">RAG Statistics</h5>
+                <div class="row">
+                    <div class="col-6">
+                        <div class="card text-center text-dark bg-light summary-card h-100">
+                            <div class="card-body">
+                                <h5 class="card-title" id="total-searches-count">0</h5>
+                                <p class="card-text text-muted small">Total Searches</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="card text-center text-dark bg-light summary-card h-100">
+                            <div class="card-body">
+                                <h5 class="card-title" id="avg-docs-count">0.0</h5>
+                                <p class="card-text text-muted small">Avg. Docs Used</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-4 mb-4 mb-lg-0">
                 <h5 class="mb-3 text-center text-muted">Rule-Based Evaluation</h5>
                 <div class="row">
                     <div class="col-4">
@@ -172,7 +240,7 @@
                     </div>
                 </div>
             </div>
-            <div class="col-lg-6">
+            <div class="col-lg-4">
                 <h5 class="mb-3 text-center text-muted">LLM Judge Evaluation</h5>
                 <div class="row">
                     <div class="col-4">
@@ -228,9 +296,10 @@
                         <thead class="table-light text-uppercase small fw-bold text-muted">
                             <tr>
                                 <th class="px-4 py-3" style="width: 5%;">#</th>
-                                <th class="px-4 py-3" style="width: 25%;">Question</th>
-                                <th class="px-4 py-3" style="width: 25%;">Model Answer</th>
-                                <th class="px-4 py-3" style="width: 20%;">Ground Truths</th>
+                                <th class="px-4 py-3" style="width: 20%;">Question</th>
+                                <th class="px-4 py-3" style="width: 20%;">Model Answer</th>
+                                <th class="px-4 py-3" style="width: 15%;">Ground Truths</th>
+                                <th class="px-4 py-3" style="width: 15%;">Search Results</th>
                                 <th class="px-4 py-3 text-center" style="width: 10%;">Rule-based</th>
                                 <th class="px-4 py-3 text-center" style="width: 10%;">LLM Judge</th>
                                 <th class="px-4 py-3 text-center" style="width: 5%;">Agreement</th>
@@ -245,6 +314,26 @@
     </div>
 </div>
 
+    <!-- Search Results List Modal -->
+    <div class="modal fade" id="searchResultsListModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Search Results</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="modal-search-results-container" class="list-group list-group-flush">
+                        <!-- Results will be injected here -->
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
 <style>
 .compact-cell {
     max-height: 150px;
@@ -252,6 +341,11 @@
     display: block;
     white-space: pre-wrap;
     word-wrap: break-word;
+}
+.last-no-border:last-child {
+    border-bottom: none !important;
+    padding-bottom: 0 !important;
+    margin-bottom: 0 !important;
 }
 .table-success-light {
     --bs-table-bg: #e6f5e6;
@@ -304,19 +398,20 @@ document.addEventListener('DOMContentLoaded', function() {
     let failedItems = [];
 
     // --- Core UI Rendering Logic ---
-    function renderResults(data, resultsBody, isRetry = false) {
+    function renderResults(data, resultsBody, index, isRetry = false) {
         const rowId = `result-${Date.now()}-${Math.random()}`;
         let resultHtml;
 
         if (data.error) {
-            resultHtml = `<tr class="table-warning" data-id="${rowId}"><td colspan="7">Error: ${data.error}</td></tr>`;
+            resultHtml = `<tr class="table-warning" data-id="${rowId}"><td colspan="8">Error: ${data.error}</td></tr>`;
             if (!isRetry) {
                 failedItems.push({ ...data, rowId });
             }
         } else {
             const ruleCorrect = data.rule_result;
             const llmCorrect = data.llm_result;
-            const textColorClass = ruleCorrect ? 'text-success-dark' : 'text-danger-dark';
+            const isCorrect = llmCorrect; // NOTICE: manually set the judge as llm
+            const textColorClass = isCorrect ? 'text-success-dark' : 'text-danger-dark';
 
             const ruleBadge = ruleCorrect ? `<span class="badge bg-success">Correct</span>` : `<span class="badge bg-danger">Incorrect</span>`;
             const llmBadge = llmCorrect === null ? `<span class="badge bg-secondary">Error</span>` : (llmCorrect ? `<span class="badge bg-success">Correct</span>` : `<span class="badge bg-danger">Incorrect</span>`);
@@ -336,11 +431,26 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             groundTruthsHtml += '</ul>';
 
-            resultHtml = `<tr class="${ruleCorrect ? 'table-success-light' : 'table-danger-light'}" data-id="${rowId}">
-                <td class="px-4 fw-bold text-muted small"></td>
+            let searchResultsHtml = '';
+            if (data.search_results && data.search_results.length > 0) {
+                const resultsJson = encodeURIComponent(JSON.stringify(data.search_results));
+                const count = data.search_results.length;
+                searchResultsHtml = `
+                    <button class="btn btn-sm btn-outline-primary view-all-results-btn" 
+                            data-results="${resultsJson}"
+                            type="button">
+                        <i class="bi bi-list-ul me-1"></i>View ${count} Results
+                    </button>`;
+            } else {
+                searchResultsHtml = '<span class="text-muted fst-italic small">No results</span>';
+            }
+
+            resultHtml = `<tr class="${isCorrect ? 'table-success-light' : 'table-danger-light'}" data-id="${rowId}">
+                <td class="px-4 fw-bold text-muted small">${index}</td>
                 <td class="px-4"><div class="compact-cell fw-bold ${textColorClass}">${data.question}</div></td>
                 <td class="px-4"><div class="compact-cell ${textColorClass}">${data.answer}</div></td>
                 <td class="px-4">${groundTruthsHtml}</td>
+                <td class="px-4">${searchResultsHtml}</td>
                 <td class="px-4 text-center align-middle">${ruleBadge}</td>
                 <td class="px-4 text-center align-middle">${llmBadge}</td>
                 <td class="px-4 text-center align-middle">${agreementIcon}</td>
@@ -366,34 +476,75 @@ document.addEventListener('DOMContentLoaded', function() {
         const llmEvalCount = stats.total - stats.llmErrors;
         const llmAccuracy = llmEvalCount > 0 ? (stats.llmCorrect / llmEvalCount) * 100 : 0;
         const agreement = llmEvalCount > 0 ? (stats.agreements / llmEvalCount) * 100 : 0;
+        const avgDocs = stats.total > 0 ? (stats.totalDocsUsed / stats.total) : 0;
 
         document.getElementById('processed-count').textContent = stats.total;
         document.getElementById('agreement-rate').textContent = `${agreement.toFixed(2)}%`;
+        
         document.getElementById('rule-correct-count').textContent = stats.ruleCorrect;
         document.getElementById('rule-incorrect-count').textContent = stats.total - stats.ruleCorrect;
         document.getElementById('rule-accuracy-rate').textContent = `${ruleAccuracy.toFixed(2)}%`;
+        
         document.getElementById('llm-correct-count').textContent = stats.llmCorrect;
         document.getElementById('llm-incorrect-count').textContent = llmEvalCount - stats.llmCorrect;
         document.getElementById('llm-accuracy-rate').textContent = `${llmAccuracy.toFixed(2)}%`;
+
+        document.getElementById('total-searches-count').textContent = stats.total; // Assuming one search per question
+        document.getElementById('avg-docs-count').textContent = avgDocs.toFixed(2);
     }
 
     // --- Configuration Management ---
-    function saveSettings() {
+    function restoreDefaultRagPrompt() {
+        const btn = document.getElementById('restore-rag-defaults-btn');
+        const originalText = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Restoring...';
+
+        fetch("{% url 'benchmark:get_default_rag_prompt' %}")
+            .then(response => response.json())
+            .then(data => {
+                if (data.default_prompt) {
+                    document.getElementById('rag-prompt-template').value = data.default_prompt;
+                    saveRagSettings(); // Automatically save
+                } else {
+                    alert('Error fetching default prompt.');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Failed to load default prompt.');
+            })
+            .finally(() => {
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            });
+    }
+
+    function saveLlmSettings() {
         const data = {
             llm_base_url: document.getElementById('llm_base_url').value,
             llm_api_key: document.getElementById('llm_api_key').value,
             llm_model: document.getElementById('llm_model').value,
         };
         const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
-        BenchmarkUtils.saveSettings("{% url 'benchmark:save_llm_settings' %}", csrfToken, data, 'save-settings-btn');
+        BenchmarkUtils.saveSettings("{% url 'benchmark:save_llm_settings' %}", csrfToken, data, 'save-llm-settings-btn');
     }
+
+    function saveRagSettings() {
+        const data = {
+            prompt_template: document.getElementById('rag-prompt-template').value,
+        };
+        const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
+        BenchmarkUtils.saveSettings("{% url 'benchmark:save_rag_settings' %}", csrfToken, data, 'save-rag-settings-btn');
+    }
+
 
     function restoreDefaults() {
         BenchmarkUtils.restoreDefaults("{% url 'benchmark:get_llm_env_vars' %}", function(data) {
             document.getElementById('llm_base_url').value = data.llm_base_url;
             document.getElementById('llm_api_key').value = data.llm_api_key;
             document.getElementById('llm_model').value = data.llm_model;
-            saveSettings();
+            saveLlmSettings();
         });
     }
 
@@ -411,21 +562,62 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // --- Save/Load/Delete Run Functions ---
     function loadSavedRuns() {
-        BenchmarkUtils.loadSavedRuns("{% url 'benchmark:list_adhoc_runs' %}", loadRun, deleteRun);
+        BenchmarkUtils.loadSavedRuns("{% url 'benchmark:list_rag_runs' %}", loadRun, deleteRun);
+    }
+    
+        function loadRun(runId) {
+            document.getElementById('pipeline-results-container').style.display = 'block';
+            document.getElementById('progress-container').style.display = 'none';
+            document.getElementById('save-run-btn').disabled = true;
+
+            fetch(`/benchmark/api/rag/get_run/${runId}/`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        alert('Error loading run: ' + data.error);
+                        return;
+                    }
+                    currentRunResults = data.results;
+                    
+                    document.getElementById('results-header-text').textContent = `Results for: ${data.name}`;
+                    
+                    // Update stats
+                    const stats = {
+                        total: data.total_questions,
+                        ruleCorrect: data.results.filter(r => r.is_correct_rule).length,
+                        llmCorrect: data.correct_answers,
+                        llmErrors: data.results.filter(r => r.is_correct_llm === null).length,
+                        agreements: data.results.filter(r => r.is_correct_llm !== null && r.is_correct_rule === r.is_correct_llm).length,
+                        totalDocsUsed: data.results.reduce((acc, r) => acc + (r.num_docs_used || 0), 0)
+                    };
+                    updateSummary(stats);
+
+                    // Render table
+                    const resultsBody = document.getElementById('pipeline-results-body');
+                    resultsBody.innerHTML = '';
+                    currentRunResults.forEach((result, idx) => {
+                        renderResults(result, resultsBody, idx + 1);
+                    });
+                })
+                .catch(error => {
+                    console.error('Error loading run:', error);
+                    alert(`Failed to load run data.`);
+                });
+        }
+    
+        function deleteRun(runId) {
+        const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
+        BenchmarkUtils.deleteRun(`/benchmark/api/rag/delete_run/${runId}/`, csrfToken);
     }
 
-    function deleteRun(runId) {
-        const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
-        BenchmarkUtils.deleteRun(`/benchmark/api/adhoc/delete_run/${runId}/`, csrfToken);
-    }    
     document.getElementById('save-run-btn').addEventListener('click', function() {
-        const defaultName = `Run ${new Date().toISOString().slice(0, 19).replace('T', ' ')}`;
+        const defaultName = `RAG Run ${new Date().toISOString().slice(0, 19).replace('T', ' ')}`;
         const runName = prompt("Please enter a name for this run:", defaultName);
         
         if (runName && currentRunResults.length > 0) {
             const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
             
-            fetch("{% url 'benchmark:adhoc_llm' %}", {
+            fetch("{% url 'benchmark:web_search_rag' %}", {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -437,8 +629,7 @@ document.addEventListener('DOMContentLoaded', function() {
             .then(data => {
                 if (data.status === 'ok') {
                     alert('Run saved successfully!');
-                    // Refresh to see the new run in the list
-                    window.location.href = "{% url 'benchmark:adhoc_llm' %}";
+                    window.location.href = "{% url 'benchmark:web_search_rag' %}";
                 } else {
                     alert('Error saving run: ' + (data.error || 'Unknown error'));
                 }
@@ -450,7 +641,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // --- Single Question Run Logic ---
+    // --- Single Question RAG Run Logic ---
     document.getElementById('run-single-question-btn').addEventListener('click', async function() {
         const resultsDiv = document.getElementById('single-run-results');
         const runBtn = this;
@@ -492,7 +683,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 body: JSON.stringify({
                     question: question,
                     ground_truths: ground_truths,
-                    pipeline_type: 'adhoc' // Specify adhoc pipeline type
+                    pipeline_type: 'rag' // Specify RAG pipeline type
                 })
             });
             const sessionData = await createSessionResponse.json();
@@ -519,32 +710,20 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // 3. Display Results
             resultsDiv.style.display = 'block';
-            
-            const singleResultAnswer = document.getElementById('single-result-answer');
-            if (singleResultAnswer) {
-                singleResultAnswer.textContent = trialData.answer || 'N/A';
-            }
-
-            const singleResultRuleCorrect = document.getElementById('single-result-rule-correct');
-            if (singleResultRuleCorrect) {
-                singleResultRuleCorrect.innerHTML = trialData.is_correct ? '<span class="badge bg-success">Correct</span>' : '<span class="badge bg-danger">Incorrect</span>';
-            }
-            
-            const singleResultLlmCorrect = document.getElementById('single-result-llm-correct');
-            if (singleResultLlmCorrect) {
-                singleResultLlmCorrect.innerHTML = trialData.is_correct ? '<span class="badge bg-success">Correct</span>' : '<span class="badge bg-danger">Incorrect</span>';
-            }
-
-            const singleResultDetails = document.getElementById('single-result-details');
-            if (singleResultDetails) {
-                singleResultDetails.textContent = trialData.error ? `Error: ${trialData.error}` : 'Run completed.';
-            }
+            document.getElementById('single-result-answer').textContent = trialData.answer || 'N/A';
+            document.getElementById('single-result-rule-correct').innerHTML = trialData.is_correct ? '<span class="badge bg-success">Correct</span>' : '<span class="badge bg-danger">Incorrect</span>';
+            // Note: RAG pipeline in views.py currently sets is_correct based on rule AND LLM,
+            // so this will reflect overall correctness based on current backend logic.
+            document.getElementById('single-result-llm-correct').innerHTML = trialData.is_correct ? '<span class="badge bg-success">Correct</span>' : '<span class="badge bg-danger">Incorrect</span>';
+            document.getElementById('single-result-docs-used').textContent = trialData.num_docs_used !== undefined ? trialData.num_docs_used : 'N/A';
+            document.getElementById('single-result-details').textContent = trialData.error ? `Error: ${trialData.error}` : 'Run completed.';
 
         } catch (error) {
             resultsDiv.style.display = 'block';
             document.getElementById('single-result-answer').textContent = 'Error';
             document.getElementById('single-result-rule-correct').textContent = '-';
             document.getElementById('single-result-llm-correct').textContent = '-';
+            document.getElementById('single-result-docs-used').textContent = '-';
             document.getElementById('single-result-details').textContent = `Error: ${error.message}`;
             console.error('Error running single question:', error);
         } finally {
@@ -559,7 +738,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function stopPipeline(pipelineId) {
         const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
-        BenchmarkUtils.stopPipeline("{% url 'benchmark:stop_adhoc_pipeline' %}", csrfToken, pipelineId);
+        BenchmarkUtils.stopPipeline("{% url 'benchmark:stop_rag_pipeline' %}", csrfToken, pipelineId);
     }
 
     window.addEventListener('beforeunload', function (e) {
@@ -574,7 +753,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         if (!apiKey.trim() || !modelName.trim()) {
             alert('Please set your LLM API Key and Model Name in the LLM Configuration section before running the benchmark.');
-            const configCollapseEl = document.getElementById('collapseConfig');
+            const configCollapseEl = document.getElementById('collapseLlmConfig');
             const configCollapse = new bootstrap.Collapse(configCollapseEl, { toggle: false });
             configCollapse.show();
             return;
@@ -588,26 +767,29 @@ document.addEventListener('DOMContentLoaded', function() {
         // Reset UI
         currentRunResults = [];
         currentRunId = null;
+        failedItems = [];
         resultsBody.innerHTML = '';
         document.getElementById('pipeline-results-container').style.display = 'block';
         document.getElementById('progress-container').style.display = 'block';
         document.getElementById('save-run-btn').disabled = true;
         document.getElementById('save-run-btn').innerHTML = '<i class="bi bi-save me-1"></i> Autosaved';
+        document.getElementById('retry-btn').style.display = 'none';
         document.getElementById('running-spinner').style.display = 'inline-block';
-        document.getElementById('results-header-text').textContent = 'Live QA Pipeline Results (Autosaving...)';
+        document.getElementById('results-header-text').textContent = 'Live RAG Pipeline Results (Autosaving...)';
         document.getElementById('run-pipeline-btn').style.display = 'none';
         document.getElementById('stop-pipeline-btn').style.display = 'block';
 
-        let stats = { total: 0, ruleCorrect: 0, llmCorrect: 0, llmErrors: 0, agreements: 0 };
+        let stats = { total: 0, ruleCorrect: 0, llmCorrect: 0, llmErrors: 0, agreements: 0, totalDocsUsed: 0 };
         updateSummary(stats);
 
         const llm_base_url = document.getElementById('llm_base_url').value;
         const llm_api_key = document.getElementById('llm_api_key').value;
         const llm_model = document.getElementById('llm_model').value;
+        const rag_prompt_template = document.getElementById('rag-prompt-template').value;
         
         currentPipelineId = BenchmarkUtils.generateUUID();
 
-        const fetchURL = `{% url 'benchmark:run_adhoc_pipeline' %}?llm_base_url=${encodeURIComponent(llm_base_url)}&llm_api_key=${encodeURIComponent(llm_api_key)}&llm_model=${encodeURIComponent(llm_model)}&pipeline_id=${currentPipelineId}`;
+        const fetchURL = `{% url 'benchmark:run_rag_pipeline' %}?llm_base_url=${encodeURIComponent(llm_base_url)}&llm_api_key=${encodeURIComponent(llm_api_key)}&llm_model=${encodeURIComponent(llm_model)}&rag_prompt_template=${encodeURIComponent(rag_prompt_template)}&pipeline_id=${currentPipelineId}`;
 
         fetch(fetchURL, { method: 'GET', signal })
             .then(response => {
@@ -618,14 +800,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 function push() {
                     reader.read().then(({ done, value }) => {
                         if (done) {
-                            currentPipelineId = null; // Pipeline finished
+                            currentPipelineId = null;
                             document.getElementById('running-spinner').style.display = 'none';
                             document.getElementById('run-pipeline-btn').style.display = 'block';
                             document.getElementById('stop-pipeline-btn').style.display = 'none';
                             
-                            // Refresh list to show new run
-                            loadSavedRuns(); 
-                            
+                            // Refresh list
+                            loadSavedRuns();
+
                             if(failedItems.length > 0) {
                                 document.getElementById('retry-btn').style.display = 'block';
                             }
@@ -637,19 +819,19 @@ document.addEventListener('DOMContentLoaded', function() {
                         jsonObjects.forEach(jsonStr => {
                             try {
                                 const data = JSON.parse(jsonStr);
-                                
+
                                 if (data.is_meta && data.type === 'run_created') {
                                     currentRunId = data.run_id;
                                     document.getElementById('results-header-text').textContent = `Live Results: ${data.name}`;
                                     return;
                                 }
-
+                                
                                 if(data.error) {
                                     const originalItem = currentRunResults.find(item => item.question === data.question);
                                     failedItems.push({ ...originalItem, ...data, rowId: `result-${stats.total}` });
                                 }
-                                currentRunResults.push(data); // Store result
-                                renderResults(data, resultsBody);
+                                currentRunResults.push(data);
+                                renderResults(data, resultsBody, stats.total + 1);
                                 
                                 stats.total++;
                                 if (!data.error) {
@@ -657,6 +839,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                     if (data.llm_result) stats.llmCorrect++;
                                     if (data.llm_result === null) stats.llmErrors++;
                                     if (data.llm_result !== null && data.rule_result === data.llm_result) stats.agreements++;
+                                    stats.totalDocsUsed += data.num_docs_used || 0;
                                 }
 
                                 const progress = (stats.total / totalQuestions) * 100;
@@ -700,72 +883,10 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     document.getElementById('retry-btn').addEventListener('click', function() {
-        runRetryPipeline();
+        // Retry logic might need adjustment for RAG specifics if different parameters are needed.
+        // For now, let's assume it's similar enough.
+        alert("Retry logic not fully implemented for RAG yet.");
     });
-
-    function runRetryPipeline() {
-        const btn = document.getElementById('retry-btn');
-        btn.disabled = true;
-        btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Retrying...';
-
-        const resultsBody = document.getElementById('pipeline-results-body');
-        const questionsToRetry = failedItems.map(item => ({ question: item.question, ground_truths: item.ground_truths, originalRowId: item.rowId }));
-        
-        const formData = new FormData();
-        formData.append('csrfmiddlewaretoken', document.querySelector('input[name="csrfmiddlewaretoken"]').value);
-        formData.append('questions', JSON.stringify(questionsToRetry.map(q => ({question: q.question, ground_truths: q.ground_truths}))));
-        formData.append('llm_base_url', document.getElementById('llm_base_url').value);
-        formData.append('llm_api_key', document.getElementById('llm_api_key').value);
-        formData.append('llm_model', document.getElementById('llm_model').value);
-
-        fetch("{% url 'benchmark:adhoc_llm' %}", { method: 'POST', body: formData })
-            .then(response => {
-                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-                const reader = response.body.getReader();
-                const decoder = new TextDecoder();
-                let retryIndex = 0;
-
-                function push() {
-                    reader.read().then(({ done, value }) => {
-                        if (done) {
-                            btn.style.display = 'none'; // Hide after successful retry
-                            failedItems = []; // Clear the list
-                            return;
-                        }
-
-                        const chunk = decoder.decode(value, { stream: true });
-                        const jsonObjects = chunk.split('\n').filter(s => s.trim());
-                        
-                        jsonObjects.forEach(jsonStr => {
-                            try {
-                                const data = JSON.parse(jsonStr);
-                                const originalItem = questionsToRetry[retryIndex++];
-                                data.originalRowId = originalItem.originalRowId;
-
-                                // Replace the old result in currentRunResults
-                                const resultIndex = currentRunResults.findIndex(r => r.rowId === data.originalRowId);
-                                if (resultIndex !== -1) {
-                                    currentRunResults[resultIndex] = data;
-                                }
-
-                                renderResults(data, resultsBody, true); // true for isRetry
-
-                            } catch (e) {
-                                console.error("Failed to parse JSON chunk on retry:", e, jsonStr);
-                            }
-                        });
-                        push();
-                    }).catch(error => console.error('Error during retry stream:', error));
-                }
-                push();
-            })
-            .catch(error => {
-                console.error('Error starting the retry pipeline:', error);
-                alert('Failed to start the retry pipeline.');
-                btn.disabled = false;
-                btn.innerHTML = 'Retry Failed';
-            });
-    }
 
     document.getElementById('stop-pipeline-btn').addEventListener('click', function() {
         if (pipelineController) {
@@ -778,17 +899,89 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // Config buttons
-    document.getElementById('save-settings-btn').addEventListener('click', saveSettings);
+    document.getElementById('save-llm-settings-btn').addEventListener('click', saveLlmSettings);
+    document.getElementById('save-rag-settings-btn').addEventListener('click', saveRagSettings);
     document.getElementById('restore-defaults-btn').addEventListener('click', restoreDefaults);
+    document.getElementById('restore-rag-defaults-btn').addEventListener('click', restoreDefaultRagPrompt);
     document.getElementById('test-connection-btn').addEventListener('click', testConnection);
 
     // Autosave for LLM Settings
-    const autosaveSettings = BenchmarkUtils.debounce(saveSettings, 1000);
+    const autosaveLlmSettings = BenchmarkUtils.debounce(saveLlmSettings, 1000);
     ['llm_base_url', 'llm_model', 'llm_api_key'].forEach(id => {
         const el = document.getElementById(id);
         if (el) {
-            el.addEventListener('input', autosaveSettings);
+            el.addEventListener('input', autosaveLlmSettings);
         }
+    });
+
+    // Autosave for RAG Settings
+    const autosaveRagSettings = BenchmarkUtils.debounce(saveRagSettings, 1000);
+    const ragPromptEl = document.getElementById('rag-prompt-template');
+    if (ragPromptEl) {
+        ragPromptEl.addEventListener('input', autosaveRagSettings);
+    }
+
+    // --- Web Search Test Logic ---
+    document.getElementById('test-web-search-btn').addEventListener('click', function() {
+        const query = document.getElementById('web-search-query').value.trim();
+        if (!query) {
+            alert('Please enter a search query.');
+            return;
+        }
+
+        const btn = this;
+        const originalHtml = btn.innerHTML;
+        const resultsContainer = document.getElementById('web-search-results');
+        const resultsList = document.getElementById('web-search-results-list');
+
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Searching...';
+        resultsContainer.style.display = 'none';
+        resultsList.innerHTML = '';
+
+        const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
+
+        fetch("{% url 'benchmark:web_search' %}", {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken
+            },
+            body: JSON.stringify({ query: query })
+        })
+        .then(response => response.json())
+        .then(data => {
+            resultsContainer.style.display = 'block';
+            if (data.error) {
+                resultsList.innerHTML = `<div class="alert alert-danger">${data.error}</div>`;
+            } else if (data.results && data.results.length > 0) {
+                data.results.forEach((res, index) => {
+                    const item = document.createElement('a');
+                    item.href = res.link || '#';
+                    item.target = "_blank";
+                    item.className = "list-group-item list-group-item-action";
+                    item.innerHTML = `
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1 text-primary">${index + 1}. ${res.title || 'No Title'}</h6>
+                        </div>
+                        <p class="mb-1 small text-muted">${res.snippet || 'No snippet available.'}</p>
+                        <small class="text-truncate d-block text-secondary">${res.link || ''}</small>
+                    `;
+                    resultsList.appendChild(item);
+                });
+            } else {
+                resultsList.innerHTML = '<div class="alert alert-info">No results found.</div>';
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            resultsContainer.style.display = 'block';
+            resultsList.innerHTML = `<div class="alert alert-danger">An error occurred: ${error.message}</div>`;
+        })
+        .finally(() => {
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
+        });
     });
 
     // Delegated event listener for toggling ground truths
@@ -810,6 +1003,56 @@ document.addEventListener('DOMContentLoaded', function() {
                     item.style.display = isExpanded ? 'none' : 'list-item';
                 }
             });
+        }
+        
+        // Delegated event listener for search result items
+        if (e.target && e.target.closest('.view-all-results-btn')) {
+            e.preventDefault();
+            const btn = e.target.closest('.view-all-results-btn');
+            try {
+                const results = JSON.parse(decodeURIComponent(btn.dataset.results));
+                const container = document.getElementById('modal-search-results-container');
+                container.innerHTML = '';
+
+                if (results && results.length > 0) {
+                    results.forEach((res, idx) => {
+                        const linkUrl = res.link || '#';
+                        const linkTitle = res.title || 'No Title';
+                        const snippet = res.snippet || 'No snippet available.';
+                        
+                        let domain = '';
+                        try {
+                            if (res.link) {
+                                const urlObj = new URL(res.link);
+                                domain = urlObj.hostname.replace('www.', '');
+                            }
+                        } catch(err) {}
+
+                        const item = document.createElement('div');
+                        item.className = 'list-group-item p-3';
+                        item.innerHTML = `
+                            <div class="d-flex w-100 justify-content-between mb-1">
+                                <h6 class="mb-0 text-primary fw-bold">
+                                    <span class="text-muted fw-normal me-2">#${idx + 1}</span>
+                                    <a href="${linkUrl}" target="_blank" class="text-decoration-none">${linkTitle}</a>
+                                </h6>
+                                <small class="text-muted text-end ms-2">${domain}</small>
+                            </div>
+                            <p class="mb-1 text-dark" style="font-size: 0.95rem; line-height: 1.4;">${snippet}</p>
+                            <small class="text-muted font-monospace" style="font-size: 0.75rem;"><i class="bi bi-link-45deg"></i> ${linkUrl}</small>
+                        `;
+                        container.appendChild(item);
+                    });
+                } else {
+                    container.innerHTML = '<div class="p-3 text-center text-muted">No results data found.</div>';
+                }
+
+                const modal = new bootstrap.Modal(document.getElementById('searchResultsListModal'));
+                modal.show();
+            } catch (err) {
+                console.error("Error opening results modal:", err);
+                alert("Failed to load results details.");
+            }
         }
     });
 });

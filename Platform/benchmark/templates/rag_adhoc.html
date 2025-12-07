@@ -562,7 +562,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // --- Save/Load/Delete Run Functions ---
     function loadSavedRuns() {
-        BenchmarkUtils.loadSavedRuns("{% url 'benchmark:list_rag_runs' %}", loadRun, deleteRun);
+        BenchmarkUtils.loadSavedRuns("{% url 'benchmark:list_rag_adhoc_runs' %}", loadRun, deleteRun);
     }
     
         function loadRun(runId) {
@@ -570,7 +570,7 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('progress-container').style.display = 'none';
             document.getElementById('save-run-btn').disabled = true;
 
-            fetch(`/benchmark/api/rag/get_run/${runId}/`)
+            fetch(`/benchmark/api/rag_adhoc/get_run/${runId}/`)
                 .then(response => response.json())
                 .then(data => {
                     if (data.error) {
@@ -607,7 +607,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
         function deleteRun(runId) {
         const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
-        BenchmarkUtils.deleteRun(`/benchmark/api/rag/delete_run/${runId}/`, csrfToken);
+        BenchmarkUtils.deleteRun(`/benchmark/api/rag_adhoc/delete_run/${runId}/`, csrfToken);
     }
 
     document.getElementById('save-run-btn').addEventListener('click', function() {
@@ -617,7 +617,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (runName && currentRunResults.length > 0) {
             const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
             
-            fetch("{% url 'benchmark:web_search_rag' %}", {
+            fetch("{% url 'benchmark:rag_adhoc' %}", {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -629,7 +629,7 @@ document.addEventListener('DOMContentLoaded', function() {
             .then(data => {
                 if (data.status === 'ok') {
                     alert('Run saved successfully!');
-                    window.location.href = "{% url 'benchmark:web_search_rag' %}";
+                    window.location.href = "{% url 'benchmark:rag_adhoc' %}";
                 } else {
                     alert('Error saving run: ' + (data.error || 'Unknown error'));
                 }
@@ -683,7 +683,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 body: JSON.stringify({
                     question: question,
                     ground_truths: ground_truths,
-                    pipeline_type: 'rag' // Specify RAG pipeline type
+                    pipeline_type: 'rag_adhoc' // Specify RAG pipeline type
                 })
             });
             const sessionData = await createSessionResponse.json();
@@ -696,7 +696,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const trialId = sessionData.trial_id;
 
             // 2. Run Trial
-            const runTrialResponse = await fetch(`/benchmark/api/interactive/run_trial/${trialId}/`, {
+            const runTrialResponse = await fetch(`/benchmark/api/multi_turn/run_trial/${trialId}/`, {
                 method: 'GET', // GET because it triggers server-side processing
                 headers: {
                     'X-CSRFToken': csrfToken // Still send CSRF for verification
@@ -738,7 +738,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function stopPipeline(pipelineId) {
         const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
-        BenchmarkUtils.stopPipeline("{% url 'benchmark:stop_rag_pipeline' %}", csrfToken, pipelineId);
+        BenchmarkUtils.stopPipeline("{% url 'benchmark:stop_rag_adhoc_pipeline' %}", csrfToken, pipelineId);
     }
 
     window.addEventListener('beforeunload', function (e) {
@@ -789,7 +789,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         currentPipelineId = BenchmarkUtils.generateUUID();
 
-        const fetchURL = `{% url 'benchmark:run_rag_pipeline' %}?llm_base_url=${encodeURIComponent(llm_base_url)}&llm_api_key=${encodeURIComponent(llm_api_key)}&llm_model=${encodeURIComponent(llm_model)}&rag_prompt_template=${encodeURIComponent(rag_prompt_template)}&pipeline_id=${currentPipelineId}`;
+        const fetchURL = `{% url 'benchmark:run_rag_adhoc_pipeline' %}?llm_base_url=${encodeURIComponent(llm_base_url)}&llm_api_key=${encodeURIComponent(llm_api_key)}&llm_model=${encodeURIComponent(llm_model)}&rag_prompt_template=${encodeURIComponent(rag_prompt_template)}&pipeline_id=${currentPipelineId}`;
 
         fetch(fetchURL, { method: 'GET', signal })
             .then(response => {

@@ -1,13 +1,13 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}Multi-Turn LLM Benchmark{% endblock %}
+{% block title %}Multi-Turn RAG Benchmark{% endblock %}
 
 {% block content %}
 <div class="container-fluid mt-5 px-lg-4">
     <div class="pb-3 mb-4 border-bottom">
-        <h1 class="h2"><i class="bi bi-person-check me-2"></i>Multi-Turn LLM Benchmark</h1>
-        <p class="text-muted mb-0">Evaluate model performance over multiple turns with corrective feedback.</p>
+        <h1 class="h2"><i class="bi bi-globe me-2"></i>Multi-Turn Web Search RAG Benchmark</h1>
+        <p class="text-muted mb-0">Evaluate RAG performance over multiple turns with optional query reformulation.</p>
     </div>
 
     <!-- Statistics -->
@@ -151,6 +151,13 @@
                 </div>
                 <div class="card-body">
                     <p class="card-text">Run all questions through the LLM and get aggregate results.</p>
+                    <div class="mb-3">
+                        <label for="pipeline-mode-pipeline" class="form-label">RAG Mode:</label>
+                        <select id="pipeline-mode-pipeline" class="form-select">
+                            <option value="rag_multi_turn_no_reform" selected>No Query Reformulation</option>
+                            <option value="rag_multi_turn_reform">With Query Reformulation</option>
+                        </select>
+                    </div>
                     <div class="d-grid gap-2">
                         <button id="run-pipeline-btn" class="btn btn-success">Run QA Pipeline</button>
                         <button id="stop-pipeline-btn" class="btn btn-danger" style="display: none;">Stop Pipeline</button>
@@ -170,6 +177,13 @@
                     <h5 class="mb-0"><i class="bi bi-plus-circle me-2"></i>Start New Session</h5>
                 </div>
                 <div class="card-body">
+                    <div class="mb-3">
+                        <label for="pipeline-mode-session" class="form-label">RAG Mode:</label>
+                        <select id="pipeline-mode-session" class="form-select">
+                            <option value="rag_multi_turn_no_reform" selected>No Query Reformulation</option>
+                            <option value="rag_multi_turn_reform">With Query Reformulation</option>
+                        </select>
+                    </div>
                     <div class="mb-3">
                         <label for="question-select" class="form-label">Select a question:</label>
                         <select id="question-select" class="form-select">
@@ -220,6 +234,7 @@
                                         <small class="text-muted">{{ session.created_at|date:"Y-m-d H:i" }}</small>
                                     </div>
                                     <p class="mb-1 small text-muted">{{ session.question|truncatechars:80 }}</p>
+                                    <span class="badge bg-secondary" style="font-size: 0.7em;">{{ session.pipeline_type }}</span>
                                 </div>
                                 {% endfor %}
                             </div>
@@ -236,6 +251,7 @@
                                 <small class="text-muted">{{ session.created_at|date:"Y-m-d H:i" }}</small>
                             </div>
                             <p class="mb-1 small text-muted">{{ session.question|truncatechars:100 }}</p>
+                            <span class="badge bg-secondary" style="font-size: 0.7em;">{{ session.pipeline_type }}</span>
                         </div>
                     </div>
                     {% endfor %}
@@ -277,6 +293,26 @@
     </div>
 </div>
 
+    <!-- Search Results List Modal -->
+    <div class="modal fade" id="searchResultsListModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Search Results</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="modal-search-results-container" class="list-group list-group-flush">
+                        <!-- Results will be injected here -->
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
 <script src="{% static 'js/benchmark_common.js' %}"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
@@ -288,204 +324,203 @@ document.addEventListener('DOMContentLoaded', function() {
 
     const startBtn = document.getElementById('start-session-btn');
     const questionSelect = document.getElementById('question-select');
-        const sessionList = document.getElementById('session-list');
-        const sessionContainer = document.getElementById('session-container');
-        const noSessionSelected = document.getElementById('no-session-selected');
+    const sessionList = document.getElementById('session-list');
+    const sessionContainer = document.getElementById('session-container');
+    const noSessionSelected = document.getElementById('no-session-selected');
     
-        // --- Batch Delete ---
-        const deleteSelectedBtn = document.getElementById('delete-selected-btn');
-    
-        function getSelectAllCheckbox() { return document.getElementById('select-all-checkbox'); }
-        function getSessionCheckboxes() { return document.querySelectorAll('.session-checkbox'); }
-        function getGroupCheckboxes() { return document.querySelectorAll('.group-select-checkbox'); }
-    
-        function toggleDeleteButton() {
-            const anySessionChecked = Array.from(getSessionCheckboxes()).some(cb => cb.checked);
-            const anyGroupChecked = Array.from(getGroupCheckboxes()).some(cb => cb.checked);
-            const anyChecked = anySessionChecked || anyGroupChecked;
-            deleteSelectedBtn.style.display = anyChecked ? 'inline-block' : 'none';
-    
-            const selectAllCheckbox = getSelectAllCheckbox();
-            if (selectAllCheckbox) {
-                const allSessionCheckboxes = Array.from(getSessionCheckboxes());
-                const allGroupCheckboxes = Array.from(getGroupCheckboxes());
-                const allCheckboxes = allSessionCheckboxes.concat(allGroupCheckboxes);
-                const allChecked = allCheckboxes.length > 0 && allCheckboxes.every(cb => cb.checked);
-                selectAllCheckbox.checked = anyChecked && allChecked;
-            }
+    // --- Batch Delete ---
+    const deleteSelectedBtn = document.getElementById('delete-selected-btn');
+
+    function getSelectAllCheckbox() { return document.getElementById('select-all-checkbox'); }
+    function getSessionCheckboxes() { return document.querySelectorAll('.session-checkbox'); }
+    function getGroupCheckboxes() { return document.querySelectorAll('.group-select-checkbox'); }
+
+    function toggleDeleteButton() {
+        const anySessionChecked = Array.from(getSessionCheckboxes()).some(cb => cb.checked);
+        const anyGroupChecked = Array.from(getGroupCheckboxes()).some(cb => cb.checked);
+        const anyChecked = anySessionChecked || anyGroupChecked;
+        deleteSelectedBtn.style.display = anyChecked ? 'inline-block' : 'none';
+
+        const selectAllCheckbox = getSelectAllCheckbox();
+        if (selectAllCheckbox) {
+            const allSessionCheckboxes = Array.from(getSessionCheckboxes());
+            const allGroupCheckboxes = Array.from(getGroupCheckboxes());
+            const allCheckboxes = allSessionCheckboxes.concat(allGroupCheckboxes);
+            const allChecked = allCheckboxes.length > 0 && allCheckboxes.every(cb => cb.checked);
+            selectAllCheckbox.checked = anyChecked && allChecked;
         }
+    }
+
+    function selectAllHandler(e) {
+        const isChecked = e.target.checked;
+        getGroupCheckboxes().forEach(checkbox => checkbox.checked = isChecked);
+        getSessionCheckboxes().forEach(checkbox => checkbox.checked = isChecked);
+        toggleDeleteButton();
+    }
+
+    if (getSelectAllCheckbox()) {
+        getSelectAllCheckbox().addEventListener('change', selectAllHandler);
+    }
     
-        function selectAllHandler(e) {
-            const isChecked = e.target.checked;
-            getGroupCheckboxes().forEach(checkbox => checkbox.checked = isChecked);
-            getSessionCheckboxes().forEach(checkbox => checkbox.checked = isChecked);
+    sessionList.addEventListener('change', function(e) {
+        if (e.target.classList.contains('session-checkbox')) {
             toggleDeleteButton();
         }
-
-        if (getSelectAllCheckbox()) {
-            getSelectAllCheckbox().addEventListener('change', selectAllHandler);
+        if (e.target.classList.contains('group-select-checkbox')) {
+            toggleDeleteButton();
         }
+    });
+
+    deleteSelectedBtn.addEventListener('click', function() {
+        const selectedSessionIds = Array.from(getSessionCheckboxes())
+            .filter(cb => cb.checked)
+            .map(cb => cb.dataset.sessionId);
         
-        sessionList.addEventListener('change', function(e) {
-            if (e.target.classList.contains('session-checkbox')) {
-                toggleDeleteButton();
-            }
-            if (e.target.classList.contains('group-select-checkbox')) {
-                toggleDeleteButton();
-            }
-        });
-    
-        deleteSelectedBtn.addEventListener('click', function() {
-            const selectedSessionIds = Array.from(getSessionCheckboxes())
-                .filter(cb => cb.checked)
-                .map(cb => cb.dataset.sessionId);
-            
-            const selectedGroupIds = Array.from(getGroupCheckboxes())
-                .filter(cb => cb.checked)
-                .map(cb => cb.dataset.groupId);
+        const selectedGroupIds = Array.from(getGroupCheckboxes())
+            .filter(cb => cb.checked)
+            .map(cb => cb.dataset.groupId);
 
-            const session_count = selectedSessionIds.length;
-            const group_count = selectedGroupIds.length;
+        const session_count = selectedSessionIds.length;
+        const group_count = selectedGroupIds.length;
 
-            if (session_count === 0 && group_count === 0) {
-                return;
-            }
+        if (session_count === 0 && group_count === 0) {
+            return;
+        }
 
-            let confirm_msg = "Are you sure you want to delete the selected items?\n";
-            if (group_count > 0) {
-                confirm_msg += `\n- ${group_count} group(s) and all their sessions`;
-            }
-            if (session_count > 0) {
-                confirm_msg += `\n- ${session_count} individual session(s)`;
-            }
+        let confirm_msg = "Are you sure you want to delete the selected items?\n";
+        if (group_count > 0) {
+            confirm_msg += "\n- " + group_count + " group(s) and all their sessions";
+        }
+        if (session_count > 0) {
+            confirm_msg += "\n- " + session_count + " individual session(s)";
+        }
 
-            if (!confirm(confirm_msg)) {
-                return;
-            }
-    
-            const deletePromises = [];
+        if (!confirm(confirm_msg)) {
+            return;
+        }
 
-            if (selectedSessionIds.length > 0) {
-                const promise = fetch('/benchmark/api/interactive/batch_delete_sessions/', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
-                    body: JSON.stringify({ session_ids: selectedSessionIds })
-                }).then(res => res.json());
-                deletePromises.push(promise);
-            }
+        const deletePromises = [];
 
-            selectedGroupIds.forEach(groupId => {
-                const promise = fetch(`/benchmark/api/interactive/delete_session_group/${groupId}/`, {
-                    method: 'DELETE',
-                    headers: { 'X-CSRFToken': '{{ csrf_token }}' }
-                }).then(res => res.json());
-                deletePromises.push(promise);
-            });
-
-            Promise.all(deletePromises)
-                .then(results => {
-                    let hasError = false;
-                    results.forEach(result => {
-                        if (result.status !== 'ok') {
-                            hasError = true;
-                            console.error('Deletion failed for an item:', result);
-                        }
-                    });
-
-                    if (hasError) {
-                        alert('Some items could not be deleted. Please check the console and refresh the page.');
-                    } else {
-                        // Easiest way to reflect all changes is to just reload.
-                        window.location.reload();
-                    }
-                })
-                .catch(err => {
-                    console.error('An error occurred during deletion:', err);
-                    alert('An error occurred during deletion. Please check the console and refresh the page.');
-                });
-        });
-    
-        // --- Session Management ---
-        startBtn.addEventListener('click', function() {
-            const selectedIndex = questionSelect.value;
-            if (selectedIndex === "") {
-                alert('Please select a question.');
-                return;
-            }
-            console.log("Selected Index:", selectedIndex);
-            const questionData = questions[selectedIndex];
-            console.log("Question Data:", questionData);
-            
-            startBtn.disabled = true;
-            startBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Starting...';
-    
-            fetch("{% url 'benchmark:create_session' %}", {
+        if (selectedSessionIds.length > 0) {
+            const promise = fetch('/benchmark/api/multi_turn/batch_delete_sessions/', {
                 method: 'POST',
-                headers: {'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}'},
-                body: JSON.stringify({
-                    question: questionData.question,
-                    ground_truths: questionData.answer
-                })
-            })
-            .then(res => res.json())
-            .then(data => {
-                if(data.error) {
-                    alert('Error starting session: ' + data.error);
-                    return;
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+                body: JSON.stringify({ session_ids: selectedSessionIds })
+            }).then(res => res.json());
+            deletePromises.push(promise);
+        }
+
+        selectedGroupIds.forEach(groupId => {
+            const promise = fetch(`/benchmark/api/multi_turn/delete_session_group/${groupId}/`, {
+                method: 'DELETE',
+                headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+            }).then(res => res.json());
+            deletePromises.push(promise);
+        });
+
+        Promise.all(deletePromises)
+            .then(results => {
+                let hasError = false;
+                results.forEach(result => {
+                    if (result.status !== 'ok') {
+                        hasError = true;
+                        console.error('Deletion failed for an item:', result);
+                    }
+                });
+
+                if (hasError) {
+                    alert('Some items could not be deleted. Please check the console and refresh the page.');
+                } else {
+                    window.location.reload();
                 }
-                addNewSessionToList(data.session_id, questionData);
-                loadSession(data.session_id, data.trial_id);
             })
             .catch(err => {
-                console.error("Error creating session:", err);
-                alert("An error occurred while trying to start a new session. Please check the console for details.");
-            })
-            .finally(() => {
-                startBtn.disabled = false;
-                startBtn.innerHTML = 'Start';
+                console.error('An error occurred during deletion:', err);
+                alert('An error occurred during deletion. Please check the console and refresh the page.');
             });
-        });
-    
-        sessionList.addEventListener('click', function(e) {
-            const target = e.target.closest('.session-details');
-            if (target) {
-                e.preventDefault();
-                const sessionId = target.dataset.sessionId;
-                loadSession(sessionId);
-            }
+    });
 
-            const groupSummary = e.target.closest('.group-summary');
-            if (groupSummary) {
-                e.preventDefault();
-                const groupId = groupSummary.dataset.groupId;
-                loadRun(groupId);
-            }
+    // --- Session Management ---
+    startBtn.addEventListener('click', function() {
+        const selectedIndex = questionSelect.value;
+        if (selectedIndex === "") {
+            alert('Please select a question.');
+            return;
+        }
+        const questionData = questions[selectedIndex];
+        const pipelineType = document.getElementById('pipeline-mode-session').value;
+        
+        startBtn.disabled = true;
+        startBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Starting...';
 
-            const deleteBtn = e.target.closest('.delete-group-btn');
-            if (deleteBtn) {
-                e.preventDefault();
-                const groupId = deleteBtn.dataset.groupId;
-                if (confirm(`Are you sure you want to delete this entire group and all its sessions?`)) {
-                    fetch(`/benchmark/api/interactive/delete_session_group/${groupId}/`, {
-                        method: 'DELETE',
-                        headers: { 'X-CSRFToken': '{{ csrf_token }}' }
-                    })
-                    .then(res => res.json())
-                    .then(data => {
-                        if (data.status === 'ok') {
-                            // remove the group from the list
-                            deleteBtn.closest('.list-group-item').remove();
-                            window.location.reload();
-                        } else {
-                            alert('Error deleting session group: ' + (data.message || 'Unknown error'));
-                        }
-                    });
-                }
+        fetch("{% url 'benchmark:create_session' %}", {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}'},
+            body: JSON.stringify({
+                question: questionData.question,
+                ground_truths: questionData.answer,
+                pipeline_type: pipelineType
+            })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if(data.error) {
+                alert('Error starting session: ' + data.error);
+                return;
             }
+            addNewSessionToList(data.session_id, questionData);
+            loadSession(data.session_id, data.trial_id);
+        })
+        .catch(err => {
+            console.error("Error creating session:", err);
+            alert("An error occurred while trying to start a new session. Please check the console for details.");
+        })
+        .finally(() => {
+            startBtn.disabled = false;
+            startBtn.innerHTML = 'Start';
         });
+    });
+
+    sessionList.addEventListener('click', function(e) {
+        const target = e.target.closest('.session-details');
+        if (target) {
+            e.preventDefault();
+            const sessionId = target.dataset.sessionId;
+            loadSession(sessionId);
+        }
+
+        const groupSummary = e.target.closest('.group-summary');
+        if (groupSummary) {
+            e.preventDefault();
+            const groupId = groupSummary.dataset.groupId;
+            loadRun(groupId);
+        }
+
+        const deleteBtn = e.target.closest('.delete-group-btn');
+        if (deleteBtn) {
+            e.preventDefault();
+            const groupId = deleteBtn.dataset.groupId;
+            if (confirm(`Are you sure you want to delete this entire group and all its sessions?`)) {
+                fetch(`/benchmark/api/multi_turn/delete_session_group/${groupId}/`, {
+                    method: 'DELETE',
+                    headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.status === 'ok') {
+                        deleteBtn.closest('.list-group-item').remove();
+                        window.location.reload();
+                    } else {
+                        alert('Error deleting session group: ' + (data.message || 'Unknown error'));
+                    }
+                });
+            }
+        }
+    });
+
     function loadSession(sessionId, initialTrialId = null) {
         activeSessionId = sessionId;
-        fetch(`/benchmark/api/interactive/get_session/${sessionId}/`)
+        fetch(`/benchmark/api/multi_turn/get_session/${sessionId}/`)
             .then(res => res.json())
             .then(data => {
                 renderSession(data.session, data.trials);
@@ -506,7 +541,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     const session = data.session;
                     if (lastTrial && lastTrial.status === 'completed' && lastTrial.is_correct === false && !session.is_completed) {
                         if (data.trials.length < session.max_retries) {
-                            // Automatically retry after a short delay to allow user to see the feedback
                             setTimeout(() => {
                                 window.retryTrial(lastTrial.id);
                             }, 1500);
@@ -517,13 +551,12 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function executeTrial(trialId, sessionId) {
-        fetch(`/benchmark/api/interactive/run_trial/${trialId}/`)
+        fetch(`/benchmark/api/multi_turn/run_trial/${trialId}/`)
             .then(res => res.json())
             .then(data => {
                 if(data.error) {
                     alert(`Error in trial #${trialId}: ${data.error}`);
                 }
-                // Reload the session to get the updated trial data
                 if (sessionId) {
                     loadSession(sessionId);
                 }
@@ -613,38 +646,93 @@ document.addEventListener('DOMContentLoaded', function() {
         trialDiv.className = 'mb-4';
         trialDiv.id = `trial-${trial.id}`;
 
+        let searchSection = '';
+        if (trial.search_query) {
+            const resultsCount = trial.search_results ? trial.search_results.length : 0;
+            const resultsJson = trial.search_results ? encodeURIComponent(JSON.stringify(trial.search_results)) : '';
+            
+            let resultsBadge = '';
+            if (resultsCount > 0) {
+                resultsBadge = `
+                    <button class="btn btn-sm btn-white bg-white border shadow-sm ms-auto view-search-results-btn d-flex align-items-center" data-results="${resultsJson}" style="font-size: 0.85rem; height: 32px;">
+                        <i class="bi bi-list-task text-primary me-2"></i>
+                        <span class="fw-semibold text-dark">${resultsCount}</span>
+                        <span class="text-muted ms-1 small d-none d-sm-inline">results</span>
+                    </button>
+                `;
+            } else {
+                resultsBadge = `<span class="badge bg-secondary bg-opacity-10 text-secondary border ms-auto">No results</span>`;
+            }
+
+            searchSection = `
+                <div class="d-flex align-items-center bg-light bg-opacity-50 rounded p-2 mb-3 border border-light-subtle">
+                    <div class="d-flex align-items-center flex-grow-1 overflow-hidden">
+                        <div class="bg-white rounded-circle border d-flex align-items-center justify-content-center me-3 shadow-sm" style="width: 36px; height: 36px; min-width: 36px;">
+                            <i class="bi bi-search text-primary" style="font-size: 1rem;"></i>
+                        </div>
+                        <div class="d-flex flex-column overflow-hidden me-3">
+                            <span class="text-uppercase text-muted fw-bold" style="font-size: 0.65rem; letter-spacing: 1px;">Search Query</span>
+                            <span class="text-dark fw-medium text-truncate font-monospace small" title="${trial.search_query}">${trial.search_query}</span>
+                        </div>
+                    </div>
+                    ${resultsBadge}
+                </div>
+            `;
+        }
+
+
         let trialBody = '';
         if (trial.status === 'processing') {
-            trialBody = `<div class="d-flex align-items-center">
-                            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                            <span>Processing...</span>
+            trialBody = `<div class="d-flex align-items-center py-3">
+                            <div class="spinner-border text-primary me-3" role="status" style="width: 2rem; height: 2rem;">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <div>
+                                <h6 class="mb-0 text-dark">Processing...</h6>
+                                <small class="text-muted">Waiting for LLM response</small>
+                            </div>
                          </div>`;
         } else if (trial.status === 'error') {
-            trialBody = `<div class="alert alert-danger">An error occurred while running this trial.</div>`;
+            trialBody = `<div class="alert alert-danger border-0 shadow-sm d-flex align-items-center">
+                            <i class="bi bi-exclamation-triangle-fill me-3 fs-4"></i>
+                            <div>
+                                <strong>Error</strong>
+                                <div class="small">An error occurred while running this trial.</div>
+                            </div>
+                         </div>`;
         } else { // completed
             let feedbackControls = '';
             if (!isCompleted && trialCount < maxRetries) {
                 if (trial.is_correct === false) {
-                    feedbackControls = `<div class="d-flex align-items-center mt-3 text-warning">
+                    feedbackControls = `<div class="d-flex align-items-center mt-3 text-warning bg-warning bg-opacity-10 p-2 rounded">
                                             <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                                            <span>Answer was incorrect. Automatically retrying...</span>
+                                            <span class="small fw-medium">Answer was incorrect. Automatically retrying...</span>
                                          </div>`;
                 } else if (trial.is_correct === null) {
-                    feedbackControls = `<p class="mt-2 text-muted">Awaiting automated judgment...</p>`;
+                    feedbackControls = `<p class="mt-2 text-muted small"><i class="bi bi-hourglass-split me-1"></i>Awaiting automated judgment...</p>`;
                 }
             }
 
-            trialBody = `<blockquote class="blockquote">
-                            <p class="mb-0">“${trial.answer}”</p>
-                         </blockquote>`;
+            trialBody = `
+                        ${searchSection}
+                        <div class="p-3 bg-white rounded border-start border-4 border-primary shadow-sm mb-3">
+                            <div class="d-flex align-items-start">
+                                <i class="bi bi-chat-quote text-primary opacity-50 fs-3 me-3"></i>
+                                <div>
+                                    <span class="text-uppercase text-muted fw-bold d-block mb-1" style="font-size: 0.65rem; letter-spacing: 1px;">LLM Answer</span>
+                                    <p class="mb-0 fs-6 text-dark">${trial.answer}</p>
+                                </div>
+                            </div>
+                        </div>`;
             if (trial.feedback) {
                 const isCorrect = trial.is_correct;
                 const alertClass = isCorrect ? 'alert-success' : 'alert-danger';
-                const icon = isCorrect ? '<i class="bi bi-check-circle-fill me-2"></i>' : '<i class="bi bi-x-circle-fill me-2"></i>';
-                trialBody += `<div class="alert ${alertClass} d-flex align-items-center mt-3" role="alert">
+                const icon = isCorrect ? '<i class="bi bi-check-circle-fill me-2 fs-5"></i>' : '<i class="bi bi-x-circle-fill me-2 fs-5"></i>';
+                trialBody += `<div class="alert ${alertClass} border-0 d-flex align-items-center mt-3 shadow-sm" role="alert">
                                 ${icon}
                                 <div>
-                                    <strong>Judge's Verdict:</strong> ${trial.feedback}
+                                    <strong class="d-block text-uppercase" style="font-size: 0.7rem; letter-spacing: 0.5px;">Verdict</strong>
+                                    ${trial.feedback}
                                 </div>
                               </div>`;
             }
@@ -655,30 +743,90 @@ document.addEventListener('DOMContentLoaded', function() {
         let statusBadge = '';
         if (isCompleted || isLastAttempt || trial.is_correct === true) {
             if (trial.is_correct) {
-                statusBadge = '<span class="badge bg-success">Final Answer: Correct</span>';
+                statusBadge = '<span class="badge bg-success rounded-pill shadow-sm"><i class="bi bi-check-lg me-1"></i>Correct</span>';
             } else if (trial.is_correct === false) {
-                 statusBadge = '<span class="badge bg-danger">Final Answer: Incorrect</span>';
+                 statusBadge = '<span class="badge bg-danger rounded-pill shadow-sm"><i class="bi bi-x-lg me-1"></i>Incorrect</span>';
             }
         }
 
         trialDiv.innerHTML = `
-            <div class="card">
-                <div class="card-header bg-light">
-                    <h6 class="mb-0 d-flex"><div class="me-2">Trial #${trial.trial_number}</div><div>${statusBadge}</div></h6>
+            <div class="card border-0 shadow-sm overflow-hidden">
+                <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0 fw-bold text-secondary text-uppercase small" style="letter-spacing: 1px;">
+                        <i class="bi bi-arrow-return-right me-2"></i>Trial #${trial.trial_number}
+                    </h6>
+                    <div>${statusBadge}</div>
                 </div>
-                <div class="card-body">
+                <div class="card-body bg-light bg-opacity-10">
                     ${trialBody}
                 </div>
             </div>`;
         return trialDiv;
     }
 
-    // --- Actions ---
+    // --- Search Results Modal ---
+    document.addEventListener('click', function(e) {
+        if (e.target && e.target.closest('.view-search-results-btn')) {
+            const btn = e.target.closest('.view-search-results-btn');
+            try {
+                const results = JSON.parse(decodeURIComponent(btn.dataset.results));
+                const container = document.getElementById('modal-search-results-container');
+                container.innerHTML = '';
+
+                if (results && results.length > 0) {
+                    results.forEach((res, idx) => {
+                        const linkUrl = res.url || res.link || '#'; // Support both keys
+                        const linkTitle = res.title || 'No Title';
+                        const snippet = res.snippet || 'No snippet available.';
+                        
+                        let domain = '';
+                        try {
+                            if (linkUrl && linkUrl !== '#') {
+                                const urlObj = new URL(linkUrl);
+                                domain = urlObj.hostname.replace('www.', '');
+                            }
+                        } catch(err) {}
+
+                        const item = document.createElement('div');
+                        item.className = 'list-group-item list-group-item-action p-3 border-start-0 border-end-0 border-top-0';
+                        item.innerHTML = `
+                             <div class="d-flex w-100 justify-content-between align-items-center mb-2">
+                                <div class="d-flex align-items-center text-truncate">
+                                    <span class="badge bg-light text-secondary border me-2 font-monospace">#${idx + 1}</span>
+                                    <small class="text-muted text-truncate">${domain}</small>
+                                </div>
+                                <a href="${linkUrl}" target="_blank" class="btn btn-sm btn-outline-secondary py-0 px-2 ms-2 border-0" style="font-size: 0.85rem;" title="Open Link">
+                                    <i class="bi bi-box-arrow-up-right"></i>
+                                </a>
+                            </div>
+                            <h6 class="mb-2">
+                                <a href="${linkUrl}" target="_blank" class="text-primary text-decoration-none fw-bold stretched-link">${linkTitle}</a>
+                            </h6>
+                            <p class="mb-0 text-secondary small text-break" style="line-height: 1.5;">${snippet}</p>
+                        `;
+                        container.appendChild(item);
+                    });
+                } else {
+                    container.innerHTML = `
+                        <div class="p-5 text-center text-muted">
+                            <i class="bi bi-inbox fs-1 d-block mb-3 opacity-50"></i>
+                            <p>No search results found.</p>
+                        </div>`;
+                }
+
+                const modal = new bootstrap.Modal(document.getElementById('searchResultsListModal'));
+                modal.show();
+            } catch (err) {
+                console.error("Error opening results modal:", err);
+                alert("Failed to load results details.");
+            }
+        }
+    });
     window.retryTrial = function(trialId) {
         const trial = sessionTrials.find(t => t.id === trialId);
         const feedback = trial ? trial.feedback : "";
 
-        fetch(`/benchmark/api/interactive/retry_session/${trialId}/`, {
+        fetch(`/benchmark/api/multi_turn/retry_session/${trialId}/`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}'},
             body: JSON.stringify({ feedback: feedback, is_correct: false })
@@ -702,9 +850,9 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('delete-session-btn').addEventListener('click', function() {
         if (!activeSessionId || !confirm('Are you sure you want to delete this session?')) return;
 
-        fetch(`/benchmark/api/interactive/delete_session/${activeSessionId}/`, {
+        fetch(`/benchmark/api/multi_turn/delete_session/${activeSessionId}/`, {
             method: 'DELETE',
-            headers: {'X-CSRFToken': '{{ csrf_token }}'}
+            headers:{'X-CSRFToken': '{{ csrf_token }}'}
         })
         .then(res => res.json())
         .then(data => {
@@ -721,7 +869,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     document.getElementById('export-session-btn').addEventListener('click', function() {
         if (!activeSessionId) return;
-        window.location.href = `/benchmark/api/interactive/export_session/${activeSessionId}/`;
+        window.location.href = `/benchmark/api/multi_turn/export_session/${activeSessionId}/`;
     });
 
     function testConnection() {
@@ -770,7 +918,7 @@ document.addEventListener('DOMContentLoaded', function() {
         summaryElement.style.color = 'blue';
 
 
-        fetch(`/benchmark/api/interactive/load_run/${groupId}/`)
+        fetch(`/benchmark/api/multi_turn/load_run/${groupId}/`)
             .then(res => res.json())
             .then(data => {
                 if (data.error) {
@@ -861,61 +1009,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    async function processQuestion(questionData, groupId = null) {
-        const createResponse = await fetch("{% url 'benchmark:create_session' %}", {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}'},
-            body: JSON.stringify({
-                question: questionData.question,
-                ground_truths: questionData.answer,
-                group_id: groupId
-            })
-        });
-        const createData = await createResponse.json();
-        if (createData.error) {
-            throw new Error(createData.error);
-        }
-        const { session_id, trial_id } = createData;
-
-        // Load the session UI to show it's processing, then kick off the trial
-        loadSession(session_id, trial_id);
-
-        return new Promise((resolve, reject) => {
-            const poll = setInterval(async () => {
-                if (pipelineController.aborted) {
-                    clearInterval(poll);
-                    return reject(new Error("Pipeline aborted by user."));
-                }
-                try {
-                    const sessionResponse = await fetch(`/benchmark/api/interactive/get_session/${session_id}/`);
-                    if (!sessionResponse.ok) {
-                        // Stop polling if the session can't be fetched
-                        clearInterval(poll);
-                        return reject(new Error(`HTTP error! status: ${sessionResponse.status}`));
-                    }
-                    const sessionData = await sessionResponse.json();
-                    
-                    if (sessionData.session.is_completed) {
-                        clearInterval(poll);
-                        const lastTrial = sessionData.trials[sessionData.trials.length - 1];
-                        resolve({
-                            question: sessionData.session.question,
-                            correct: lastTrial.is_correct,
-                            trials: sessionData.trials.length,
-                            session_id: session_id,
-                            final_answer: lastTrial.answer,
-                            ground_truths: sessionData.session.ground_truths,
-                            max_retries: sessionData.session.max_retries
-                        });
-                    }
-                } catch (error) {
-                    clearInterval(poll);
-                    console.error(`Polling failed for session ${session_id}:`, error);
-                    reject(error);
-                }
-            }, 3000); 
-        });
-    }
     
     function displayStats(results, groupName) {
         currentPipelineResults = results;
@@ -1015,22 +1108,23 @@ document.addEventListener('DOMContentLoaded', function() {
             tbody.appendChild(row);
         });
 
-        // Add event listeners for "Show more/less" buttons after all rows are added
         document.querySelectorAll('.show-more-groundtruths').forEach(button => {
-            button.addEventListener('click', function() {
+            button.addEventListener('click', function(e) {
+                e.stopPropagation(); // Prevent row click
                 const targetId = this.dataset.targetId;
                 document.getElementById(targetId).style.display = 'block';
                 this.style.display = 'none';
-                this.nextElementSibling.style.display = 'inline'; // Show "Show less"
+                this.nextElementSibling.style.display = 'inline';
             });
         });
 
         document.querySelectorAll('.show-less-groundtruths').forEach(button => {
-            button.addEventListener('click', function() {
+            button.addEventListener('click', function(e) {
+                e.stopPropagation();
                 const targetId = this.dataset.targetId;
                 document.getElementById(targetId).style.display = 'none';
                 this.style.display = 'none';
-                this.previousElementSibling.style.display = 'inline'; // Show "Show more"
+                this.previousElementSibling.style.display = 'inline';
             });
         });
 
@@ -1041,6 +1135,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const runBtn = document.getElementById('run-pipeline-btn');
         const stopBtn = document.getElementById('stop-pipeline-btn');
         const pipelineId = BenchmarkUtils.generateUUID();
+        const pipelineType = document.getElementById('pipeline-mode-pipeline').value;
         
         runBtn.style.display = 'none';
         stopBtn.style.display = 'block';
@@ -1075,12 +1170,13 @@ document.addEventListener('DOMContentLoaded', function() {
             llm_api_key: apiKey,
             llm_model: model,
             max_retries: maxRetries,
-            pipeline_id: pipelineId
+            pipeline_id: pipelineId,
+            pipeline_type: pipelineType
         });
 
         // Handle Stop
         stopBtn.onclick = () => {
-            fetch("{% url 'benchmark:stop_interactive_pipeline' %}", {
+            fetch("{% url 'benchmark:stop_vanilla_llm_multi_turn_pipeline' %}", {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}'},
                 body: JSON.stringify({ pipeline_id: pipelineId })
@@ -1092,10 +1188,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
         const results = [];
         let completedCount = 0;
-        let totalQuestions = questions.length; // Approximation, backend iterates file
+        let totalQuestions = questions.length; 
         
         try {
-            const response = await fetch(`/benchmark/api/run_interactive_pipeline/?${params.toString()}`);
+            const response = await fetch(`/benchmark/api/run_vanilla_llm_multi_turn_pipeline/?${params.toString()}`);
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
             let buffer = '';
@@ -1106,7 +1202,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 buffer += decoder.decode(value, { stream: true });
                 const lines = buffer.split('\n');
-                buffer = lines.pop(); // Keep the last partial line
+                buffer = lines.pop(); 
 
                 for (const line of lines) {
                     if (!line.trim()) continue;
@@ -1125,9 +1221,9 @@ document.addEventListener('DOMContentLoaded', function() {
                             });
                         } else {
                             results.push(result);
-                            // Add to session list - using the group info from the result
                             const qData = { question: result.question }; 
                             addNewSessionToList(result.session_id, qData, result.group_id, result.group_name);
+                            loadSession(result.session_id);
                         }
                         
                         completedCount++;
@@ -1167,9 +1263,9 @@ document.addEventListener('DOMContentLoaded', function() {
         currentPipelineResults.forEach((result, index) => {
             const row = [
                 index + 1,
-                `"${result.question.replace(/"/g, '""')}"`,
-                `"${(result.final_answer || 'N/A').replace(/"/g, '""')}"`,
-                `"${result.ground_truths.join('; ').replace(/"/g, '""')}"`,
+                `"${result.question.replace(/"/g, '""')}"`, 
+                `"${(result.final_answer || 'N/A').replace(/"/g, '""')}"`, 
+                `"${result.ground_truths.join('; ').replace(/"/g, '""')}"`, 
                 result.correct === true ? 'Correct' : (result.correct === false ? 'Incorrect' : 'Error'),
                 result.trials
             ];

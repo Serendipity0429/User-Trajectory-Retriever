@@ -411,12 +411,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // --- Save/Load/Delete Run Functions ---
     function loadSavedRuns() {
-        BenchmarkUtils.loadSavedRuns("{% url 'benchmark:list_adhoc_runs' %}", loadRun, deleteRun);
+        BenchmarkUtils.loadSavedRuns("{% url 'benchmark:list_vanilla_llm_adhoc_runs' %}", loadRun, deleteRun);
     }
 
     function deleteRun(runId) {
         const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
-        BenchmarkUtils.deleteRun(`/benchmark/api/adhoc/delete_run/${runId}/`, csrfToken);
+        BenchmarkUtils.deleteRun(`/benchmark/api/vanilla_llm_adhoc/delete_run/${runId}/`, csrfToken);
     }    
     document.getElementById('save-run-btn').addEventListener('click', function() {
         const defaultName = `Run ${new Date().toISOString().slice(0, 19).replace('T', ' ')}`;
@@ -425,7 +425,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (runName && currentRunResults.length > 0) {
             const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
             
-            fetch("{% url 'benchmark:adhoc_llm' %}", {
+            fetch("{% url 'benchmark:vanilla_llm_adhoc' %}", {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -438,7 +438,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (data.status === 'ok') {
                     alert('Run saved successfully!');
                     // Refresh to see the new run in the list
-                    window.location.href = "{% url 'benchmark:adhoc_llm' %}";
+                    window.location.href = "{% url 'benchmark:vanilla_llm_adhoc' %}";
                 } else {
                     alert('Error saving run: ' + (data.error || 'Unknown error'));
                 }
@@ -492,7 +492,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 body: JSON.stringify({
                     question: question,
                     ground_truths: ground_truths,
-                    pipeline_type: 'adhoc' // Specify adhoc pipeline type
+                    pipeline_type: 'vanilla_llm_adhoc' // Specify adhoc pipeline type
                 })
             });
             const sessionData = await createSessionResponse.json();
@@ -505,7 +505,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const trialId = sessionData.trial_id;
 
             // 2. Run Trial
-            const runTrialResponse = await fetch(`/benchmark/api/interactive/run_trial/${trialId}/`, {
+            const runTrialResponse = await fetch(`/benchmark/api/multi_turn/run_trial/${trialId}/`, {
                 method: 'GET', // GET because it triggers server-side processing
                 headers: {
                     'X-CSRFToken': csrfToken // Still send CSRF for verification
@@ -559,7 +559,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function stopPipeline(pipelineId) {
         const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
-        BenchmarkUtils.stopPipeline("{% url 'benchmark:stop_adhoc_pipeline' %}", csrfToken, pipelineId);
+        BenchmarkUtils.stopPipeline("{% url 'benchmark:stop_vanilla_llm_adhoc_pipeline' %}", csrfToken, pipelineId);
     }
 
     window.addEventListener('beforeunload', function (e) {
@@ -607,7 +607,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         currentPipelineId = BenchmarkUtils.generateUUID();
 
-        const fetchURL = `{% url 'benchmark:run_adhoc_pipeline' %}?llm_base_url=${encodeURIComponent(llm_base_url)}&llm_api_key=${encodeURIComponent(llm_api_key)}&llm_model=${encodeURIComponent(llm_model)}&pipeline_id=${currentPipelineId}`;
+        const fetchURL = `{% url 'benchmark:run_vanilla_llm_adhoc_pipeline' %}?llm_base_url=${encodeURIComponent(llm_base_url)}&llm_api_key=${encodeURIComponent(llm_api_key)}&llm_model=${encodeURIComponent(llm_model)}&pipeline_id=${currentPipelineId}`;
 
         fetch(fetchURL, { method: 'GET', signal })
             .then(response => {
@@ -718,7 +718,7 @@ document.addEventListener('DOMContentLoaded', function() {
         formData.append('llm_api_key', document.getElementById('llm_api_key').value);
         formData.append('llm_model', document.getElementById('llm_model').value);
 
-        fetch("{% url 'benchmark:adhoc_llm' %}", { method: 'POST', body: formData })
+        fetch("{% url 'benchmark:vanilla_llm_adhoc' %}", { method: 'POST', body: formData })
             .then(response => {
                 if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                 const reader = response.body.getReader();

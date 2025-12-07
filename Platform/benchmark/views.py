@@ -16,28 +16,54 @@ from user_system.utils import print_debug
 import httpx
 from task_manager.utils import check_answer_rule, check_answer_llm, redis_client
 from .search_utils import get_search_engine
-from .models import LLMSettings, RagSettings, InteractiveSession, InteractiveTrial, AdhocRun, AdhocSessionResult, InteractiveSessionGroup, RagBenchmarkRun, RagBenchmarkResult
+from .models import (
+    LLMSettings, 
+    RagSettings, 
+    MultiTurnSession, 
+    MultiTurnTrial, 
+    MultiTurnSessionGroup, 
+    VanillaLLMAdhocRun, 
+    VanillaLLMAdhocResult,
+    RagAdhocRun, 
+    RagAdhocResult
+)
 
 from datetime import datetime
 
 # Import from the new utils module
 from .pipeline_utils import (
-    adhoc_pipeline_stream,
-    rag_pipeline_stream,
-    interactive_pipeline_stream,
+    vanilla_llm_adhoc_pipeline_stream,
+    rag_adhoc_pipeline_stream,
+    vanilla_llm_multi_turn_pipeline_stream,
     stop_pipeline_token
 )
 
 @admin_required
 def home(request):
     settings = LLMSettings.load()
+
+    # If the settings are empty, try to populate from .env file
+    if not settings.llm_api_key and not settings.llm_model:
+        try:
+            llm_api_key_env = config('LLM_API_KEY', default=None)
+            llm_model_env = config('LLM_MODEL', default=None)
+            if llm_api_key_env or llm_model_env:
+                settings.llm_base_url = config('LLM_BASE_URL', default='')
+                settings.llm_api_key = llm_api_key_env or ''
+                settings.llm_model = llm_model_env or ''
+                settings.save()
+        except OperationalError:
+            pass
+
+    rag_settings = RagSettings.load()
     context = {
-        'llm_settings': settings
+        'llm_settings': settings,
+        'rag_settings': rag_settings
     }
     return render(request, 'home.html', context)
 
 @admin_required
-def adhoc_llm(request):
+def vanilla_llm_adhoc(request):
     if request.method == 'POST':
         try:
             # This logic is now for saving the results of a run
@@ -53,16 +79,16 @@ def adhoc_llm(request):
             total_questions = len(results)
             correct_answers_llm = sum(1 for r in results if r.get('llm_result'))
 
-            run = AdhocRun.objects.create(
+            run = VanillaLLMAdhocRun.objects.create(
                 name=run_name,
-                settings=settings,
+                llm_settings=settings,
                 total_questions=total_questions,
                 correct_answers=correct_answers_llm,
                 accuracy=(correct_answers_llm / total_questions * 100) if total_questions > 0 else 0
             )
 
             for result in results:
-                AdhocSessionResult.objects.create(
+                VanillaLLMAdhocResult.objects.create(
                     run=run,
                     question=result.get('question', ''),
                     ground_truths=result.get('ground_truths', []),
@@ -76,14 +102,14 @@ def adhoc_llm(request):
             return JsonResponse({'error': str(e)}, status=500)
 
     # GET request logic
-    runs = AdhocRun.objects.all().prefetch_related('settings')
+    runs = VanillaLLMAdhocRun.objects.all().prefetch_related('llm_settings')
     selected_run = None
     run_results = []
     run_id = request.GET.get('run_id')
 
     if run_id:
         try:
-            selected_run = get_object_or_404(AdhocRun, pk=run_id)
+            selected_run = get_object_or_404(VanillaLLMAdhocRun, pk=run_id)
             # Serialize the results to pass as JSON to the template
             run_results = list(selected_run.results.values(
                 'question', 'answer', 'ground_truths', 'is_correct_rule', 'is_correct_llm'
@@ -128,13 +154,13 @@ def adhoc_llm(request):
         'questions': questions,
         'total_questions': len(questions)
     }
-    return render(request, 'adhoc_llm.html', context)
+    return render(request, 'vanilla_llm_adhoc.html', context)
 
 
 @admin_required
 def list_runs(request):
     try:
-        runs = InteractiveSession.objects.filter(run_tag__isnull=False).values_list('run_tag', flat=True).distinct().order_by('-run_tag')
+        runs = MultiTurnSession.objects.filter(run_tag__isnull=False).values_list('run_tag', flat=True).distinct().order_by('-run_tag')
         return JsonResponse({'runs': list(runs)})
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
@@ -142,7 +168,7 @@ def list_runs(request):
 @admin_required
 def load_run(request, run_tag):
     def stream_run_from_db(run_tag):
-        sessions = InteractiveSession.objects.filter(run_tag=run_tag).prefetch_related('trials')
+        sessions = MultiTurnSession.objects.filter(run_tag=run_tag).prefetch_related('trials')
         for session in sessions:
             trial = session.trials.first() # Assuming one trial per session for ad-hoc runs
             if trial:
@@ -191,7 +217,7 @@ def batch_delete_sessions(request):
         except (ValueError, TypeError):
             return JsonResponse({'status': 'error', 'message': 'Invalid session ID format.'}, status=400)
 
-        sessions_to_delete = InteractiveSession.objects.filter(id__in=session_ids)
+        sessions_to_delete = MultiTurnSession.objects.filter(id__in=session_ids)
         deleted_count = sessions_to_delete.count()
         deleted_ids = list(sessions_to_delete.values_list('id', flat=True))
         
@@ -251,7 +277,7 @@ def test_llm_connection(request):
 
 
 @admin_required
-def interactive_llm(request):
+def vanilla_llm_multi_turn(request):
     # Load questions from the file
     questions = []
     try:
@@ -264,11 +290,13 @@ def interactive_llm(request):
         pass
 
     # Load sessions and group them
-    groups = InteractiveSessionGroup.objects.prefetch_related(
-        models.Prefetch('sessions', queryset=InteractiveSession.objects.order_by('-created_at'))
-    ).order_by('-created_at')
+    groups = MultiTurnSessionGroup.objects.filter(
+        sessions__pipeline_type='vanilla_llm_multi_turn'
+    ).prefetch_related(
+        models.Prefetch('sessions', queryset=MultiTurnSession.objects.order_by('-created_at'))
+    ).order_by('-created_at').distinct()
     
-    individual_sessions = InteractiveSession.objects.filter(group__isnull=True).order_by('-created_at')
+    individual_sessions = MultiTurnSession.objects.filter(group__isnull=True, pipeline_type='vanilla_llm_multi_turn').order_by('-created_at')
 
     context = {
         'questions': questions,
@@ -276,11 +304,45 @@ def interactive_llm(request):
         'individual_sessions': individual_sessions,
         'llm_settings': LLMSettings.load()
     }
-    return render(request, 'interactive_llm.html', context)
+    return render(request, 'vanilla_llm_multi_turn.html', context)
 
 
 @admin_required
-def web_search_rag(request):
+def rag_multi_turn(request):
+    # Load questions from the file
+    questions = []
+    try:
+        file_path = os.path.join(os.path.dirname(__file__), '..', 'data', 'hard_questions_refined.jsonl')
+        with open(file_path, 'r') as f:
+            for line in f:
+                questions.append(json.loads(line))
+    except FileNotFoundError:
+        pass
+
+    # Load sessions and group them - filter for RAG pipeline types
+    rag_pipeline_types = ['rag_multi_turn_no_reform', 'rag_multi_turn_reform']
+    groups = MultiTurnSessionGroup.objects.filter(
+        sessions__pipeline_type__in=rag_pipeline_types
+    ).prefetch_related(
+        models.Prefetch('sessions', queryset=MultiTurnSession.objects.order_by('-created_at'))
+    ).order_by('-created_at').distinct()
+    
+    individual_sessions = MultiTurnSession.objects.filter(
+        group__isnull=True, 
+        pipeline_type__in=rag_pipeline_types
+    ).order_by('-created_at')
+
+    context = {
+        'questions': questions,
+        'groups': groups,
+        'individual_sessions': individual_sessions,
+        'llm_settings': LLMSettings.load()
+    }
+    return render(request, 'rag_multi_turn.html', context)
+
+
+@admin_required
+def rag_adhoc(request):
     if request.method == 'POST':
         try:
             data = json.loads(request.body)
@@ -296,7 +358,7 @@ def web_search_rag(request):
             total_questions = len(results)
             correct_answers_llm = sum(1 for r in results if r.get('llm_result'))
 
-            run = RagBenchmarkRun.objects.create(
+            run = RagAdhocRun.objects.create(
                 name=run_name,
                 llm_settings=llm_settings,
                 rag_settings=rag_settings,
@@ -306,7 +368,7 @@ def web_search_rag(request):
             )
 
             for result in results:
-                RagBenchmarkResult.objects.create(
+                RagAdhocResult.objects.create(
                     run=run,
                     question=result.get('question', ''),
                     ground_truths=result.get('ground_truths', []),
@@ -340,7 +402,7 @@ def web_search_rag(request):
         'llm_settings': LLMSettings.load(),
         'rag_settings': RagSettings.load()
     }
-    return render(request, 'web_search_rag.html', context)
+    return render(request, 'rag_adhoc.html', context)
 
 @admin_required
 @require_POST
@@ -356,7 +418,7 @@ def save_rag_settings(request):
 
 
 @admin_required
-def run_rag_pipeline(request):
+def run_rag_adhoc_pipeline(request):
     try:
         base_url = request.GET.get('llm_base_url')
         api_key = request.GET.get('llm_api_key')
@@ -368,10 +430,10 @@ def run_rag_pipeline(request):
             return JsonResponse({'error': 'An API Key is required.'}, status=400)
 
         if pipeline_id:
-            redis_client.set(f"rag_pipeline_active:{pipeline_id}", "1", ex=3600) # Expire after 1 hour
+            redis_client.set(f"rag_adhoc_pipeline_active:{pipeline_id}", "1", ex=3600) # Expire after 1 hour
 
         return StreamingHttpResponse(
-            rag_pipeline_stream(base_url, api_key, model, prompt_template, pipeline_id), 
+            rag_adhoc_pipeline_stream(base_url, api_key, model, prompt_template, pipeline_id), 
             content_type='application/json'
         )
     except Exception as e:
@@ -379,28 +441,28 @@ def run_rag_pipeline(request):
 
 @admin_required
 @require_POST
-def stop_rag_pipeline(request):
+def stop_rag_adhoc_pipeline(request):
     try:
         data = json.loads(request.body)
         pipeline_id = data.get('pipeline_id')
         if pipeline_id:
-            stop_pipeline_token(pipeline_id, "rag_pipeline_active")
+            stop_pipeline_token(pipeline_id, "rag_adhoc_pipeline_active")
         return JsonResponse({'status': 'ok'})
     except Exception as e:
         return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
 
 @admin_required
-def list_rag_runs(request):
+def list_rag_adhoc_runs(request):
     try:
-        runs = RagBenchmarkRun.objects.values('id', 'name', 'created_at', 'accuracy').order_by('-created_at')
+        runs = RagAdhocRun.objects.values('id', 'name', 'created_at', 'accuracy').order_by('-created_at')
         return JsonResponse({'runs': list(runs)})
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
 
 @admin_required
-def get_rag_run(request, run_id):
+def get_rag_adhoc_run(request, run_id):
     try:
-        run = get_object_or_404(RagBenchmarkRun, pk=run_id)
+        run = get_object_or_404(RagAdhocRun, pk=run_id)
         results = list(run.results.values('question', 'answer', 'ground_truths', 'is_correct_rule', 'is_correct_llm', 'num_docs_used', 'search_results'))
         run_data = {
             'id': run.id,
@@ -417,9 +479,9 @@ def get_rag_run(request, run_id):
 
 @admin_required
 @require_http_methods(["DELETE"])
-def delete_rag_run(request, run_id):
+def delete_rag_adhoc_run(request, run_id):
     try:
-        run = get_object_or_404(RagBenchmarkRun, pk=run_id)
+        run = get_object_or_404(RagAdhocRun, pk=run_id)
         run.delete()
         return JsonResponse({'status': 'ok'})
     except Exception as e:
@@ -431,7 +493,7 @@ def create_session_group(request):
     try:
         data = json.loads(request.body)
         name = data.get('name', f"Pipeline Run - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        group = InteractiveSessionGroup.objects.create(name=name)
+        group = MultiTurnSessionGroup.objects.create(name=name)
         return JsonResponse({'group_id': group.id, 'group_name': group.name})
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
@@ -444,7 +506,7 @@ def create_session(request):
         question_text = data.get('question')
         ground_truths = data.get('ground_truths')
         group_id = data.get('group_id')
-        pipeline_type = data.get('pipeline_type', 'interactive') # Default to 'interactive'
+        pipeline_type = data.get('pipeline_type', 'vanilla_llm_multi_turn') # Default to 'vanilla_llm_multi_turn'
 
         if not question_text or not ground_truths:
             return JsonResponse({'error': 'Question and ground truths are required.'}, status=400)
@@ -452,18 +514,18 @@ def create_session(request):
         settings = LLMSettings.load()
         
         session_data = {
-            "settings": settings,
+            "llm_settings": settings,
             "question": question_text,
             "ground_truths": ground_truths,
             "pipeline_type": pipeline_type,
         }
         
         if group_id:
-            session_data['group'] = get_object_or_404(InteractiveSessionGroup, pk=group_id)
+            session_data['group'] = get_object_or_404(MultiTurnSessionGroup, pk=group_id)
 
-        session = InteractiveSession.objects.create(**session_data)
+        session = MultiTurnSession.objects.create(**session_data)
         
-        trial = InteractiveTrial.objects.create(
+        trial = MultiTurnTrial.objects.create(
             session=session,
             trial_number=1,
             status='processing'
@@ -476,8 +538,11 @@ def create_session(request):
 
 @admin_required
 def get_session(request, session_id):
-    session = get_object_or_404(InteractiveSession, pk=session_id)
-    trials = list(session.trials.values('id', 'trial_number', 'answer', 'feedback', 'is_correct', 'created_at', 'status'))
+    session = get_object_or_404(MultiTurnSession, pk=session_id)
+    trials = list(session.trials.values(
+        'id', 'trial_number', 'answer', 'feedback', 'is_correct', 
+        'created_at', 'status', 'search_query', 'search_results'
+    ))
     return JsonResponse({
         'session': {
             'id': session.id,
@@ -485,8 +550,9 @@ def get_session(request, session_id):
             'ground_truths': session.ground_truths,
             'is_completed': session.is_completed,
             'created_at': session.created_at,
-            'max_retries': session.settings.max_retries,
-            'group_id': session.group_id
+            'max_retries': session.llm_settings.max_retries,
+            'group_id': session.group_id,
+            'pipeline_type': session.pipeline_type
         },
         'trials': trials
     })
@@ -499,7 +565,7 @@ def retry_session(request, trial_id):
         feedback = data.get('feedback')
         is_correct = data.get('is_correct')
 
-        original_trial = get_object_or_404(InteractiveTrial, pk=trial_id)
+        original_trial = get_object_or_404(MultiTurnTrial, pk=trial_id)
         original_trial.feedback = feedback
         original_trial.is_correct = is_correct
         original_trial.save()
@@ -511,12 +577,12 @@ def retry_session(request, trial_id):
             session.save()
             return JsonResponse({'status': 'completed', 'session_id': session.id})
 
-        if session.trials.count() >= session.settings.max_retries:
+        if session.trials.count() >= session.llm_settings.max_retries:
             session.is_completed = True
             session.save()
             return JsonResponse({'status': 'max_retries_reached', 'session_id': session.id})
 
-        new_trial = InteractiveTrial.objects.create(
+        new_trial = MultiTurnTrial.objects.create(
             session=session,
             trial_number=original_trial.trial_number + 1,
             status='processing'
@@ -532,9 +598,9 @@ import traceback
 @admin_required
 def run_trial(request, trial_id):
     try:
-        trial = get_object_or_404(InteractiveTrial, pk=trial_id)
+        trial = get_object_or_404(MultiTurnTrial, pk=trial_id)
         session = trial.session
-        db_settings = session.settings
+        db_settings = session.llm_settings
 
         # Fallback logic for settings
         base_url = db_settings.llm_base_url or config("LLM_BASE_URL", default=None)
@@ -554,7 +620,7 @@ def run_trial(request, trial_id):
         is_correct = False
         num_docs_used = 0 # Only relevant for RAG
 
-        if session.pipeline_type == 'adhoc':
+        if session.pipeline_type == 'vanilla_llm_adhoc':
             # Adhoc pipeline logic (simple QA)
             answer_prompt = f"""Your task is to answer the following question. Follow these rules strictly:
 1.  Your answer must be an exact match to the correct answer.
@@ -582,7 +648,7 @@ Answer:"""
             llm_result = check_answer_llm(session.question, session.ground_truths, answer, client=client, model=model)
             is_correct = rule_result and llm_result # For adhoc, both must be correct
             
-        elif session.pipeline_type == 'rag':
+        elif session.pipeline_type == 'rag_adhoc':
             # RAG pipeline logic
             rag_settings = RagSettings.load()
             search_engine = get_search_engine()
@@ -602,7 +668,69 @@ Answer:"""
             is_correct = rule_result and llm_result # For RAG, both must be correct
             num_docs_used = len(search_results)
 
-        else: # 'interactive' pipeline_type or any other default
+        elif session.pipeline_type in ['rag_multi_turn_no_reform', 'rag_multi_turn_reform']:
+            search_engine = get_search_engine()
+            messages = []
+            
+            current_search_query = session.question
+            
+            # Reformulation Logic (Only for reform mode and subsequent turns)
+            if session.pipeline_type == 'rag_multi_turn_reform' and trial.trial_number > 1:
+                reform_messages = [{"role": "system", "content": "You are a helpful assistant that reformulates search queries based on conversation history."}]
+                reform_messages.append({"role": "user", "content": f"Original Question: {session.question}"})
+                
+                prev_trials = session.trials.filter(trial_number__lt=trial.trial_number).order_by('trial_number')
+                for prev_trial in prev_trials:
+                    if prev_trial.answer:
+                        reform_messages.append({"role": "assistant", "content": f"Previous Answer: {prev_trial.answer}"})
+                    reform_messages.append({"role": "user", "content": "The previous answer was incorrect."})
+                
+                reform_messages.append({"role": "user", "content": "Based on the history, provide a better search query to find the correct answer. Output ONLY the query."})
+                
+                try:
+                    reform_response = client.chat.completions.create(
+                        model=model,
+                        messages=reform_messages
+                    )
+                    current_search_query = reform_response.choices[0].message.content.strip()
+                except Exception:
+                    pass # Fallback to original
+
+            # Perform Search
+            search_results = search_engine.search(current_search_query)
+            formatted_results = "\n".join([f"{i+1}. {r.get('title', '')}\n{r.get('snippet', '')}" for i, r in enumerate(search_results)]) if search_results else "No results found."
+            num_docs_used = len(search_results)
+
+            # Save search info to trial
+            trial.search_query = current_search_query
+            trial.search_results = search_results
+            trial.save()
+
+            # Construct RAG Context
+            system_prompt = f"Context from web search (Query: {current_search_query}):\n{formatted_results}\n\n"
+            messages.append({"role": "system", "content": system_prompt})
+            messages.append({"role": "user", "content": f"Question: {session.question}"})
+            
+            # Add History
+            prev_trials = session.trials.filter(trial_number__lt=trial.trial_number).order_by('trial_number')
+            for prev_trial in prev_trials:
+                if prev_trial.answer:
+                    messages.append({"role": "assistant", "content": prev_trial.answer})
+                if prev_trial.is_correct == False:
+                    messages.append({"role": "user", "content": "Your previous answer was incorrect."})
+
+            messages.append({"role": "user", "content": "Answer the question based on the context. Return ONLY the exact answer."})
+            
+            response = client.chat.completions.create(
+                model=model,
+                messages=messages
+            )
+            answer = response.choices[0].message.content
+            
+            # Automated Judgment (same as multi-turn)
+            is_correct = check_answer_llm(session.question, session.ground_truths, answer, client=client, model=model)
+
+        else: # 'vanilla_llm_multi_turn' pipeline_type or any other default
             messages = []
             if trial.trial_number == 1:
                 # First turn
@@ -638,7 +766,7 @@ Answer:"""
             answer = response.choices[0].message.content
             print_debug(f"LLM Response: {answer}")
 
-            # Perform automated judgment for interactive
+            # Perform automated judgment for multi-turn
             is_correct = check_answer_llm(session.question, session.ground_truths, answer, client=client, model=model)
 
         trial.answer = answer
@@ -649,7 +777,7 @@ Answer:"""
         trial.save()
 
         # If the answer is correct or max retries are reached, mark the session as completed
-        if is_correct or trial.trial_number >= session.settings.max_retries:
+        if is_correct or trial.trial_number >= session.llm_settings.max_retries:
             session.is_completed = True
             session.save()
 
@@ -664,7 +792,7 @@ Answer:"""
 @require_http_methods(["DELETE"])
 def delete_session(request, session_id):
     try:
-        session = get_object_or_404(InteractiveSession, pk=session_id)
+        session = get_object_or_404(MultiTurnSession, pk=session_id)
         session.delete()
         return JsonResponse({'status': 'ok'})
     except Exception as e:
@@ -674,7 +802,7 @@ def delete_session(request, session_id):
 @require_http_methods(["DELETE"])
 def delete_session_group(request, group_id):
     try:
-        group = get_object_or_404(InteractiveSessionGroup, pk=group_id)
+        group = get_object_or_404(MultiTurnSessionGroup, pk=group_id)
         group.delete()
         return JsonResponse({'status': 'ok'})
     except Exception as e:
@@ -682,22 +810,23 @@ def delete_session_group(request, group_id):
 
 
 @admin_required
-def run_interactive_pipeline(request):
+def run_vanilla_llm_multi_turn_pipeline(request):
     try:
         base_url = request.GET.get('llm_base_url') or config("LLM_BASE_URL", default=None)
         api_key = request.GET.get('llm_api_key') or config("LLM_API_KEY", default=None)
         model = request.GET.get('llm_model') or config("LLM_MODEL", default='gpt-3.5-turbo')
         max_retries = int(request.GET.get('max_retries', 3))
         pipeline_id = request.GET.get('pipeline_id')
+        pipeline_type = request.GET.get('pipeline_type', 'vanilla_llm_multi_turn')
 
         if not api_key:
             return JsonResponse({'error': 'An API Key is required to run the benchmark.'}, status=400)
 
         if pipeline_id:
-            redis_client.set(f"interactive_pipeline_active:{pipeline_id}", "1", ex=3600)
+            redis_client.set(f"vanilla_llm_multi_turn_pipeline_active:{pipeline_id}", "1", ex=3600)
 
         return StreamingHttpResponse(
-            interactive_pipeline_stream(base_url, api_key, model, max_retries, pipeline_id=pipeline_id), 
+            vanilla_llm_multi_turn_pipeline_stream(base_url, api_key, model, max_retries, pipeline_id=pipeline_id, pipeline_type=pipeline_type), 
             content_type='application/json'
         )
     except Exception as e:
@@ -705,28 +834,32 @@ def run_interactive_pipeline(request):
 
 @admin_required
 @require_POST
-def stop_interactive_pipeline(request):
+def stop_vanilla_llm_multi_turn_pipeline(request):
     try:
         data = json.loads(request.body)
         pipeline_id = data.get('pipeline_id')
         if pipeline_id:
-            stop_pipeline_token(pipeline_id, "interactive_pipeline_active")
+            stop_pipeline_token(pipeline_id, "vanilla_llm_multi_turn_pipeline_active")
         return JsonResponse({'status': 'ok'})
     except Exception as e:
         return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
 
 @admin_required
 def export_session(request, session_id):
-    session = get_object_or_404(InteractiveSession, pk=session_id)
-    trials = list(session.trials.values('trial_number', 'answer', 'feedback', 'is_correct', 'created_at'))
+    session = get_object_or_404(MultiTurnSession, pk=session_id)
+    trials = list(session.trials.values(
+        'trial_number', 'answer', 'feedback', 'is_correct', 
+        'created_at', 'search_query', 'search_results'
+    ))
     
     export_data = {
         'session_id': session.id,
         'question': session.question,
         'ground_truths': session.ground_truths,
         'is_completed': session.is_completed,
+        'pipeline_type': session.pipeline_type,
         'created_at': session.created_at.isoformat(),
-        'max_retries': session.settings.max_retries,
+        'max_retries': session.llm_settings.max_retries,
         'trials': trials
     }
 
@@ -762,14 +895,14 @@ def save_run(request):
             if not result.get('question'):
                 continue
 
-            session = InteractiveSession.objects.create(
-                settings=settings,
+            session = MultiTurnSession.objects.create(
+                llm_settings=settings,
                 question=result.get('question'),
                 ground_truths=result.get('ground_truths'),
                 run_tag=run_name,
                 is_completed=True 
             )
-            InteractiveTrial.objects.create(
+            MultiTurnTrial.objects.create(
                 session=session,
                 trial_number=1,
                 answer=result.get('answer'),
@@ -786,14 +919,14 @@ def delete_run(request, run_tag):
     try:
         data = json.loads(request.body)
         run_name = data.get('name')
-        InteractiveSession.objects.filter(run_tag=run_tag).delete()
+        MultiTurnSession.objects.filter(run_tag=run_tag).delete()
         return JsonResponse({"status": "ok", "filename": run_name})
     except Exception as e:
-        return JsonResponse({"status": "error", "message": str(e)}, status=500)
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
 
 @admin_required
-def load_interactive_run(request, group_id):
-    group = get_object_or_404(InteractiveSessionGroup, pk=group_id)
+def load_vanilla_llm_multi_turn_run(request, group_id):
+    group = get_object_or_404(MultiTurnSessionGroup, pk=group_id)
     sessions = group.sessions.all().prefetch_related('trials')
     
     results = []
@@ -807,29 +940,29 @@ def load_interactive_run(request, group_id):
                 'session_id': session.id,
                 'final_answer': last_trial.answer,
                 'ground_truths': session.ground_truths,
-                'max_retries': session.settings.max_retries
+                'max_retries': session.llm_settings.max_retries
             })
 
     return JsonResponse({'results': results, 'group_name': group.name})
 
 
 @admin_required
-def run_adhoc_pipeline(request):
+def run_vanilla_llm_adhoc_pipeline(request):
     try:
-        pipeline_base_url = request.GET.get('llm_base_url') or config("LLM_BASE_URL", default=None)
-        pipeline_api_key = request.GET.get('llm_api_key') or config("LLM_API_KEY", default=None)
-        pipeline_model = request.GET.get('llm_model') or config("LLM_MODEL", default='gpt-3.5-turbo')
+        base_url = request.GET.get('llm_base_url') or config("LLM_BASE_URL", default=None)
+        api_key = request.GET.get('llm_api_key') or config("LLM_API_KEY", default=None)
+        model = request.GET.get('llm_model') or config("LLM_MODEL", default='gpt-3.5-turbo')
         pipeline_id = request.GET.get('pipeline_id')
 
-        if not pipeline_api_key:
+        if not api_key:
             return JsonResponse({'error': 'An API Key is required to run the benchmark.'}, status=400)
 
         if pipeline_id:
             # Set the flag in Redis with a 1-hour expiry
-            redis_client.set(f"adhoc_pipeline_active:{pipeline_id}", "1", ex=3600)
+            redis_client.set(f"vanilla_llm_adhoc_pipeline_active:{pipeline_id}", "1", ex=3600)
 
         return StreamingHttpResponse(
-            adhoc_pipeline_stream(pipeline_base_url, pipeline_api_key, pipeline_model, pipeline_id=pipeline_id), 
+            vanilla_llm_adhoc_pipeline_stream(base_url, api_key, model, pipeline_id=pipeline_id),
             content_type='application/json'
         )
     except Exception as e:
@@ -837,28 +970,28 @@ def run_adhoc_pipeline(request):
 
 @admin_required
 @require_POST
-def stop_adhoc_pipeline(request):
+def stop_vanilla_llm_adhoc_pipeline(request):
     try:
         data = json.loads(request.body)
         pipeline_id = data.get('pipeline_id')
         if pipeline_id:
-            stop_pipeline_token(pipeline_id, "adhoc_pipeline_active")
+            stop_pipeline_token(pipeline_id, "vanilla_llm_adhoc_pipeline_active")
         return JsonResponse({'status': 'ok'})
     except Exception as e:
         return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
 
 @admin_required
-def list_adhoc_runs(request):
+def list_vanilla_llm_adhoc_runs(request):
     try:
-        runs = AdhocRun.objects.values('id', 'name', 'created_at', 'accuracy').order_by('-created_at')
+        runs = VanillaLLMAdhocRun.objects.values('id', 'name', 'created_at', 'accuracy').order_by('-created_at')
         return JsonResponse({'runs': list(runs)})
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
 
 @admin_required
-def get_adhoc_run(request, run_id):
+def get_vanilla_llm_adhoc_run(request, run_id):
     try:
-        run = get_object_or_404(AdhocRun, pk=run_id)
+        run = get_object_or_404(VanillaLLMAdhocRun, pk=run_id)
         results = list(run.results.values('question', 'answer', 'ground_truths', 'is_correct_rule', 'is_correct_llm'))
         run_data = {
             'id': run.id,
@@ -868,7 +1001,7 @@ def get_adhoc_run(request, run_id):
             'total_questions': run.total_questions,
             'correct_answers': run.correct_answers,
             'settings': {
-                'llm_model': run.settings.llm_model if run.settings else 'N/A'
+                'llm_model': run.llm_settings.llm_model if run.llm_settings else 'N/A'
             },
             'results': results
         }
@@ -896,9 +1029,9 @@ def web_search(request):
         return JsonResponse({'error': str(e)}, status=500)
 @admin_required
 @require_http_methods(["DELETE"])
-def delete_adhoc_run(request, run_id):
+def delete_vanilla_llm_adhoc_run(request, run_id):
     try:
-        run = get_object_or_404(AdhocRun, pk=run_id)
+        run = get_object_or_404(VanillaLLMAdhocRun, pk=run_id)
         run.delete()
         return JsonResponse({'status': 'ok'})
     except Exception as e:

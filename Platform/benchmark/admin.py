@@ -1,67 +1,64 @@
 from django.contrib import admin
 from .models import (
     LLMSettings, 
-    InteractiveSessionGroup, 
-    InteractiveSession, 
-    InteractiveTrial,
-    AdhocRun,
-    AdhocSessionResult,
+    MultiTurnSessionGroup, 
+    MultiTurnSession, 
+    MultiTurnTrial, 
+    VanillaLLMAdhocRun, 
+    VanillaLLMAdhocResult,
     RagSettings,
-    RagBenchmarkRun,
-    RagBenchmarkResult
+    RagAdhocRun,
+    RagAdhocResult
 )
 
 # Register your models here.
 @admin.register(LLMSettings)
 class LLMSettingsAdmin(admin.ModelAdmin):
-    list_display = ('id', 'llm_model', 'llm_base_url')
-
-@admin.register(InteractiveSessionGroup)
-class InteractiveSessionGroupAdmin(admin.ModelAdmin):
-    list_display = ('name', 'created_at')
-    ordering = ('-created_at',)
-
-class InteractiveTrialInline(admin.TabularInline):
-    model = InteractiveTrial
-    extra = 0
-    readonly_fields = ('created_at',)
-
-@admin.register(InteractiveSession)
-class InteractiveSessionAdmin(admin.ModelAdmin):
-    list_display = ('id', 'group', 'question', 'is_completed', 'created_at')
-    list_filter = ('is_completed', 'group')
-    search_fields = ('question',)
-    inlines = [InteractiveTrialInline]
-
-@admin.register(InteractiveTrial)
-class InteractiveTrialAdmin(admin.ModelAdmin):
-    list_display = ('id', 'session', 'trial_number', 'status', 'is_correct', 'created_at')
-    list_filter = ('status', 'is_correct')
-
-class AdhocSessionResultInline(admin.TabularInline):
-    model = AdhocSessionResult
-    extra = 0
-    readonly_fields = ('question', 'answer', 'is_correct_rule', 'is_correct_llm')
-    can_delete = False
-
-@admin.register(AdhocRun)
-class AdhocRunAdmin(admin.ModelAdmin):
-    list_display = ('name', 'created_at', 'total_questions', 'correct_answers', 'accuracy')
-    ordering = ('-created_at',)
-    inlines = [AdhocSessionResultInline]
+    list_display = ('llm_base_url', 'llm_model', 'llm_api_key', 'max_retries')
 
 @admin.register(RagSettings)
 class RagSettingsAdmin(admin.ModelAdmin):
-    list_display = ('id',)
+    list_display = ('prompt_template',)
 
-class RagBenchmarkResultInline(admin.TabularInline):
-    model = RagBenchmarkResult
+@admin.register(MultiTurnSessionGroup)
+class MultiTurnSessionGroupAdmin(admin.ModelAdmin):
+    list_display = ('name', 'created_at')
+    search_fields = ('name',)
+
+class MultiTurnTrialInline(admin.TabularInline):
+    model = MultiTurnTrial
     extra = 0
-    readonly_fields = ('question', 'answer', 'is_correct_rule', 'is_correct_llm', 'num_docs_used')
-    can_delete = False
+    readonly_fields = ('created_at',)
 
-@admin.register(RagBenchmarkRun)
-class RagBenchmarkRunAdmin(admin.ModelAdmin):
+@admin.register(MultiTurnSession)
+class MultiTurnSessionAdmin(admin.ModelAdmin):
+    list_display = ('id', 'question', 'is_completed', 'created_at', 'pipeline_type', 'group')
+    list_filter = ('is_completed', 'pipeline_type', 'group')
+    search_fields = ('question',)
+    inlines = [MultiTurnTrialInline]
+
+@admin.register(MultiTurnTrial)
+class MultiTurnTrialAdmin(admin.ModelAdmin):
+    list_display = ('id', 'session', 'trial_number', 'status', 'is_correct', 'created_at')
+    list_filter = ('status', 'is_correct')
+    search_fields = ('answer', 'feedback', 'session__question')
+
+class VanillaLLMAdhocResultInline(admin.TabularInline):
+    model = VanillaLLMAdhocResult
+    extra = 0
+
+@admin.register(VanillaLLMAdhocRun)
+class VanillaLLMAdhocRunAdmin(admin.ModelAdmin):
     list_display = ('name', 'created_at', 'total_questions', 'correct_answers', 'accuracy')
-    ordering = ('-created_at',)
-    inlines = [RagBenchmarkResultInline]
+    search_fields = ('name',)
+    inlines = [VanillaLLMAdhocResultInline]
+
+class RagAdhocResultInline(admin.TabularInline):
+    model = RagAdhocResult
+    extra = 0
+
+@admin.register(RagAdhocRun)
+class RagAdhocRunAdmin(admin.ModelAdmin):
+    list_display = ('name', 'created_at', 'total_questions', 'correct_answers', 'accuracy')
+    search_fields = ('name',)
+    inlines = [RagAdhocResultInline]

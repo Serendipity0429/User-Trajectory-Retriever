@@ -27,7 +27,7 @@ class LLMSettings(models.Model):
     def __str__(self):
         return "LLM Settings"
 
-class InteractiveSessionGroup(models.Model):
+class MultiTurnSessionGroup(models.Model):
     """
     Represents a group of benchmark sessions, typically from a single pipeline run.
     """
@@ -40,12 +40,12 @@ class InteractiveSessionGroup(models.Model):
     def __str__(self):
         return f"Session Group from {self.created_at.strftime('%Y-%m-%d %H:%M')}"
 
-class InteractiveSession(models.Model):
+class MultiTurnSession(models.Model):
     """
     Represents a multi-turn conversation session for benchmarking.
     """
-    settings = models.ForeignKey(LLMSettings, on_delete=models.CASCADE)
-    group = models.ForeignKey(InteractiveSessionGroup, related_name='sessions', on_delete=models.CASCADE, null=True, blank=True)
+    llm_settings = models.ForeignKey(LLMSettings, on_delete=models.CASCADE)
+    group = models.ForeignKey(MultiTurnSessionGroup, related_name='sessions', on_delete=models.CASCADE, null=True, blank=True)
     question = models.TextField()
     ground_truths = models.JSONField(default=list)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -53,16 +53,18 @@ class InteractiveSession(models.Model):
     run_tag = models.CharField(max_length=255, blank=True, null=True, db_index=True)
     
     PIPELINE_CHOICES = [
-        ('interactive', 'Interactive'),
-        ('adhoc', 'Ad-hoc'),
-        ('rag', 'RAG'),
+        ('vanilla_llm_multi_turn', 'Vanilla LLM (Multi-Turn)'),
+        ('vanilla_llm_adhoc', 'Vanilla LLM (Ad-hoc)'),
+        ('rag_adhoc', 'RAG (Ad-hoc)'),
+        ('rag_multi_turn_no_reform', 'RAG Multi-Turn (No Reformulation)'),
+        ('rag_multi_turn_reform', 'RAG Multi-Turn (Reformulation)'),
     ]
-    pipeline_type = models.CharField(max_length=20, choices=PIPELINE_CHOICES, default='interactive')
+    pipeline_type = models.CharField(max_length=30, choices=PIPELINE_CHOICES, default='vanilla_llm_multi_turn')
 
     def __str__(self):
         return f"Session for: {self.question[:50]}..."
 
-class InteractiveTrial(models.Model):
+class MultiTurnTrial(models.Model):
     """
     Represents a single trial (turn) within a benchmark session.
     """
@@ -71,13 +73,15 @@ class InteractiveTrial(models.Model):
         ('completed', 'Completed'),
         ('error', 'Error'),
     ]
-    session = models.ForeignKey(InteractiveSession, related_name='trials', on_delete=models.CASCADE)
+    session = models.ForeignKey(MultiTurnSession, related_name='trials', on_delete=models.CASCADE)
     trial_number = models.PositiveIntegerField()
     answer = models.TextField(blank=True, null=True)
     feedback = models.TextField(blank=True, null=True)
     is_correct = models.BooleanField(null=True, blank=True) # Can be null if not yet evaluated
     created_at = models.DateTimeField(auto_now_add=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='processing')
+    search_query = models.TextField(blank=True, null=True)
+    search_results = models.JSONField(default=list, blank=True)
 
     class Meta:
         unique_together = ('session', 'trial_number')
@@ -87,13 +91,13 @@ class InteractiveTrial(models.Model):
         return f"Trial {self.trial_number} for Session {self.session.id}"
 
 
-class AdhocRun(models.Model):
+class VanillaLLMAdhocRun(models.Model):
     """
     Represents a single, complete run of the ad-hoc QA pipeline.
     """
     name = models.CharField(max_length=255, unique=True, help_text="A unique name for this benchmark run, e.g., 'gpt-4o-2025-12-02'")
     created_at = models.DateTimeField(auto_now_add=True)
-    settings = models.ForeignKey(LLMSettings, on_delete=models.SET_NULL, null=True, blank=True)
+    llm_settings = models.ForeignKey(LLMSettings, on_delete=models.SET_NULL, null=True, blank=True)
     
     # Aggregate statistics
     total_questions = models.IntegerField(default=0)
@@ -106,11 +110,11 @@ class AdhocRun(models.Model):
     def __str__(self):
         return self.name
 
-class AdhocSessionResult(models.Model):
+class VanillaLLMAdhocResult(models.Model):
     """
-    Stores the result of a single question-answer session within an AdhocRun.
+    Stores the result of a single question-answer session within an VanillaLLMAdhocRun.
     """
-    run = models.ForeignKey(AdhocRun, related_name='results', on_delete=models.CASCADE)
+    run = models.ForeignKey(VanillaLLMAdhocRun, related_name='results', on_delete=models.CASCADE)
     question = models.TextField()
     ground_truths = models.JSONField(default=list)
     answer = models.TextField()
@@ -162,7 +166,7 @@ Answer:""",
     def __str__(self):
         return "RAG Settings"
 
-class RagBenchmarkRun(models.Model):
+class RagAdhocRun(models.Model):
     """
     Represents a single, complete run of the RAG QA pipeline.
     """
@@ -182,11 +186,11 @@ class RagBenchmarkRun(models.Model):
     def __str__(self):
         return self.name
 
-class RagBenchmarkResult(models.Model):
+class RagAdhocResult(models.Model):
     """
-    Stores the result of a single question-answer session within a RagBenchmarkRun.
+    Stores the result of a single question-answer session within a RagAdhocRun.
     """
-    run = models.ForeignKey(RagBenchmarkRun, related_name='results', on_delete=models.CASCADE)
+    run = models.ForeignKey(RagAdhocRun, related_name='results', on_delete=models.CASCADE)
     question = models.TextField()
     ground_truths = models.JSONField(default=list)
     answer = models.TextField()

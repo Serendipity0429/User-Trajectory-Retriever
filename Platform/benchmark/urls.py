@@ -5,51 +5,52 @@ app_name = 'benchmark'
 
 urlpatterns = [
     path("", views.home, name="home"),
-    path("interactive_llm/", views.interactive_llm, name="interactive_llm"),
-    path("adhoc_llm/", views.adhoc_llm, name="adhoc_llm"),
-    path("web_search_rag/", views.web_search_rag, name="web_search_rag"),
+    path("vanilla_llm_multi_turn/", views.vanilla_llm_multi_turn, name="vanilla_llm_multi_turn"),
+    path("vanilla_llm_adhoc/", views.vanilla_llm_adhoc, name="vanilla_llm_adhoc"),
+    path("rag_adhoc/", views.rag_adhoc, name="rag_adhoc"),
+    path("rag_multi_turn/", views.rag_multi_turn, name="rag_multi_turn"),
     path("api/list_runs/", views.list_runs, name="list_runs"),
-    path("api/interactive/create_session_group/", views.create_session_group, name="create_session_group"),
-    path("api/interactive/create_session/", views.create_session, name="create_session"),
-    path("api/interactive/get_session/<int:session_id>/", views.get_session, name="get_session"),
-    path("api/interactive/retry_session/<int:trial_id>/", views.retry_session, name="retry_session"),
-    path("api/interactive/run_trial/<int:trial_id>/", views.run_trial, name="run_trial"),
+    path("api/multi_turn/create_session_group/", views.create_session_group, name="create_session_group"),
+    path("api/multi_turn/create_session/", views.create_session, name="create_session"),
+    path("api/multi_turn/get_session/<int:session_id>/", views.get_session, name="get_session"),
+    path("api/multi_turn/retry_session/<int:trial_id>/", views.retry_session, name="retry_session"),
+    path("api/multi_turn/run_trial/<int:trial_id>/", views.run_trial, name="run_trial"),
     path("api/load_run/<str:run_tag>/", views.load_run, name="load_run"),
     path("api/get_llm_env_vars/", views.get_llm_env_vars, name="get_llm_env_vars"),
     path("api/save_llm_settings/", views.save_llm_settings, name="save_llm_settings"),
     path("api/test_llm_connection/", views.test_llm_connection, name="test_llm_connection"),
     path("api/save_run/", views.save_run, name="save_run"),
     path("api/delete_run/<str:run_tag>/", views.delete_run, name="delete_run"),
-    path("api/interactive/delete_session/<int:session_id>/", views.delete_session, name="delete_session"),
-    path('api/interactive/export_session/<int:session_id>/', views.export_session, name='export_session'),
-    path('api/interactive/batch_delete_sessions/', views.batch_delete_sessions, name='batch_delete_sessions'),
-    path('api/interactive/delete_session_group/<int:group_id>/', views.delete_session_group, name='delete_session_group'),
-    path('api/interactive/load_run/<int:group_id>/', views.load_interactive_run, name='load_interactive_run'),
+    path("api/multi_turn/delete_session/<int:session_id>/", views.delete_session, name="delete_session"),
+    path('api/multi_turn/export_session/<int:session_id>/', views.export_session, name='export_session'),
+    path('api/multi_turn/batch_delete_sessions/', views.batch_delete_sessions, name='batch_delete_sessions'),
+    path('api/multi_turn/delete_session_group/<int:group_id>/', views.delete_session_group, name='delete_session_group'),
+    path('api/multi_turn/load_run/<int:group_id>/', views.load_vanilla_llm_multi_turn_run, name='load_vanilla_llm_multi_turn_run'),
 
-    # Interactive Pipeline APIs
-    path('api/run_interactive_pipeline/', views.run_interactive_pipeline, name='run_interactive_pipeline'),
-    path('api/stop_interactive_pipeline/', views.stop_interactive_pipeline, name='stop_interactive_pipeline'),
+    # Multi-turn Pipeline APIs (Vanilla LLM Multi-turn)
+    path('api/run_vanilla_llm_multi_turn_pipeline/', views.run_vanilla_llm_multi_turn_pipeline, name='run_vanilla_llm_multi_turn_pipeline'),
+    path('api/stop_vanilla_llm_multi_turn_pipeline/', views.stop_vanilla_llm_multi_turn_pipeline, name='stop_vanilla_llm_multi_turn_pipeline'),
 
-    # New Ad-hoc pipeline URL
-    path('api/run_adhoc_pipeline/', views.run_adhoc_pipeline, name='run_adhoc_pipeline'),
-    path('api/stop_adhoc_pipeline/', views.stop_adhoc_pipeline, name='stop_adhoc_pipeline'),
+    # Vanilla LLM Ad-hoc pipeline URL
+    path('api/run_vanilla_llm_adhoc_pipeline/', views.run_vanilla_llm_adhoc_pipeline, name='run_vanilla_llm_adhoc_pipeline'),
+    path('api/stop_vanilla_llm_adhoc_pipeline/', views.stop_vanilla_llm_adhoc_pipeline, name='stop_vanilla_llm_adhoc_pipeline'),
 
     # LLM Settings
-    path('api/save_llm_settings/', views.save_llm_settings, name='save_llm_settings'),
+    # path('api/save_llm_settings/', views.save_llm_settings, name='save_llm_settings'), # Removed duplicate
 
     # Ad-hoc run APIs
-    path('api/adhoc/list_runs/', views.list_adhoc_runs, name='list_adhoc_runs'),
-    path('api/adhoc/get_run/<int:run_id>/', views.get_adhoc_run, name='get_adhoc_run'),
-    path('api/adhoc/delete_run/<int:run_id>/', views.delete_adhoc_run, name='delete_adhoc_run'),
+    path('api/vanilla_llm_adhoc/list_runs/', views.list_vanilla_llm_adhoc_runs, name='list_vanilla_llm_adhoc_runs'),
+    path('api/vanilla_llm_adhoc/get_run/<int:run_id>/', views.get_vanilla_llm_adhoc_run, name='get_vanilla_llm_adhoc_run'),
+    path('api/vanilla_llm_adhoc/delete_run/<int:run_id>/', views.delete_vanilla_llm_adhoc_run, name='delete_vanilla_llm_adhoc_run'),
     path('api/web_search/', views.web_search, name='web_search'),
 
     # RAG APIs
     path('api/save_rag_settings/', views.save_rag_settings, name='save_rag_settings'),
-    path('api/run_rag_pipeline/', views.run_rag_pipeline, name='run_rag_pipeline'),
-    path('api/stop_rag_pipeline/', views.stop_rag_pipeline, name='stop_rag_pipeline'),
-    path('api/rag/list_runs/', views.list_rag_runs, name='list_rag_runs'),
-    path('api/rag/get_run/<int:run_id>/', views.get_rag_run, name='get_rag_run'),
-    path('api/rag/delete_run/<int:run_id>/', views.delete_rag_run, name='delete_rag_run'),
-    path('api/rag/get_default_prompt/', views.get_default_rag_prompt, name='get_default_rag_prompt'),
+    path('api/run_rag_adhoc_pipeline/', views.run_rag_adhoc_pipeline, name='run_rag_adhoc_pipeline'),
+    path('api/stop_rag_adhoc_pipeline/', views.stop_rag_adhoc_pipeline, name='stop_rag_adhoc_pipeline'),
+    path('api/rag_adhoc/list_runs/', views.list_rag_adhoc_runs, name='list_rag_adhoc_runs'),
+    path('api/rag_adhoc/get_run/<int:run_id>/', views.get_rag_adhoc_run, name='get_rag_adhoc_run'),
+    path('api/rag_adhoc/delete_run/<int:run_id>/', views.delete_rag_adhoc_run, name='delete_rag_adhoc_run'),
+    path('api/rag_adhoc/get_default_prompt/', views.get_default_rag_prompt, name='get_default_rag_prompt'),
 ]
 

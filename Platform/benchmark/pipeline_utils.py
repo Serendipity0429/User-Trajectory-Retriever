@@ -8,13 +8,13 @@ from .search_utils import get_search_engine
 from .models import (
     LLMSettings, 
     RagSettings, 
-    InteractiveSession, 
-    InteractiveTrial, 
-    InteractiveSessionGroup,
-    AdhocRun,
-    AdhocSessionResult,
-    RagBenchmarkRun,
-    RagBenchmarkResult
+    MultiTurnSession, 
+    MultiTurnTrial, 
+    MultiTurnSessionGroup,
+    VanillaLLMAdhocRun,
+    VanillaLLMAdhocResult,
+    RagAdhocRun,
+    RagAdhocResult
 )
 
 # Constants
@@ -51,17 +51,17 @@ def stop_pipeline_token(pipeline_id, prefix):
     if pipeline_id:
         redis_client.delete(f"{prefix}:{pipeline_id}")
 
-def adhoc_pipeline_stream(base_url, api_key, model, pipeline_id=None):
+def vanilla_llm_adhoc_pipeline_stream(base_url, api_key, model, pipeline_id=None):
     """
-    Stream generator for the Ad-hoc QA pipeline.
+    Stream generator for the Vanilla LLM Ad-hoc QA pipeline.
     """
     client = openai.OpenAI(base_url=base_url, api_key=api_key)
-    prefix = "adhoc_pipeline_active"
+    prefix = "vanilla_llm_adhoc_pipeline_active"
     
     # Create Run
     settings = LLMSettings.load()
-    run_name = f"Adhoc Run {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-    run = AdhocRun.objects.create(
+    run_name = f"Vanilla LLM Ad-hoc Run {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+    run = VanillaLLMAdhocRun.objects.create(
         name=run_name,
         settings=settings,
         total_questions=0,
@@ -117,7 +117,7 @@ Answer:"""
             llm_result = check_answer_llm(question, ground_truths, answer, client=client, model=model)
 
             # Save result
-            AdhocSessionResult.objects.create(
+            VanillaLLMAdhocResult.objects.create(
                 run=run,
                 question=question,
                 ground_truths=ground_truths,
@@ -160,20 +160,20 @@ Answer:"""
 
     stop_pipeline_token(pipeline_id, prefix)
 
-def rag_pipeline_stream(base_url, api_key, model, prompt_template, pipeline_id=None):
+def rag_adhoc_pipeline_stream(base_url, api_key, model, prompt_template, pipeline_id=None):
     """
-    Stream generator for the RAG pipeline.
+    Stream generator for the RAG Ad-hoc pipeline.
     """
     client = openai.OpenAI(base_url=base_url, api_key=api_key)
     search_engine = get_search_engine()
-    prefix = "rag_pipeline_active"
+    prefix = "rag_adhoc_pipeline_active"
     
     # Create Run
     llm_settings = LLMSettings.load()
     rag_settings = RagSettings.load()
-    run_name = f"RAG Run {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+    run_name = f"RAG Ad-hoc Run {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
     
-    run = RagBenchmarkRun.objects.create(
+    run = RagAdhocRun.objects.create(
         name=run_name,
         llm_settings=llm_settings,
         rag_settings=rag_settings,
@@ -216,7 +216,7 @@ def rag_pipeline_stream(base_url, api_key, model, prompt_template, pipeline_id=N
             llm_result = check_answer_llm(question, ground_truths, answer, client=client, model=model)
 
             # Save result
-            RagBenchmarkResult.objects.create(
+            RagAdhocResult.objects.create(
                 run=run,
                 question=question,
                 ground_truths=ground_truths,
@@ -263,15 +263,17 @@ def rag_pipeline_stream(base_url, api_key, model, prompt_template, pipeline_id=N
 
     stop_pipeline_token(pipeline_id, prefix)
 
-def interactive_pipeline_stream(base_url, api_key, model, max_retries, pipeline_id=None):
+def vanilla_llm_multi_turn_pipeline_stream(base_url, api_key, model, max_retries, pipeline_id=None, pipeline_type='vanilla_llm_multi_turn', redis_prefix="vanilla_llm_multi_turn_pipeline_active"):
     """
-    Stream generator for the Interactive pipeline (saves to DB).
+    Stream generator for the Vanilla LLM Multi-Turn pipeline (saves to DB).
     """
     client = openai.OpenAI(base_url=base_url, api_key=api_key)
-    prefix = "interactive_pipeline_active"
+    prefix = redis_prefix
+    search_engine = get_search_engine()
+    rag_settings = RagSettings.load()
     
-    group_name = f"Pipeline Run - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-    group = InteractiveSessionGroup.objects.create(name=group_name)
+    group_name = f"Pipeline Run ({pipeline_type}) - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+    group = MultiTurnSessionGroup.objects.create(name=group_name)
     
     def process_question(data):
         if not check_pipeline_active(pipeline_id, prefix):
@@ -283,11 +285,11 @@ def interactive_pipeline_stream(base_url, api_key, model, max_retries, pipeline_
         try:
             # Create Session
             settings = LLMSettings.load() 
-            session = InteractiveSession.objects.create(
+            session = MultiTurnSession.objects.create(
                 settings=settings,
                 question=question_text,
                 ground_truths=ground_truths,
-                pipeline_type='interactive',
+                pipeline_type=pipeline_type,
                 group=group
             )
 
@@ -300,7 +302,7 @@ def interactive_pipeline_stream(base_url, api_key, model, max_retries, pipeline_
                 if not check_pipeline_active(pipeline_id, prefix):
                     return None
 
-                trial = InteractiveTrial.objects.create(
+                trial = MultiTurnTrial.objects.create(
                     session=session,
                     trial_number=trial_number,
                     status='processing'
@@ -308,29 +310,81 @@ def interactive_pipeline_stream(base_url, api_key, model, max_retries, pipeline_
 
                 # Construct Messages
                 messages = []
-                if trial_number == 1:
-                    answer_prompt = f"""Your task is to answer the following question. Follow these rules strictly:
+                
+                if pipeline_type == 'vanilla_llm_multi_turn':
+                    if trial_number == 1:
+                        answer_prompt = f"""Your task is to answer the following question. Follow these rules strictly:
 1.  Your answer must be an exact match to the correct answer.
 2.  Do not include any punctuation.
 3.  Do not include any extra words or sentences.
 Question: {session.question}
 Answer:"""
-                    messages.append({"role": "user", "content": answer_prompt})
-                else:
+                        messages.append({"role": "user", "content": answer_prompt})
+                    else:
+                        messages.append({"role": "user", "content": f"Question: {session.question}"})
+                        prev_trials = session.trials.filter(trial_number__lt=trial_number).order_by('trial_number')
+                        for prev_trial in prev_trials:
+                            if prev_trial.answer:
+                                messages.append({"role": "assistant", "content": prev_trial.answer})
+                            if prev_trial.is_correct == False:
+                                messages.append({"role": "user", "content": "Your previous answer was incorrect."})
+                        
+                        strict_rules = """Your task is to answer the question again. Follow these rules strictly:
+1.  Your answer must be an exact match to the correct answer.
+2.  Do not include any punctuation.
+3.  Do not include any extra words or sentences.
+Answer:"""
+                        messages.append({"role": "user", "content": strict_rules})
+
+                elif pipeline_type in ['rag_multi_turn_no_reform', 'rag_multi_turn_reform']:
+                    current_search_query = session.question
+                    
+                    # Reformulation Logic
+                    if pipeline_type == 'rag_multi_turn_reform' and trial_number > 1:
+                        reform_messages = [{"role": "system", "content": "You are a helpful assistant that reformulates search queries based on conversation history."}]
+                        reform_messages.append({"role": "user", "content": f"Original Question: {session.question}"})
+                        
+                        prev_trials = session.trials.filter(trial_number__lt=trial_number).order_by('trial_number')
+                        for prev_trial in prev_trials:
+                            if prev_trial.answer:
+                                reform_messages.append({"role": "assistant", "content": f"Previous Answer: {prev_trial.answer}"})
+                            reform_messages.append({"role": "user", "content": "The previous answer was incorrect."})
+                        
+                        reform_messages.append({"role": "user", "content": "Based on the history, provide a better search query to find the correct answer. Output ONLY the query."})
+                        
+                        try:
+                            reform_response = client.chat.completions.create(
+                                model=model,
+                                messages=reform_messages
+                            )
+                            current_search_query = reform_response.choices[0].message.content.strip()
+                        except Exception:
+                            pass # Fallback to original question
+
+                    # Perform Search
+                    search_results = search_engine.search(current_search_query)
+                    formatted_results = "\n".join([f"{i+1}. {r.get('title', '')}\n{r.get('snippet', '')}" for i, r in enumerate(search_results)]) if search_results else "No results found."
+                    num_docs_used = len(search_results)
+
+                    # Save search info to trial
+                    trial.search_query = current_search_query
+                    trial.search_results = search_results
+                    trial.save()
+
+                    # Construct RAG Context
+                    system_prompt = f"Context from web search (Query: {current_search_query}):\n{formatted_results}\n\n"
+                    messages.append({"role": "system", "content": system_prompt})
                     messages.append({"role": "user", "content": f"Question: {session.question}"})
+                    
+                    # Add history
                     prev_trials = session.trials.filter(trial_number__lt=trial_number).order_by('trial_number')
                     for prev_trial in prev_trials:
                         if prev_trial.answer:
                             messages.append({"role": "assistant", "content": prev_trial.answer})
                         if prev_trial.is_correct == False:
                             messages.append({"role": "user", "content": "Your previous answer was incorrect."})
-                    
-                    strict_rules = """Your task is to answer the question again. Follow these rules strictly:
-1.  Your answer must be an exact match to the correct answer.
-2.  Do not include any punctuation.
-3.  Do not include any extra words or sentences.
-Answer:"""
-                    messages.append({"role": "user", "content": strict_rules})
+
+                    messages.append({"role": "user", "content": "Answer the question based on the context. Return ONLY the exact answer."})
 
                 try:
                     response = client.chat.completions.create(

@@ -31,8 +31,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 failedItems.push({ ...data, rowId });
             }
         } else {
-            const ruleCorrect = data.rule_result;
-            const llmCorrect = data.llm_result;
+            // Normalize keys (DB uses is_correct_*, Pipeline uses *_result)
+            const ruleCorrect = data.hasOwnProperty('is_correct_rule') ? data.is_correct_rule : data.rule_result;
+            const llmCorrect = data.hasOwnProperty('is_correct_llm') ? data.is_correct_llm : data.llm_result;
+            
             const textColorClass = ruleCorrect ? 'text-success-dark' : 'text-danger-dark';
 
             const ruleBadge = ruleCorrect ? `<span class="badge bg-success">Correct</span>` : `<span class="badge bg-danger">Incorrect</span>`;
@@ -75,7 +77,51 @@ document.addEventListener('DOMContentLoaded', function() {
             resultsBody.insertAdjacentHTML('afterbegin', resultHtml);
         }
         
-        return { ruleCorrect: data.rule_result, llmCorrect: data.llm_result };
+        const finalRuleCorrect = data.hasOwnProperty('is_correct_rule') ? data.is_correct_rule : data.rule_result;
+        const finalLlmCorrect = data.hasOwnProperty('is_correct_llm') ? data.is_correct_llm : data.llm_result;
+        
+        return { ruleCorrect: finalRuleCorrect, llmCorrect: finalLlmCorrect };
+    }
+
+    function renderRunConfiguration(settings) {
+        const configCard = document.getElementById('run-config-card');
+        const configDetails = document.getElementById('run-config-details');
+        
+        if (!configCard || !configDetails) return;
+
+        if (!settings || Object.keys(settings).length === 0) {
+            configCard.style.display = 'none';
+            return;
+        }
+
+        configDetails.innerHTML = '';
+        
+        const addItem = (label, value, icon) => {
+            const col = document.createElement('div');
+            col.className = 'col-md-4 col-sm-6';
+            col.innerHTML = `
+                <div class="d-flex align-items-center bg-white p-2 rounded border">
+                    <i class="bi ${icon} text-secondary me-2 fs-5"></i>
+                    <div class="overflow-hidden">
+                        <div class="text-muted text-uppercase" style="font-size: 0.65rem; letter-spacing: 0.5px;">${label}</div>
+                        <div class="fw-medium text-truncate" title="${value}">${value}</div>
+                    </div>
+                </div>`;
+            configDetails.appendChild(col);
+        };
+
+        // Handle flat structure or nested 'llm_settings' if snapshot structure varies
+        // Ad-hoc view returns 'settings' object which might be the snapshot or a constructed dict
+        // Based on views.py: it returns `run.settings_snapshot['llm_settings']` OR a fallback dict with keys 'llm_model', etc.
+        
+        // Check for nested first (if full snapshot passed)
+        let llmSettings = settings.llm_settings || settings; 
+
+        if (llmSettings.llm_model) addItem('LLM Model', llmSettings.llm_model, 'bi-cpu');
+        if (llmSettings.max_retries) addItem('Max Retries', llmSettings.max_retries, 'bi-arrow-repeat');
+        if (llmSettings.llm_base_url) addItem('Base URL', llmSettings.llm_base_url, 'bi-link-45deg');
+
+        configCard.style.display = 'block';
     }
 
     function updateSummary(stats) {
@@ -102,11 +148,11 @@ document.addEventListener('DOMContentLoaded', function() {
             llm_model: document.getElementById('llm_model').value,
         };
         const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
-        BenchmarkUtils.saveSettings("{% url 'benchmark:save_llm_settings' %}", csrfToken, data, 'save-settings-btn');
+        BenchmarkUtils.saveSettings(window.benchmarkUrls.saveLlmSettings, csrfToken, data, 'save-settings-btn');
     }
 
     function restoreDefaults() {
-        BenchmarkUtils.restoreDefaults("{% url 'benchmark:get_llm_env_vars' %}", function(data) {
+        BenchmarkUtils.restoreDefaults(window.benchmarkUrls.getLlmEnvVars, function(data) {
             document.getElementById('llm_base_url').value = data.llm_base_url;
             document.getElementById('llm_api_key').value = data.llm_api_key;
             document.getElementById('llm_model').value = data.llm_model;
@@ -120,7 +166,7 @@ document.addEventListener('DOMContentLoaded', function() {
             llm_api_key: document.getElementById('llm_api_key').value,
         };
         const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
-        BenchmarkUtils.testConnection("{% url 'benchmark:test_llm_connection' %}", csrfToken, data, 'test-connection-result', 'test-connection-btn');
+        BenchmarkUtils.testConnection(window.benchmarkUrls.testLlmConnection, csrfToken, data, 'test-connection-result', 'test-connection-btn');
     }
 
     // --- Event Listeners ---
@@ -128,7 +174,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // --- Save/Load/Delete Run Functions ---
     function loadSavedRuns() {
-        BenchmarkUtils.loadSavedRuns("{% url 'benchmark:list_vanilla_llm_adhoc_runs' %}", loadRun, deleteRun);
+        BenchmarkUtils.loadSavedRuns(window.benchmarkUrls.listRuns, loadRun, deleteRun);
     }
 
     function loadRun(runId) {
@@ -147,6 +193,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 document.getElementById('results-header-text').textContent = `Results for: ${data.name}`;
                 
+                if (data.settings) {
+                    renderRunConfiguration(data.settings);
+                }
+
                 // Re-calculate stats from the results
                 let stats = {
                     total: currentRunResults.length,
@@ -157,10 +207,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 };
 
                 currentRunResults.forEach(result => {
-                    if (result.rule_result) stats.ruleCorrect++;
-                    if (result.llm_result) stats.llmCorrect++;
-                    if (result.llm_result === null) stats.llmErrors++;
-                    if (result.llm_result !== null && result.rule_result === result.llm_result) {
+                    const ruleCorrect = result.hasOwnProperty('is_correct_rule') ? result.is_correct_rule : result.rule_result;
+                    const llmCorrect = result.hasOwnProperty('is_correct_llm') ? result.is_correct_llm : result.llm_result;
+
+                    if (ruleCorrect) stats.ruleCorrect++;
+                    if (llmCorrect) stats.llmCorrect++;
+                    if (llmCorrect === null) stats.llmErrors++;
+                    if (llmCorrect !== null && ruleCorrect === llmCorrect) {
                         stats.agreements++;
                     }
                 });
@@ -194,7 +247,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (runName && currentRunResults.length > 0) {
             const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
             
-            fetch("{% url 'benchmark:vanilla_llm_adhoc' %}", {
+            fetch(window.benchmarkUrls.vanillaLlmAdhoc, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -207,7 +260,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (data.status === 'ok') {
                     alert('Run saved successfully!');
                     // Refresh to see the new run in the list
-                    window.location.href = "{% url 'benchmark:vanilla_llm_adhoc' %}";
+                    window.location.href = window.benchmarkUrls.vanillaLlmAdhoc;
                 } else {
                     alert('Error saving run: ' + (data.error || 'Unknown error'));
                 }
@@ -221,7 +274,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     async function processVanillaAdhocQuestion(questionData) {
         const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
-        const createSessionResponse = await fetch("{% url 'benchmark:create_session' %}", {
+        const createSessionResponse = await fetch(window.benchmarkUrls.createSession, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -295,7 +348,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         try {
             // 1. Create Session
-            const createSessionResponse = await fetch("{% url 'benchmark:create_session' %}", {
+            const createSessionResponse = await fetch(window.benchmarkUrls.createSession, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -373,7 +426,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!pipelineId) return;
 
         const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
-        const url = "{% url 'benchmark:stop_vanilla_llm_adhoc_pipeline' %}";
+        const url = window.benchmarkUrls.stopPipeline;
         
         const data = JSON.stringify({ pipeline_id: pipelineId });
 
@@ -461,7 +514,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
 
-        fetch("{% url 'benchmark:run_vanilla_llm_adhoc_pipeline' %}", { method: 'POST', body: formData, signal: signal })
+        fetch(window.benchmarkUrls.runPipeline, { method: 'POST', body: formData, signal: signal })
             .then(response => {
                 if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                 const reader = response.body.getReader();
@@ -573,7 +626,7 @@ document.addEventListener('DOMContentLoaded', function() {
         formData.append('llm_api_key', document.getElementById('llm_api_key').value);
         formData.append('llm_model', document.getElementById('llm_model').value);
 
-        fetch("{% url 'benchmark:vanilla_llm_adhoc' %}", { method: 'POST', body: formData })
+        fetch(window.benchmarkUrls.vanillaLlmAdhoc, { method: 'POST', body: formData })
             .then(response => {
                 if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                 const reader = response.body.getReader();

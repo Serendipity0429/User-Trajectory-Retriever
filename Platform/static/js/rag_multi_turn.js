@@ -1,5 +1,5 @@
 document.addEventListener('DOMContentLoaded', function() {
-    const questions = {{ questions|safe }};
+    const questions = JSON.parse(document.getElementById('questions-data').textContent);
     let activeSessionId = null;
     let sessionTrials = [];
     let pipelineController = { aborted: false };
@@ -136,7 +136,7 @@ document.addEventListener('DOMContentLoaded', function() {
         startBtn.disabled = true;
         startBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Starting...';
 
-        fetch("{% url 'benchmark:create_session' %}", {
+        fetch(window.benchmarkUrls.createSession, {
             method: 'POST',
             headers: {'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}'},
             body: JSON.stringify({
@@ -207,6 +207,9 @@ document.addEventListener('DOMContentLoaded', function() {
             .then(res => res.json())
             .then(data => {
                 renderSession(data.session, data.trials);
+                if (data.session.settings_snapshot) {
+                    renderRunConfiguration(data.session.settings_snapshot);
+                }
                 sessionContainer.style.display = 'block';
                 noSessionSelected.style.display = 'none';
 
@@ -507,7 +510,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     async function processQuestion(questionData, groupId = null, pipelineType = 'rag_multi_turn_no_reform') {
         const csrfToken = '{{ csrf_token }}';
-        const createResponse = await fetch("{% url 'benchmark:create_session' %}", {
+        const createResponse = await fetch(window.benchmarkUrls.createSession, {
             method: 'POST',
             headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
             body: JSON.stringify({
@@ -618,7 +621,7 @@ document.addEventListener('DOMContentLoaded', function() {
             llm_api_key: document.getElementById('llm_api_key').value,
         };
         const csrfToken = '{{ csrf_token }}';
-        BenchmarkUtils.testConnection("{% url 'benchmark:test_llm_connection' %}", csrfToken, data, 'test-connection-result', 'test-connection-btn');
+        BenchmarkUtils.testConnection(window.benchmarkUrls.testLlmConnection, csrfToken, data, 'test-connection-result', 'test-connection-btn');
     }
 
     function saveSettings() {
@@ -629,11 +632,11 @@ document.addEventListener('DOMContentLoaded', function() {
             max_retries: document.getElementById('max_retries').value
         };
         const csrfToken = '{{ csrf_token }}';
-        BenchmarkUtils.saveSettings("{% url 'benchmark:save_llm_settings' %}", csrfToken, data, 'save-settings-btn');
+        BenchmarkUtils.saveSettings(window.benchmarkUrls.saveLlmSettings, csrfToken, data, 'save-settings-btn');
     }
 
     function restoreDefaults() {
-        BenchmarkUtils.restoreDefaults("{% url 'benchmark:get_llm_env_vars' %}", function(data) {
+        BenchmarkUtils.restoreDefaults(window.benchmarkUrls.getLlmEnvVars, function(data) {
             document.getElementById('llm_base_url').value = data.llm_base_url;
             document.getElementById('llm_api_key').value = data.llm_api_key;
             document.getElementById('llm_model').value = data.llm_model;
@@ -658,7 +661,7 @@ document.addEventListener('DOMContentLoaded', function() {
         summaryElement.style.color = 'blue';
 
 
-        fetch(`/benchmark/api/multi_turn/load_run/${groupId}/`)
+        fetch(`/benchmark/api/multi_turn/load_rag_run/${groupId}/`)
             .then(res => res.json())
             .then(data => {
                 if (data.error) {
@@ -666,6 +669,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     return;
                 }
                 displayStats(data.results, data.group_name);
+                if (data.settings_snapshot) {
+                    renderRunConfiguration(data.settings_snapshot);
+                }
                 const statsContainer = document.getElementById('statistics-container');
                 statsContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             })
@@ -677,6 +683,59 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Restore original color
                 summaryElement.style.color = originalColor;
             });
+    }
+
+    function renderRunConfiguration(snapshot) {
+        const configCard = document.getElementById('run-config-card');
+        const configDetails = document.getElementById('run-config-details');
+        
+        if (!configCard || !configDetails) return;
+
+        if (!snapshot || Object.keys(snapshot).length === 0) {
+            configCard.style.display = 'none';
+            return;
+        }
+
+        configDetails.innerHTML = '';
+        
+        const addItem = (label, value, icon) => {
+            const col = document.createElement('div');
+            col.className = 'col-md-4 col-sm-6';
+            col.innerHTML = `
+                <div class="d-flex align-items-center bg-white p-2 rounded border">
+                    <i class="bi ${icon} text-secondary me-2 fs-5"></i>
+                    <div class="overflow-hidden">
+                        <div class="text-muted text-uppercase" style="font-size: 0.65rem; letter-spacing: 0.5px;">${label}</div>
+                        <div class="fw-medium text-truncate" title="${value}">${value}</div>
+                    </div>
+                </div>`;
+            configDetails.appendChild(col);
+        };
+
+        if (snapshot.llm_settings) {
+            const ls = snapshot.llm_settings;
+            if (ls.llm_model) addItem('LLM Model', ls.llm_model, 'bi-cpu');
+            if (ls.max_retries) addItem('Max Retries', ls.max_retries, 'bi-arrow-repeat');
+            if (ls.llm_base_url) addItem('Base URL', ls.llm_base_url, 'bi-link-45deg');
+        }
+        
+        if (snapshot.rag_settings) {
+             const rs = snapshot.rag_settings;
+             if (rs.prompt_template) {
+                 const snippet = rs.prompt_template.substring(0, 30) + '...';
+                 addItem('RAG Prompt', snippet, 'bi-chat-text');
+             }
+        }
+        
+        if (snapshot.search_settings) {
+             const ss = snapshot.search_settings;
+             addItem('Search Provider', ss.search_provider === 'mcp' ? 'MCP Server' : (ss.search_provider === 'serper' ? 'Serper API' : ss.search_provider), 'bi-globe');
+             if (ss.serper_fetch_full_content !== undefined) {
+                 addItem('Full Content', ss.serper_fetch_full_content ? 'Enabled' : 'Disabled', 'bi-file-text');
+             }
+        }
+
+        configCard.style.display = 'block';
     }
 
 
@@ -920,7 +979,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         let groupData;
         try {
-            const groupResponse = await fetch("{% url 'benchmark:create_session_group' %}", {
+            const groupResponse = await fetch(window.benchmarkUrls.createSessionGroup, {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}'},
                 body: JSON.stringify({ name: `Pipeline Run - ${new Date().toLocaleString()}` })

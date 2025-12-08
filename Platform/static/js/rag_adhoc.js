@@ -31,8 +31,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 failedItems.push({ ...data, rowId });
             }
         } else {
-            const ruleCorrect = data.rule_result;
-            const llmCorrect = data.llm_result;
+            // Normalize keys
+            const ruleCorrect = data.hasOwnProperty('is_correct_rule') ? data.is_correct_rule : data.rule_result;
+            const llmCorrect = data.hasOwnProperty('is_correct_llm') ? data.is_correct_llm : data.llm_result;
+            
             const isCorrect = llmCorrect; // NOTICE: manually set the judge as llm
             const textColorClass = isCorrect ? 'text-success-dark' : 'text-danger-dark';
 
@@ -91,7 +93,76 @@ document.addEventListener('DOMContentLoaded', function() {
             resultsBody.insertAdjacentHTML('afterbegin', resultHtml);
         }
         
-        return { ruleCorrect: data.rule_result, llmCorrect: data.llm_result };
+        // ruleCorrect and llmCorrect are derived at the top of the else block.
+        // But they are scoped to the else block. I need to lift them or re-derive them or just return them if I move the return inside.
+        // Actually, renderResults is called in a loop where the return value is used to update stats LIVE.
+        // If it's loading from DB, stats are pre-calculated in `loadRun` so the return value here is ignored?
+        // In `loadRun`: `currentRunResults.forEach(result => { renderResults(result, resultsBody); });` -> Return value ignored.
+        // In `runQAPipeline` (live): `const resultSummary = renderResults(data, resultsBody, false); stats.total++; if (resultSummary.ruleCorrect) ...` -> Return value USED.
+        
+        // For live pipeline, `data` has `rule_result` properties directly (from python yield).
+        // So the existing return statement `return { ruleCorrect: data.rule_result, llmCorrect: data.llm_result };` works for live runs.
+        
+        // The issue is only when `renderResults` is called for DB data, but in that case the return value is ignored.
+        
+        // However, to be safe and correct:
+        const finalRuleCorrect = data.hasOwnProperty('is_correct_rule') ? data.is_correct_rule : data.rule_result;
+        const finalLlmCorrect = data.hasOwnProperty('is_correct_llm') ? data.is_correct_llm : data.llm_result;
+        
+        return { ruleCorrect: finalRuleCorrect, llmCorrect: finalLlmCorrect };
+    }
+
+    function renderRunConfiguration(snapshot) {
+        const configCard = document.getElementById('run-config-card');
+        const configDetails = document.getElementById('run-config-details');
+        
+        if (!configCard || !configDetails) return;
+
+        if (!snapshot || Object.keys(snapshot).length === 0) {
+            configCard.style.display = 'none';
+            return;
+        }
+
+        configDetails.innerHTML = '';
+        
+        const addItem = (label, value, icon) => {
+            const col = document.createElement('div');
+            col.className = 'col-md-4 col-sm-6';
+            col.innerHTML = `
+                <div class="d-flex align-items-center bg-white p-2 rounded border">
+                    <i class="bi ${icon} text-secondary me-2 fs-5"></i>
+                    <div class="overflow-hidden">
+                        <div class="text-muted text-uppercase" style="font-size: 0.65rem; letter-spacing: 0.5px;">${label}</div>
+                        <div class="fw-medium text-truncate" title="${value}">${value}</div>
+                    </div>
+                </div>`;
+            configDetails.appendChild(col);
+        };
+
+        if (snapshot.llm_settings) {
+            const ls = snapshot.llm_settings;
+            if (ls.llm_model) addItem('LLM Model', ls.llm_model, 'bi-cpu');
+            if (ls.max_retries) addItem('Max Retries', ls.max_retries, 'bi-arrow-repeat');
+            if (ls.llm_base_url) addItem('Base URL', ls.llm_base_url, 'bi-link-45deg');
+        }
+        
+        if (snapshot.rag_settings) {
+             const rs = snapshot.rag_settings;
+             if (rs.prompt_template) {
+                 const snippet = rs.prompt_template.substring(0, 30) + '...';
+                 addItem('RAG Prompt', snippet, 'bi-chat-text');
+             }
+        }
+        
+        if (snapshot.search_settings) {
+             const ss = snapshot.search_settings;
+             addItem('Search Provider', ss.search_provider === 'mcp' ? 'MCP Server' : (ss.search_provider === 'serper' ? 'Serper API' : ss.search_provider), 'bi-globe');
+             if (ss.serper_fetch_full_content !== undefined) {
+                 addItem('Full Content', ss.serper_fetch_full_content ? 'Enabled' : 'Disabled', 'bi-file-text');
+             }
+        }
+
+        configCard.style.display = 'block';
     }
 
     function updateSummary(stats) {
@@ -123,7 +194,7 @@ document.addEventListener('DOMContentLoaded', function() {
         btn.disabled = true;
         btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Restoring...';
 
-        fetch("{% url 'benchmark:get_default_rag_prompt' %}")
+        fetch(window.benchmarkUrls.getDefaultRagPrompt)
             .then(response => response.json())
             .then(data => {
                 if (data.default_prompt) {
@@ -150,7 +221,7 @@ document.addEventListener('DOMContentLoaded', function() {
             llm_model: document.getElementById('llm_model').value,
         };
         const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
-        BenchmarkUtils.saveSettings("{% url 'benchmark:save_llm_settings' %}", csrfToken, data, 'save-llm-settings-btn');
+        BenchmarkUtils.saveSettings(window.benchmarkUrls.saveLlmSettings, csrfToken, data, 'save-llm-settings-btn');
     }
 
     function saveRagSettings() {
@@ -158,12 +229,12 @@ document.addEventListener('DOMContentLoaded', function() {
             prompt_template: document.getElementById('rag-prompt-template').value,
         };
         const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
-        BenchmarkUtils.saveSettings("{% url 'benchmark:save_rag_settings' %}", csrfToken, data, 'save-rag-settings-btn');
+        BenchmarkUtils.saveSettings(window.benchmarkUrls.saveRagSettings, csrfToken, data, 'save-rag-settings-btn');
     }
 
 
     function restoreDefaults() {
-        BenchmarkUtils.restoreDefaults("{% url 'benchmark:get_llm_env_vars' %}", function(data) {
+        BenchmarkUtils.restoreDefaults(window.benchmarkUrls.getLlmEnvVars, function(data) {
             document.getElementById('llm_base_url').value = data.llm_base_url;
             document.getElementById('llm_api_key').value = data.llm_api_key;
             document.getElementById('llm_model').value = data.llm_model;
@@ -177,7 +248,7 @@ document.addEventListener('DOMContentLoaded', function() {
             llm_api_key: document.getElementById('llm_api_key').value,
         };
         const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
-        BenchmarkUtils.testConnection("{% url 'benchmark:test_llm_connection' %}", csrfToken, data, 'test-connection-result', 'test-connection-btn');
+        BenchmarkUtils.testConnection(window.benchmarkUrls.testLlmConnection, csrfToken, data, 'test-connection-result', 'test-connection-btn');
     }
 
     // --- Event Listeners ---
@@ -185,7 +256,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // --- Save/Load/Delete Run Functions ---
     function loadSavedRuns() {
-        BenchmarkUtils.loadSavedRuns("{% url 'benchmark:list_rag_adhoc_runs' %}", loadRun, deleteRun);
+        BenchmarkUtils.loadSavedRuns(window.benchmarkUrls.listRuns, loadRun, deleteRun);
     }
     
         function loadRun(runId) {
@@ -202,9 +273,21 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                     currentRunResults = data.results;
                     
-                    document.getElementById('results-header-text').textContent = `Results for: ${data.name}`;
+                                    document.getElementById('results-header-text').textContent = `Results for: ${data.name}`;
                     
-                    // Re-calculate stats from the results for consistency
+                                    
+                    
+                                    if (data.settings) {
+                    
+                                        renderRunConfiguration(data.settings);
+                    
+                                    }
+                    
+                                    
+                    
+                                    // Re-calculate stats from the results for consistency
+                    
+                    
                     let stats = {
                         total: currentRunResults.length,
                         ruleCorrect: 0,
@@ -215,14 +298,18 @@ document.addEventListener('DOMContentLoaded', function() {
                     };
 
                     currentRunResults.forEach(result => {
-                        if (result.is_correct_rule) stats.ruleCorrect++;
-                        if (result.is_correct_llm) stats.llmCorrect++;
-                        if (result.is_correct_llm === null) stats.llmErrors++;
-                        if (result.is_correct_llm !== null && result.is_correct_rule === result.is_correct_llm) {
-                            stats.agreements++;
-                        }
-                        stats.totalDocsUsed += (result.num_docs_used || 0);
-                    });
+                                            const ruleCorrect = result.hasOwnProperty('is_correct_rule') ? result.is_correct_rule : result.rule_result;
+                                            const llmCorrect = result.hasOwnProperty('is_correct_llm') ? result.is_correct_llm : result.llm_result;
+                        
+                                            if (ruleCorrect) stats.ruleCorrect++;
+                                            if (llmCorrect) stats.llmCorrect++;
+                                            if (llmCorrect === null) stats.llmErrors++;
+                                            if (llmCorrect !== null && ruleCorrect === llmCorrect) {
+                                                stats.agreements++;
+                                            }
+                                            stats.totalDocsUsed += (result.num_docs_used || 0);
+                                        });
+                        
                     updateSummary(stats);
 
                     // Render table
@@ -250,7 +337,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (runName && currentRunResults.length > 0) {
             const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
             
-            fetch("{% url 'benchmark:rag_adhoc' %}", {
+            fetch(window.benchmarkUrls.ragAdhoc, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -262,7 +349,7 @@ document.addEventListener('DOMContentLoaded', function() {
             .then(data => {
                 if (data.status === 'ok') {
                     alert('Run saved successfully!');
-                    window.location.href = "{% url 'benchmark:rag_adhoc' %}";
+                    window.location.href = window.benchmarkUrls.ragAdhoc;
                 } else {
                     alert('Error saving run: ' + (data.error || 'Unknown error'));
                 }
@@ -276,7 +363,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     async function processRagAdhocQuestion(questionData, groupId = null) {
         const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
-        const createSessionResponse = await fetch("{% url 'benchmark:create_session' %}", {
+        const createSessionResponse = await fetch(window.benchmarkUrls.createSession, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -353,7 +440,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         try {
             // 1. Create Session
-            const createSessionResponse = await fetch("{% url 'benchmark:create_session' %}", {
+            const createSessionResponse = await fetch(window.benchmarkUrls.createSession, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -419,7 +506,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!pipelineId) return;
 
         const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
-        const url = "{% url 'benchmark:stop_rag_adhoc_pipeline' %}";
+        const url = window.benchmarkUrls.stopPipeline;
         
         const data = JSON.stringify({ pipeline_id: pipelineId });
 
@@ -485,7 +572,7 @@ document.addEventListener('DOMContentLoaded', function() {
             totalDocsUsed: 0
         };
 
-        fetch("{% url 'benchmark:run_rag_adhoc_pipeline' %}", { method: 'POST', body: formData, signal: signal })
+        fetch(window.benchmarkUrls.runPipeline, { method: 'POST', body: formData, signal: signal })
             .then(response => {
                 if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                 const reader = response.body.getReader();
@@ -637,7 +724,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
 
-        fetch("{% url 'benchmark:web_search' %}", {
+        fetch(window.benchmarkUrls.webSearch, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

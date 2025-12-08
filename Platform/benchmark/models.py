@@ -61,6 +61,7 @@ class MultiTurnSessionGroup(models.Model):
     """
     name = models.CharField(max_length=255, default='Pipeline Run')
     created_at = models.DateTimeField(auto_now_add=True)
+    settings_snapshot = models.JSONField(default=dict, blank=True, help_text="Snapshot of settings used for this run.")
 
     class Meta:
         ordering = ['-created_at']
@@ -72,8 +73,7 @@ class VanillaLLMMultiTurnSession(models.Model):
     """
     Represents a multi-turn conversation session for a Vanilla LLM.
     """
-    llm_settings = models.ForeignKey(LLMSettings, on_delete=models.CASCADE)
-    group = models.ForeignKey(MultiTurnSessionGroup, related_name='vanilla_sessions', on_delete=models.CASCADE, null=True, blank=True)
+    group = models.ForeignKey(MultiTurnSessionGroup, related_name='vanilla_sessions', on_delete=models.CASCADE)
     question = models.TextField()
     ground_truths = models.JSONField(default=list)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -111,9 +111,7 @@ class RAGMultiTurnSession(models.Model):
     """
     Represents a multi-turn conversation session for a RAG pipeline.
     """
-    llm_settings = models.ForeignKey(LLMSettings, on_delete=models.CASCADE)
-    rag_settings = models.ForeignKey('RagSettings', on_delete=models.SET_NULL, null=True, blank=True)
-    group = models.ForeignKey(MultiTurnSessionGroup, related_name='rag_sessions', on_delete=models.CASCADE, null=True, blank=True)
+    group = models.ForeignKey(MultiTurnSessionGroup, related_name='rag_sessions', on_delete=models.CASCADE)
     question = models.TextField()
     ground_truths = models.JSONField(default=list)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -162,7 +160,7 @@ class VanillaLLMAdhocRun(models.Model):
     """
     name = models.CharField(max_length=255, unique=True, help_text="A unique name for this benchmark run, e.g., 'gpt-4o-2025-12-02'")
     created_at = models.DateTimeField(auto_now_add=True)
-    llm_settings = models.ForeignKey(LLMSettings, on_delete=models.SET_NULL, null=True, blank=True)
+    settings_snapshot = models.JSONField(default=dict, blank=True, help_text="Snapshot of settings used for this run.")
     
     # Aggregate statistics
     total_questions = models.IntegerField(default=0)
@@ -237,8 +235,7 @@ class RagAdhocRun(models.Model):
     """
     name = models.CharField(max_length=255, unique=True)
     created_at = models.DateTimeField(auto_now_add=True)
-    llm_settings = models.ForeignKey(LLMSettings, on_delete=models.SET_NULL, null=True, blank=True)
-    rag_settings = models.ForeignKey(RagSettings, on_delete=models.SET_NULL, null=True, blank=True)
+    settings_snapshot = models.JSONField(default=dict, blank=True, help_text="Snapshot of settings used for this run.")
 
     # Aggregate statistics
     total_questions = models.IntegerField(default=0)
@@ -277,6 +274,7 @@ class SearchSettings(models.Model):
     ]
     search_provider = models.CharField(max_length=20, choices=PROVIDER_CHOICES, default='mcp', help_text="Select the search provider.")
     serper_api_key = models.CharField(max_length=255, blank=True, help_text="API Key for Serper.dev")
+    serper_fetch_full_content = models.BooleanField(default=True, help_text="If enabled, fetches full page content for Serper results.")
 
     def save(self, *args, **kwargs):
         if not self.pk and SearchSettings.objects.exists():

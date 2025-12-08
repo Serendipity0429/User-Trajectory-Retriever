@@ -234,5 +234,47 @@ const BenchmarkUtils = {
             clearTimeout(timeout);
             timeout = setTimeout(() => func.apply(context, args), wait);
         };
+    },
+    displayRunResults: function(runData, renderFunc, updateSummaryFunc) {
+        const resultsContainer = document.getElementById('pipeline-results-container');
+        const progressContainer = document.getElementById('progress-container');
+        const saveRunBtn = document.getElementById('save-run-btn');
+        const resultsHeader = document.getElementById('results-header-text');
+        const resultsBody = document.getElementById('pipeline-results-body');
+
+        resultsContainer.style.display = 'block';
+        if (progressContainer) progressContainer.style.display = 'none';
+        if (saveRunBtn) saveRunBtn.disabled = true;
+
+        resultsHeader.textContent = `Results for: ${runData.name}`;
+        resultsBody.innerHTML = '';
+
+        let stats = {
+            total: runData.results.length,
+            ruleCorrect: 0,
+            llmCorrect: 0,
+            llmErrors: 0,
+            agreements: 0,
+            totalDocsUsed: 0
+        };
+
+        runData.results.forEach((result, index) => {
+            const summary = renderFunc(result, resultsBody, index + 1);
+            if (summary.ruleCorrect) stats.ruleCorrect++;
+            if (summary.llmCorrect) stats.llmCorrect++;
+            if (summary.llmCorrect === null) stats.llmErrors++;
+            if (summary.llmCorrect !== null && summary.ruleCorrect === summary.llmCorrect) {
+                stats.agreements++;
+            }
+            stats.totalDocsUsed += (result.num_docs_used || 0);
+        });
+
+        if (updateSummaryFunc) {
+            updateSummaryFunc(stats);
+        }
+
+        if (saveRunBtn) saveRunBtn.disabled = true;
+        const retryBtn = document.getElementById('retry-btn');
+        if (retryBtn) retryBtn.style.display = 'none';
     }
 };

@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% extends "benchmark_base.html" %}
 {% load static %}
 
 {% block title %}Benchmark Dashboard{% endblock %}
@@ -46,92 +46,31 @@
             </div>
             
             <!-- Dataset Manager -->
-            {% include 'dataset_manager_partial.html' %}
+            {% include 'includes/dataset_manager.html' %}
         </div>
 
-        <!-- LLM Configuration -->
+        <!-- LLM and RAG Configuration -->
         <div class="col-md-6">
-            <div class="card shadow-sm mb-4">
-                <div class="card-header" data-bs-toggle="collapse" data-bs-target="#collapseConfig" style="cursor: pointer;">
-                    <h5 class="mb-0"><i class="bi bi-gear me-2"></i>LLM Configuration</h5>
-                </div>
-                <div id="collapseConfig" class="collapse show">
-                    <div class="card-body">
-                        <div class="mb-3">
-                            <label for="llm_base_url" class="form-label">Base URL</label>
-                            <input type="text" class="form-control" id="llm_base_url" value="{{ llm_settings.llm_base_url|safe }}">
-                        </div>
-                        <div class="mb-3">
-                            <label for="llm_model" class="form-label">Model</label>
-                            <input type="text" class="form-control" id="llm_model" value="{{ llm_settings.llm_model|safe }}">
-                        </div>
-                        <div class="mb-3">
-                            <label for="llm_api_key" class="form-label">API Key</label>
-                            <input type="text" class="form-control" id="llm_api_key" value="{{ llm_settings.llm_api_key|safe }}">
-                        </div>
-                        <div class="mb-3">
-                            <label for="max_retries" class="form-label">Max Retries</label>
-                            <input type="number" class="form-control" id="max_retries" value="{{ llm_settings.max_retries }}">
-                        </div>
-                        <hr>
-                        <div class="d-flex justify-content-end">
-                            <button type="button" class="btn btn-outline-primary me-2" id="save-settings-btn"><i class="bi bi-save me-1"></i> Save</button>
-                            <button type="button" class="btn btn-outline-info me-2" id="test-connection-btn"><i class="bi bi-person-check me-1"></i> Test Connection</button>
-                            <button type="button" class="btn btn-outline-secondary" id="restore-defaults-btn"><i class="bi bi-server me-1"></i> Load .env</button>
-                        </div>
-                        <div id="test-connection-result" class="mt-3"></div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- RAG Configuration -->
-            <div class="card shadow-sm mb-4">
-                <div class="card-header" data-bs-toggle="collapse" data-bs-target="#collapseRagConfig" style="cursor: pointer;">
-                    <h5 class="mb-0"><i class="bi bi-search me-2"></i>RAG Configuration</h5>
-                </div>
-                <div id="collapseRagConfig" class="collapse show">
-                    <div class="card-body">
-                        <div class="mb-3">
-                            <label for="rag_prompt_template" class="form-label">Prompt Template</label>
-                            <textarea class="form-control" id="rag_prompt_template" rows="10" style="font-family: monospace; font-size: 0.85rem;">{{ rag_settings.prompt_template|safe }}</textarea>
-                            <div class="form-text">Use <code>{question}</code> and <code>{search_results}</code> as placeholders.</div>
-                        </div>
-                        <hr>
-                        <div class="d-flex justify-content-end">
-                            <button type="button" class="btn btn-outline-primary me-2" id="save-rag-settings-btn"><i class="bi bi-save me-1"></i> Save</button>
-                            <button type="button" class="btn btn-outline-secondary" id="restore-rag-defaults-btn"><i class="bi bi-arrow-counterclockwise me-1"></i> Restore Default</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            {% include 'includes/llm_config.html' with show_retries=True card_expanded=True %}
+            {% include 'includes/rag_config.html' %}
         </div>
     </div>
 </div>
 
-<script src="{% static 'js/benchmark_common.js' %}"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    function testConnection() {
-        const data = {
-            llm_base_url: document.getElementById('llm_base_url').value,
-            llm_api_key: document.getElementById('llm_api_key').value,
-        };
-        const csrfToken = '{{ csrf_token }}';
-        BenchmarkUtils.testConnection(
-            "{% url 'benchmark:test_llm_connection' %}",
-            csrfToken,
-            data,
-            'test-connection-result',
-            'test-connection-btn'
-        );
-    }
+    // LLM Settings
+    const llm_base_url = document.getElementById('llm_base_url');
+    const llm_api_key = document.getElementById('llm_api_key');
+    const llm_model = document.getElementById('llm_model');
+    const max_retries = document.getElementById('max_retries');
 
-    function saveSettings() {
+    function saveLlmSettings() {
         const data = {
-            llm_base_url: document.getElementById('llm_base_url').value,
-            llm_api_key: document.getElementById('llm_api_key').value,
-            llm_model: document.getElementById('llm_model').value,
-            max_retries: document.getElementById('max_retries').value
+            llm_base_url: llm_base_url.value,
+            llm_api_key: llm_api_key.value,
+            llm_model: llm_model.value,
+            max_retries: max_retries.value
         };
         const csrfToken = '{{ csrf_token }}';
         BenchmarkUtils.saveSettings(
@@ -142,18 +81,39 @@ document.addEventListener('DOMContentLoaded', function() {
         );
     }
 
-    function restoreDefaults() {
+    function restoreLlmDefaults() {
         BenchmarkUtils.restoreDefaults("{% url 'benchmark:get_llm_env_vars' %}", function(data) {
-            document.getElementById('llm_base_url').value = data.llm_base_url;
-            document.getElementById('llm_api_key').value = data.llm_api_key;
-            document.getElementById('llm_model').value = data.llm_model;
-            saveSettings();
+            llm_base_url.value = data.llm_base_url;
+            llm_api_key.value = data.llm_api_key;
+            llm_model.value = data.llm_model;
+            // max_retries is not part of the .env restore
+            saveLlmSettings(); 
         });
     }
 
+    document.getElementById('save-settings-btn').addEventListener('click', saveLlmSettings);
+    document.getElementById('test-connection-btn').addEventListener('click', () => {
+         const data = {
+            llm_base_url: llm_base_url.value,
+            llm_api_key: llm_api_key.value,
+        };
+        const csrfToken = '{{ csrf_token }}';
+        BenchmarkUtils.testConnection(
+            "{% url 'benchmark:test_llm_connection' %}",
+            csrfToken,
+            data,
+            'test-connection-result',
+            'test-connection-btn'
+        );
+    });
+    document.getElementById('restore-defaults-btn').addEventListener('click', restoreLlmDefaults);
+
+    // RAG Settings
+    const rag_prompt_template = document.getElementById('rag_prompt_template');
+
     function saveRagSettings() {
         const data = {
-            prompt_template: document.getElementById('rag_prompt_template').value
+            prompt_template: rag_prompt_template.value
         };
         const csrfToken = '{{ csrf_token }}';
         BenchmarkUtils.saveSettings(
@@ -169,17 +129,12 @@ document.addEventListener('DOMContentLoaded', function() {
             .then(response => response.json())
             .then(data => {
                 if (data.default_prompt) {
-                    document.getElementById('rag_prompt_template').value = data.default_prompt;
-                    // Optionally auto-save
-                    // saveRagSettings();
+                    rag_prompt_template.value = data.default_prompt;
+                    saveRagSettings();
                 }
             })
             .catch(error => console.error('Error restoring defaults:', error));
     }
-
-    document.getElementById('save-settings-btn').addEventListener('click', saveSettings);
-    document.getElementById('test-connection-btn').addEventListener('click', testConnection);
-    document.getElementById('restore-defaults-btn').addEventListener('click', restoreDefaults);
     
     document.getElementById('save-rag-settings-btn').addEventListener('click', saveRagSettings);
     document.getElementById('restore-rag-defaults-btn').addEventListener('click', restoreRagDefaults);

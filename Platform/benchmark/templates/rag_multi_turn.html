@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}Multi-Turn RAG Benchmark{% endblock %}
+{% block title %}Multi-Turn Web RAG Benchmark{% endblock %}
 
 {% block content %}
 <div class="container-fluid mt-5 px-lg-4">
     <div class="pb-3 mb-4 border-bottom">
-        <h1 class="h2"><i class="bi bi-globe me-2"></i>Multi-Turn Web Search RAG Benchmark</h1>
+        <h1 class="h2"><i class="bi bi-globe me-2"></i>Multi-Turn Web RAG Benchmark</h1>
         <p class="text-muted mb-0">Evaluate RAG performance over multiple turns with optional query reformulation.</p>
     </div>
 
@@ -151,6 +151,15 @@
                 </div>
                 <div class="card-body">
                     <p class="card-text">Run all questions through the LLM and get aggregate results.</p>
+                    <div class="mb-3">
+                        <label for="dataset-selector" class="form-label">Select Dataset</label>
+                        <select class="form-select" id="dataset-selector">
+                            <option value="">Default (Hard Questions Refined)</option>
+                            {% for dataset in datasets %}
+                                <option value="{{ dataset.id }}" {% if dataset.is_active %}selected{% endif %}>{{ dataset.name }} {% if dataset.is_active %}(Active){% endif %}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
                     <div class="mb-3">
                         <label for="pipeline-mode-pipeline" class="form-label">RAG Mode:</label>
                         <select id="pipeline-mode-pipeline" class="form-select">
@@ -822,6 +831,63 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
     });
+    async function processQuestion(questionData, groupId = null, pipelineType = 'rag_multi_turn_no_reform') {
+        const csrfToken = '{{ csrf_token }}';
+        const createResponse = await fetch("{% url 'benchmark:create_session' %}", {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
+            body: JSON.stringify({
+                question: questionData.question,
+                ground_truths: questionData.answer,
+                group_id: groupId,
+                pipeline_type: pipelineType
+            })
+        });
+        const createData = await createResponse.json();
+        if (createData.error) {
+            throw new Error(createData.error);
+        }
+        const { session_id, trial_id } = createData;
+
+        // Load the session UI to show it's processing, then kick off the trial
+        loadSession(session_id, trial_id);
+
+        return new Promise((resolve, reject) => {
+            const poll = setInterval(async () => {
+                if (pipelineController.aborted) {
+                    clearInterval(poll);
+                    return reject(new Error("Pipeline aborted by user."));
+                }
+                try {
+                    const sessionResponse = await fetch(`/benchmark/api/multi_turn/get_session/${session_id}/`);
+                    if (!sessionResponse.ok) {
+                        clearInterval(poll);
+                        return reject(new Error(`HTTP error! status: ${sessionResponse.status}`));
+                    }
+                    const sessionData = await sessionResponse.json();
+                    
+                    if (sessionData.session.is_completed) {
+                        clearInterval(poll);
+                        const lastTrial = sessionData.trials[sessionData.trials.length - 1];
+                        resolve({
+                            question: sessionData.session.question,
+                            correct: lastTrial.is_correct,
+                            trials: sessionData.trials.length,
+                            session_id: session_id,
+                            final_answer: lastTrial.answer,
+                            ground_truths: sessionData.session.ground_truths,
+                            max_retries: sessionData.session.max_retries
+                        });
+                    }
+                } catch (error) {
+                    clearInterval(poll);
+                    console.error(`Polling failed for session ${session_id}:`, error);
+                    reject(error);
+                }
+            }, 3000); 
+        });
+    }
+
     window.retryTrial = function(trialId) {
         const trial = sessionTrials.find(t => t.id === trialId);
         const feedback = trial ? trial.feedback : "";
@@ -1134,7 +1200,6 @@ document.addEventListener('DOMContentLoaded', function() {
     async function runQAPipeline() {
         const runBtn = document.getElementById('run-pipeline-btn');
         const stopBtn = document.getElementById('stop-pipeline-btn');
-        const pipelineId = BenchmarkUtils.generateUUID();
         const pipelineType = document.getElementById('pipeline-mode-pipeline').value;
         
         runBtn.style.display = 'none';
@@ -1158,97 +1223,86 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('pipeline-progress').style.display = 'block';
         const progressBar = document.getElementById('pipeline-progress-bar');
         const statusDiv = document.getElementById('pipeline-status');
+
+        const datasetId = document.getElementById('dataset-selector').value;
+        let questionsToRun = questions; // Default questions
+
+        if (datasetId) {
+            try {
+                const response = await fetch(`/benchmark/api/datasets/${datasetId}/questions/`);
+                const data = await response.json();
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+                questionsToRun = data.questions;
+            } catch (error) {
+                console.error("Error fetching dataset questions:", error);
+                statusDiv.textContent = "Error loading questions for the selected dataset.";
+                stopBtn.style.display = 'none';
+                runBtn.style.display = 'block';
+                return;
+            }
+        }
         
-        // Build URL
-        const baseUrl = document.getElementById('llm_base_url').value;
-        const apiKey = document.getElementById('llm_api_key').value;
-        const model = document.getElementById('llm_model').value;
-        const maxRetries = document.getElementById('max_retries').value;
-
-        const params = new URLSearchParams({
-            llm_base_url: baseUrl,
-            llm_api_key: apiKey,
-            llm_model: model,
-            max_retries: maxRetries,
-            pipeline_id: pipelineId,
-            pipeline_type: pipelineType
-        });
-
-        // Handle Stop
-        stopBtn.onclick = () => {
-            fetch("{% url 'benchmark:stop_vanilla_llm_multi_turn_pipeline' %}", {
+        let groupData;
+        try {
+            const groupResponse = await fetch("{% url 'benchmark:create_session_group' %}", {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}'},
-                body: JSON.stringify({ pipeline_id: pipelineId })
-            }).then(() => {
-                statusDiv.textContent = "Stopping pipeline...";
-                stopBtn.disabled = true;
+                body: JSON.stringify({ name: `Pipeline Run - ${new Date().toLocaleString()}` })
             });
-        };
+            groupData = await groupResponse.json();
+            if (groupData.error) throw new Error(groupData.error);
+        } catch (error) {
+            console.error("Error creating session group:", error);
+            statusDiv.textContent = "Error starting pipeline run.";
+            stopBtn.style.display = 'none';
+            runBtn.style.display = 'block';
+            return;
+        }
 
         const results = [];
         let completedCount = 0;
-        let totalQuestions = questions.length; 
-        
-        try {
-            const response = await fetch(`/benchmark/api/run_vanilla_llm_multi_turn_pipeline/?${params.toString()}`);
-            const reader = response.body.getReader();
-            const decoder = new TextDecoder();
-            let buffer = '';
+        const totalQuestions = questionsToRun.length;
 
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-                
-                buffer += decoder.decode(value, { stream: true });
-                const lines = buffer.split('\n');
-                buffer = lines.pop(); 
-
-                for (const line of lines) {
-                    if (!line.trim()) continue;
-                    
-                    try {
-                        const result = JSON.parse(line);
-                        if (result.error) {
-                            console.error("Error in pipeline result:", result.error);
-                             results.push({ 
-                                question: result.question || "Unknown", 
-                                correct: 'error', 
-                                trials: 0, 
-                                session_id: null,
-                                final_answer: "Error processing",
-                                ground_truths: []
-                            });
-                        } else {
-                            results.push(result);
-                            const qData = { question: result.question }; 
-                            addNewSessionToList(result.session_id, qData, result.group_id, result.group_name);
-                            loadSession(result.session_id);
-                        }
-                        
-                        completedCount++;
-                        displayStats(results, result.group_name || "Current Run");
-                        
-                        // Update progress
-                        const progress = Math.round((completedCount / totalQuestions) * 100);
-                        progressBar.style.width = `${progress}%`;
-                        progressBar.textContent = `${progress}%`;
-                        statusDiv.textContent = `Processed ${completedCount} questions...`;
-
-                    } catch (e) {
-                        console.error("Error parsing JSON line:", e);
-                    }
-                }
+        for (const questionData of questionsToRun) {
+            if (pipelineController.aborted) {
+                statusDiv.textContent = "Pipeline stopped by user.";
+                break;
             }
-        } catch (error) {
-            console.error("Stream error:", error);
-            statusDiv.textContent = "An error occurred during the pipeline run.";
-        } finally {
-            stopBtn.style.display = 'none';
-            runBtn.style.display = 'block';
-            stopBtn.disabled = false;
-            statusDiv.textContent = `Pipeline finished. Processed ${completedCount} questions.`;
+
+            statusDiv.textContent = `Processing question ${completedCount + 1} of ${totalQuestions}...`;
+
+            try {
+                const result = await processQuestion(questionData, groupData.group_id, pipelineType);
+                results.push(result);
+                // Add to session list - using the group info from the result
+                addNewSessionToList(result.session_id, questionData, groupData.group_id, groupData.group_name);
+            } catch (error) {
+                console.error("Error processing question:", error);
+                results.push({
+                    question: questionData.question,
+                    correct: 'error',
+                    trials: 0,
+                    session_id: null,
+                    final_answer: "Error processing",
+                    ground_truths: questionData.answer || []
+                });
+            }
+            
+            completedCount++;
+            displayStats(results, groupData.group_name || "Current Run");
+
+            const progress = Math.round((completedCount / totalQuestions) * 100);
+            progressBar.style.width = `${progress}%`;
+            progressBar.textContent = `${progress}%`;
+            progressBar.setAttribute('aria-valuenow', progress);
+            statusDiv.textContent = `Processed ${completedCount} questions...`;
         }
+
+        stopBtn.style.display = 'none';
+        runBtn.style.display = 'block';
+        statusDiv.textContent = `Pipeline finished. Processed ${completedCount} of ${totalQuestions} questions.`;
     }
 
     function exportResultsAsCSV() {

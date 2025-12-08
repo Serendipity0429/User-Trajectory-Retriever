@@ -218,7 +218,7 @@ class MCPSearch(WebSearch):
             # Fallback: If description is missing or "No description available", use content as snippet
             if (not result.get('snippet') or result['snippet'] == "No description available") and result.get('content'):
                  # Take first 300 chars of content as snippet
-                 result['snippet'] = result['content'][:300].replace('\n', ' ') + "..."
+                 result['snippet'] = result['content']
 
             if 'title' in result:
                 results.append(result)

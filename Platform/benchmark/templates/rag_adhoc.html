@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}Web RAG Benchmark{% endblock %}
+{% block title %}Ad-hoc Web RAG Benchmark{% endblock %}
 
 {% block content %}
 <div class="container mt-5 px-lg-4">
     <div class="pb-3 mb-4 border-bottom">
-        <h1 class="h2"><i class="bi bi-search me-2"></i>Web RAG Benchmark</h1>
+        <h1 class="h2"><i class="bi bi-search me-2"></i>Ad-hoc Web RAG Benchmark</h1>
         <p class="text-muted mb-0">Run a RAG pipeline using web search against the full QA dataset and evaluate its performance.</p>
     </div>
 
@@ -18,7 +18,16 @@
                     <h5 class="mb-0"><i class="bi bi-play-circle me-2"></i>Control Panel</h5>
                 </div>
                 <div class="card-body">
-                    <p>Run the RAG pipeline against the 'hard_questions_refined.jsonl' dataset ({{ total_questions }} questions).</p>
+                    <p>Run the RAG pipeline against the selected dataset.</p>
+                    <div class="mb-3">
+                        <label for="dataset-selector" class="form-label">Select Dataset</label>
+                        <select class="form-select" id="dataset-selector">
+                            <option value="">Default (Hard Questions Refined)</option>
+                            {% for dataset in datasets %}
+                                <option value="{{ dataset.id }}" {% if dataset.is_active %}selected{% endif %}>{{ dataset.name }} {% if dataset.is_active %}(Active){% endif %}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
                     <form id="pipeline-form" data-total-questions="{{ total_questions }}">
                         {% csrf_token %}
                         <input type="hidden" name="mode" value="rag_pipeline">
@@ -399,6 +408,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // --- Core UI Rendering Logic ---
     function renderResults(data, resultsBody, index, isRetry = false) {
+        if (data.is_meta) {
+            return {};
+        }
+        
         const rowId = `result-${Date.now()}-${Math.random()}`;
         let resultHtml;
 
@@ -419,7 +432,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 ? `<i class="bi bi-check-circle-fill text-success fs-5"></i>`
                 : `<i class="bi bi-x-circle-fill text-danger fs-5"></i>`;
 
-            const groundTruthsArray = data.ground_truths;
+            const groundTruthsArray = data.ground_truths || [];
             const remainingCount = groundTruthsArray.length - 3;
             let groundTruthsHtml = `<ul class="list-unstyled mb-0" data-expanded="false" data-remaining="${remainingCount}">`;
             groundTruthsArray.forEach((gt, index) => {
@@ -581,15 +594,25 @@ document.addEventListener('DOMContentLoaded', function() {
                     
                     document.getElementById('results-header-text').textContent = `Results for: ${data.name}`;
                     
-                    // Update stats
-                    const stats = {
-                        total: data.total_questions,
-                        ruleCorrect: data.results.filter(r => r.is_correct_rule).length,
-                        llmCorrect: data.correct_answers,
-                        llmErrors: data.results.filter(r => r.is_correct_llm === null).length,
-                        agreements: data.results.filter(r => r.is_correct_llm !== null && r.is_correct_rule === r.is_correct_llm).length,
-                        totalDocsUsed: data.results.reduce((acc, r) => acc + (r.num_docs_used || 0), 0)
+                    // Re-calculate stats from the results for consistency
+                    let stats = {
+                        total: currentRunResults.length,
+                        ruleCorrect: 0,
+                        llmCorrect: 0,
+                        llmErrors: 0,
+                        agreements: 0,
+                        totalDocsUsed: 0
                     };
+
+                    currentRunResults.forEach(result => {
+                        if (result.is_correct_rule) stats.ruleCorrect++;
+                        if (result.is_correct_llm) stats.llmCorrect++;
+                        if (result.is_correct_llm === null) stats.llmErrors++;
+                        if (result.is_correct_llm !== null && result.is_correct_rule === result.is_correct_llm) {
+                            stats.agreements++;
+                        }
+                        stats.totalDocsUsed += (result.num_docs_used || 0);
+                    });
                     updateSummary(stats);
 
                     // Render table
@@ -640,6 +663,52 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
     });
+
+    async function processRagAdhocQuestion(questionData, groupId = null) {
+        const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
+        const createSessionResponse = await fetch("{% url 'benchmark:create_session' %}", {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken
+            },
+            body: JSON.stringify({
+                question: questionData.question,
+                ground_truths: questionData.ground_truths || questionData.answer, // Accommodate both keys
+                group_id: groupId,
+                pipeline_type: 'rag_adhoc'
+            })
+        });
+        const sessionData = await createSessionResponse.json();
+
+        if (sessionData.error) {
+            throw new Error(sessionData.error);
+        }
+
+        const trialId = sessionData.trial_id;
+
+        const runTrialResponse = await fetch(`/benchmark/api/multi_turn/run_trial/${trialId}/`, {
+            method: 'GET',
+            headers: {
+                'X-CSRFToken': csrfToken
+            }
+        });
+        const trialData = await runTrialResponse.json();
+
+        if (trialData.error) {
+            throw new Error(trialData.error);
+        }
+        
+        return {
+            question: questionData.question,
+            rule_result: trialData.is_correct, // For RAG adhoc, this is the result of the rule
+            llm_result: trialData.is_correct, // For RAG adhoc, this is the result of the LLM judge
+            answer: trialData.answer,
+            ground_truths: questionData.ground_truths || questionData.answer,
+            num_docs_used: trialData.num_docs_used,
+            search_results: trialData.search_results || []
+        };
+    }
 
     // --- Single Question RAG Run Logic ---
     document.getElementById('run-single-question-btn').addEventListener('click', async function() {
@@ -733,154 +802,171 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // --- Pipeline Execution ---
-    let currentPipelineId = null;
     let currentRunId = null;
+    let currentPipelineId = null;
 
     function stopPipeline(pipelineId) {
+        if (!pipelineId) return;
+
         const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
-        BenchmarkUtils.stopPipeline("{% url 'benchmark:stop_rag_adhoc_pipeline' %}", csrfToken, pipelineId);
+        const url = "{% url 'benchmark:stop_rag_adhoc_pipeline' %}";
+        
+        const data = JSON.stringify({ pipeline_id: pipelineId });
+
+        fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken
+            },
+            body: data,
+            keepalive: true
+        }).catch(e => console.error("Stop request failed", e));
     }
 
-    window.addEventListener('beforeunload', function (e) {
-        if (currentPipelineId) {
-            stopPipeline(currentPipelineId);
-        }
-    });
+    document.getElementById('run-pipeline-btn').addEventListener('click', runQAPipeline);
 
-    document.getElementById('run-pipeline-btn').addEventListener('click', function() {
-        const apiKey = document.getElementById('llm_api_key').value;
-        const modelName = document.getElementById('llm_model').value;
+    function runQAPipeline() {
+        const runBtn = document.getElementById('run-pipeline-btn');
+        const stopBtn = document.getElementById('stop-pipeline-btn');
+        const retryBtn = document.getElementById('retry-btn');
+        const progressContainer = document.getElementById('progress-container');
+        const progressBar = document.getElementById('progress-bar');
+        const resultsBody = document.getElementById('pipeline-results-body');
+        const resultsContainer = document.getElementById('pipeline-results-container');
+        const totalQuestions = questionsData.length;
 
-        if (!apiKey.trim() || !modelName.trim()) {
-            alert('Please set your LLM API Key and Model Name in the LLM Configuration section before running the benchmark.');
-            const configCollapseEl = document.getElementById('collapseLlmConfig');
-            const configCollapse = new bootstrap.Collapse(configCollapseEl, { toggle: false });
-            configCollapse.show();
-            return;
-        }
+        // Reset UI
+        runBtn.style.display = 'none';
+        stopBtn.style.display = 'block';
+        retryBtn.style.display = 'none';
+        progressContainer.style.display = 'block';
+        progressBar.style.width = '0%';
+        progressBar.textContent = '0%';
+        resultsContainer.style.display = 'block';
+        resultsBody.innerHTML = '';
+        currentRunResults = [];
+        failedItems = [];
+        document.getElementById('save-run-btn').disabled = true;
+        document.getElementById('results-header-text').textContent = "RAG Pipeline Results";
+        document.getElementById('running-spinner').style.display = 'inline-block';
 
+        // Controller to stop the fetch
         pipelineController = new AbortController();
         const signal = pipelineController.signal;
-        const totalQuestions = parseInt(document.getElementById('pipeline-form').dataset.totalQuestions, 10);
-        const resultsBody = document.getElementById('pipeline-results-body');
+
+        const datasetId = document.getElementById('dataset-selector').value;
+        const formData = new FormData();
+        formData.append('csrfmiddlewaretoken', document.querySelector('input[name="csrfmiddlewaretoken"]').value);
+        formData.append('dataset_id', datasetId);
+        formData.append('llm_base_url', document.getElementById('llm_base_url').value);
+        formData.append('llm_api_key', document.getElementById('llm_api_key').value);
+        formData.append('llm_model', document.getElementById('llm_model').value);
+        formData.append('rag_prompt_template', document.getElementById('rag-prompt-template').value);
+        formData.append('pipeline_id', currentPipelineId);
         
-        // Reset UI
-        currentRunResults = [];
-        currentRunId = null;
-        failedItems = [];
-        resultsBody.innerHTML = '';
-        document.getElementById('pipeline-results-container').style.display = 'block';
-        document.getElementById('progress-container').style.display = 'block';
-        document.getElementById('save-run-btn').disabled = true;
-        document.getElementById('save-run-btn').innerHTML = '<i class="bi bi-save me-1"></i> Autosaved';
-        document.getElementById('retry-btn').style.display = 'none';
-        document.getElementById('running-spinner').style.display = 'inline-block';
-        document.getElementById('results-header-text').textContent = 'Live RAG Pipeline Results (Autosaving...)';
-        document.getElementById('run-pipeline-btn').style.display = 'none';
-        document.getElementById('stop-pipeline-btn').style.display = 'block';
+        let processedCount = 0;
+        let stats = {
+            total: 0,
+            ruleCorrect: 0,
+            llmCorrect: 0,
+            llmErrors: 0,
+            agreements: 0,
+            totalDocsUsed: 0
+        };
 
-        let stats = { total: 0, ruleCorrect: 0, llmCorrect: 0, llmErrors: 0, agreements: 0, totalDocsUsed: 0 };
-        updateSummary(stats);
-
-        const llm_base_url = document.getElementById('llm_base_url').value;
-        const llm_api_key = document.getElementById('llm_api_key').value;
-        const llm_model = document.getElementById('llm_model').value;
-        const rag_prompt_template = document.getElementById('rag-prompt-template').value;
-        
-        currentPipelineId = BenchmarkUtils.generateUUID();
-
-        const fetchURL = `{% url 'benchmark:run_rag_adhoc_pipeline' %}?llm_base_url=${encodeURIComponent(llm_base_url)}&llm_api_key=${encodeURIComponent(llm_api_key)}&llm_model=${encodeURIComponent(llm_model)}&rag_prompt_template=${encodeURIComponent(rag_prompt_template)}&pipeline_id=${currentPipelineId}`;
-
-        fetch(fetchURL, { method: 'GET', signal })
+        fetch("{% url 'benchmark:run_rag_adhoc_pipeline' %}", { method: 'POST', body: formData, signal: signal })
             .then(response => {
                 if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
+                let buffer = '';
 
                 function push() {
                     reader.read().then(({ done, value }) => {
                         if (done) {
-                            currentPipelineId = null;
+                            runBtn.style.display = 'block';
+                            stopBtn.style.display = 'none';
                             document.getElementById('running-spinner').style.display = 'none';
-                            document.getElementById('run-pipeline-btn').style.display = 'block';
-                            document.getElementById('stop-pipeline-btn').style.display = 'none';
-                            
-                            // Refresh list
-                            loadSavedRuns();
-
-                            if(failedItems.length > 0) {
-                                document.getElementById('retry-btn').style.display = 'block';
+                            if (failedItems.length > 0) {
+                                retryBtn.style.display = 'block';
+                                retryBtn.disabled = false;
+                                retryBtn.innerHTML = `Retry ${failedItems.length} Failed`;
                             }
+                            document.getElementById('save-run-btn').disabled = false;
+                            currentPipelineId = null;
                             return;
                         }
 
-                        const chunk = decoder.decode(value, { stream: true });
-                        const jsonObjects = chunk.split('\n').filter(s => s.trim());
-                        jsonObjects.forEach(jsonStr => {
+                        buffer += decoder.decode(value, { stream: true });
+                        const lines = buffer.split('\n');
+                        buffer = lines.pop();
+
+                        lines.forEach(line => {
+                            if (pipelineController.signal.aborted) {
+                                reader.cancel();
+                                return;
+                            }
+                            if (line.trim() === '') return;
+
                             try {
-                                const data = JSON.parse(jsonStr);
+                                let data = JSON.parse(line);
+                                if (typeof data === 'string') {
+                                    data = JSON.parse(data);
+                                }
+                                if (data.is_meta) return;
 
-                                if (data.is_meta && data.type === 'run_created') {
-                                    currentRunId = data.run_id;
-                                    document.getElementById('results-header-text').textContent = `Live Results: ${data.name}`;
-                                    return;
-                                }
-                                
-                                if(data.error) {
-                                    const originalItem = currentRunResults.find(item => item.question === data.question);
-                                    failedItems.push({ ...originalItem, ...data, rowId: `result-${stats.total}` });
-                                }
                                 currentRunResults.push(data);
-                                renderResults(data, resultsBody, stats.total + 1);
                                 
-                                stats.total++;
-                                if (!data.error) {
-                                    if (data.rule_result) stats.ruleCorrect++;
-                                    if (data.llm_result) stats.llmCorrect++;
-                                    if (data.llm_result === null) stats.llmErrors++;
-                                    if (data.llm_result !== null && data.rule_result === data.llm_result) stats.agreements++;
-                                    stats.totalDocsUsed += data.num_docs_used || 0;
-                                }
-
-                                const progress = (stats.total / totalQuestions) * 100;
-                                const progressBar = document.getElementById('progress-bar');
+                                processedCount++;
+                                const resultSummary = renderResults(data, resultsBody, processedCount, false);
+                                
+                                const progress = totalQuestions > 0 ? (processedCount / totalQuestions) * 100 : 0;
                                 progressBar.style.width = `${progress}%`;
                                 progressBar.textContent = `${Math.round(progress)}%`;
-                                progressBar.setAttribute('aria-valuenow', progress);
+
+                                stats.total++;
+                                if (resultSummary.ruleCorrect) stats.ruleCorrect++;
+                                if (resultSummary.llmCorrect) stats.llmCorrect++;
+                                if (resultSummary.llmCorrect === null) stats.llmErrors++;
+                                if (resultSummary.llmCorrect !== null && resultSummary.ruleCorrect === resultSummary.llmCorrect) {
+                                    stats.agreements++;
+                                }
+                                stats.totalDocsUsed += (data.num_docs_used || 0);
                                 updateSummary(stats);
 
                             } catch (e) {
-                                console.error("Failed to parse JSON chunk:", e, jsonStr);
+                                console.error("Failed to parse JSON chunk:", e, line);
                             }
                         });
                         push();
                     }).catch(error => {
                         if (error.name === 'AbortError') {
-                            console.log('Fetch aborted by user.');
-                            loadSavedRuns();
+                            console.log('Pipeline stopped by user.');
                         } else {
-                            console.error('Fetch error:', error);
+                            console.error('Error during stream processing:', error);
                         }
-                        currentPipelineId = null;
+                        runBtn.style.display = 'block';
+                        stopBtn.style.display = 'none';
                         document.getElementById('running-spinner').style.display = 'none';
-                        document.getElementById('run-pipeline-btn').style.display = 'block';
-                        document.getElementById('stop-pipeline-btn').style.display = 'none';
-                        if (failedItems.length > 0) {
-                            document.getElementById('retry-btn').style.display = 'block';
-                        }
+                        currentPipelineId = null;
                     });
                 }
                 push();
             })
             .catch(error => {
-                console.error('Error starting the pipeline:', error);
-                alert('Failed to start the pipeline. Check the console for details.');
-                currentPipelineId = null;
+                if (error.name === 'AbortError') {
+                     console.log('Fetch aborted by user.');
+                } else {
+                    console.error('Error starting the pipeline:', error);
+                    alert('Failed to start the pipeline.');
+                }
+                runBtn.style.display = 'block';
+                stopBtn.style.display = 'none';
                 document.getElementById('running-spinner').style.display = 'none';
-                document.getElementById('run-pipeline-btn').style.display = 'block';
-                document.getElementById('stop-pipeline-btn').style.display = 'none';
+                currentPipelineId = null;
             });
-    });
+    }
 
     document.getElementById('retry-btn').addEventListener('click', function() {
         // Retry logic might need adjustment for RAG specifics if different parameters are needed.

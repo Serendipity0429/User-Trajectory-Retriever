@@ -27,13 +27,17 @@ urlpatterns = [
     path('api/multi_turn/delete_session_group/<int:group_id>/', views.delete_session_group, name='delete_session_group'),
     path('api/multi_turn/load_run/<int:group_id>/', views.load_vanilla_llm_multi_turn_run, name='load_vanilla_llm_multi_turn_run'),
 
-    # Multi-turn Pipeline APIs (Vanilla LLM Multi-turn)
+    # Multi-turn Pipeline APIs
     path('api/run_vanilla_llm_multi_turn_pipeline/', views.run_vanilla_llm_multi_turn_pipeline, name='run_vanilla_llm_multi_turn_pipeline'),
     path('api/stop_vanilla_llm_multi_turn_pipeline/', views.stop_vanilla_llm_multi_turn_pipeline, name='stop_vanilla_llm_multi_turn_pipeline'),
+
 
     # Vanilla LLM Ad-hoc pipeline URL
     path('api/run_vanilla_llm_adhoc_pipeline/', views.run_vanilla_llm_adhoc_pipeline, name='run_vanilla_llm_adhoc_pipeline'),
     path('api/stop_vanilla_llm_adhoc_pipeline/', views.stop_vanilla_llm_adhoc_pipeline, name='stop_vanilla_llm_adhoc_pipeline'),
+    path('api/run_rag_adhoc_pipeline/', views.run_rag_adhoc_pipeline, name='run_rag_adhoc_pipeline'),
+    path('api/stop_rag_adhoc_pipeline/', views.stop_rag_adhoc_pipeline, name='stop_rag_adhoc_pipeline'),
+
 
     # LLM Settings
     # path('api/save_llm_settings/', views.save_llm_settings, name='save_llm_settings'), # Removed duplicate
@@ -46,11 +50,18 @@ urlpatterns = [
 
     # RAG APIs
     path('api/save_rag_settings/', views.save_rag_settings, name='save_rag_settings'),
-    path('api/run_rag_adhoc_pipeline/', views.run_rag_adhoc_pipeline, name='run_rag_adhoc_pipeline'),
-    path('api/stop_rag_adhoc_pipeline/', views.stop_rag_adhoc_pipeline, name='stop_rag_adhoc_pipeline'),
+
     path('api/rag_adhoc/list_runs/', views.list_rag_adhoc_runs, name='list_rag_adhoc_runs'),
     path('api/rag_adhoc/get_run/<int:run_id>/', views.get_rag_adhoc_run, name='get_rag_adhoc_run'),
     path('api/rag_adhoc/delete_run/<int:run_id>/', views.delete_rag_adhoc_run, name='delete_rag_adhoc_run'),
     path('api/rag_adhoc/get_default_prompt/', views.get_default_rag_prompt, name='get_default_rag_prompt'),
+
+    # Dataset APIs
+    path('api/datasets/list/', views.dataset_list, name='dataset_list'),
+    path('api/datasets/<int:dataset_id>/questions/', views.get_dataset_questions, name='get_dataset_questions'),
+    path('api/datasets/upload/', views.dataset_upload, name='dataset_upload'),
+    path('api/datasets/delete/<int:dataset_id>/', views.dataset_delete, name='dataset_delete'),
+    path('api/datasets/sync/', views.sync_datasets, name='sync_datasets'),
+    path('api/datasets/activate/<int:dataset_id>/', views.activate_dataset, name='activate_dataset'),
 ]
 

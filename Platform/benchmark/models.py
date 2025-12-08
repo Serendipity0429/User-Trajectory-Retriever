@@ -1,5 +1,33 @@
 from django.db import models
 from django.core.exceptions import ValidationError
+import os
+
+class BenchmarkDataset(models.Model):
+    """
+    Represents a dataset of questions for benchmarking.
+    Expected format: JSONL where each line is a JSON object with 'question' and 'ground_truths' (or 'answer') keys.
+    """
+    name = models.CharField(max_length=255, unique=True, help_text="A unique name for this dataset.")
+    description = models.TextField(blank=True, help_text="Optional description of the dataset.")
+    file = models.FileField(upload_to='benchmark_datasets/', help_text="The JSONL file containing the questions.")
+    created_at = models.DateTimeField(auto_now_add=True)
+    is_active = models.BooleanField(default=False, help_text="Set this dataset as the default/active one.")
+
+    def __str__(self):
+        return self.name
+
+    def save(self, *args, **kwargs):
+        # If this object is set to be active, deactivate all others
+        if self.is_active:
+            BenchmarkDataset.objects.filter(is_active=True).exclude(pk=self.pk).update(is_active=False)
+        return super(BenchmarkDataset, self).save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        # Clean up the file from the filesystem when the object is deleted
+        if self.file:
+            if os.path.isfile(self.file.path):
+                os.remove(self.file.path)
+        super(BenchmarkDataset, self).delete(*args, **kwargs)
 
 class LLMSettings(models.Model):
     """
@@ -40,40 +68,77 @@ class MultiTurnSessionGroup(models.Model):
     def __str__(self):
         return f"Session Group from {self.created_at.strftime('%Y-%m-%d %H:%M')}"
 
-class MultiTurnSession(models.Model):
+class VanillaLLMMultiTurnSession(models.Model):
     """
-    Represents a multi-turn conversation session for benchmarking.
+    Represents a multi-turn conversation session for a Vanilla LLM.
     """
     llm_settings = models.ForeignKey(LLMSettings, on_delete=models.CASCADE)
-    group = models.ForeignKey(MultiTurnSessionGroup, related_name='sessions', on_delete=models.CASCADE, null=True, blank=True)
+    group = models.ForeignKey(MultiTurnSessionGroup, related_name='vanilla_sessions', on_delete=models.CASCADE, null=True, blank=True)
     question = models.TextField()
     ground_truths = models.JSONField(default=list)
     created_at = models.DateTimeField(auto_now_add=True)
     is_completed = models.BooleanField(default=False)
     run_tag = models.CharField(max_length=255, blank=True, null=True, db_index=True)
-    
-    PIPELINE_CHOICES = [
-        ('vanilla_llm_multi_turn', 'Vanilla LLM (Multi-Turn)'),
-        ('vanilla_llm_adhoc', 'Vanilla LLM (Ad-hoc)'),
-        ('rag_adhoc', 'RAG (Ad-hoc)'),
-        ('rag_multi_turn_no_reform', 'RAG Multi-Turn (No Reformulation)'),
-        ('rag_multi_turn_reform', 'RAG Multi-Turn (Reformulation)'),
-    ]
-    pipeline_type = models.CharField(max_length=30, choices=PIPELINE_CHOICES, default='vanilla_llm_multi_turn')
 
     def __str__(self):
-        return f"Session for: {self.question[:50]}..."
+        return f"Vanilla LLM Session for: {self.question[:50]}..."
 
-class MultiTurnTrial(models.Model):
+class VanillaLLMMultiTurnTrial(models.Model):
     """
-    Represents a single trial (turn) within a benchmark session.
+    Represents a single trial (turn) within a Vanilla LLM session.
     """
     STATUS_CHOICES = [
         ('processing', 'Processing'),
         ('completed', 'Completed'),
         ('error', 'Error'),
     ]
-    session = models.ForeignKey(MultiTurnSession, related_name='trials', on_delete=models.CASCADE)
+    session = models.ForeignKey(VanillaLLMMultiTurnSession, related_name='trials', on_delete=models.CASCADE)
+    trial_number = models.PositiveIntegerField()
+    answer = models.TextField(blank=True, null=True)
+    feedback = models.TextField(blank=True, null=True)
+    is_correct = models.BooleanField(null=True, blank=True) # Can be null if not yet evaluated
+    created_at = models.DateTimeField(auto_now_add=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='processing')
+
+    class Meta:
+        unique_together = ('session', 'trial_number')
+        ordering = ['trial_number']
+
+    def __str__(self):
+        return f"Trial {self.trial_number} for Vanilla LLM Session {self.session.id}"
+
+class RAGMultiTurnSession(models.Model):
+    """
+    Represents a multi-turn conversation session for a RAG pipeline.
+    """
+    llm_settings = models.ForeignKey(LLMSettings, on_delete=models.CASCADE)
+    rag_settings = models.ForeignKey('RagSettings', on_delete=models.SET_NULL, null=True, blank=True)
+    group = models.ForeignKey(MultiTurnSessionGroup, related_name='rag_sessions', on_delete=models.CASCADE, null=True, blank=True)
+    question = models.TextField()
+    ground_truths = models.JSONField(default=list)
+    created_at = models.DateTimeField(auto_now_add=True)
+    is_completed = models.BooleanField(default=False)
+    run_tag = models.CharField(max_length=255, blank=True, null=True, db_index=True)
+    
+    REFORMULATION_CHOICES = [
+        ('no_reform', 'No Reformulation'),
+        ('reform', 'Reformulation'),
+    ]
+    reformulation_strategy = models.CharField(max_length=20, choices=REFORMULATION_CHOICES, default='no_reform')
+
+    def __str__(self):
+        return f"RAG Session for: {self.question[:50]}... ({self.reformulation_strategy})"
+
+class RAGMultiTurnTrial(models.Model):
+    """
+    Represents a single trial (turn) within a RAG session.
+    """
+    STATUS_CHOICES = [
+        ('processing', 'Processing'),
+        ('completed', 'Completed'),
+        ('error', 'Error'),
+    ]
+    session = models.ForeignKey(RAGMultiTurnSession, related_name='trials', on_delete=models.CASCADE)
     trial_number = models.PositiveIntegerField()
     answer = models.TextField(blank=True, null=True)
     feedback = models.TextField(blank=True, null=True)
@@ -88,7 +153,7 @@ class MultiTurnTrial(models.Model):
         ordering = ['trial_number']
 
     def __str__(self):
-        return f"Trial {self.trial_number} for Session {self.session.id}"
+        return f"Trial {self.trial_number} for RAG Session {self.session.id}"
 
 
 class VanillaLLMAdhocRun(models.Model):

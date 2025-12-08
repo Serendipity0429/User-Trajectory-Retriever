@@ -15,7 +15,13 @@
                 </div>
                 <div class="col-md-12">
                     <label for="llm_api_key" class="form-label">API Key</label>
-                    <input type="password" class="form-control" id="llm_api_key" placeholder="Enter your API Key" value="{{ llm_settings.llm_api_key|safe }}">
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="bi bi-key"></i></span>
+                        <input type="password" class="form-control" id="llm_api_key" placeholder="Enter your API Key" value="{{ llm_settings.llm_api_key|safe }}">
+                        <button class="btn btn-outline-secondary" type="button" id="toggle-llm-key-visibility">
+                            <i class="bi bi-eye"></i>
+                        </button>
+                    </div>
                 </div>
                 {% if show_retries %}
                 <div class="col-md-12 mt-3">
@@ -23,6 +29,21 @@
                     <input type="number" class="form-control" id="max_retries" value="{{ llm_settings.max_retries }}">
                 </div>
                 {% endif %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const llmApiKey = document.getElementById('llm_api_key');
+    const toggleLlmKeyBtn = document.getElementById('toggle-llm-key-visibility');
+
+    if (toggleLlmKeyBtn) {
+        toggleLlmKeyBtn.addEventListener('click', function() {
+            const type = llmApiKey.getAttribute('type') === 'password' ? 'text' : 'password';
+            llmApiKey.setAttribute('type', type);
+            this.querySelector('i').classList.toggle('bi-eye');
+            this.querySelector('i').classList.toggle('bi-eye-slash');
+        });
+    }
+});
+</script>
             </div>
             <hr>
             <div class="d-flex justify-content-end">

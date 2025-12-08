@@ -735,4 +735,49 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
     });
+
+    function exportResultsAsCSV() {
+        if (currentRunResults.length === 0) {
+            alert("No results to export.");
+            return;
+        }
+
+        const headers = ["#", "Question", "Model Answer", "Ground Truths", "Rule-based Correct", "LLM Judge Correct", "Agreement"];
+        const csvRows = [headers.join(',')];
+
+        currentRunResults.forEach((result, index) => {
+            const ruleCorrect = result.hasOwnProperty('is_correct_rule') ? result.is_correct_rule : result.rule_result;
+            const llmCorrect = result.hasOwnProperty('is_correct_llm') ? result.is_correct_llm : result.llm_result;
+            const agreement = (llmCorrect !== null && ruleCorrect === llmCorrect);
+            const groundTruths = result.ground_truths || result.answer || []; // Fallback
+
+            const row = [
+                index + 1,
+                `"${(result.question || '').replace(/"/g, '""')}"`,
+                `"${(result.answer || '').replace(/"/g, '""')}"`,
+                `"${(Array.isArray(groundTruths) ? groundTruths.join('; ') : groundTruths).replace(/"/g, '""')}"`,
+                ruleCorrect ? 'Correct' : 'Incorrect',
+                llmCorrect === null ? 'Error' : (llmCorrect ? 'Correct' : 'Incorrect'),
+                agreement ? 'Yes' : 'No'
+            ];
+            csvRows.push(row.join(','));
+        });
+
+        const csvString = csvRows.join('\n');
+        const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement("a");
+        if (link.download !== undefined) {
+            const url = URL.createObjectURL(blob);
+            const headerText = document.getElementById("results-header-text").textContent;
+            const filename = `vanilla-adhoc-${headerText.replace(/[^a-zA-Z0-9]/g, '_')}.csv`;
+            link.setAttribute("href", url);
+            link.setAttribute("download", filename);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    }
+
+    document.getElementById('export-results-btn').addEventListener('click', exportResultsAsCSV);
 });

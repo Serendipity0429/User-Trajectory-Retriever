@@ -617,8 +617,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     return;
                 }
                 displayStats(data.results, data.group_name);
-                if (data.settings_snapshot) {
-                    renderRunConfiguration(data.settings_snapshot);
+                if (data.settings) {
+                    renderRunConfiguration(data.settings);
                 }
                 const statsContainer = document.getElementById('statistics-container');
                 statsContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -941,6 +941,21 @@ document.addEventListener('DOMContentLoaded', function() {
         runBtn.style.display = 'none';
         stopBtn.style.display = 'block';
         pipelineController.aborted = false;
+
+        // Capture current LLM settings
+        const currentLlmSettings = {
+            llm_base_url: document.getElementById('llm_base_url').value,
+            llm_api_key: document.getElementById('llm_api_key').value,
+            llm_model: document.getElementById('llm_model').value,
+            max_retries: document.getElementById('max_retries') ? document.getElementById('max_retries').value : null, // max_retries might not always be present
+        };
+
+        const initialSnapshot = {
+            llm_settings: currentLlmSettings,
+        };
+        
+        // Render the configuration immediately upon pipeline start
+        renderRunConfiguration(initialSnapshot);
 
         // Reset stats
         const statsContainer = document.getElementById('statistics-container');

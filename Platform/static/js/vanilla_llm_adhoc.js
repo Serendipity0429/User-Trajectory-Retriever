@@ -110,9 +110,6 @@ document.addEventListener('DOMContentLoaded', function() {
             configDetails.appendChild(col);
         };
 
-        // Handle flat structure or nested 'llm_settings' if snapshot structure varies
-        // Ad-hoc view returns 'settings' object which might be the snapshot or a constructed dict
-        // Based on views.py: it returns `run.settings_snapshot['llm_settings']` OR a fallback dict with keys 'llm_model', etc.
         
         // Check for nested first (if full snapshot passed)
         let llmSettings = settings.llm_settings || settings; 
@@ -491,14 +488,24 @@ document.addEventListener('DOMContentLoaded', function() {
         let stats = { total: 0, ruleCorrect: 0, llmCorrect: 0, llmErrors: 0, agreements: 0 };
         updateSummary(stats);
 
+        const initialLlmSettings = {
+            llm_base_url: document.getElementById('llm_base_url').value,
+            llm_api_key: document.getElementById('llm_api_key').value,
+            llm_model: document.getElementById('llm_model').value,
+        };
+
+        // Render the configuration immediately upon pipeline start
+        renderRunConfiguration(initialLlmSettings);
+
         const formData = new FormData();
         const datasetId = document.getElementById('dataset-selector').value;
         formData.append('csrfmiddlewaretoken', document.querySelector('input[name="csrfmiddlewaretoken"]').value);
         formData.append('dataset_id', datasetId);
-        formData.append('llm_base_url', document.getElementById('llm_base_url').value);
-        formData.append('llm_api_key', document.getElementById('llm_api_key').value);
-        formData.append('llm_model', document.getElementById('llm_model').value);
+        formData.append('llm_base_url', initialLlmSettings.llm_base_url);
+        formData.append('llm_api_key', initialLlmSettings.llm_api_key);
+        formData.append('llm_model', initialLlmSettings.llm_model);
         formData.append('pipeline_id', currentPipelineId);
+
         
         let processedCount = 0;
 
@@ -559,7 +566,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                     console.log("Skipping meta object"); // DEBUG
                                     return;
                                 }
-
+                                
                                 currentRunResults.push(data);
                                 
                                 const resultSummary = renderResults(data, resultsBody, false);

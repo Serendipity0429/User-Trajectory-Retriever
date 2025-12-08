@@ -154,7 +154,7 @@
         </h4>
 
         <!-- Run Configuration Card -->
-        <div id="run-config-card" class="card mb-4 bg-light border-0" style="display: none;">
+        <div id="run-config-card" class="card mb-4 bg-light border-0">
             <div class="card-body py-3">
                     <h6 class="card-title d-flex align-items-center mb-3">
                     <i class="bi bi-gear-wide-connected me-2 text-primary"></i>
@@ -311,50 +311,9 @@
             </div>
         </div>
     </div>
+{% endblock %}
 
-<style>
-.compact-cell {
-    max-height: 150px;
-    overflow-y: auto;
-    display: block;
-    white-space: pre-wrap;
-    word-wrap: break-word;
-}
-.last-no-border:last-child {
-    border-bottom: none !important;
-    padding-bottom: 0 !important;
-    margin-bottom: 0 !important;
-}
-.table-success-light {
-    --bs-table-bg: #e6f5e6;
-}
-.table-danger-light {
-    --bs-table-bg: #fdeeee;
-}
-.text-success-dark {
-    color: #146c43;
-    font-weight: 500;
-}
-.text-danger-dark {
-    color: #b02a37;
-    font-weight: 500;
-}
-@keyframes spin {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
-}
-.spin {
-    animation: spin 1s linear infinite;
-    display: inline-block;
-}
-.summary-card {
-    transition: transform 0.2s ease-in-out;
-}
-.summary-card:hover {
-    transform: translateY(-5px);
-}
-</style>
-
+{% block benchmark_extra_js %}
 <script>
     window.benchmarkUrls = {
         ...window.benchmarkCommonUrls,
@@ -364,9 +323,8 @@
         ragAdhoc: "{% url 'benchmark:rag_adhoc' %}",
         stopPipeline: "{% url 'benchmark:stop_rag_adhoc_pipeline' %}",
         runPipeline: "{% url 'benchmark:run_rag_adhoc_pipeline' %}",
-        webSearch: "{% url 'benchmark:web_search' %}"
+        webSearch: "{% url 'benchmark:web_search' %}",
     };
 </script>
 <script src="{% static 'js/rag_adhoc.js' %}"></script>
-
 {% endblock %}

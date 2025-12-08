@@ -93,19 +93,7 @@ document.addEventListener('DOMContentLoaded', function() {
             resultsBody.insertAdjacentHTML('afterbegin', resultHtml);
         }
         
-        // ruleCorrect and llmCorrect are derived at the top of the else block.
-        // But they are scoped to the else block. I need to lift them or re-derive them or just return them if I move the return inside.
-        // Actually, renderResults is called in a loop where the return value is used to update stats LIVE.
-        // If it's loading from DB, stats are pre-calculated in `loadRun` so the return value here is ignored?
-        // In `loadRun`: `currentRunResults.forEach(result => { renderResults(result, resultsBody); });` -> Return value ignored.
-        // In `runQAPipeline` (live): `const resultSummary = renderResults(data, resultsBody, false); stats.total++; if (resultSummary.ruleCorrect) ...` -> Return value USED.
         
-        // For live pipeline, `data` has `rule_result` properties directly (from python yield).
-        // So the existing return statement `return { ruleCorrect: data.rule_result, llmCorrect: data.llm_result };` works for live runs.
-        
-        // The issue is only when `renderResults` is called for DB data, but in that case the return value is ignored.
-        
-        // However, to be safe and correct:
         const finalRuleCorrect = data.hasOwnProperty('is_correct_rule') ? data.is_correct_rule : data.rule_result;
         const finalLlmCorrect = data.hasOwnProperty('is_correct_llm') ? data.is_correct_llm : data.llm_result;
         
@@ -273,21 +261,11 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                     currentRunResults = data.results;
                     
-                                    document.getElementById('results-header-text').textContent = `Results for: ${data.name}`;
-                    
-                                    
-                    
-                                    if (data.settings) {
-                    
-                                        renderRunConfiguration(data.settings);
-                    
-                                    }
-                    
-                                    
-                    
-                                    // Re-calculate stats from the results for consistency
-                    
-                    
+                    document.getElementById('results-header-text').textContent = `Results for: ${data.name}`;
+                    if (data.settings) {
+                        renderRunConfiguration(data.settings);
+                    }
+                    // Re-calculate stats from the results for consistency
                     let stats = {
                         total: currentRunResults.length,
                         ruleCorrect: 0,
@@ -552,14 +530,52 @@ document.addEventListener('DOMContentLoaded', function() {
         pipelineController = new AbortController();
         const signal = pipelineController.signal;
 
+        // Get current LLM settings
+        const currentLlmSettings = {
+            llm_base_url: document.getElementById('llm_base_url').value,
+            llm_api_key: document.getElementById('llm_api_key').value,
+            llm_model: document.getElementById('llm_model').value,
+        };
+
+        // Get current RAG settings
+        const currentRagSettings = {
+            prompt_template: document.getElementById('rag-prompt-template').value,
+        };
+        
+        // Get current Search settings
+        // Assuming existence of these elements based on renderRunConfiguration logic
+        const searchProviderEl = document.getElementById('search_provider');
+        const serperFetchFullContentEl = document.getElementById('serper_fetch_full_content');
+
+        const currentSearchSettings = {
+            search_provider: searchProviderEl ? searchProviderEl.value : null,
+            serper_fetch_full_content: serperFetchFullContentEl ? serperFetchFullContentEl.checked : null,
+        };
+
+        const initialSnapshot = {
+            llm_settings: currentLlmSettings,
+            rag_settings: currentRagSettings,
+            search_settings: currentSearchSettings
+        };
+        
+        // Render the configuration immediately upon pipeline start
+        renderRunConfiguration(initialSnapshot);
+
+
         const datasetId = document.getElementById('dataset-selector').value;
         const formData = new FormData();
         formData.append('csrfmiddlewaretoken', document.querySelector('input[name="csrfmiddlewaretoken"]').value);
         formData.append('dataset_id', datasetId);
-        formData.append('llm_base_url', document.getElementById('llm_base_url').value);
-        formData.append('llm_api_key', document.getElementById('llm_api_key').value);
-        formData.append('llm_model', document.getElementById('llm_model').value);
-        formData.append('rag_prompt_template', document.getElementById('rag-prompt-template').value);
+        formData.append('llm_base_url', currentLlmSettings.llm_base_url);
+        formData.append('llm_api_key', currentLlmSettings.llm_api_key);
+        formData.append('llm_model', currentLlmSettings.llm_model);
+        formData.append('rag_prompt_template', currentRagSettings.prompt_template);
+        if (currentSearchSettings.search_provider) {
+            formData.append('search_provider', currentSearchSettings.search_provider);
+        }
+        if (currentSearchSettings.serper_fetch_full_content !== null) { // Check for null, as `false` is a valid value
+            formData.append('serper_fetch_full_content', currentSearchSettings.serper_fetch_full_content);
+        }
         formData.append('pipeline_id', currentPipelineId);
         
         let processedCount = 0;
@@ -611,7 +627,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                 if (typeof data === 'string') {
                                     data = JSON.parse(data);
                                 }
-                                if (data.is_meta) return;
+                                // if (data.is_meta) return; // Removed, and assumed renderRunConfiguration is handled initially
 
                                 currentRunResults.push(data);
                                 

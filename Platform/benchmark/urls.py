@@ -50,6 +50,7 @@ urlpatterns = [
 
     # RAG APIs
     path('api/save_rag_settings/', views.save_rag_settings, name='save_rag_settings'),
+    path('api/save_search_settings/', views.save_search_settings, name='save_search_settings'),
 
     path('api/rag_adhoc/list_runs/', views.list_rag_adhoc_runs, name='list_rag_adhoc_runs'),
     path('api/rag_adhoc/get_run/<int:run_id>/', views.get_rag_adhoc_run, name='get_rag_adhoc_run'),

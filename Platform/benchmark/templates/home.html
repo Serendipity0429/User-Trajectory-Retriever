@@ -52,6 +52,7 @@
         <!-- LLM and RAG Configuration -->
         <div class="col-md-6">
             {% include 'includes/llm_config.html' with show_retries=True card_expanded=True %}
+            {% include 'includes/search_config.html' %}
             {% include 'includes/rag_config.html' %}
         </div>
     </div>

@@ -200,6 +200,7 @@ class MCPSearch(WebSearch):
             url_match = re.search(r'^URL:\s+(.*?)$', chunk, re.MULTILINE)
             if url_match:
                 result['url'] = url_match.group(1).strip()
+                result['link'] = result['url'] # Alias for frontend compatibility
                 
             # Extract Description
             desc_match = re.search(r'^Description:\s+(.*?)$', chunk, re.MULTILINE)
@@ -253,6 +254,54 @@ class MCPSearch(WebSearch):
             self._client.close()
             self._client = None
 
+class SerperSearch(WebSearch):
+    def __init__(self, api_key):
+        self.api_key = api_key
+
+    def search(self, query: str) -> list:
+        if not self.api_key:
+            return [{"error": "Serper API key not configured."}]
+            
+        import http.client
+        import json
+
+        try:
+            conn = http.client.HTTPSConnection("google.serper.dev")
+            payload = json.dumps({
+                "q": query
+            })
+            headers = {
+                'X-API-KEY': self.api_key,
+                'Content-Type': 'application/json'
+            }
+            conn.request("POST", "/search", payload, headers)
+            res = conn.getresponse()
+            data = res.read()
+            response_data = json.loads(data.decode("utf-8"))
+            
+            # Normalize results to match the expected format
+            results = []
+            if 'organic' in response_data:
+                for item in response_data['organic']:
+                    results.append({
+                        'title': item.get('title'),
+                        'url': item.get('link'),
+                        'link': item.get('link'), # Alias for frontend compatibility
+                        'snippet': item.get('snippet'),
+                        'content': item.get('snippet') # Serper doesn't provide full content in basic search, use snippet
+                    })
+            return results
+
+        except Exception as e:
+            logger.error(f"Error calling Serper API: {e}")
+            return [{"error": f"Error calling Serper API: {str(e)}"}]
+
 # For easy swapping of search implementations
 def get_search_engine() -> WebSearch:
-    return MCPSearch()
+    from .models import SearchSettings
+    settings = SearchSettings.load()
+    
+    if settings.search_provider == 'serper':
+        return SerperSearch(api_key=settings.serper_api_key)
+    else:
+        return MCPSearch()

@@ -799,7 +799,7 @@ def get_session(request, session_id):
             'max_retries': max_retries,
             'group_id': session.group_id,
             'pipeline_type': pipeline_type,
-            'settings_snapshot': snapshot
+            'settings': snapshot
         },
         'trials': trials
     })
@@ -1227,7 +1227,7 @@ def load_vanilla_llm_multi_turn_run(request, group_id):
                 'max_retries': max_retries
             })
 
-    return JsonResponse({'results': results, 'group_name': group.name, 'settings_snapshot': snapshot})
+    return JsonResponse({'results': results, 'group_name': group.name, 'settings': snapshot})
 
 @admin_required
 def load_rag_multi_turn_run(request, group_id):
@@ -1253,7 +1253,7 @@ def load_rag_multi_turn_run(request, group_id):
                 'max_retries': max_retries
             })
 
-    return JsonResponse({'results': results, 'group_name': group.name, 'settings_snapshot': snapshot})
+    return JsonResponse({'results': results, 'group_name': group.name, 'settings': snapshot})
 
 
 

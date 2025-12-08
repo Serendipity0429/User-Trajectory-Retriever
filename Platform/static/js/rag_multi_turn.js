@@ -669,8 +669,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     return;
                 }
                 displayStats(data.results, data.group_name);
-                if (data.settings_snapshot) {
-                    renderRunConfiguration(data.settings_snapshot);
+                if (data.settings) {
+                    renderRunConfiguration(data.settings);
                 }
                 const statsContainer = document.getElementById('statistics-container');
                 statsContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -938,6 +938,37 @@ document.addEventListener('DOMContentLoaded', function() {
         runBtn.style.display = 'none';
         stopBtn.style.display = 'block';
         pipelineController.aborted = false;
+
+        // Capture current LLM settings
+        const currentLlmSettings = {
+            llm_base_url: document.getElementById('llm_base_url').value,
+            llm_api_key: document.getElementById('llm_api_key').value,
+            llm_model: document.getElementById('llm_model').value,
+            max_retries: document.getElementById('max_retries') ? document.getElementById('max_retries').value : null,
+        };
+
+        // Capture current RAG settings (pipelineType is the primary one for multi-turn RAG)
+        const currentRagSettings = {
+            prompt_template: pipelineType, // Use pipelineType as a representative RAG setting for display
+        };
+
+        // Get current Search settings (assuming existence of these elements or null)
+        const searchProviderEl = document.getElementById('search_provider');
+        const serperFetchFullContentEl = document.getElementById('serper_fetch_full_content');
+
+        const currentSearchSettings = {
+            search_provider: searchProviderEl ? searchProviderEl.value : null,
+            serper_fetch_full_content: serperFetchFullContentEl ? serperFetchFullContentEl.checked : null,
+        };
+
+        const initialSnapshot = {
+            llm_settings: currentLlmSettings,
+            rag_settings: currentRagSettings,
+            search_settings: currentSearchSettings
+        };
+        
+        // Render the configuration immediately upon pipeline start
+        renderRunConfiguration(initialSnapshot);
 
         // Reset stats
         const statsContainer = document.getElementById('statistics-container');

@@ -19,6 +19,7 @@ from .search_utils import get_search_engine
 from .models import (
     LLMSettings, 
     RagSettings, 
+    SearchSettings,
     VanillaLLMMultiTurnSession,
     VanillaLLMMultiTurnTrial,
     RAGMultiTurnSession,
@@ -61,11 +62,13 @@ def home(request):
             pass
 
     rag_settings = RagSettings.load()
+    search_settings = SearchSettings.load()
     datasets = BenchmarkDataset.objects.all().order_by('-created_at')
     
     context = {
         'llm_settings': settings,
         'rag_settings': rag_settings,
+        'search_settings': search_settings,
         'datasets': datasets
     }
     return render(request, 'home.html', context)
@@ -567,6 +570,19 @@ def save_rag_settings(request):
         data = json.loads(request.body)
         settings = RagSettings.load()
         settings.prompt_template = data.get('prompt_template', settings.prompt_template)
+        settings.save()
+        return JsonResponse({'status': 'ok'})
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+
+@admin_required
+@require_POST
+def save_search_settings(request):
+    try:
+        data = json.loads(request.body)
+        settings = SearchSettings.load()
+        settings.search_provider = data.get('search_provider', settings.search_provider)
+        settings.serper_api_key = data.get('serper_api_key', settings.serper_api_key)
         settings.save()
         return JsonResponse({'status': 'ok'})
     except Exception as e:

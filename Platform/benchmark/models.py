@@ -266,3 +266,27 @@ class RagAdhocResult(models.Model):
 
     def __str__(self):
         return f"RAG Result for '{self.question[:50]}...' in run {self.run.name}"
+
+class SearchSettings(models.Model):
+    """
+    A singleton model to store Search-specific settings.
+    """
+    PROVIDER_CHOICES = [
+        ('mcp', 'MCP Server'),
+        ('serper', 'Serper API'),
+    ]
+    search_provider = models.CharField(max_length=20, choices=PROVIDER_CHOICES, default='mcp', help_text="Select the search provider.")
+    serper_api_key = models.CharField(max_length=255, blank=True, help_text="API Key for Serper.dev")
+
+    def save(self, *args, **kwargs):
+        if not self.pk and SearchSettings.objects.exists():
+            raise ValidationError("There can be only one SearchSettings instance.")
+        return super(SearchSettings, self).save(*args, **kwargs)
+
+    @classmethod
+    def load(cls):
+        obj, created = cls.objects.get_or_create(pk=1)
+        return obj
+
+    def __str__(self):
+        return "Search Settings"

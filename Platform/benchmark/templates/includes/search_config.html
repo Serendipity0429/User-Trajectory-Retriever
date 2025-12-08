@@ -1,0 +1,122 @@
+<div class="card shadow-sm mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="bi bi-search me-2"></i>Search Settings</h5>
+        <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#searchSettingsContent" aria-expanded="false" aria-controls="searchSettingsContent">
+            <i class="bi bi-chevron-down"></i>
+        </button>
+    </div>
+    <div class="collapse show" id="searchSettingsContent">
+        <div class="card-body">
+            <div class="mb-3">
+                <label for="search_provider" class="form-label">Search Provider</label>
+                <select class="form-select" id="search_provider">
+                    <option value="mcp" {% if search_settings.search_provider == 'mcp' %}selected{% endif %}>MCP Server (Default)</option>
+                    <option value="serper" {% if search_settings.search_provider == 'serper' %}selected{% endif %}>Serper API</option>
+                </select>
+                <div class="form-text">Select the search backend for the RAG pipeline.</div>
+            </div>
+            <div class="mb-3" id="serper_api_key_container" style="{% if search_settings.search_provider != 'serper' %}display: none;{% endif %}">
+                <label for="serper_api_key" class="form-label">Serper API Key</label>
+                <div class="input-group">
+                    <span class="input-group-text"><i class="bi bi-key"></i></span>
+                    <input type="password" class="form-control" id="serper_api_key" value="{{ search_settings.serper_api_key }}" placeholder="Enter Serper API Key">
+                    <button class="btn btn-outline-secondary" type="button" id="toggle-serper-key-visibility">
+                        <i class="bi bi-eye"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="d-flex justify-content-end">
+                <button type="button" id="save-search-settings-btn" class="btn btn-primary">
+                    <i class="bi bi-save me-1"></i>Save Search Settings
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const searchProvider = document.getElementById('search_provider');
+    const serperApiKeyContainer = document.getElementById('serper_api_key_container');
+    const serperApiKey = document.getElementById('serper_api_key');
+    const saveSearchBtn = document.getElementById('save-search-settings-btn');
+    const toggleSerperKeyBtn = document.getElementById('toggle-serper-key-visibility');
+
+    // Toggle API Key visibility
+    if (toggleSerperKeyBtn) {
+        toggleSerperKeyBtn.addEventListener('click', function() {
+            const type = serperApiKey.getAttribute('type') === 'password' ? 'text' : 'password';
+            serperApiKey.setAttribute('type', type);
+            this.querySelector('i').classList.toggle('bi-eye');
+            this.querySelector('i').classList.toggle('bi-eye-slash');
+        });
+    }
+
+    // Toggle Serper API Key field visibility
+    searchProvider.addEventListener('change', function() {
+        if (this.value === 'serper') {
+            serperApiKeyContainer.style.display = 'block';
+        } else {
+            serperApiKeyContainer.style.display = 'none';
+        }
+    });
+
+    // Save Settings
+    saveSearchBtn.addEventListener('click', function() {
+        const data = {
+            search_provider: searchProvider.value,
+            serper_api_key: serperApiKey.value
+        };
+        const csrfToken = '{{ csrf_token }}';
+        
+        // Using BenchmarkUtils from benchmark_common.js if available, or fetch directly
+        if (typeof BenchmarkUtils !== 'undefined' && BenchmarkUtils.saveSettings) {
+            BenchmarkUtils.saveSettings(
+                "{% url 'benchmark:save_search_settings' %}",
+                csrfToken,
+                data,
+                'save-search-settings-btn'
+            );
+        } else {
+            // Fallback implementation
+            const originalText = saveSearchBtn.innerHTML;
+            saveSearchBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Saving...';
+            saveSearchBtn.disabled = true;
+
+            fetch("{% url 'benchmark:save_search_settings' %}", {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(result => {
+                if (result.status === 'ok') {
+                    // Show success
+                    saveSearchBtn.classList.remove('btn-primary');
+                    saveSearchBtn.classList.add('btn-success');
+                    saveSearchBtn.innerHTML = '<i class="bi bi-check-lg me-1"></i>Saved!';
+                    setTimeout(() => {
+                        saveSearchBtn.classList.remove('btn-success');
+                        saveSearchBtn.classList.add('btn-primary');
+                        saveSearchBtn.innerHTML = originalText;
+                        saveSearchBtn.disabled = false;
+                    }, 2000);
+                } else {
+                    alert('Error saving settings: ' + (result.message || 'Unknown error'));
+                    saveSearchBtn.innerHTML = originalText;
+                    saveSearchBtn.disabled = false;
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error saving settings.');
+                saveSearchBtn.innerHTML = originalText;
+                saveSearchBtn.disabled = false;
+            });
+        }
+    });
+});
+</script>

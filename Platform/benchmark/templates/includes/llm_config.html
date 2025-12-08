@@ -1,0 +1,36 @@
+<div class="card shadow-sm mb-4">
+    <div class="card-header" id="headingConfig" data-bs-toggle="collapse" data-bs-target="#collapseConfig" aria-expanded="{% if card_expanded %}true{% else %}false{% endif %}" aria-controls="collapseConfig" style="cursor: pointer;">
+        <h5 class="mb-0"><i class="bi bi-gear me-2"></i>LLM Configuration</h5>
+    </div>
+    <div id="collapseConfig" class="collapse {% if card_expanded %}show{% endif %}">
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label for="llm_base_url" class="form-label">Base URL</label>
+                    <input type="text" class="form-control" id="llm_base_url" placeholder="Optional: e.g., http://localhost:11434/v1" value="{{ llm_settings.llm_base_url|safe }}">
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label for="llm_model" class="form-label">Model Name</label>
+                    <input type="text" class="form-control" id="llm_model" placeholder="e.g., gpt-4o" value="{{ llm_settings.llm_model|safe }}">
+                </div>
+                <div class="col-md-12">
+                    <label for="llm_api_key" class="form-label">API Key</label>
+                    <input type="password" class="form-control" id="llm_api_key" placeholder="Enter your API Key" value="{{ llm_settings.llm_api_key|safe }}">
+                </div>
+                {% if show_retries %}
+                <div class="col-md-12 mt-3">
+                    <label for="max_retries" class="form-label">Max Retries</label>
+                    <input type="number" class="form-control" id="max_retries" value="{{ llm_settings.max_retries }}">
+                </div>
+                {% endif %}
+            </div>
+            <hr>
+            <div class="d-flex justify-content-end">
+                <button type="button" class="btn btn-outline-primary me-2" id="save-settings-btn"><i class="bi bi-save me-1"></i> Save</button>
+                <button type="button" class="btn btn-outline-info me-2" id="test-connection-btn"><i class="bi bi-person-check me-1"></i> Test Connection</button>
+                <button type="button" class="btn btn-outline-secondary" id="restore-defaults-btn"><i class="bi bi-server me-1"></i> Load .env</button>
+            </div>
+            <div id="test-connection-result" class="mt-3"></div>
+        </div>
+    </div>
+</div>

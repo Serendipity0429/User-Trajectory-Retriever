@@ -1,0 +1,754 @@
+document.addEventListener('DOMContentLoaded', function() {
+    const questionsData = JSON.parse(document.getElementById('questions-data').textContent);
+    const questionSelector = document.getElementById('question-selector');
+    const runSingleQuestionBtn = document.getElementById('run-single-question-btn');
+
+    questionSelector.addEventListener('change', function() {
+        const index = this.value;
+        if (index !== "") {
+            runSingleQuestionBtn.disabled = false;
+        } else {
+            runSingleQuestionBtn.disabled = true;
+        }
+    });
+
+    let pipelineController;
+    let currentRunResults = [];
+    let failedItems = [];
+
+    // --- Core UI Rendering Logic ---
+    function renderResults(data, resultsBody, index, isRetry = false) {
+        if (data.is_meta) {
+            return {};
+        }
+        
+        const rowId = `result-${Date.now()}-${Math.random()}`;
+        let resultHtml;
+
+        if (data.error) {
+            resultHtml = `<tr class="table-warning" data-id="${rowId}"><td colspan="8">Error: ${data.error}</td></tr>`;
+            if (!isRetry) {
+                failedItems.push({ ...data, rowId });
+            }
+        } else {
+            const ruleCorrect = data.rule_result;
+            const llmCorrect = data.llm_result;
+            const isCorrect = llmCorrect; // NOTICE: manually set the judge as llm
+            const textColorClass = isCorrect ? 'text-success-dark' : 'text-danger-dark';
+
+            const ruleBadge = ruleCorrect ? `<span class="badge bg-success">Correct</span>` : `<span class="badge bg-danger">Incorrect</span>`;
+            const llmBadge = llmCorrect === null ? `<span class="badge bg-secondary">Error</span>` : (llmCorrect ? `<span class="badge bg-success">Correct</span>` : `<span class="badge bg-danger">Incorrect</span>`);
+            const agreementIcon = (llmCorrect !== null && ruleCorrect === llmCorrect)
+                ? `<i class="bi bi-check-circle-fill text-success fs-5"></i>`
+                : `<i class="bi bi-x-circle-fill text-danger fs-5"></i>`;
+
+            const groundTruthsArray = data.ground_truths || [];
+            const remainingCount = groundTruthsArray.length - 3;
+            let groundTruthsHtml = `<ul class="list-unstyled mb-0" data-expanded="false" data-remaining="${remainingCount}">`;
+            groundTruthsArray.forEach((gt, index) => {
+                const isHidden = index >= 3;
+                groundTruthsHtml += `<li class="text-secondary small ground-truth-item" ${isHidden ? 'style="display:none;"' : ''}><i class="bi bi-dot me-1 text-muted"></i>${gt}</li>`;
+            });
+            if (groundTruthsArray.length > 3) {
+                groundTruthsHtml += `<li class="show-more-item"><a href="#" class="toggle-answers-link small text-decoration-none">... Show ${remainingCount} more</a></li>`;
+            }
+            groundTruthsHtml += '</ul>';
+
+            let searchResultsHtml = '';
+            if (data.search_results && data.search_results.length > 0) {
+                const resultsJson = encodeURIComponent(JSON.stringify(data.search_results));
+                const count = data.search_results.length;
+                searchResultsHtml = `
+                    <button class="btn btn-sm btn-outline-primary view-all-results-btn" 
+                            data-results="${resultsJson}"
+                            type="button">
+                        <i class="bi bi-list-ul me-1"></i>View ${count} Results
+                    </button>`;
+            } else {
+                searchResultsHtml = '<span class="text-muted fst-italic small">No results</span>';
+            }
+
+            resultHtml = `<tr class="${isCorrect ? 'table-success-light' : 'table-danger-light'}" data-id="${rowId}">
+                <td class="px-4 fw-bold text-muted small">${index}</td>
+                <td class="px-4"><div class="compact-cell fw-bold ${textColorClass}">${data.question}</div></td>
+                <td class="px-4"><div class="compact-cell ${textColorClass}">${data.answer}</div></td>
+                <td class="px-4">${groundTruthsHtml}</td>
+                <td class="px-4">${searchResultsHtml}</td>
+                <td class="px-4 text-center align-middle">${ruleBadge}</td>
+                <td class="px-4 text-center align-middle">${llmBadge}</td>
+                <td class="px-4 text-center align-middle">${agreementIcon}</td>
+            </tr>`;
+        }
+
+        if (isRetry && data.originalRowId) {
+            const originalRow = resultsBody.querySelector(`[data-id="${data.originalRowId}"]`);
+            if (originalRow) {
+                originalRow.outerHTML = resultHtml; // Replace the original error row
+            } else {
+                 resultsBody.insertAdjacentHTML('afterbegin', resultHtml); // Fallback
+            }
+        } else {
+            resultsBody.insertAdjacentHTML('afterbegin', resultHtml);
+        }
+        
+        return { ruleCorrect: data.rule_result, llmCorrect: data.llm_result };
+    }
+
+    function updateSummary(stats) {
+        const ruleAccuracy = stats.total > 0 ? (stats.ruleCorrect / stats.total) * 100 : 0;
+        const llmEvalCount = stats.total - stats.llmErrors;
+        const llmAccuracy = llmEvalCount > 0 ? (stats.llmCorrect / llmEvalCount) * 100 : 0;
+        const agreement = llmEvalCount > 0 ? (stats.agreements / llmEvalCount) * 100 : 0;
+        const avgDocs = stats.total > 0 ? (stats.totalDocsUsed / stats.total) : 0;
+
+        document.getElementById('processed-count').textContent = stats.total;
+        document.getElementById('agreement-rate').textContent = `${agreement.toFixed(2)}%`;
+        
+        document.getElementById('rule-correct-count').textContent = stats.ruleCorrect;
+        document.getElementById('rule-incorrect-count').textContent = stats.total - stats.ruleCorrect;
+        document.getElementById('rule-accuracy-rate').textContent = `${ruleAccuracy.toFixed(2)}%`;
+        
+        document.getElementById('llm-correct-count').textContent = stats.llmCorrect;
+        document.getElementById('llm-incorrect-count').textContent = llmEvalCount - stats.llmCorrect;
+        document.getElementById('llm-accuracy-rate').textContent = `${llmAccuracy.toFixed(2)}%`;
+
+        document.getElementById('total-searches-count').textContent = stats.total; // Assuming one search per question
+        document.getElementById('avg-docs-count').textContent = avgDocs.toFixed(2);
+    }
+
+    // --- Configuration Management ---
+    function restoreDefaultRagPrompt() {
+        const btn = document.getElementById('restore-rag-defaults-btn');
+        const originalText = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Restoring...';
+
+        fetch("{% url 'benchmark:get_default_rag_prompt' %}")
+            .then(response => response.json())
+            .then(data => {
+                if (data.default_prompt) {
+                    document.getElementById('rag-prompt-template').value = data.default_prompt;
+                    saveRagSettings(); // Automatically save
+                } else {
+                    alert('Error fetching default prompt.');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Failed to load default prompt.');
+            })
+            .finally(() => {
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            });
+    }
+
+    function saveLlmSettings() {
+        const data = {
+            llm_base_url: document.getElementById('llm_base_url').value,
+            llm_api_key: document.getElementById('llm_api_key').value,
+            llm_model: document.getElementById('llm_model').value,
+        };
+        const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
+        BenchmarkUtils.saveSettings("{% url 'benchmark:save_llm_settings' %}", csrfToken, data, 'save-llm-settings-btn');
+    }
+
+    function saveRagSettings() {
+        const data = {
+            prompt_template: document.getElementById('rag-prompt-template').value,
+        };
+        const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
+        BenchmarkUtils.saveSettings("{% url 'benchmark:save_rag_settings' %}", csrfToken, data, 'save-rag-settings-btn');
+    }
+
+
+    function restoreDefaults() {
+        BenchmarkUtils.restoreDefaults("{% url 'benchmark:get_llm_env_vars' %}", function(data) {
+            document.getElementById('llm_base_url').value = data.llm_base_url;
+            document.getElementById('llm_api_key').value = data.llm_api_key;
+            document.getElementById('llm_model').value = data.llm_model;
+            saveLlmSettings();
+        });
+    }
+
+    function testConnection() {
+        const data = {
+            llm_base_url: document.getElementById('llm_base_url').value,
+            llm_api_key: document.getElementById('llm_api_key').value,
+        };
+        const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
+        BenchmarkUtils.testConnection("{% url 'benchmark:test_llm_connection' %}", csrfToken, data, 'test-connection-result', 'test-connection-btn');
+    }
+
+    // --- Event Listeners ---
+    loadSavedRuns();
+
+    // --- Save/Load/Delete Run Functions ---
+    function loadSavedRuns() {
+        BenchmarkUtils.loadSavedRuns("{% url 'benchmark:list_rag_adhoc_runs' %}", loadRun, deleteRun);
+    }
+    
+        function loadRun(runId) {
+            document.getElementById('pipeline-results-container').style.display = 'block';
+            document.getElementById('progress-container').style.display = 'none';
+            document.getElementById('save-run-btn').disabled = true;
+
+            fetch(`/benchmark/api/rag_adhoc/get_run/${runId}/`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        alert('Error loading run: ' + data.error);
+                        return;
+                    }
+                    currentRunResults = data.results;
+                    
+                    document.getElementById('results-header-text').textContent = `Results for: ${data.name}`;
+                    
+                    // Re-calculate stats from the results for consistency
+                    let stats = {
+                        total: currentRunResults.length,
+                        ruleCorrect: 0,
+                        llmCorrect: 0,
+                        llmErrors: 0,
+                        agreements: 0,
+                        totalDocsUsed: 0
+                    };
+
+                    currentRunResults.forEach(result => {
+                        if (result.is_correct_rule) stats.ruleCorrect++;
+                        if (result.is_correct_llm) stats.llmCorrect++;
+                        if (result.is_correct_llm === null) stats.llmErrors++;
+                        if (result.is_correct_llm !== null && result.is_correct_rule === result.is_correct_llm) {
+                            stats.agreements++;
+                        }
+                        stats.totalDocsUsed += (result.num_docs_used || 0);
+                    });
+                    updateSummary(stats);
+
+                    // Render table
+                    const resultsBody = document.getElementById('pipeline-results-body');
+                    resultsBody.innerHTML = '';
+                    currentRunResults.forEach((result, idx) => {
+                        renderResults(result, resultsBody, idx + 1);
+                    });
+                })
+                .catch(error => {
+                    console.error('Error loading run:', error);
+                    alert(`Failed to load run data.`);
+                });
+        }
+    
+        function deleteRun(runId) {
+        const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
+        BenchmarkUtils.deleteRun(`/benchmark/api/rag_adhoc/delete_run/${runId}/`, csrfToken);
+    }
+
+    document.getElementById('save-run-btn').addEventListener('click', function() {
+        const defaultName = `RAG Run ${new Date().toISOString().slice(0, 19).replace('T', ' ')}`;
+        const runName = prompt("Please enter a name for this run:", defaultName);
+        
+        if (runName && currentRunResults.length > 0) {
+            const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
+            
+            fetch("{% url 'benchmark:rag_adhoc' %}", {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
+                },
+                body: JSON.stringify({ name: runName, results: currentRunResults })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'ok') {
+                    alert('Run saved successfully!');
+                    window.location.href = "{% url 'benchmark:rag_adhoc' %}";
+                } else {
+                    alert('Error saving run: ' + (data.error || 'Unknown error'));
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('An network error occurred while saving the run.');
+            });
+        }
+    });
+
+    async function processRagAdhocQuestion(questionData, groupId = null) {
+        const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
+        const createSessionResponse = await fetch("{% url 'benchmark:create_session' %}", {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken
+            },
+            body: JSON.stringify({
+                question: questionData.question,
+                ground_truths: questionData.ground_truths || questionData.answer, // Accommodate both keys
+                group_id: groupId,
+                pipeline_type: 'rag_adhoc'
+            })
+        });
+        const sessionData = await createSessionResponse.json();
+
+        if (sessionData.error) {
+            throw new Error(sessionData.error);
+        }
+
+        const trialId = sessionData.trial_id;
+
+        const runTrialResponse = await fetch(`/benchmark/api/multi_turn/run_trial/${trialId}/`, {
+            method: 'GET',
+            headers: {
+                'X-CSRFToken': csrfToken
+            }
+        });
+        const trialData = await runTrialResponse.json();
+
+        if (trialData.error) {
+            throw new Error(trialData.error);
+        }
+        
+        return {
+            question: questionData.question,
+            rule_result: trialData.is_correct, // For RAG adhoc, this is the result of the rule
+            llm_result: trialData.is_correct, // For RAG adhoc, this is the result of the LLM judge
+            answer: trialData.answer,
+            ground_truths: questionData.ground_truths || questionData.answer,
+            num_docs_used: trialData.num_docs_used,
+            search_results: trialData.search_results || []
+        };
+    }
+
+    // --- Single Question RAG Run Logic ---
+    document.getElementById('run-single-question-btn').addEventListener('click', async function() {
+        const resultsDiv = document.getElementById('single-run-results');
+        const runBtn = this;
+
+        resultsDiv.style.display = 'none'; // Hide previous results
+
+        const apiKey = document.getElementById('llm_api_key').value;
+        const modelName = document.getElementById('llm_model').value;
+
+        if (!apiKey.trim() || !modelName.trim()) {
+            alert('Please set your LLM API Key and Model Name in the LLM Configuration section.');
+            return;
+        }
+
+        const selectedIndex = questionSelector.value;
+        if (selectedIndex === "") {
+            alert('Please select a question to run.');
+            return;
+        }
+        const selectedQ = questionsData[selectedIndex];
+        const question = selectedQ.question;
+        const ground_truths = selectedQ.ground_truths || [];
+
+        // Disable button and show spinner
+        runBtn.disabled = true;
+        const originalBtnHtml = runBtn.innerHTML;
+        runBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Running...';
+
+        const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
+
+        try {
+            // 1. Create Session
+            const createSessionResponse = await fetch("{% url 'benchmark:create_session' %}", {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
+                },
+                body: JSON.stringify({
+                    question: question,
+                    ground_truths: ground_truths,
+                    pipeline_type: 'rag_adhoc' // Specify RAG pipeline type
+                })
+            });
+            const sessionData = await createSessionResponse.json();
+
+            if (sessionData.error) {
+                throw new Error(sessionData.error);
+            }
+
+            const sessionId = sessionData.session_id;
+            const trialId = sessionData.trial_id;
+
+            // 2. Run Trial
+            const runTrialResponse = await fetch(`/benchmark/api/multi_turn/run_trial/${trialId}/`, {
+                method: 'GET', // GET because it triggers server-side processing
+                headers: {
+                    'X-CSRFToken': csrfToken // Still send CSRF for verification
+                }
+            });
+            const trialData = await runTrialResponse.json();
+
+            if (trialData.error) {
+                throw new Error(trialData.error);
+            }
+
+            // 3. Display Results
+            resultsDiv.style.display = 'block';
+            document.getElementById('single-result-answer').textContent = trialData.answer || 'N/A';
+            document.getElementById('single-result-rule-correct').innerHTML = trialData.is_correct ? '<span class="badge bg-success">Correct</span>' : '<span class="badge bg-danger">Incorrect</span>';
+            // Note: RAG pipeline in views.py currently sets is_correct based on rule AND LLM,
+            // so this will reflect overall correctness based on current backend logic.
+            document.getElementById('single-result-llm-correct').innerHTML = trialData.is_correct ? '<span class="badge bg-success">Correct</span>' : '<span class="badge bg-danger">Incorrect</span>';
+            document.getElementById('single-result-docs-used').textContent = trialData.num_docs_used !== undefined ? trialData.num_docs_used : 'N/A';
+            document.getElementById('single-result-details').textContent = trialData.error ? `Error: ${trialData.error}` : 'Run completed.';
+
+        } catch (error) {
+            resultsDiv.style.display = 'block';
+            document.getElementById('single-result-answer').textContent = 'Error';
+            document.getElementById('single-result-rule-correct').textContent = '-';
+            document.getElementById('single-result-llm-correct').textContent = '-';
+            document.getElementById('single-result-docs-used').textContent = '-';
+            document.getElementById('single-result-details').textContent = `Error: ${error.message}`;
+            console.error('Error running single question:', error);
+        } finally {
+            runBtn.disabled = false;
+            runBtn.innerHTML = originalBtnHtml;
+        }
+    });
+
+    // --- Pipeline Execution ---
+    let currentRunId = null;
+    let currentPipelineId = null;
+
+    function stopPipeline(pipelineId) {
+        if (!pipelineId) return;
+
+        const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
+        const url = "{% url 'benchmark:stop_rag_adhoc_pipeline' %}";
+        
+        const data = JSON.stringify({ pipeline_id: pipelineId });
+
+        fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken
+            },
+            body: data,
+            keepalive: true
+        }).catch(e => console.error("Stop request failed", e));
+    }
+
+    document.getElementById('run-pipeline-btn').addEventListener('click', runQAPipeline);
+
+    function runQAPipeline() {
+        const runBtn = document.getElementById('run-pipeline-btn');
+        const stopBtn = document.getElementById('stop-pipeline-btn');
+        const retryBtn = document.getElementById('retry-btn');
+        const progressContainer = document.getElementById('progress-container');
+        const progressBar = document.getElementById('progress-bar');
+        const resultsBody = document.getElementById('pipeline-results-body');
+        const resultsContainer = document.getElementById('pipeline-results-container');
+        const totalQuestions = questionsData.length;
+
+        // Reset UI
+        runBtn.style.display = 'none';
+        stopBtn.style.display = 'block';
+        retryBtn.style.display = 'none';
+        progressContainer.style.display = 'block';
+        progressBar.style.width = '0%';
+        progressBar.textContent = '0%';
+        resultsContainer.style.display = 'block';
+        resultsBody.innerHTML = '';
+        currentRunResults = [];
+        failedItems = [];
+        document.getElementById('save-run-btn').disabled = true;
+        document.getElementById('results-header-text').textContent = "RAG Pipeline Results";
+        document.getElementById('running-spinner').style.display = 'inline-block';
+
+        // Controller to stop the fetch
+        pipelineController = new AbortController();
+        const signal = pipelineController.signal;
+
+        const datasetId = document.getElementById('dataset-selector').value;
+        const formData = new FormData();
+        formData.append('csrfmiddlewaretoken', document.querySelector('input[name="csrfmiddlewaretoken"]').value);
+        formData.append('dataset_id', datasetId);
+        formData.append('llm_base_url', document.getElementById('llm_base_url').value);
+        formData.append('llm_api_key', document.getElementById('llm_api_key').value);
+        formData.append('llm_model', document.getElementById('llm_model').value);
+        formData.append('rag_prompt_template', document.getElementById('rag-prompt-template').value);
+        formData.append('pipeline_id', currentPipelineId);
+        
+        let processedCount = 0;
+        let stats = {
+            total: 0,
+            ruleCorrect: 0,
+            llmCorrect: 0,
+            llmErrors: 0,
+            agreements: 0,
+            totalDocsUsed: 0
+        };
+
+        fetch("{% url 'benchmark:run_rag_adhoc_pipeline' %}", { method: 'POST', body: formData, signal: signal })
+            .then(response => {
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+
+                function push() {
+                    reader.read().then(({ done, value }) => {
+                        if (done) {
+                            runBtn.style.display = 'block';
+                            stopBtn.style.display = 'none';
+                            document.getElementById('running-spinner').style.display = 'none';
+                            if (failedItems.length > 0) {
+                                retryBtn.style.display = 'block';
+                                retryBtn.disabled = false;
+                                retryBtn.innerHTML = `Retry ${failedItems.length} Failed`;
+                            }
+                            document.getElementById('save-run-btn').disabled = false;
+                            currentPipelineId = null;
+                            return;
+                        }
+
+                        buffer += decoder.decode(value, { stream: true });
+                        const lines = buffer.split('\n');
+                        buffer = lines.pop();
+
+                        lines.forEach(line => {
+                            if (pipelineController.signal.aborted) {
+                                reader.cancel();
+                                return;
+                            }
+                            if (line.trim() === '') return;
+
+                            try {
+                                let data = JSON.parse(line);
+                                if (typeof data === 'string') {
+                                    data = JSON.parse(data);
+                                }
+                                if (data.is_meta) return;
+
+                                currentRunResults.push(data);
+                                
+                                processedCount++;
+                                const resultSummary = renderResults(data, resultsBody, processedCount, false);
+                                
+                                const progress = totalQuestions > 0 ? (processedCount / totalQuestions) * 100 : 0;
+                                progressBar.style.width = `${progress}%`;
+                                progressBar.textContent = `${Math.round(progress)}%`;
+
+                                stats.total++;
+                                if (resultSummary.ruleCorrect) stats.ruleCorrect++;
+                                if (resultSummary.llmCorrect) stats.llmCorrect++;
+                                if (resultSummary.llmCorrect === null) stats.llmErrors++;
+                                if (resultSummary.llmCorrect !== null && resultSummary.ruleCorrect === resultSummary.llmCorrect) {
+                                    stats.agreements++;
+                                }
+                                stats.totalDocsUsed += (data.num_docs_used || 0);
+                                updateSummary(stats);
+
+                            } catch (e) {
+                                console.error("Failed to parse JSON chunk:", e, line);
+                            }
+                        });
+                        push();
+                    }).catch(error => {
+                        if (error.name === 'AbortError') {
+                            console.log('Pipeline stopped by user.');
+                        } else {
+                            console.error('Error during stream processing:', error);
+                        }
+                        runBtn.style.display = 'block';
+                        stopBtn.style.display = 'none';
+                        document.getElementById('running-spinner').style.display = 'none';
+                        currentPipelineId = null;
+                    });
+                }
+                push();
+            })
+            .catch(error => {
+                if (error.name === 'AbortError') {
+                     console.log('Fetch aborted by user.');
+                } else {
+                    console.error('Error starting the pipeline:', error);
+                    alert('Failed to start the pipeline.');
+                }
+                runBtn.style.display = 'block';
+                stopBtn.style.display = 'none';
+                document.getElementById('running-spinner').style.display = 'none';
+                currentPipelineId = null;
+            });
+    }
+
+    document.getElementById('retry-btn').addEventListener('click', function() {
+        // Retry logic might need adjustment for RAG specifics if different parameters are needed.
+        // For now, let's assume it's similar enough.
+        alert("Retry logic not fully implemented for RAG yet.");
+    });
+
+    document.getElementById('stop-pipeline-btn').addEventListener('click', function() {
+        if (pipelineController) {
+            pipelineController.abort();
+        }
+        if (currentPipelineId) {
+            stopPipeline(currentPipelineId);
+            currentPipelineId = null;
+        }
+    });
+
+    // Config buttons
+    document.getElementById('save-llm-settings-btn').addEventListener('click', saveLlmSettings);
+    document.getElementById('save-rag-settings-btn').addEventListener('click', saveRagSettings);
+    document.getElementById('restore-defaults-btn').addEventListener('click', restoreDefaults);
+    document.getElementById('restore-rag-defaults-btn').addEventListener('click', restoreDefaultRagPrompt);
+    document.getElementById('test-connection-btn').addEventListener('click', testConnection);
+
+    // Autosave for LLM Settings
+    const autosaveLlmSettings = BenchmarkUtils.debounce(saveLlmSettings, 1000);
+    ['llm_base_url', 'llm_model', 'llm_api_key'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.addEventListener('input', autosaveLlmSettings);
+        }
+    });
+
+    // Autosave for RAG Settings
+    const autosaveRagSettings = BenchmarkUtils.debounce(saveRagSettings, 1000);
+    const ragPromptEl = document.getElementById('rag-prompt-template');
+    if (ragPromptEl) {
+        ragPromptEl.addEventListener('input', autosaveRagSettings);
+    }
+
+    // --- Web Search Test Logic ---
+    document.getElementById('test-web-search-btn').addEventListener('click', function() {
+        const query = document.getElementById('web-search-query').value.trim();
+        if (!query) {
+            alert('Please enter a search query.');
+            return;
+        }
+
+        const btn = this;
+        const originalHtml = btn.innerHTML;
+        const resultsContainer = document.getElementById('web-search-results');
+        const resultsList = document.getElementById('web-search-results-list');
+
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Searching...';
+        resultsContainer.style.display = 'none';
+        resultsList.innerHTML = '';
+
+        const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
+
+        fetch("{% url 'benchmark:web_search' %}", {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken
+            },
+            body: JSON.stringify({ query: query })
+        })
+        .then(response => response.json())
+        .then(data => {
+            resultsContainer.style.display = 'block';
+            if (data.error) {
+                resultsList.innerHTML = `<div class="alert alert-danger">${data.error}</div>`;
+            } else if (data.results && data.results.length > 0) {
+                data.results.forEach((res, index) => {
+                    const item = document.createElement('a');
+                    item.href = res.link || '#';
+                    item.target = "_blank";
+                    item.className = "list-group-item list-group-item-action";
+                    item.innerHTML = `
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1 text-primary">${index + 1}. ${res.title || 'No Title'}</h6>
+                        </div>
+                        <p class="mb-1 small text-muted">${res.snippet || 'No snippet available.'}</p>
+                        <small class="text-truncate d-block text-secondary">${res.link || ''}</small>
+                    `;
+                    resultsList.appendChild(item);
+                });
+            } else {
+                resultsList.innerHTML = '<div class="alert alert-info">No results found.</div>';
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            resultsContainer.style.display = 'block';
+            resultsList.innerHTML = `<div class="alert alert-danger">An error occurred: ${error.message}</div>`;
+        })
+        .finally(() => {
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
+        });
+    });
+
+    // Delegated event listener for toggling ground truths
+    document.getElementById('pipeline-results-body').addEventListener('click', function(e) {
+        if (e.target && e.target.classList.contains('toggle-answers-link')) {
+            e.preventDefault();
+            const link = e.target;
+            const listItem = link.parentNode;
+            const list = listItem.parentNode;
+            const isExpanded = list.dataset.expanded === 'true';
+            const remainingCount = parseInt(list.dataset.remaining, 10);
+            const items = list.querySelectorAll('.ground-truth-item');
+
+            list.dataset.expanded = !isExpanded;
+            link.textContent = isExpanded ? `... Show ${remainingCount} more` : '... Show less';
+
+            items.forEach((item, index) => {
+                if (index >= 3) { // Only toggle items beyond the initial 3
+                    item.style.display = isExpanded ? 'none' : 'list-item';
+                }
+            });
+        }
+        
+        // Delegated event listener for search result items
+        if (e.target && e.target.closest('.view-all-results-btn')) {
+            e.preventDefault();
+            const btn = e.target.closest('.view-all-results-btn');
+            try {
+                const results = JSON.parse(decodeURIComponent(btn.dataset.results));
+                const container = document.getElementById('modal-search-results-container');
+                container.innerHTML = '';
+
+                if (results && results.length > 0) {
+                    results.forEach((res, idx) => {
+                        const linkUrl = res.link || '#';
+                        const linkTitle = res.title || 'No Title';
+                        const snippet = res.snippet || 'No snippet available.';
+                        
+                        let domain = '';
+                        try {
+                            if (res.link) {
+                                const urlObj = new URL(res.link);
+                                domain = urlObj.hostname.replace('www.', '');
+                            }
+                        } catch(err) {}
+
+                        const item = document.createElement('div');
+                        item.className = 'list-group-item p-3';
+                        item.innerHTML = `
+                            <div class="d-flex w-100 justify-content-between mb-1">
+                                <h6 class="mb-0 text-primary fw-bold">
+                                    <span class="text-muted fw-normal me-2">#${idx + 1}</span>
+                                    <a href="${linkUrl}" target="_blank" class="text-decoration-none">${linkTitle}</a>
+                                </h6>
+                                <small class="text-muted text-end ms-2">${domain}</small>
+                            </div>
+                            <p class="mb-1 text-dark" style="font-size: 0.95rem; line-height: 1.4;">${snippet}</p>
+                            <small class="text-muted font-monospace" style="font-size: 0.75rem;"><i class="bi bi-link-45deg"></i> ${linkUrl}</small>
+                        `;
+                        container.appendChild(item);
+                    });
+                } else {
+                    container.innerHTML = '<div class="p-3 text-center text-muted">No results data found.</div>';
+                }
+
+                const modal = new bootstrap.Modal(document.getElementById('searchResultsListModal'));
+                modal.show();
+            } catch (err) {
+                console.error("Error opening results modal:", err);
+                alert("Failed to load results details.");
+            }
+        }
+    });
+});

@@ -36,3 +36,4 @@ gunicorn
 matplotlib
 numpy
 psycopg2-binary
+beautifulsoup4

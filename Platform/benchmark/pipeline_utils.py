@@ -5,7 +5,7 @@ from datetime import datetime
 from task_manager.utils import check_answer_rule, check_answer_llm, redis_client
 from .search_utils import get_search_engine
 from .models import (
-    LLMSettings, RagSettings, BenchmarkDataset, 
+    LLMSettings, RagSettings, BenchmarkDataset, SearchSettings,
     VanillaLLMAdhocRun, VanillaLLMAdhocResult,
     RagAdhocRun, RagAdhocResult,
     MultiTurnSessionGroup, VanillaLLMMultiTurnSession, VanillaLLMMultiTurnTrial,
@@ -71,9 +71,19 @@ class VanillaLLMAdhocPipeline(BasePipeline):
     def run(self):
         settings = LLMSettings.load()
         run_name = f"Vanilla LLM Ad-hoc Run {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+        
+        snapshot = {
+            'llm_settings': {
+                'llm_base_url': settings.llm_base_url,
+                'llm_model': settings.llm_model,
+                'max_retries': settings.max_retries
+                # Exclude API key for security/logging best practices, unless explicitly needed for reproduction
+            }
+        }
+        
         run = VanillaLLMAdhocRun.objects.create(
             name=run_name,
-            llm_settings=settings,
+            settings_snapshot=snapshot,
             total_questions=0,
             correct_answers=0
         )
@@ -159,12 +169,28 @@ class RagAdhocPipeline(BasePipeline):
     def run(self):
         llm_settings = LLMSettings.load()
         rag_settings = RagSettings.load()
+        search_settings = SearchSettings.load()
+        
         run_name = f"RAG Ad-hoc Run {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+        
+        snapshot = {
+            'llm_settings': {
+                'llm_base_url': llm_settings.llm_base_url,
+                'llm_model': llm_settings.llm_model,
+                'max_retries': llm_settings.max_retries
+            },
+            'rag_settings': {
+                'prompt_template': rag_settings.prompt_template
+            },
+            'search_settings': {
+                'search_provider': search_settings.search_provider,
+                'serper_fetch_full_content': search_settings.serper_fetch_full_content
+            }
+        }
         
         run = RagAdhocRun.objects.create(
             name=run_name,
-            llm_settings=llm_settings,
-            rag_settings=rag_settings,
+            settings_snapshot=snapshot,
             total_questions=0,
             correct_answers=0
         )
@@ -183,7 +209,7 @@ class RagAdhocPipeline(BasePipeline):
 
             try:
                 search_results = self.search_engine.search(question)
-                formatted_results = "\n".join([f"{i+1}. {r.get('title', '')}\n{r.get('snippet', '')}" for i, r in enumerate(search_results)]) if search_results else "No results found."
+                formatted_results = self.search_engine.format_results(search_results)
                 
                 prompt = self.prompt_template.replace('{question}', question).replace('{search_results}', formatted_results)
                 
@@ -245,8 +271,28 @@ class BaseMultiTurnPipeline(BasePipeline):
 
     def run(self):
         group_name = f"Pipeline Run ({self.__class__.__name__}) - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-        group = MultiTurnSessionGroup.objects.create(name=group_name)
-        settings = LLMSettings.load()
+        
+        llm_settings = LLMSettings.load()
+        rag_settings = RagSettings.load()
+        search_settings = SearchSettings.load()
+
+        snapshot = {
+            'llm_settings': {
+                'llm_base_url': llm_settings.llm_base_url,
+                'llm_model': llm_settings.llm_model,
+                'max_retries': llm_settings.max_retries
+            },
+            'rag_settings': {
+                'prompt_template': rag_settings.prompt_template
+            },
+            'search_settings': {
+                'search_provider': search_settings.search_provider,
+                'serper_fetch_full_content': search_settings.serper_fetch_full_content
+            }
+        }
+
+        group = MultiTurnSessionGroup.objects.create(name=group_name, settings_snapshot=snapshot)
+        settings = llm_settings
 
         for data in self.load_questions():
             if not self.check_active():
@@ -356,7 +402,6 @@ class VanillaLLMMultiTurnPipeline(BaseMultiTurnPipeline):
 
     def create_session(self, settings, question_text, ground_truths, group):
         return VanillaLLMMultiTurnSession.objects.create(
-            llm_settings=settings,
             question=question_text,
             ground_truths=ground_truths,
             group=group,
@@ -409,10 +454,7 @@ class RagMultiTurnPipeline(BaseMultiTurnPipeline):
         self.redis_prefix = f"rag_multi_turn_{self.reformulation_strategy}_pipeline_active"
 
     def create_session(self, settings, question_text, ground_truths, group):
-        rag_settings = RagSettings.load()
         return RAGMultiTurnSession.objects.create(
-            llm_settings=settings,
-            rag_settings=rag_settings,
             question=question_text,
             ground_truths=ground_truths,
             group=group,
@@ -455,7 +497,7 @@ class RagMultiTurnPipeline(BaseMultiTurnPipeline):
                 pass
 
         search_results = self.search_engine.search(current_search_query)
-        formatted_results = "\n".join([f"{i+1}. {r.get('title', '')}\n{r.get('snippet', '')}" for i, r in enumerate(search_results)]) if search_results else "No results found."
+        formatted_results = self.search_engine.format_results(search_results)
         
         # Save search info to the passed trial object directly
         trial.search_query = current_search_query

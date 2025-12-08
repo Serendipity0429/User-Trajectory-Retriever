@@ -194,7 +194,18 @@ def vanilla_llm_adhoc(request):
                 # Update existing run
                 run = get_object_or_404(VanillaLLMAdhocRun, pk=run_id)
                 run.name = run_name
-                run.llm_settings = settings
+                # run.llm_settings = settings # Removed
+                # Update snapshot if needed, or leave as is? Ideally snapshot is immutable once run is done.
+                # If we are saving a run from frontend, it means the run just finished.
+                snapshot = {
+                    'llm_settings': {
+                        'llm_base_url': settings.llm_base_url,
+                        'llm_model': settings.llm_model,
+                        'max_retries': settings.max_retries
+                    }
+                }
+                run.settings_snapshot = snapshot
+                
                 run.total_questions = total_questions
                 run.correct_answers = correct_answers_llm
                 run.accuracy = (correct_answers_llm / total_questions * 100) if total_questions > 0 else 0
@@ -204,9 +215,16 @@ def vanilla_llm_adhoc(request):
                 run.results.all().delete()
             else:
                 # Create new run
+                snapshot = {
+                    'llm_settings': {
+                        'llm_base_url': settings.llm_base_url,
+                        'llm_model': settings.llm_model,
+                        'max_retries': settings.max_retries
+                    }
+                }
                 run = VanillaLLMAdhocRun.objects.create(
                     name=run_name,
-                    llm_settings=settings,
+                    settings_snapshot=snapshot,
                     total_questions=total_questions,
                     correct_answers=correct_answers_llm,
                     accuracy=(correct_answers_llm / total_questions * 100) if total_questions > 0 else 0
@@ -227,7 +245,7 @@ def vanilla_llm_adhoc(request):
             return JsonResponse({'error': str(e)}, status=500)
 
     # GET request logic
-    runs = VanillaLLMAdhocRun.objects.all().prefetch_related('llm_settings')
+    runs = VanillaLLMAdhocRun.objects.all()
     selected_run = None
     run_results = []
     run_id = request.GET.get('run_id')
@@ -430,11 +448,13 @@ def vanilla_llm_multi_turn(request):
     # Load sessions and group them
     groups = MultiTurnSessionGroup.objects.filter(
         vanilla_sessions__isnull=False
+    ).exclude(
+        name__startswith="Ad-hoc Session"
     ).prefetch_related(
         models.Prefetch('vanilla_sessions', queryset=VanillaLLMMultiTurnSession.objects.order_by('-created_at'))
     ).order_by('-created_at').distinct()
     
-    individual_sessions = VanillaLLMMultiTurnSession.objects.filter(group__isnull=True).order_by('-created_at')
+    individual_sessions = VanillaLLMMultiTurnSession.objects.filter(group__name__startswith="Ad-hoc Session").order_by('-created_at')
 
     datasets = BenchmarkDataset.objects.all().order_by('-created_at')
 
@@ -463,11 +483,13 @@ def rag_multi_turn(request):
     # Load sessions and group them
     groups = MultiTurnSessionGroup.objects.filter(
         rag_sessions__isnull=False
+    ).exclude(
+        name__startswith="Ad-hoc Session"
     ).prefetch_related(
         models.Prefetch('rag_sessions', queryset=RAGMultiTurnSession.objects.order_by('-created_at'))
     ).order_by('-created_at').distinct()
     
-    individual_sessions = RAGMultiTurnSession.objects.filter(group__isnull=True).order_by('-created_at')
+    individual_sessions = RAGMultiTurnSession.objects.filter(group__name__startswith="Ad-hoc Session").order_by('-created_at')
 
     datasets = BenchmarkDataset.objects.all().order_by('-created_at')
 
@@ -499,12 +521,30 @@ def rag_adhoc(request):
             total_questions = len(results)
             correct_answers_llm = sum(1 for r in results if r.get('llm_result'))
 
+            snapshot = {
+                'llm_settings': {
+                    'llm_base_url': llm_settings.llm_base_url,
+                    'llm_model': llm_settings.llm_model,
+                    'max_retries': llm_settings.max_retries
+                },
+                'rag_settings': {
+                    'prompt_template': rag_settings.prompt_template
+                }
+                # Search settings should ideally be captured too, but might not be easily accessible here without loading SearchSettings.
+                # Assuming this view is used for saving runs from frontend where backend settings were used.
+            }
+            # Add search settings to snapshot
+            search_settings = SearchSettings.load()
+            snapshot['search_settings'] = {
+                'search_provider': search_settings.search_provider,
+                'serper_fetch_full_content': search_settings.serper_fetch_full_content
+            }
+
             if run_id:
                 # Update existing run
                 run = get_object_or_404(RagAdhocRun, pk=run_id)
                 run.name = run_name
-                run.llm_settings = llm_settings
-                run.rag_settings = rag_settings
+                run.settings_snapshot = snapshot
                 run.total_questions = total_questions
                 run.correct_answers = correct_answers_llm
                 run.accuracy = (correct_answers_llm / total_questions * 100) if total_questions > 0 else 0
@@ -516,8 +556,7 @@ def rag_adhoc(request):
                 # Create new run
                 run = RagAdhocRun.objects.create(
                     name=run_name,
-                    llm_settings=llm_settings,
-                    rag_settings=rag_settings,
+                    settings_snapshot=snapshot,
                     total_questions=total_questions,
                     correct_answers=correct_answers_llm,
                     accuracy=(correct_answers_llm / total_questions * 100) if total_questions > 0 else 0
@@ -583,6 +622,7 @@ def save_search_settings(request):
         settings = SearchSettings.load()
         settings.search_provider = data.get('search_provider', settings.search_provider)
         settings.serper_api_key = data.get('serper_api_key', settings.serper_api_key)
+        settings.serper_fetch_full_content = data.get('serper_fetch_full_content', settings.serper_fetch_full_content)
         settings.save()
         return JsonResponse({'status': 'ok'})
     except Exception as e:
@@ -604,6 +644,12 @@ def get_rag_adhoc_run(request, run_id):
     try:
         run = get_object_or_404(RagAdhocRun, pk=run_id)
         results = list(run.results.values('question', 'answer', 'ground_truths', 'is_correct_rule', 'is_correct_llm', 'num_docs_used', 'search_results'))
+        
+        # Prefer snapshot settings, fallback to empty dict
+        settings_data = {}
+        if run.settings_snapshot:
+            settings_data = run.settings_snapshot
+        
         run_data = {
             'id': run.id,
             'name': run.name,
@@ -611,6 +657,7 @@ def get_rag_adhoc_run(request, run_id):
             'accuracy': run.accuracy,
             'total_questions': run.total_questions,
             'correct_answers': run.correct_answers,
+            'settings': settings_data,
             'results': results
         }
         return JsonResponse(run_data)
@@ -651,20 +698,43 @@ def create_session(request):
         if not question_text or not ground_truths:
             return JsonResponse({'error': 'Question and ground truths are required.'}, status=400)
 
-        settings = LLMSettings.load()
-        
-        session_data = {
-            "llm_settings": settings,
-            "question": question_text,
-            "ground_truths": ground_truths,
+        # Determine settings for snapshot
+        llm_settings = LLMSettings.load()
+        snapshot = {
+            'llm_settings': {
+                'llm_base_url': llm_settings.llm_base_url,
+                'llm_model': llm_settings.llm_model,
+                'max_retries': llm_settings.max_retries
+            }
         }
         
-        if group_id:
-            session_data['group'] = get_object_or_404(MultiTurnSessionGroup, pk=group_id)
-
         if 'rag' in pipeline_type:
             rag_settings = RagSettings.load()
-            session_data['rag_settings'] = rag_settings
+            search_settings = SearchSettings.load()
+            snapshot['rag_settings'] = {
+                'prompt_template': rag_settings.prompt_template
+            }
+            snapshot['search_settings'] = {
+                'search_provider': search_settings.search_provider,
+                'serper_fetch_full_content': search_settings.serper_fetch_full_content
+            }
+        
+        # Ensure Group exists
+        if group_id:
+            group = get_object_or_404(MultiTurnSessionGroup, pk=group_id)
+            # We assume existing group has its snapshot. 
+        else:
+            # Create a new ad-hoc group for this single session
+            group_name = f"Ad-hoc Session - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+            group = MultiTurnSessionGroup.objects.create(name=group_name, settings_snapshot=snapshot)
+
+        session_data = {
+            "question": question_text,
+            "ground_truths": ground_truths,
+            "group": group
+        }
+
+        if 'rag' in pipeline_type:
             if 'reform' in pipeline_type:
                 session_data['reformulation_strategy'] = 'reform'
             else:
@@ -692,14 +762,21 @@ def create_session(request):
 @admin_required
 def get_session(request, session_id):
     try:
-        session = VanillaLLMMultiTurnSession.objects.select_related('llm_settings').get(pk=session_id)
+        session = VanillaLLMMultiTurnSession.objects.select_related('group').get(pk=session_id)
         pipeline_type = 'vanilla_llm_multi_turn'
     except VanillaLLMMultiTurnSession.DoesNotExist:
         try:
-            session = RAGMultiTurnSession.objects.select_related('llm_settings', 'rag_settings').get(pk=session_id)
+            session = RAGMultiTurnSession.objects.select_related('group').get(pk=session_id)
             pipeline_type = f"rag_multi_turn_{session.reformulation_strategy}"
         except RAGMultiTurnSession.DoesNotExist:
             return JsonResponse({'error': 'Session not found'}, status=404)
+
+    # Resolve settings snapshot from group
+    snapshot = session.group.settings_snapshot if session.group else {}
+    
+    max_retries = 3 # Default
+    if snapshot and 'llm_settings' in snapshot:
+        max_retries = snapshot['llm_settings'].get('max_retries', 3)
 
     if isinstance(session, RAGMultiTurnSession):
         trials = list(session.trials.values(
@@ -719,9 +796,10 @@ def get_session(request, session_id):
             'ground_truths': session.ground_truths,
             'is_completed': session.is_completed,
             'created_at': session.created_at,
-            'max_retries': session.llm_settings.max_retries,
+            'max_retries': max_retries,
             'group_id': session.group_id,
-            'pipeline_type': pipeline_type
+            'pipeline_type': pipeline_type,
+            'settings_snapshot': snapshot
         },
         'trials': trials
     })
@@ -735,11 +813,11 @@ def retry_session(request, trial_id):
         is_correct = data.get('is_correct')
 
         try:
-            original_trial = VanillaLLMMultiTurnTrial.objects.select_related('session__llm_settings').get(pk=trial_id)
+            original_trial = VanillaLLMMultiTurnTrial.objects.select_related('session', 'session__group').get(pk=trial_id)
             TrialModel = VanillaLLMMultiTurnTrial
         except VanillaLLMMultiTurnTrial.DoesNotExist:
             try:
-                original_trial = RAGMultiTurnTrial.objects.select_related('session__llm_settings').get(pk=trial_id)
+                original_trial = RAGMultiTurnTrial.objects.select_related('session', 'session__group').get(pk=trial_id)
                 TrialModel = RAGMultiTurnTrial
             except RAGMultiTurnTrial.DoesNotExist:
                 return JsonResponse({'error': 'Trial not found'}, status=404)
@@ -749,13 +827,20 @@ def retry_session(request, trial_id):
         original_trial.save()
 
         session = original_trial.session
+        
+        # Resolve snapshot from group
+        snapshot = session.group.settings_snapshot if session.group else {}
+            
+        max_retries = 3
+        if snapshot and 'llm_settings' in snapshot:
+            max_retries = snapshot['llm_settings'].get('max_retries', 3)
 
         if is_correct:
             session.is_completed = True
             session.save()
             return JsonResponse({'status': 'completed', 'session_id': session.id})
 
-        if session.trials.count() >= session.llm_settings.max_retries:
+        if session.trials.count() >= max_retries:
             session.is_completed = True
             session.save()
             return JsonResponse({'status': 'max_retries_reached', 'session_id': session.id})
@@ -777,20 +862,46 @@ import traceback
 def run_trial(request, trial_id):
     try:
         try:
-            trial = VanillaLLMMultiTurnTrial.objects.select_related('session__llm_settings').get(pk=trial_id)
+            trial = VanillaLLMMultiTurnTrial.objects.select_related('session', 'session__group').get(pk=trial_id)
         except VanillaLLMMultiTurnTrial.DoesNotExist:
             try:
-                trial = RAGMultiTurnTrial.objects.select_related('session__llm_settings').get(pk=trial_id)
+                trial = RAGMultiTurnTrial.objects.select_related('session', 'session__group').get(pk=trial_id)
             except RAGMultiTurnTrial.DoesNotExist:
                 return JsonResponse({'error': 'Trial not found'}, status=404)
 
         session = trial.session
-        db_settings = session.llm_settings
-
-        base_url = db_settings.llm_base_url or config("LLM_BASE_URL", default=None)
-        api_key = db_settings.llm_api_key or config("LLM_API_KEY", default=None)
-        model = db_settings.llm_model or config("LLM_MODEL", default='gpt-3.5-turbo')
         
+        # Resolve snapshot from group
+        snapshot = session.group.settings_snapshot if session.group else {}
+
+        base_url = None
+        api_key = None
+        model = 'gpt-3.5-turbo'
+        
+        if snapshot and 'llm_settings' in snapshot:
+            llm_s = snapshot['llm_settings']
+            base_url = llm_s.get('llm_base_url')
+            api_key = config("LLM_API_KEY", default=None) # API keys are usually not fully in snapshot or are blanked out? 
+            # WAIT: pipeline_utils snapshot stores API keys? No, I excluded it in my previous edit for vanilla pipeline but kept it ambiguous for others.
+            # In create_session (standalone), I put settings directly.
+            # The BasePipeline uses 'config' or passed args.
+            # The Views 'run_trial' used to look at DB settings which might have API key.
+            # If snapshot doesn't store API key (security), we need to load current Global settings for API key ONLY?
+            # Or use environment variables.
+            
+            # Re-reading `pipeline_utils`: I excluded API Key in `VanillaLLMAdhocPipeline`.
+            # For standalone sessions created in `create_session` view, I copied `settings.llm_base_url`, etc.
+            # If we want to support API Key from DB, we might need to fallback to global settings for credentials if missing in snapshot.
+            
+            model = llm_s.get('llm_model') or model
+        
+        # Fallback for API Key if not in snapshot (likely)
+        if not api_key:
+             db_settings = LLMSettings.load()
+             api_key = db_settings.llm_api_key or config("LLM_API_KEY", default=None)
+             if not base_url:
+                 base_url = db_settings.llm_base_url or config("LLM_BASE_URL", default=None)
+
         if isinstance(session, RAGMultiTurnSession):
             pipeline = RagMultiTurnPipeline(
                 base_url=base_url, 
@@ -983,14 +1094,20 @@ def stop_rag_adhoc_pipeline(request):
 @admin_required
 def export_session(request, session_id):
     try:
-        session = VanillaLLMMultiTurnSession.objects.select_related('llm_settings').get(pk=session_id)
+        session = VanillaLLMMultiTurnSession.objects.select_related('group').get(pk=session_id)
         pipeline_type = 'vanilla_llm_multi_turn'
     except VanillaLLMMultiTurnSession.DoesNotExist:
         try:
-            session = RAGMultiTurnSession.objects.select_related('llm_settings').get(pk=session_id)
+            session = RAGMultiTurnSession.objects.select_related('group').get(pk=session_id)
             pipeline_type = f"rag_multi_turn_{session.reformulation_strategy}"
         except RAGMultiTurnSession.DoesNotExist:
             return HttpResponse("Session not found", status=404)
+
+    snapshot = session.group.settings_snapshot if session.group else {}
+    
+    max_retries = 3
+    if snapshot and 'llm_settings' in snapshot:
+        max_retries = snapshot['llm_settings'].get('max_retries', 3)
 
     if isinstance(session, RAGMultiTurnSession):
         trials = list(session.trials.values(
@@ -1010,7 +1127,7 @@ def export_session(request, session_id):
         'is_completed': session.is_completed,
         'pipeline_type': pipeline_type,
         'created_at': session.created_at.isoformat(),
-        'max_retries': session.llm_settings.max_retries,
+        'max_retries': max_retries,
         'trials': trials
     }
 
@@ -1035,17 +1152,31 @@ def save_run(request):
         settings = LLMSettings.load()
 
         if isinstance(run_config, dict):
-            settings.llm_base_url = run_config.get('llm_base_url', settings.llm_base_url)
-            settings.llm_model = run_config.get('llm_model', settings.llm_model)
-            settings.llm_api_key = run_config.get('llm_api_key', settings.llm_api_key)
-            settings.save()
+            # Optionally update global settings if requested, but mainly use for snapshot
+            # settings.llm_base_url = run_config.get('llm_base_url', settings.llm_base_url)
+            # settings.llm_model = run_config.get('llm_model', settings.llm_model)
+            # settings.llm_api_key = run_config.get('llm_api_key', settings.llm_api_key)
+            # settings.save()
+            pass
+        
+        # Prepare snapshot from the config passed in the request
+        snapshot = {
+            'llm_settings': {
+                'llm_base_url': run_config.get('llm_base_url', ''),
+                'llm_model': run_config.get('llm_model', ''),
+                'max_retries': 3 # Default or extract if available
+            }
+        } if run_config else {}
 
+        # Create a group for this imported run
+        group = MultiTurnSessionGroup.objects.create(name=run_name, settings_snapshot=snapshot)
+        
         for result in run_data:
             if not result.get('question'):
                 continue
 
             session = VanillaLLMMultiTurnSession.objects.create(
-                llm_settings=settings,
+                group=group,
                 question=result.get('question'),
                 ground_truths=result.get('ground_truths'),
                 run_tag=run_name,
@@ -1078,6 +1209,11 @@ def load_vanilla_llm_multi_turn_run(request, group_id):
     sessions = group.vanilla_sessions.all().prefetch_related('trials')
     
     results = []
+    snapshot = group.settings_snapshot
+    max_retries = 3
+    if snapshot and 'llm_settings' in snapshot:
+        max_retries = snapshot['llm_settings'].get('max_retries', 3)
+        
     for session in sessions:
         last_trial = session.trials.last()
         if last_trial:
@@ -1088,10 +1224,36 @@ def load_vanilla_llm_multi_turn_run(request, group_id):
                 'session_id': session.id,
                 'final_answer': last_trial.answer,
                 'ground_truths': session.ground_truths,
-                'max_retries': session.llm_settings.max_retries
+                'max_retries': max_retries
             })
 
-    return JsonResponse({'results': results, 'group_name': group.name})
+    return JsonResponse({'results': results, 'group_name': group.name, 'settings_snapshot': snapshot})
+
+@admin_required
+def load_rag_multi_turn_run(request, group_id):
+    group = get_object_or_404(MultiTurnSessionGroup, pk=group_id)
+    sessions = group.rag_sessions.all().prefetch_related('trials')
+    
+    results = []
+    snapshot = group.settings_snapshot
+    max_retries = 3
+    if snapshot and 'llm_settings' in snapshot:
+        max_retries = snapshot['llm_settings'].get('max_retries', 3)
+        
+    for session in sessions:
+        last_trial = session.trials.last()
+        if last_trial:
+            results.append({
+                'question': session.question,
+                'correct': last_trial.is_correct,
+                'trials': session.trials.count(),
+                'session_id': session.id,
+                'final_answer': last_trial.answer,
+                'ground_truths': session.ground_truths,
+                'max_retries': max_retries
+            })
+
+    return JsonResponse({'results': results, 'group_name': group.name, 'settings_snapshot': snapshot})
 
 
 
@@ -1109,6 +1271,12 @@ def get_vanilla_llm_adhoc_run(request, run_id):
     try:
         run = get_object_or_404(VanillaLLMAdhocRun, pk=run_id)
         results = list(run.results.values('question', 'answer', 'ground_truths', 'is_correct_rule', 'is_correct_llm'))
+        
+        # Prefer snapshot settings, fallback to empty dict
+        settings_data = {}
+        if run.settings_snapshot and 'llm_settings' in run.settings_snapshot:
+            settings_data = run.settings_snapshot['llm_settings']
+
         run_data = {
             'id': run.id,
             'name': run.name,
@@ -1116,9 +1284,7 @@ def get_vanilla_llm_adhoc_run(request, run_id):
             'accuracy': run.accuracy,
             'total_questions': run.total_questions,
             'correct_answers': run.correct_answers,
-            'settings': {
-                'llm_model': run.llm_settings.llm_model if run.llm_settings else 'N/A'
-            },
+            'settings': settings_data,
             'results': results
         }
         return JsonResponse(run_data)

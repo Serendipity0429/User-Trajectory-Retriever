@@ -14,6 +14,13 @@ class WebSearch(ABC):
     def search(self, query: str) -> list:
         pass
 
+    @abstractmethod
+    def format_results(self, results: list) -> str:
+        """
+        Formats the search results into a string suitable for LLM consumption.
+        """
+        pass
+
 class MCPClient:
     """
     A basic Python client to communicate with an MCP server over stdio.
@@ -254,9 +261,61 @@ class MCPSearch(WebSearch):
             self._client.close()
             self._client = None
 
+    def format_results(self, results: list) -> str:
+        if not results:
+            return "No results found."
+        
+        formatted = []
+        for i, r in enumerate(results):
+            title = r.get('title', 'No Title')
+            snippet = r.get('snippet', '')
+            content = r.get('content', '')
+            
+            # Prefer content if available and longer than snippet, otherwise use snippet
+            text = content if content and len(content) > len(snippet) else snippet
+            
+            formatted.append(f"{i+1}. {title}\n{text}")
+            
+        return "\n\n".join(formatted)
+
 class SerperSearch(WebSearch):
-    def __init__(self, api_key):
+    def __init__(self, api_key, fetch_full_content=True):
         self.api_key = api_key
+        self.fetch_full_content = fetch_full_content
+
+    def _fetch_page_content(self, url: str) -> str:
+        """Helper to fetch and parse main content from a URL."""
+        import requests
+        from bs4 import BeautifulSoup
+
+        try:
+            # Use a generic user agent to avoid being blocked by some sites
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            }
+            response = requests.get(url, headers=headers, timeout=5)
+            response.raise_for_status()
+            
+            soup = BeautifulSoup(response.content, 'html.parser')
+            
+            # Remove script and style elements
+            for script in soup(["script", "style"]):
+                script.decompose()
+
+            # Get text
+            text = soup.get_text()
+
+            # Break into lines and remove leading/trailing space on each
+            lines = (line.strip() for line in text.splitlines())
+            # Break multi-headlines into a line each
+            chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
+            # Drop blank lines
+            text = '\n'.join(chunk for chunk in chunks if chunk)
+            
+            return text[:5000] # Limit content length to avoid context window issues
+        except Exception as e:
+            logger.warning(f"Failed to fetch content for {url}: {e}")
+            return ""
 
     def search(self, query: str) -> list:
         if not self.api_key:
@@ -283,12 +342,22 @@ class SerperSearch(WebSearch):
             results = []
             if 'organic' in response_data:
                 for item in response_data['organic']:
+                    snippet = item.get('snippet', '')
+                    content = snippet # Default to snippet
+                    url = item.get('link')
+                    
+                    if self.fetch_full_content and url:
+                        # Fetch full content logic here
+                        full_text = self._fetch_page_content(url)
+                        if full_text:
+                            content = full_text
+                            
                     results.append({
                         'title': item.get('title'),
-                        'url': item.get('link'),
-                        'link': item.get('link'), # Alias for frontend compatibility
-                        'snippet': item.get('snippet'),
-                        'content': item.get('snippet') # Serper doesn't provide full content in basic search, use snippet
+                        'url': url,
+                        'link': url, # Alias for frontend compatibility
+                        'snippet': snippet,
+                        'content': content
                     })
             return results
 
@@ -296,12 +365,25 @@ class SerperSearch(WebSearch):
             logger.error(f"Error calling Serper API: {e}")
             return [{"error": f"Error calling Serper API: {str(e)}"}]
 
+    def format_results(self, results: list) -> str:
+        if not results:
+            return "No results found."
+            
+        formatted = []
+        for i, r in enumerate(results):
+            title = r.get('title', 'No Title')
+            content = r.get('content', '')
+            
+            formatted.append(f"{i+1}. {title}\n{content}")
+            
+        return "\n\n".join(formatted)
+
 # For easy swapping of search implementations
 def get_search_engine() -> WebSearch:
     from .models import SearchSettings
     settings = SearchSettings.load()
     
     if settings.search_provider == 'serper':
-        return SerperSearch(api_key=settings.serper_api_key)
+        return SerperSearch(api_key=settings.serper_api_key, fetch_full_content=settings.serper_fetch_full_content)
     else:
         return MCPSearch()

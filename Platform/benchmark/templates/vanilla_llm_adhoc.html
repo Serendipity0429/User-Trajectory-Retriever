@@ -5,9 +5,14 @@
 
 {% block content %}
 <div class="container mt-5 px-lg-4">
-    <div class="pb-3 mb-4 border-bottom">
-        <h1 class="h2"><i class="bi bi-robot me-2"></i>Ad-hoc LLM Benchmark</h1>
-        <p class="text-muted mb-0">Run the model against the full QA pipeline and evaluate its performance with rule-based and LLM-based validation.</p>
+    <div class="pb-3 mb-4 border-bottom d-flex justify-content-between align-items-center">
+        <div>
+            <h1 class="h2"><i class="bi bi-robot me-2"></i>Ad-hoc LLM Benchmark</h1>
+            <p class="text-muted mb-0">Run the model against the full QA pipeline and evaluate its performance with rule-based and LLM-based validation.</p>
+        </div>
+        <a href="{% url 'benchmark:home' %}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-return-left"></i> Dashboard
+        </a>
     </div>
 
     <!-- LLM Configuration Card -->
@@ -120,6 +125,19 @@
                 <i class="bi bi-arrow-repeat spin"></i>
             </span>
         </h4>
+
+        <!-- Run Configuration Card -->
+        <div id="run-config-card" class="card mb-4 bg-light border-0" style="display: none;">
+            <div class="card-body py-3">
+                    <h6 class="card-title d-flex align-items-center mb-3">
+                    <i class="bi bi-gear-wide-connected me-2 text-primary"></i>
+                    <span class="fw-bold text-primary">Run Configuration</span>
+                </h6>
+                <div class="row g-3 small" id="run-config-details">
+                    <!-- Config details injected via JS -->
+                </div>
+            </div>
+        </div>
 
         <!-- Summary Stats -->
         <div class="row my-4" id="summary-container">
@@ -263,6 +281,15 @@
 }
 </style>
 
+<script>
+    window.benchmarkUrls = {
+        ...window.benchmarkCommonUrls,
+        listRuns: "{% url 'benchmark:list_vanilla_llm_adhoc_runs' %}",
+        vanillaLlmAdhoc: "{% url 'benchmark:vanilla_llm_adhoc' %}",
+        stopPipeline: "{% url 'benchmark:stop_vanilla_llm_adhoc_pipeline' %}",
+        runPipeline: "{% url 'benchmark:run_vanilla_llm_adhoc_pipeline' %}"
+    };
+</script>
 <script src="{% static 'js/vanilla_llm_adhoc.js' %}"></script>
 
 {% endblock %}

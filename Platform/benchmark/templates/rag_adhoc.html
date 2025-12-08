@@ -5,9 +5,14 @@
 
 {% block content %}
 <div class="container mt-5 px-lg-4">
-    <div class="pb-3 mb-4 border-bottom">
-        <h1 class="h2"><i class="bi bi-search me-2"></i>Ad-hoc Web RAG Benchmark</h1>
-        <p class="text-muted mb-0">Run a RAG pipeline using web search against the full QA dataset and evaluate its performance.</p>
+    <div class="pb-3 mb-4 border-bottom d-flex justify-content-between align-items-center">
+        <div>
+            <h1 class="h2"><i class="bi bi-search me-2"></i>Ad-hoc Web RAG Benchmark</h1>
+            <p class="text-muted mb-0">Run a RAG pipeline using web search against the full QA dataset and evaluate its performance.</p>
+        </div>
+        <a href="{% url 'benchmark:home' %}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-return-left"></i> Dashboard
+        </a>
     </div>
 
     <div class="row justify-content-center">
@@ -147,6 +152,19 @@
                 <i class="bi bi-arrow-repeat spin"></i>
             </span>
         </h4>
+
+        <!-- Run Configuration Card -->
+        <div id="run-config-card" class="card mb-4 bg-light border-0" style="display: none;">
+            <div class="card-body py-3">
+                    <h6 class="card-title d-flex align-items-center mb-3">
+                    <i class="bi bi-gear-wide-connected me-2 text-primary"></i>
+                    <span class="fw-bold text-primary">Run Configuration</span>
+                </h6>
+                <div class="row g-3 small" id="run-config-details">
+                    <!-- Config details injected via JS -->
+                </div>
+            </div>
+        </div>
 
         <!-- Summary Stats -->
         <div class="row my-4" id="summary-container">
@@ -337,6 +355,18 @@
 }
 </style>
 
+<script>
+    window.benchmarkUrls = {
+        ...window.benchmarkCommonUrls,
+        getDefaultRagPrompt: "{% url 'benchmark:get_default_rag_prompt' %}",
+        saveRagSettings: "{% url 'benchmark:save_rag_settings' %}",
+        listRuns: "{% url 'benchmark:list_rag_adhoc_runs' %}",
+        ragAdhoc: "{% url 'benchmark:rag_adhoc' %}",
+        stopPipeline: "{% url 'benchmark:stop_rag_adhoc_pipeline' %}",
+        runPipeline: "{% url 'benchmark:run_rag_adhoc_pipeline' %}",
+        webSearch: "{% url 'benchmark:web_search' %}"
+    };
+</script>
 <script src="{% static 'js/rag_adhoc.js' %}"></script>
 
 {% endblock %}

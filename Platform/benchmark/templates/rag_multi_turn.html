@@ -117,6 +117,8 @@
         <!-- Left Sidebar: Sessions & Questions -->
         <div class="col-lg-4">
             {% include 'includes/llm_config.html' with show_retries=True card_expanded=False %}
+            {% include 'includes/rag_config.html' %}
+            {% include 'includes/search_config.html' %}
 
             <!-- QA Pipeline -->
             <div class="card shadow-sm mb-4">
@@ -210,7 +212,7 @@
                                 </div>
                             </summary>
                             <div class="list-group list-group-flush mt-2">
-                                {% for session in group.sessions.all %}
+                                {% for session in group.rag_sessions.all %}
                                 <div class="list-group-item session-item-container ps-4 session-details" data-session-id="{{ session.id }}" style="cursor: pointer;">
                                     <div class="d-flex w-100 justify-content-between">
                                         <h6 class="mb-1">Session #{{ session.id }}</h6>
@@ -315,6 +317,8 @@
     window.benchmarkUrls = {
         ...window.benchmarkCommonUrls,
         createSession: "{% url 'benchmark:create_session' %}",
+        getDefaultRagPrompt: "{% url 'benchmark:get_default_rag_prompt' %}",
+        saveRagSettings: "{% url 'benchmark:save_rag_settings' %}",
     };
 </script>
 <script src="{% static 'js/rag_multi_turn.js' %}"></script>

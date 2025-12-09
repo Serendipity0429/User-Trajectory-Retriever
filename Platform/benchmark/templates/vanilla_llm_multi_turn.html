@@ -198,7 +198,7 @@
                                 </div>
                             </summary>
                             <div class="list-group list-group-flush mt-2">
-                                {% for session in group.sessions.all %}
+                                {% for session in group.vanilla_sessions.all %}
                                 <div class="list-group-item session-item-container ps-4 session-details" data-session-id="{{ session.id }}" style="cursor: pointer;">
                                     <div class="d-flex w-100 justify-content-between">
                                         <h6 class="mb-1">Session #{{ session.id }}</h6>

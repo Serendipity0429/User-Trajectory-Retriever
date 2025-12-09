@@ -210,7 +210,7 @@ Answer:"""
         for attempt in range(max_retries + 1):
             try:
                 completion = await client.chat.completions.create(
-                    model=model, messages=[{"role": "user", "content": prompt}]
+                    model=model, messages=[{"role": "user", "content": prompt}], temperature=0
                 )
                 if (
                     completion.choices
@@ -277,7 +277,7 @@ Is the user's answer correct?"""
         for attempt in range(max_retries + 1):
             try:
                 completion = await client.chat.completions.create(
-                    model=model, messages=[{"role": "user", "content": prompt}]
+                    model=model, messages=[{"role": "user", "content": prompt}], temperature=0
                 )
                 if (
                     completion.choices

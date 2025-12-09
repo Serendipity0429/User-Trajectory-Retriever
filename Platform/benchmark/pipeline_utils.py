@@ -1,6 +1,7 @@
 import json
 import os
 import openai
+import logging
 from datetime import datetime
 from task_manager.utils import check_answer_rule, check_answer_llm, redis_client
 from .search_utils import get_search_engine
@@ -11,8 +12,43 @@ from .models import (
     MultiTurnSessionGroup, VanillaLLMMultiTurnSession, VanillaLLMMultiTurnTrial,
     RAGMultiTurnSession, RAGMultiTurnTrial
 )
+from .utils import print_debug
+
 
 HARD_QUESTIONS_PATH = os.path.join(os.path.dirname(__file__), '..', 'data', 'hard_questions_refined.jsonl')
+
+PROMPTS = {
+    "adhoc_answer": """Your task is to answer the following question. Follow these rules strictly:
+1.  Your answer must be an exact match to the correct answer.
+2.  Do not include any punctuation.
+3.  Do not include any extra words or sentences.
+
+For example:
+Question: What is the capital of France?
+Correct Answer: Paris
+
+Incorrect Answers:
+- "The capital of France is Paris." (contains extra words)
+- "Paris is the capital of France." (contains extra words)
+- "Paris." (contains a period)
+
+Now, answer the following question:
+Question: {question}
+Answer:""",
+    "multi_turn_initial": """Your task is to answer the following question. Follow these rules strictly:
+1.  Your answer must be an exact match to the correct answer.
+2.  Do not include any punctuation.
+3.  Do not include any extra words or sentences.
+Question: {question}
+Answer:""",
+    "multi_turn_followup": """Your task is to answer the question again. Follow these rules strictly:
+1.  Your answer must be an exact match to the correct answer.
+2.  Do not include any punctuation.
+3.  Do not include any extra words or sentences.
+Answer:""",
+    "rag_system_context": "Context from web search (Query: {query}):\n{results}\n\n",
+    "rag_reformulation": "Based on the history, provide a better search query to find the correct answer. Output ONLY the query."
+}
 
 class BasePipeline:
     def __init__(self, base_url, api_key, model, pipeline_id=None, dataset_id=None):
@@ -54,41 +90,25 @@ class BasePipeline:
                         yield data
                     except json.JSONDecodeError:
                         continue
-
+    
     def run(self):
-        """
-        Generator that yields JSON string responses (one per line)
-        """
         yield json.dumps({'is_meta': True, 'type': 'info', 'message': 'Pipeline started'}) + "\n"
-        # Subclasses should override this and yield results
         pass
 
-class VanillaLLMAdhocPipeline(BasePipeline):
-    def __init__(self, base_url, api_key, model, pipeline_id=None, dataset_id=None):
-        super().__init__(base_url, api_key, model, pipeline_id, dataset_id)
-        self.redis_prefix = "vanilla_llm_adhoc_pipeline_active"
+
+class BaseAdhocPipeline(BasePipeline):
+    """
+    Base class for Ad-hoc pipelines (Vanilla and RAG) to reduce duplication.
+    """
+    def create_run_object(self):
+        raise NotImplementedError
+
+    def process_question(self, run_object, question, ground_truths):
+        raise NotImplementedError
 
     def run(self):
-        settings = LLMSettings.load()
-        run_name = f"Vanilla LLM Ad-hoc Run {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-        
-        snapshot = {
-            'llm_settings': {
-                'llm_base_url': settings.llm_base_url,
-                'llm_model': settings.llm_model,
-                'max_retries': settings.max_retries
-                # Exclude API key for security/logging best practices, unless explicitly needed for reproduction
-            }
-        }
-        
-        run = VanillaLLMAdhocRun.objects.create(
-            name=run_name,
-            settings_snapshot=snapshot,
-            total_questions=0,
-            correct_answers=0
-        )
-        
-        yield json.dumps({'is_meta': True, 'type': 'run_created', 'run_id': run.id, 'name': run_name}) + "\n"
+        run_object = self.create_run_object()
+        yield json.dumps({'is_meta': True, 'type': 'run_created', 'run_id': run_object.id, 'name': run_object.name}) + "\n"
         
         total_count = 0
         correct_count = 0
@@ -101,78 +121,90 @@ class VanillaLLMAdhocPipeline(BasePipeline):
             ground_truths = data.get('ground_truths', [])
 
             try:
-                answer_prompt = f"""Your task is to answer the following question. Follow these rules strictly:
-1.  Your answer must be an exact match to the correct answer.
-2.  Do not include any punctuation.
-3.  Do not include any extra words or sentences.
-
-For example:
-Question: What is the capital of France?
-Correct Answer: Paris
-
-Incorrect Answers:
-- \"The capital of France is Paris.\" (contains extra words)
-- \"Paris is the capital of France.\" (contains extra words)
-- \"Paris.\" (contains a period)
-
-Now, answer the following question:
-Question: {question}
-Answer:"""
+                result_data, is_correct = self.process_question(run_object, question, ground_truths)
                 
-                response = self.client.chat.completions.create(
-                    model=self.model,
-                    messages=[{"role": "user", "content": answer_prompt}]
-                )
-                answer = response.choices[0].message.content
-                
-                rule_result = check_answer_rule(question, ground_truths, answer)
-                llm_result = check_answer_llm(question, ground_truths, answer, client=self.client, model=self.model)
-
-                VanillaLLMAdhocResult.objects.create(
-                    run=run,
-                    question=question,
-                    ground_truths=ground_truths,
-                    answer=answer,
-                    is_correct_rule=rule_result,
-                    is_correct_llm=llm_result
-                )
-
-                if llm_result:
+                if is_correct:
                     correct_count += 1
                 total_count += 1
 
-                yield json.dumps({
-                    'question': question,
-                    'answer': answer,
-                    'ground_truths': ground_truths,
-                    'rule_result': rule_result,
-                    'llm_result': llm_result
-                }) + "\n"
+                yield json.dumps(result_data) + "\n"
 
             except Exception as e:
                 yield json.dumps({'error': str(e), 'question': question}) + "\n"
 
-        run.total_questions = total_count
-        run.correct_answers = correct_count
-        run.accuracy = (correct_count / total_count * 100) if total_count > 0 else 0
-        run.save()
+        run_object.total_questions = total_count
+        run_object.correct_answers = correct_count
+        run_object.accuracy = (correct_count / total_count * 100) if total_count > 0 else 0
+        run_object.save()
         self.stop_token()
 
 
-class RagAdhocPipeline(BasePipeline):
+class VanillaLLMAdhocPipeline(BaseAdhocPipeline):
+    def __init__(self, base_url, api_key, model, pipeline_id=None, dataset_id=None):
+        super().__init__(base_url, api_key, model, pipeline_id, dataset_id)
+        self.redis_prefix = "vanilla_llm_adhoc_pipeline_active"
+
+    def create_run_object(self):
+        settings = LLMSettings.load()
+        run_name = f"Vanilla LLM Ad-hoc Run {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+        snapshot = {
+            'llm_settings': {
+                'llm_base_url': settings.llm_base_url,
+                'llm_model': settings.llm_model,
+                'max_retries': settings.max_retries
+            }
+        }
+        return VanillaLLMAdhocRun.objects.create(
+            name=run_name,
+            settings_snapshot=snapshot,
+            total_questions=0,
+            correct_answers=0
+        )
+
+    def process_question(self, run, question, ground_truths):
+        prompt = PROMPTS["adhoc_answer"].format(question=question)
+        
+        response = self.client.chat.completions.create(
+            model=self.model,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0,
+        )
+        answer = response.choices[0].message.content
+        
+        rule_result = check_answer_rule(question, ground_truths, answer)
+        llm_result = check_answer_llm(question, ground_truths, answer, client=self.client, model=self.model)
+
+        VanillaLLMAdhocResult.objects.create(
+            run=run,
+            question=question,
+            ground_truths=ground_truths,
+            answer=answer,
+            is_correct_rule=rule_result,
+            is_correct_llm=llm_result
+        )
+
+        return {
+            'question': question,
+            'answer': answer,
+            'ground_truths': ground_truths,
+            'rule_result': rule_result,
+            'llm_result': llm_result
+        }, llm_result
+
+
+class RagAdhocPipeline(BaseAdhocPipeline):
     def __init__(self, base_url, api_key, model, rag_prompt_template, pipeline_id=None, dataset_id=None):
         super().__init__(base_url, api_key, model, pipeline_id, dataset_id)
         self.prompt_template = rag_prompt_template
         self.search_engine = get_search_engine()
         self.redis_prefix = "rag_adhoc_pipeline_active"
 
-    def run(self):
+    def create_run_object(self):
         llm_settings = LLMSettings.load()
         rag_settings = RagSettings.load()
         search_settings = SearchSettings.load()
         
         run_name = f"RAG Ad-hoc Run {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-        
         snapshot = {
             'llm_settings': {
                 'llm_base_url': llm_settings.llm_base_url,
@@ -187,74 +219,49 @@ class RagAdhocPipeline(BasePipeline):
                 'serper_fetch_full_content': search_settings.serper_fetch_full_content
             }
         }
-        
-        run = RagAdhocRun.objects.create(
+        return RagAdhocRun.objects.create(
             name=run_name,
             settings_snapshot=snapshot,
             total_questions=0,
             correct_answers=0
         )
+
+    def process_question(self, run, question, ground_truths):
+        search_results = self.search_engine.search(question)
+        formatted_results = self.search_engine.format_results(search_results)
         
-        yield json.dumps({'is_meta': True, 'type': 'run_created', 'run_id': run.id, 'name': run_name}) + "\n"
+        prompt = self.prompt_template.replace('{question}', question).replace('{search_results}', formatted_results)
         
-        total_count = 0
-        correct_count = 0
+        response = self.client.chat.completions.create(
+            model=self.model,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0,
+        )
+        answer = response.choices[0].message.content
+        
+        rule_result = check_answer_rule(question, ground_truths, answer)
+        llm_result = check_answer_llm(question, ground_truths, answer, client=self.client, model=self.model)
 
-        for data in self.load_questions():
-            if not self.check_active():
-                break
+        RagAdhocResult.objects.create(
+            run=run,
+            question=question,
+            ground_truths=ground_truths,
+            answer=answer,
+            is_correct_rule=rule_result,
+            is_correct_llm=llm_result,
+            num_docs_used=len(search_results),
+            search_results=search_results
+        )
 
-            question = data['question']
-            ground_truths = data.get('ground_truths', [])
-
-            try:
-                search_results = self.search_engine.search(question)
-                formatted_results = self.search_engine.format_results(search_results)
-                
-                prompt = self.prompt_template.replace('{question}', question).replace('{search_results}', formatted_results)
-                
-                response = self.client.chat.completions.create(
-                    model=self.model,
-                    messages=[{"role": "user", "content": prompt}]
-                )
-                answer = response.choices[0].message.content
-                
-                rule_result = check_answer_rule(question, ground_truths, answer)
-                llm_result = check_answer_llm(question, ground_truths, answer, client=self.client, model=self.model)
-
-                RagAdhocResult.objects.create(
-                    run=run,
-                    question=question,
-                    ground_truths=ground_truths,
-                    answer=answer,
-                    is_correct_rule=rule_result,
-                    is_correct_llm=llm_result,
-                    num_docs_used=len(search_results),
-                    search_results=search_results
-                )
-
-                if llm_result:
-                    correct_count += 1
-                total_count += 1
-
-                yield json.dumps({
-                    'question': question,
-                    'answer': answer,
-                    'ground_truths': ground_truths,
-                    'rule_result': rule_result,
-                    'llm_result': llm_result,
-                    'num_docs_used': len(search_results),
-                    'search_results': search_results
-                }) + "\n"
-
-            except Exception as e:
-                yield json.dumps({'error': str(e), 'question': question}) + "\n"
-
-        run.total_questions = total_count
-        run.correct_answers = correct_count
-        run.accuracy = (correct_count / total_count * 100) if total_count > 0 else 0
-        run.save()
-        self.stop_token()
+        return {
+            'question': question,
+            'answer': answer,
+            'ground_truths': ground_truths,
+            'rule_result': rule_result,
+            'llm_result': llm_result,
+            'num_docs_used': len(search_results),
+            'search_results': search_results
+        }, llm_result
 
 
 class BaseMultiTurnPipeline(BasePipeline):
@@ -268,10 +275,14 @@ class BaseMultiTurnPipeline(BasePipeline):
 
     def create_trial(self, session, trial_number):
         raise NotImplementedError("Subclasses must implement create_trial")
+    
+    def _construct_messages(self, session, trial):
+        raise NotImplementedError("Subclasses must implement _construct_messages")
 
     def run(self):
-        group_name = f"Pipeline Run ({self.__class__.__name__}) - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+        group_name = f"Pipeline Run ({self.__class__.__name__}) - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}" 
         
+        # Load settings for snapshot
         llm_settings = LLMSettings.load()
         rag_settings = RagSettings.load()
         search_settings = SearchSettings.load()
@@ -292,7 +303,7 @@ class BaseMultiTurnPipeline(BasePipeline):
         }
 
         group = MultiTurnSessionGroup.objects.create(name=group_name, settings_snapshot=snapshot)
-        settings = llm_settings
+        settings = llm_settings # Pass LLM settings to create_session if needed
 
         for data in self.load_questions():
             if not self.check_active():
@@ -319,7 +330,8 @@ class BaseMultiTurnPipeline(BasePipeline):
                     try:
                         response = self.client.chat.completions.create(
                             model=self.model,
-                            messages=messages
+                            messages=messages,
+                            temperature=0,
                         )
                         answer = response.choices[0].message.content
                     except Exception as e:
@@ -391,9 +403,6 @@ class BaseMultiTurnPipeline(BasePipeline):
         
         return answer, is_correct, getattr(trial, 'search_results', [])
 
-    def _construct_messages(self, session, trial):
-        raise NotImplementedError("Subclasses must implement _construct_messages")
-
 
 class VanillaLLMMultiTurnPipeline(BaseMultiTurnPipeline):
     def __init__(self, base_url, api_key, model, max_retries, pipeline_id=None, dataset_id=None):
@@ -420,12 +429,7 @@ class VanillaLLMMultiTurnPipeline(BaseMultiTurnPipeline):
         messages = []
         
         if trial_number == 1:
-            answer_prompt = f"""Your task is to answer the following question. Follow these rules strictly:
-1.  Your answer must be an exact match to the correct answer.
-2.  Do not include any punctuation.
-3.  Do not include any extra words or sentences.
-Question: {session.question}
-Answer:"""
+            answer_prompt = PROMPTS["multi_turn_initial"].format(question=session.question)
             messages.append({"role": "user", "content": answer_prompt})
         else:
             messages.append({"role": "user", "content": f"Question: {session.question}"})
@@ -436,12 +440,7 @@ Answer:"""
                 if prev_trial.is_correct == False:
                     messages.append({"role": "user", "content": "Your previous answer was incorrect."})
             
-            strict_rules = """Your task is to answer the question again. Follow these rules strictly:
-1.  Your answer must be an exact match to the correct answer.
-2.  Do not include any punctuation.
-3.  Do not include any extra words or sentences.
-Answer:"""
-            messages.append({"role": "user", "content": strict_rules})
+            messages.append({"role": "user", "content": PROMPTS["multi_turn_followup"]})
             
         return messages
 
@@ -484,16 +483,17 @@ class RagMultiTurnPipeline(BaseMultiTurnPipeline):
                     reform_messages.append({"role": "assistant", "content": f"Previous Answer: {prev_trial.answer}"})
                 reform_messages.append({"role": "user", "content": "The previous answer was incorrect."})
             
-            reform_messages.append({"role": "user", "content": "Based on the history, provide a better search query to find the correct answer. Output ONLY the query."})
+            reform_messages.append({"role": "user", "content": PROMPTS["rag_reformulation"]})
             
             try:
                 reform_response = self.client.chat.completions.create(
                     model=self.model,
-                    messages=reform_messages
+                    messages=reform_messages,
+                    temperature=0,
                 )
                 current_search_query = reform_response.choices[0].message.content.strip()
             except Exception as e:
-                print(f"Reformulation failed: {e}")
+                print_debug(f"Reformulation failed: {e}")
                 pass
 
         search_results = self.search_engine.search(current_search_query)
@@ -504,7 +504,7 @@ class RagMultiTurnPipeline(BaseMultiTurnPipeline):
         trial.search_results = search_results
         trial.save()
 
-        system_prompt = f"Context from web search (Query: {current_search_query}):\n{formatted_results}\n\n"
+        system_prompt = PROMPTS["rag_system_context"].format(query=current_search_query, results=formatted_results)
         messages.append({"role": "system", "content": system_prompt})
         messages.append({"role": "user", "content": f"Question: {session.question}"})
         

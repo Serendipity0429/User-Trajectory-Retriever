@@ -83,32 +83,34 @@
     <div class="row justify-content-center mt-4">
         <div class="col-md-12">
             <div class="card shadow-sm mb-4">
-                <div class="card-header">
+                <div class="card-header"  data-bs-toggle="collapse" data-bs-target="#collapseSingleQuestionRun" aria-expanded="false" aria-controls="collapseSingleQuestionRun" style="cursor: pointer;">
                     <h5 class="mb-0"><i class="bi bi-chat-left-text me-2"></i>Single Question Run</h5>
                 </div>
-                <div class="card-body">
-                    <p>Select a question from the dataset to run it through the LLM pipeline and see the result immediately.</p>
-                    {{ questions|json_script:"questions-data" }}
-                    <div class="mb-3">
-                        <label for="question-selector" class="form-label">Select Question from Dataset</label>
-                        <select class="form-select" id="question-selector">
-                            <option value="" selected disabled>Choose a question...</option>
-                            {% for q in questions %}
-                                <option value="{{ forloop.counter0 }}">{{ q.question|truncatechars:100 }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="d-grid gap-2">
-                        <button type="button" id="run-single-question-btn" class="btn btn-primary" disabled><i class="bi bi-play me-2"></i>Run Selected Question</button>
-                    </div>
-                    <div id="single-run-results" class="mt-4" style="display: none;">
-                        <h6>Result:</h6>
-                        <div class="card">
-                            <div class="card-body">
-                                <p class="mb-1"><strong>Model Answer:</strong> <span id="single-result-answer"></span></p>
-                                <p class="mb-1"><strong>Rule-based Correct:</strong> <span id="single-result-rule-correct"></span></p>
-                                <p class="mb-1"><strong>LLM Judge Correct:</strong> <span id="single-result-llm-correct"></span></p>
-                                <p class="mb-0"><strong>Details:</strong> <span id="single-result-details"></span></p>
+                <div id="collapseSingleQuestionRun" class="collapse">
+                    <div class="card-body">
+                        <p>Select a question from the dataset to run it through the LLM pipeline and see the result immediately.</p>
+                        {{ questions|json_script:"questions-data" }}
+                        <div class="mb-3">
+                            <label for="question-selector" class="form-label">Select Question from Dataset</label>
+                            <select class="form-select" id="question-selector">
+                                <option value="" selected disabled>Choose a question...</option>
+                                {% for q in questions %}
+                                    <option value="{{ forloop.counter0 }}">{{ q.question|truncatechars:100 }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="d-grid gap-2">
+                            <button type="button" id="run-single-question-btn" class="btn btn-primary" disabled><i class="bi bi-play me-2"></i>Run Selected Question</button>
+                        </div>
+                        <div id="single-run-results" class="mt-4" style="display: none;">
+                            <h6>Result:</h6>
+                            <div class="card">
+                                <div class="card-body">
+                                    <p class="mb-1"><strong>Model Answer:</strong> <span id="single-result-answer"></span></p>
+                                    <p class="mb-1"><strong>Rule-based Correct:</strong> <span id="single-result-rule-correct"></span></p>
+                                    <p class="mb-1"><strong>LLM Judge Correct:</strong> <span id="single-result-llm-correct"></span></p>
+                                    <p class="mb-0"><strong>Details:</strong> <span id="single-result-details"></span></p>
+                                </div>
                             </div>
                         </div>
                     </div>

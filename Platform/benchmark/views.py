@@ -1,6 +1,5 @@
 from django.db import models
 from django.views.decorators.http import require_POST, require_http_methods
-from django.views.decorators.csrf import csrf_exempt
 import re
 from django.shortcuts import render, get_object_or_404
 from django.http import JsonResponse, StreamingHttpResponse, HttpResponse
@@ -44,25 +43,27 @@ from .pipeline_utils import (
     RagMultiTurnPipeline
 )
 
+def get_llm_settings_with_fallback():
+    settings = LLMSettings.load()
+    if not settings.llm_api_key:
+        settings.llm_api_key = config('LLM_API_KEY', default='')
+    if not settings.llm_model:
+        settings.llm_model = config('LLM_MODEL', default='')
+    if not settings.llm_base_url:
+        settings.llm_base_url = config('LLM_BASE_URL', default='')
+    return settings
+
+def get_search_settings_with_fallback():
+    settings = SearchSettings.load()
+    if not settings.serper_api_key:
+        settings.serper_api_key = config('SERPER_API_KEY', default='')
+    return settings
+
 @admin_required
 def home(request):
-    settings = LLMSettings.load()
-
-    # If the settings are empty, try to populate from .env file
-    if not settings.llm_api_key and not settings.llm_model:
-        try:
-            llm_api_key_env = config('LLM_API_KEY', default=None)
-            llm_model_env = config('LLM_MODEL', default=None)
-            if llm_api_key_env or llm_model_env:
-                settings.llm_base_url = config('LLM_BASE_URL', default='')
-                settings.llm_api_key = llm_api_key_env or ''
-                settings.llm_model = llm_model_env or ''
-                settings.save()
-        except OperationalError:
-            pass
-
+    settings = get_llm_settings_with_fallback()
     rag_settings = RagSettings.load()
-    search_settings = SearchSettings.load()
+    search_settings = get_search_settings_with_fallback()
     datasets = BenchmarkDataset.objects.all().order_by('-created_at')
     
     context = {
@@ -185,7 +186,7 @@ def vanilla_llm_adhoc(request):
             if not run_name or not results:
                 return JsonResponse({'error': 'Run name and results are required.'}, status=400)
 
-            settings = LLMSettings.load()
+            settings = get_llm_settings_with_fallback()
             
             total_questions = len(results)
             correct_answers_llm = sum(1 for r in results if r.get('llm_result'))
@@ -260,20 +261,7 @@ def vanilla_llm_adhoc(request):
         except (ValueError, TypeError):
             pass # Ignore invalid run_id
 
-    settings_obj = LLMSettings.load()
-
-    # If the settings are empty, try to populate from .env file
-    if not settings_obj.llm_api_key and not settings_obj.llm_model:
-        try:
-            llm_api_key_env = config('LLM_API_KEY', default=None)
-            llm_model_env = config('LLM_MODEL', default=None)
-            if llm_api_key_env or llm_model_env:
-                settings_obj.llm_base_url = config('LLM_BASE_URL', default='')
-                settings_obj.llm_api_key = llm_api_key_env or ''
-                settings_obj.llm_model = llm_model_env or ''
-                settings_obj.save()
-        except OperationalError:
-            pass
+    settings_obj = get_llm_settings_with_fallback()
     
     # Load questions from the file
     questions = []
@@ -338,7 +326,7 @@ def load_run(request, run_tag):
 @admin_required
 def get_llm_env_vars(request):
     try:
-        settings = LLMSettings.load()
+        settings = get_llm_settings_with_fallback()
         config_data = {
             'llm_base_url': config('LLM_BASE_URL', default=settings.llm_base_url),
             'llm_api_key': config('LLM_API_KEY', default=settings.llm_api_key),
@@ -354,7 +342,6 @@ def get_llm_env_vars(request):
         return JsonResponse({'error': str(e)}, status=500)
 
 @require_POST
-@csrf_exempt
 def batch_delete_sessions(request):
     try:
         data = json.loads(request.body)
@@ -462,7 +449,7 @@ def vanilla_llm_multi_turn(request):
         'questions': questions,
         'groups': groups,
         'individual_sessions': individual_sessions,
-        'llm_settings': LLMSettings.load(),
+        'llm_settings': get_llm_settings_with_fallback(),
         'datasets': datasets
     }
     return render(request, 'vanilla_llm_multi_turn.html', context)
@@ -497,7 +484,9 @@ def rag_multi_turn(request):
         'questions': questions,
         'groups': groups,
         'individual_sessions': individual_sessions,
-        'llm_settings': LLMSettings.load(),
+        'llm_settings': get_llm_settings_with_fallback(),
+        'rag_settings': RagSettings.load(),
+        'search_settings': get_search_settings_with_fallback(),
         'datasets': datasets
     }
     return render(request, 'rag_multi_turn.html', context)
@@ -596,8 +585,9 @@ def rag_adhoc(request):
     context = {
         'questions': questions,
         'total_questions': len(questions),
-        'llm_settings': LLMSettings.load(),
+        'llm_settings': get_llm_settings_with_fallback(),
         'rag_settings': RagSettings.load(),
+        'search_settings': get_search_settings_with_fallback(),
         'datasets': datasets
     }
     return render(request, 'rag_adhoc.html', context)
@@ -674,7 +664,6 @@ def delete_rag_adhoc_run(request, run_id):
     except Exception as e:
         return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
 
-@csrf_exempt
 @require_POST
 def create_session_group(request):
     try:
@@ -685,7 +674,6 @@ def create_session_group(request):
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
 
-@csrf_exempt
 @require_POST
 def create_session(request):
     try:
@@ -898,9 +886,9 @@ def run_trial(request, trial_id):
         # Fallback for API Key if not in snapshot (likely)
         if not api_key:
              db_settings = LLMSettings.load()
-             api_key = db_settings.llm_api_key or config("LLM_API_KEY", default=None)
+             api_key = config("LLM_API_KEY", default=db_settings.llm_api_key)
              if not base_url:
-                 base_url = db_settings.llm_base_url or config("LLM_BASE_URL", default=None)
+                 base_url = config("LLM_BASE_URL", default=db_settings.llm_base_url)
 
         if isinstance(session, RAGMultiTurnSession):
             pipeline = RagMultiTurnPipeline(
@@ -963,7 +951,7 @@ def delete_session_group(request, group_id):
 def run_vanilla_llm_multi_turn_pipeline(request):
     try:
         base_url = request.GET.get('llm_base_url') or config("LLM_BASE_URL", default=None)
-        api_key = request.GET.get('llm_api_key') or config("LLM_API_KEY", default=None)
+        api_key = config("LLM_API_KEY", default=None) or request.GET.get('llm_api_key')
         model = request.GET.get('llm_model') or config("LLM_MODEL", default='gpt-3.5-turbo')
         max_retries = int(request.GET.get('max_retries', 3))
         pipeline_id = request.GET.get('pipeline_id')
@@ -1149,7 +1137,7 @@ def save_run(request):
         if not isinstance(run_data, list):
             return JsonResponse({"status": "error", "message": "Invalid data format: 'data' is not a list."}, status=400)
         
-        settings = LLMSettings.load()
+        settings = get_llm_settings_with_fallback()
 
         if isinstance(run_config, dict):
             # Optionally update global settings if requested, but mainly use for snapshot
@@ -1292,7 +1280,6 @@ def get_vanilla_llm_adhoc_run(request, run_id):
         return JsonResponse({'error': str(e)}, status=500)
 
 
-@csrf_exempt
 @require_POST
 def web_search(request):
     try:

@@ -67,7 +67,6 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
-# Refined
 def print_debug(*args, **kwargs):
     if settings.DEBUG:
         message = " ".join(map(str, args)) + " ".join(
@@ -380,7 +379,7 @@ def check_answer_llm(question, authentic_answers, user_answer, client = None, mo
 Is the user's answer correct?"""
 
     completion = client.chat.completions.create(
-        model=model, messages=[{"role": "user", "content": prompt}]
+        model=model, messages=[{"role": "user", "content": prompt}], temperature=0
     )
 
     judgment = completion.choices[0].message.content.strip().lower()

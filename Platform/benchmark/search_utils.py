@@ -3,11 +3,8 @@ from abc import ABC, abstractmethod
 import subprocess
 import json
 import os
-import sys
 import threading
-import logging
-
-logger = logging.getLogger(__name__)
+from .utils import print_debug
 
 class WebSearch(ABC):
     @abstractmethod
@@ -33,7 +30,7 @@ class MCPClient:
         self._cwd = cwd
         self._process = None
         self._next_id = 1
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
         self._stderr_thread = None
 
     def start(self):
@@ -46,7 +43,7 @@ class MCPClient:
             bufsize=0,
             cwd=self._cwd,
         )
-        logger.info(f"Started MCP server with PID: {self._process.pid}")
+        print_debug(f"Started MCP server with PID: {self._process.pid}")
 
         self._stderr_thread = threading.Thread(target=self._read_stderr, daemon=True)
         self._stderr_thread.start()
@@ -102,13 +99,13 @@ class MCPClient:
             try:
                 return json.loads(line_str)
             except json.JSONDecodeError:
-                # logger.info(f"Ignored non-JSON output from server: {line_str}")
                 continue
 
     def list_tools(self):
         """Sends a tools/list request and returns the result."""
-        self._send_request("tools/list")
-        response = self._read_response()
+        with self._lock:
+            self._send_request("tools/list")
+            response = self._read_response()
         return response.get("result", {})
 
     def call_tool(self, name, arguments):
@@ -117,8 +114,9 @@ class MCPClient:
             "name": name,
             "arguments": arguments,
         }
-        self._send_request("tools/call", params)
-        response = self._read_response()
+        with self._lock:
+            self._send_request("tools/call", params)
+            response = self._read_response()
         return response.get("result", {})
 
     def close(self):
@@ -130,12 +128,12 @@ class MCPClient:
                 except (IOError, BrokenPipeError):
                     pass
             if self._process.poll() is None:
-                logger.info(f"Terminating MCP server with PID: {self._process.pid}")
+                print_debug(f"Terminating MCP server with PID: {self._process.pid}")
                 self._process.terminate()
                 try:
                     self._process.wait(timeout=5)
                 except subprocess.TimeoutExpired:
-                    logger.warning(f"Server {self._process.pid} did not terminate, killing.")
+                    print_debug(f"Server {self._process.pid} did not terminate, killing.")
                     self._process.kill()
             self._process = None
 
@@ -158,7 +156,7 @@ class MCPSearch(WebSearch):
         script_path = os.path.join(server_dir, 'dist/index.js')
 
         if not os.path.exists(script_path):
-            logger.error(f"Could not find MCP script at {script_path}")
+            print_debug(f"Could not find MCP script at {script_path}")
             # Here we should probably handle this error more gracefully
             # For now, just log and the search will fail.
             self._client = None
@@ -245,9 +243,8 @@ class MCPSearch(WebSearch):
 
         try:
             search_result = self._client.call_tool("full-web-search", search_args)
-            print(search_result)
         except Exception as e:
-            logger.error(f"Error calling MCP tool: {e}")
+            print_debug(f"Error calling MCP tool: {e}")
             return [{"error": f"Error calling MCP tool: {str(e)}"}]
 
         if search_result and "content" in search_result and len(search_result['content']) > 0:
@@ -314,7 +311,7 @@ class SerperSearch(WebSearch):
             
             return text[:5000] # Limit content length to avoid context window issues
         except Exception as e:
-            logger.warning(f"Failed to fetch content for {url}: {e}")
+            print_debug(f"Failed to fetch content for {url}: {e}")
             return ""
 
     def search(self, query: str) -> list:
@@ -323,6 +320,7 @@ class SerperSearch(WebSearch):
             
         import http.client
         import json
+        from concurrent.futures import ThreadPoolExecutor, as_completed
 
         try:
             conn = http.client.HTTPSConnection("google.serper.dev")
@@ -340,29 +338,42 @@ class SerperSearch(WebSearch):
             
             # Normalize results to match the expected format
             results = []
+            items_to_fetch = []
+            
             if 'organic' in response_data:
                 for item in response_data['organic']:
                     snippet = item.get('snippet', '')
-                    content = snippet # Default to snippet
                     url = item.get('link')
                     
-                    if self.fetch_full_content and url:
-                        # Fetch full content logic here
-                        full_text = self._fetch_page_content(url)
-                        if full_text:
-                            content = full_text
-                            
-                    results.append({
+                    result_item = {
                         'title': item.get('title'),
                         'url': url,
                         'link': url, # Alias for frontend compatibility
                         'snippet': snippet,
-                        'content': content
-                    })
+                        'content': snippet # Default to snippet
+                    }
+                    results.append(result_item)
+                    
+                    if self.fetch_full_content and url:
+                        items_to_fetch.append(result_item)
+
+            # Parallel fetch
+            if items_to_fetch:
+                with ThreadPoolExecutor(max_workers=5) as executor:
+                    future_to_item = {executor.submit(self._fetch_page_content, item['url']): item for item in items_to_fetch}
+                    for future in as_completed(future_to_item):
+                        item = future_to_item[future]
+                        try:
+                            full_text = future.result()
+                            if full_text:
+                                item['content'] = full_text
+                        except Exception as e:
+                            print_debug(f"Error fetching content for {item['url']}: {e}")
+
             return results
 
         except Exception as e:
-            logger.error(f"Error calling Serper API: {e}")
+            print_debug(f"Error calling Serper API: {e}")
             return [{"error": f"Error calling Serper API: {str(e)}"}]
 
     def format_results(self, results: list) -> str:
@@ -384,6 +395,7 @@ def get_search_engine() -> WebSearch:
     settings = SearchSettings.load()
     
     if settings.search_provider == 'serper':
-        return SerperSearch(api_key=settings.serper_api_key, fetch_full_content=settings.serper_fetch_full_content)
+        api_key = os.getenv('SERPER_API_KEY') or settings.serper_api_key
+        return SerperSearch(api_key=api_key, fetch_full_content=settings.serper_fetch_full_content)
     else:
         return MCPSearch()

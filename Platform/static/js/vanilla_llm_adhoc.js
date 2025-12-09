@@ -16,126 +16,11 @@ document.addEventListener('DOMContentLoaded', function() {
     let currentRunResults = [];
     let failedItems = [];
 
-    // --- Core UI Rendering Logic ---
-    function renderResults(data, resultsBody, isRetry = false) {
-        if (data.is_meta) {
-            return {};
-        }
 
-        const rowId = `result-${Date.now()}-${Math.random()}`;
-        let resultHtml;
 
-        if (data.error) {
-            resultHtml = `<tr class="table-warning" data-id="${rowId}"><td colspan="7">Error: ${data.error}</td></tr>`;
-            if (!isRetry) {
-                failedItems.push({ ...data, rowId });
-            }
-        } else {
-            // Normalize keys (DB uses is_correct_*, Pipeline uses *_result)
-            const ruleCorrect = data.hasOwnProperty('is_correct_rule') ? data.is_correct_rule : data.rule_result;
-            const llmCorrect = data.hasOwnProperty('is_correct_llm') ? data.is_correct_llm : data.llm_result;
-            
-            const textColorClass = ruleCorrect ? 'text-success-dark' : 'text-danger-dark';
 
-            const ruleBadge = ruleCorrect ? `<span class="badge bg-success">Correct</span>` : `<span class="badge bg-danger">Incorrect</span>`;
-            const llmBadge = llmCorrect === null ? `<span class="badge bg-secondary">Error</span>` : (llmCorrect ? `<span class="badge bg-success">Correct</span>` : `<span class="badge bg-danger">Incorrect</span>`);
-            const agreementIcon = (llmCorrect !== null && ruleCorrect === llmCorrect)
-                ? `<i class="bi bi-check-circle-fill text-success fs-5"></i>`
-                : `<i class="bi bi-x-circle-fill text-danger fs-5"></i>`;
 
-            const groundTruthsArray = data.ground_truths || [];
-            const remainingCount = groundTruthsArray.length - 3;
-            let groundTruthsHtml = `<ul class="list-unstyled mb-0" data-expanded="false" data-remaining="${remainingCount}">`;
-            groundTruthsArray.forEach((gt, index) => {
-                const isHidden = index >= 3;
-                groundTruthsHtml += `<li class="text-secondary small ground-truth-item" ${isHidden ? 'style="display:none;"' : ''}><i class="bi bi-dot me-1 text-muted"></i>${gt}</li>`;
-            });
-            if (groundTruthsArray.length > 3) {
-                groundTruthsHtml += `<li class="show-more-item"><a href="#" class="toggle-answers-link small text-decoration-none">... Show ${remainingCount} more</a></li>`;
-            }
-            groundTruthsHtml += '</ul>';
 
-            resultHtml = `<tr class="${ruleCorrect ? 'table-success-light' : 'table-danger-light'}" data-id="${rowId}">
-                <td class="px-4 fw-bold text-muted small"></td>
-                <td class="px-4"><div class="compact-cell fw-bold ${textColorClass}">${data.question}</div></td>
-                <td class="px-4"><div class="compact-cell ${textColorClass}">${data.answer}</div></td>
-                <td class="px-4">${groundTruthsHtml}</td>
-                <td class="px-4 text-center align-middle">${ruleBadge}</td>
-                <td class="px-4 text-center align-middle">${llmBadge}</td>
-                <td class="px-4 text-center align-middle">${agreementIcon}</td>
-            </tr>`;
-        }
-
-        if (isRetry && data.originalRowId) {
-            const originalRow = resultsBody.querySelector(`[data-id="${data.originalRowId}"]`);
-            if (originalRow) {
-                originalRow.outerHTML = resultHtml; // Replace the original error row
-            } else {
-                 resultsBody.insertAdjacentHTML('afterbegin', resultHtml); // Fallback
-            }
-        } else {
-            resultsBody.insertAdjacentHTML('afterbegin', resultHtml);
-        }
-        
-        const finalRuleCorrect = data.hasOwnProperty('is_correct_rule') ? data.is_correct_rule : data.rule_result;
-        const finalLlmCorrect = data.hasOwnProperty('is_correct_llm') ? data.is_correct_llm : data.llm_result;
-        
-        return { ruleCorrect: finalRuleCorrect, llmCorrect: finalLlmCorrect };
-    }
-
-    function renderRunConfiguration(settings) {
-        const configCard = document.getElementById('run-config-card');
-        const configDetails = document.getElementById('run-config-details');
-        
-        if (!configCard || !configDetails) return;
-
-        if (!settings || Object.keys(settings).length === 0) {
-            configCard.style.display = 'none';
-            return;
-        }
-
-        configDetails.innerHTML = '';
-        
-        const addItem = (label, value, icon) => {
-            const col = document.createElement('div');
-            col.className = 'col-md-4 col-sm-6';
-            col.innerHTML = `
-                <div class="d-flex align-items-center bg-white p-2 rounded border">
-                    <i class="bi ${icon} text-secondary me-2 fs-5"></i>
-                    <div class="overflow-hidden">
-                        <div class="text-muted text-uppercase" style="font-size: 0.65rem; letter-spacing: 0.5px;">${label}</div>
-                        <div class="fw-medium text-truncate" title="${value}">${value}</div>
-                    </div>
-                </div>`;
-            configDetails.appendChild(col);
-        };
-
-        
-        // Check for nested first (if full snapshot passed)
-        let llmSettings = settings.llm_settings || settings; 
-
-        if (llmSettings.llm_model) addItem('LLM Model', llmSettings.llm_model, 'bi-cpu');
-        if (llmSettings.max_retries) addItem('Max Retries', llmSettings.max_retries, 'bi-arrow-repeat');
-        if (llmSettings.llm_base_url) addItem('Base URL', llmSettings.llm_base_url, 'bi-link-45deg');
-
-        configCard.style.display = 'block';
-    }
-
-    function updateSummary(stats) {
-        const ruleAccuracy = stats.total > 0 ? (stats.ruleCorrect / stats.total) * 100 : 0;
-        const llmEvalCount = stats.total - stats.llmErrors;
-        const llmAccuracy = llmEvalCount > 0 ? (stats.llmCorrect / llmEvalCount) * 100 : 0;
-        const agreement = llmEvalCount > 0 ? (stats.agreements / llmEvalCount) * 100 : 0;
-
-        document.getElementById('processed-count').textContent = stats.total;
-        document.getElementById('agreement-rate').textContent = `${agreement.toFixed(2)}%`;
-        document.getElementById('rule-correct-count').textContent = stats.ruleCorrect;
-        document.getElementById('rule-incorrect-count').textContent = stats.total - stats.ruleCorrect;
-        document.getElementById('rule-accuracy-rate').textContent = `${ruleAccuracy.toFixed(2)}%`;
-        document.getElementById('llm-correct-count').textContent = stats.llmCorrect;
-        document.getElementById('llm-incorrect-count').textContent = llmEvalCount - stats.llmCorrect;
-        document.getElementById('llm-accuracy-rate').textContent = `${llmAccuracy.toFixed(2)}%`;
-    }
 
     // --- Configuration Management ---
     function saveSettings() {
@@ -144,7 +29,7 @@ document.addEventListener('DOMContentLoaded', function() {
             llm_api_key: document.getElementById('llm_api_key').value,
             llm_model: document.getElementById('llm_model').value,
         };
-        const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
         BenchmarkUtils.saveSettings(window.benchmarkUrls.saveLlmSettings, csrfToken, data, 'save-settings-btn');
     }
 
@@ -162,8 +47,42 @@ document.addEventListener('DOMContentLoaded', function() {
             llm_base_url: document.getElementById('llm_base_url').value,
             llm_api_key: document.getElementById('llm_api_key').value,
         };
-        const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
         BenchmarkUtils.testConnection(window.benchmarkUrls.testLlmConnection, csrfToken, data, 'test-connection-result', 'test-connection-btn');
+    }
+
+    function updateSummary(stats) {
+        document.getElementById('rule-correct-count').textContent = stats.ruleCorrect;
+        document.getElementById('rule-incorrect-count').textContent = stats.total - stats.ruleCorrect; // Assuming total includes incorrect + correct only (ignoring nulls/errors for simplicity in this specific logic, or adjust if total counts processed items)
+        // Actually, let's use explicit counts if available or derive from total
+        // stats.total is total processed so far.
+        // The HTML has specific incorrect count ID.
+        // Let's calculate:
+        const ruleIncorrect = stats.total - stats.ruleCorrect;
+        document.getElementById('rule-incorrect-count').textContent = ruleIncorrect;
+        
+        const ruleAccuracy = stats.total > 0 ? (stats.ruleCorrect / stats.total) * 100 : 0;
+        document.getElementById('rule-accuracy-rate').textContent = `${ruleAccuracy.toFixed(2)}%`;
+
+        document.getElementById('llm-correct-count').textContent = stats.llmCorrect;
+        // For LLM, we might have nulls (errors). 
+        // stats.llmErrors tracks nulls.
+        const llmIncorrect = stats.total - stats.llmCorrect - stats.llmErrors;
+        document.getElementById('llm-incorrect-count').textContent = llmIncorrect;
+
+        // Accuracy usually excludes errors or includes them as incorrect? 
+        // Let's assume accuracy is correct / total processed.
+        const llmAccuracy = stats.total > 0 ? (stats.llmCorrect / stats.total) * 100 : 0;
+        document.getElementById('llm-accuracy-rate').textContent = `${llmAccuracy.toFixed(2)}%`;
+
+        document.getElementById('processed-count').textContent = stats.total;
+        
+        // Agreement
+        // Agreement only makes sense when both have a valid result.
+        // Let's stick to simple agreement rate over total processed for now, or total valid.
+        // stats.agreements is count where rule === llm (and not null).
+        const agreementRate = stats.total > 0 ? (stats.agreements / stats.total) * 100 : 0;
+        document.getElementById('agreement-rate').textContent = `${agreementRate.toFixed(2)}%`;
     }
 
     // --- Event Listeners ---
@@ -179,62 +98,36 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('progress-container').style.display = 'none';
         document.getElementById('save-run-btn').disabled = true;
 
-        fetch(`/benchmark/api/vanilla_llm_adhoc/get_run/${runId}/`)
-            .then(response => response.json())
-            .then(data => {
-                if (data.error) {
-                    alert('Error loading run: ' + data.error);
-                    return;
-                }
-                currentRunResults = data.results;
-                
-                document.getElementById('results-header-text').textContent = `Results for: ${data.name}`;
-                
-                if (data.settings) {
-                    renderRunConfiguration(data.settings);
-                }
-
-                // Re-calculate stats from the results
-                let stats = {
-                    total: currentRunResults.length,
-                    ruleCorrect: 0,
-                    llmCorrect: 0,
-                    llmErrors: 0,
-                    agreements: 0
-                };
-
-                currentRunResults.forEach(result => {
-                    const ruleCorrect = result.hasOwnProperty('is_correct_rule') ? result.is_correct_rule : result.rule_result;
-                    const llmCorrect = result.hasOwnProperty('is_correct_llm') ? result.is_correct_llm : result.llm_result;
-
-                    if (ruleCorrect) stats.ruleCorrect++;
-                    if (llmCorrect) stats.llmCorrect++;
-                    if (llmCorrect === null) stats.llmErrors++;
-                    if (llmCorrect !== null && ruleCorrect === llmCorrect) {
-                        stats.agreements++;
-                    }
-                });
-                updateSummary(stats);
-
-                // Render table
-                const resultsBody = document.getElementById('pipeline-results-body');
-                resultsBody.innerHTML = ''; // Clear existing results
-                currentRunResults.forEach(result => {
-                    renderResults(result, resultsBody);
-                });
-
-                document.getElementById('save-run-btn').disabled = true;
-                document.getElementById('retry-btn').style.display = 'none';
-                failedItems = [];
-            })
-            .catch(error => {
+                    fetch(`/benchmark/api/vanilla_llm_adhoc/get_run/${runId}/`)
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.error) {
+                                alert('Error loading run: ' + data.error);
+                                return;
+                            }
+                            currentRunResults = data.results;
+                            
+                            document.getElementById('results-header-text').textContent = `Results for: ${data.name}`;
+                            
+                BenchmarkUtils.renderRunConfiguration(data.settings, ['llm_model', 'llm_base_url']);        
+                            // Replace manual stats calculation and rendering with displayRunResults
+                            const runData = {
+                                name: data.name,
+                                results: data.results
+                            };
+                            BenchmarkUtils.displayRunResults(runData, updateSummary, 'vanilla_adhoc');
+        
+                            document.getElementById('save-run-btn').disabled = true;
+                            document.getElementById('retry-btn').style.display = 'none';
+                            failedItems = [];
+                        })            .catch(error => {
                 console.error('Error loading run:', error);
                 alert(`Failed to load run data.`);
             });
     }
 
     function deleteRun(runId) {
-        const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
         BenchmarkUtils.deleteRun(`/benchmark/api/vanilla_llm_adhoc/delete_run/${runId}/`, csrfToken);
     }    
     document.getElementById('save-run-btn').addEventListener('click', function() {
@@ -242,7 +135,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const runName = prompt("Please enter a name for this run:", defaultName);
         
         if (runName && currentRunResults.length > 0) {
-            const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
+            const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
             
             fetch(window.benchmarkUrls.vanillaLlmAdhoc, {
                 method: 'POST',
@@ -270,7 +163,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     async function processVanillaAdhocQuestion(questionData) {
-        const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
         const createSessionResponse = await fetch(window.benchmarkUrls.createSession, {
             method: 'POST',
             headers: {
@@ -341,7 +234,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const originalBtnHtml = runBtn.innerHTML;
         runBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Running...';
 
-        const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 
         try {
             // 1. Create Session
@@ -389,12 +282,20 @@ document.addEventListener('DOMContentLoaded', function() {
 
             const singleResultRuleCorrect = document.getElementById('single-result-rule-correct');
             if (singleResultRuleCorrect) {
-                singleResultRuleCorrect.innerHTML = trialData.is_correct ? '<span class="badge bg-success">Correct</span>' : '<span class="badge bg-danger">Incorrect</span>';
+                const ruleBadge = document.createElement('span');
+                ruleBadge.className = trialData.is_correct ? 'badge bg-success' : 'badge bg-danger';
+                ruleBadge.textContent = trialData.is_correct ? 'Correct' : 'Incorrect';
+                singleResultRuleCorrect.innerHTML = ''; // Clear existing content
+                singleResultRuleCorrect.appendChild(ruleBadge);
             }
             
             const singleResultLlmCorrect = document.getElementById('single-result-llm-correct');
             if (singleResultLlmCorrect) {
-                singleResultLlmCorrect.innerHTML = trialData.is_correct ? '<span class="badge bg-success">Correct</span>' : '<span class="badge bg-danger">Incorrect</span>';
+                const llmBadge = document.createElement('span');
+                llmBadge.className = trialData.is_correct ? 'badge bg-success' : 'badge bg-danger';
+                llmBadge.textContent = trialData.is_correct ? 'Correct' : 'Incorrect';
+                singleResultLlmCorrect.innerHTML = ''; // Clear existing content
+                singleResultLlmCorrect.appendChild(llmBadge);
             }
 
             const singleResultDetails = document.getElementById('single-result-details');
@@ -422,7 +323,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function stopPipeline(pipelineId) {
         if (!pipelineId) return;
 
-        const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
         const url = window.benchmarkUrls.stopPipeline;
         
         const data = JSON.stringify({ pipeline_id: pipelineId });
@@ -495,11 +396,11 @@ document.addEventListener('DOMContentLoaded', function() {
         };
 
         // Render the configuration immediately upon pipeline start
-        renderRunConfiguration(initialLlmSettings);
+        BenchmarkUtils.renderRunConfiguration(initialLlmSettings);
 
         const formData = new FormData();
         const datasetId = document.getElementById('dataset-selector').value;
-        formData.append('csrfmiddlewaretoken', document.querySelector('input[name="csrfmiddlewaretoken"]').value);
+        formData.append('csrfmiddlewaretoken', document.querySelector('meta[name="csrf-token"]').getAttribute('content'));
         formData.append('dataset_id', datasetId);
         formData.append('llm_base_url', initialLlmSettings.llm_base_url);
         formData.append('llm_api_key', initialLlmSettings.llm_api_key);
@@ -569,7 +470,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                 
                                 currentRunResults.push(data);
                                 
-                                const resultSummary = renderResults(data, resultsBody, false);
+                                const resultSummary = BenchmarkUtils.BenchmarkRenderer.renderResultRow(data, resultsBody, processedCount, 'vanilla_adhoc', false);
                                 
                                 processedCount++;
                                 const progress = totalQuestions > 0 ? (processedCount / totalQuestions) * 100 : 0;
@@ -627,7 +528,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const questionsToRetry = failedItems.map(item => ({ question: item.question, ground_truths: item.ground_truths, originalRowId: item.rowId }));
         
         const formData = new FormData();
-        formData.append('csrfmiddlewaretoken', document.querySelector('input[name="csrfmiddlewaretoken"]').value);
+        formData.append('csrfmiddlewaretoken', document.querySelector('meta[name="csrf-token"]').getAttribute('content'));
         formData.append('questions', JSON.stringify(questionsToRetry.map(q => ({question: q.question, ground_truths: q.ground_truths}))));
         formData.append('llm_base_url', document.getElementById('llm_base_url').value);
         formData.append('llm_api_key', document.getElementById('llm_api_key').value);
@@ -671,7 +572,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                     currentRunResults[resultIndex] = data;
                                 }
 
-                                renderResults(data, resultsBody, true); // true for isRetry
+                                BenchmarkUtils.BenchmarkRenderer.renderResultRow(data, resultsBody, null, 'vanilla_adhoc', true); // true for isRetry, null for index as it's a retry
 
                             } catch (e) {
                                 console.error("Failed to parse JSON chunk on retry:", e, jsonStr);

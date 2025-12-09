@@ -16,164 +16,11 @@ document.addEventListener('DOMContentLoaded', function() {
     let currentRunResults = [];
     let failedItems = [];
 
-    // --- Core UI Rendering Logic ---
-    function renderResults(data, resultsBody, index, isRetry = false) {
-        if (data.is_meta) {
-            return {};
-        }
-        
-        const rowId = `result-${Date.now()}-${Math.random()}`;
-        let resultHtml;
 
-        if (data.error) {
-            resultHtml = `<tr class="table-warning" data-id="${rowId}"><td colspan="8">Error: ${data.error}</td></tr>`;
-            if (!isRetry) {
-                failedItems.push({ ...data, rowId });
-            }
-        } else {
-            // Normalize keys
-            const ruleCorrect = data.hasOwnProperty('is_correct_rule') ? data.is_correct_rule : data.rule_result;
-            const llmCorrect = data.hasOwnProperty('is_correct_llm') ? data.is_correct_llm : data.llm_result;
-            
-            const isCorrect = llmCorrect; // NOTICE: manually set the judge as llm
-            const textColorClass = isCorrect ? 'text-success-dark' : 'text-danger-dark';
 
-            const ruleBadge = ruleCorrect ? `<span class="badge bg-success">Correct</span>` : `<span class="badge bg-danger">Incorrect</span>`;
-            const llmBadge = llmCorrect === null ? `<span class="badge bg-secondary">Error</span>` : (llmCorrect ? `<span class="badge bg-success">Correct</span>` : `<span class="badge bg-danger">Incorrect</span>`);
-            const agreementIcon = (llmCorrect !== null && ruleCorrect === llmCorrect)
-                ? `<i class="bi bi-check-circle-fill text-success fs-5"></i>`
-                : `<i class="bi bi-x-circle-fill text-danger fs-5"></i>`;
 
-            const groundTruthsArray = data.ground_truths || [];
-            const remainingCount = groundTruthsArray.length - 3;
-            let groundTruthsHtml = `<ul class="list-unstyled mb-0" data-expanded="false" data-remaining="${remainingCount}">`;
-            groundTruthsArray.forEach((gt, index) => {
-                const isHidden = index >= 3;
-                groundTruthsHtml += `<li class="text-secondary small ground-truth-item" ${isHidden ? 'style="display:none;"' : ''}><i class="bi bi-dot me-1 text-muted"></i>${gt}</li>`;
-            });
-            if (groundTruthsArray.length > 3) {
-                groundTruthsHtml += `<li class="show-more-item"><a href="#" class="toggle-answers-link small text-decoration-none">... Show ${remainingCount} more</a></li>`;
-            }
-            groundTruthsHtml += '</ul>';
 
-            let searchResultsHtml = '';
-            if (data.search_results && data.search_results.length > 0) {
-                const resultsJson = encodeURIComponent(JSON.stringify(data.search_results));
-                const count = data.search_results.length;
-                searchResultsHtml = `
-                    <button class="btn btn-sm btn-outline-primary view-all-results-btn" 
-                            data-results="${resultsJson}"
-                            type="button">
-                        <i class="bi bi-list-ul me-1"></i>View ${count} Results
-                    </button>`;
-            } else {
-                searchResultsHtml = '<span class="text-muted fst-italic small">No results</span>';
-            }
 
-            resultHtml = `<tr class="${isCorrect ? 'table-success-light' : 'table-danger-light'}" data-id="${rowId}">
-                <td class="px-4 fw-bold text-muted small">${index}</td>
-                <td class="px-4"><div class="compact-cell fw-bold ${textColorClass}">${data.question}</div></td>
-                <td class="px-4"><div class="compact-cell ${textColorClass}">${data.answer}</div></td>
-                <td class="px-4">${groundTruthsHtml}</td>
-                <td class="px-4">${searchResultsHtml}</td>
-                <td class="px-4 text-center align-middle">${ruleBadge}</td>
-                <td class="px-4 text-center align-middle">${llmBadge}</td>
-                <td class="px-4 text-center align-middle">${agreementIcon}</td>
-            </tr>`;
-        }
-
-        if (isRetry && data.originalRowId) {
-            const originalRow = resultsBody.querySelector(`[data-id="${data.originalRowId}"]`);
-            if (originalRow) {
-                originalRow.outerHTML = resultHtml; // Replace the original error row
-            } else {
-                 resultsBody.insertAdjacentHTML('afterbegin', resultHtml); // Fallback
-            }
-        } else {
-            resultsBody.insertAdjacentHTML('afterbegin', resultHtml);
-        }
-        
-        
-        const finalRuleCorrect = data.hasOwnProperty('is_correct_rule') ? data.is_correct_rule : data.rule_result;
-        const finalLlmCorrect = data.hasOwnProperty('is_correct_llm') ? data.is_correct_llm : data.llm_result;
-        
-        return { ruleCorrect: finalRuleCorrect, llmCorrect: finalLlmCorrect };
-    }
-
-    function renderRunConfiguration(snapshot) {
-        const configCard = document.getElementById('run-config-card');
-        const configDetails = document.getElementById('run-config-details');
-        
-        if (!configCard || !configDetails) return;
-
-        if (!snapshot || Object.keys(snapshot).length === 0) {
-            configCard.style.display = 'none';
-            return;
-        }
-
-        configDetails.innerHTML = '';
-        
-        const addItem = (label, value, icon) => {
-            const col = document.createElement('div');
-            col.className = 'col-md-4 col-sm-6';
-            col.innerHTML = `
-                <div class="d-flex align-items-center bg-white p-2 rounded border">
-                    <i class="bi ${icon} text-secondary me-2 fs-5"></i>
-                    <div class="overflow-hidden">
-                        <div class="text-muted text-uppercase" style="font-size: 0.65rem; letter-spacing: 0.5px;">${label}</div>
-                        <div class="fw-medium text-truncate" title="${value}">${value}</div>
-                    </div>
-                </div>`;
-            configDetails.appendChild(col);
-        };
-
-        if (snapshot.llm_settings) {
-            const ls = snapshot.llm_settings;
-            if (ls.llm_model) addItem('LLM Model', ls.llm_model, 'bi-cpu');
-            if (ls.max_retries) addItem('Max Retries', ls.max_retries, 'bi-arrow-repeat');
-            if (ls.llm_base_url) addItem('Base URL', ls.llm_base_url, 'bi-link-45deg');
-        }
-        
-        if (snapshot.rag_settings) {
-             const rs = snapshot.rag_settings;
-             if (rs.prompt_template) {
-                 const snippet = rs.prompt_template.substring(0, 30) + '...';
-                 addItem('RAG Prompt', snippet, 'bi-chat-text');
-             }
-        }
-        
-        if (snapshot.search_settings) {
-             const ss = snapshot.search_settings;
-             addItem('Search Provider', ss.search_provider === 'mcp' ? 'MCP Server' : (ss.search_provider === 'serper' ? 'Serper API' : ss.search_provider), 'bi-globe');
-             if (ss.serper_fetch_full_content !== undefined) {
-                 addItem('Full Content', ss.serper_fetch_full_content ? 'Enabled' : 'Disabled', 'bi-file-text');
-             }
-        }
-
-        configCard.style.display = 'block';
-    }
-
-    function updateSummary(stats) {
-        const ruleAccuracy = stats.total > 0 ? (stats.ruleCorrect / stats.total) * 100 : 0;
-        const llmEvalCount = stats.total - stats.llmErrors;
-        const llmAccuracy = llmEvalCount > 0 ? (stats.llmCorrect / llmEvalCount) * 100 : 0;
-        const agreement = llmEvalCount > 0 ? (stats.agreements / llmEvalCount) * 100 : 0;
-        const avgDocs = stats.total > 0 ? (stats.totalDocsUsed / stats.total) : 0;
-
-        document.getElementById('processed-count').textContent = stats.total;
-        document.getElementById('agreement-rate').textContent = `${agreement.toFixed(2)}%`;
-        
-        document.getElementById('rule-correct-count').textContent = stats.ruleCorrect;
-        document.getElementById('rule-incorrect-count').textContent = stats.total - stats.ruleCorrect;
-        document.getElementById('rule-accuracy-rate').textContent = `${ruleAccuracy.toFixed(2)}%`;
-        
-        document.getElementById('llm-correct-count').textContent = stats.llmCorrect;
-        document.getElementById('llm-incorrect-count').textContent = llmEvalCount - stats.llmCorrect;
-        document.getElementById('llm-accuracy-rate').textContent = `${llmAccuracy.toFixed(2)}%`;
-
-        document.getElementById('total-searches-count').textContent = stats.total; // Assuming one search per question
-        document.getElementById('avg-docs-count').textContent = avgDocs.toFixed(2);
-    }
 
     // --- Configuration Management ---
     function restoreDefaultRagPrompt() {
@@ -186,7 +33,7 @@ document.addEventListener('DOMContentLoaded', function() {
             .then(response => response.json())
             .then(data => {
                 if (data.default_prompt) {
-                    document.getElementById('rag-prompt-template').value = data.default_prompt;
+                    rag_prompt_template = data.default_prompt;
                     saveRagSettings(); // Automatically save
                 } else {
                     alert('Error fetching default prompt.');
@@ -208,15 +55,15 @@ document.addEventListener('DOMContentLoaded', function() {
             llm_api_key: document.getElementById('llm_api_key').value,
             llm_model: document.getElementById('llm_model').value,
         };
-        const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
         BenchmarkUtils.saveSettings(window.benchmarkUrls.saveLlmSettings, csrfToken, data, 'save-llm-settings-btn');
     }
 
     function saveRagSettings() {
         const data = {
-            prompt_template: document.getElementById('rag-prompt-template').value,
+            prompt_template: rag_prompt_template,
         };
-        const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
         BenchmarkUtils.saveSettings(window.benchmarkUrls.saveRagSettings, csrfToken, data, 'save-rag-settings-btn');
     }
 
@@ -235,8 +82,38 @@ document.addEventListener('DOMContentLoaded', function() {
             llm_base_url: document.getElementById('llm_base_url').value,
             llm_api_key: document.getElementById('llm_api_key').value,
         };
-        const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
         BenchmarkUtils.testConnection(window.benchmarkUrls.testLlmConnection, csrfToken, data, 'test-connection-result', 'test-connection-btn');
+    }
+
+    function updateSummary(stats) {
+        document.getElementById('rule-correct-count').textContent = stats.ruleCorrect;
+        const ruleIncorrect = stats.total - stats.ruleCorrect;
+        document.getElementById('rule-incorrect-count').textContent = ruleIncorrect;
+        
+        const ruleAccuracy = stats.total > 0 ? (stats.ruleCorrect / stats.total) * 100 : 0;
+        document.getElementById('rule-accuracy-rate').textContent = `${ruleAccuracy.toFixed(2)}%`;
+
+        document.getElementById('llm-correct-count').textContent = stats.llmCorrect;
+        const llmIncorrect = stats.total - stats.llmCorrect - stats.llmErrors;
+        document.getElementById('llm-incorrect-count').textContent = llmIncorrect;
+
+        const llmAccuracy = stats.total > 0 ? (stats.llmCorrect / stats.total) * 100 : 0;
+        document.getElementById('llm-accuracy-rate').textContent = `${llmAccuracy.toFixed(2)}%`;
+
+        document.getElementById('processed-count').textContent = stats.total;
+        
+        const agreementRate = stats.total > 0 ? (stats.agreements / stats.total) * 100 : 0;
+        document.getElementById('agreement-rate').textContent = `${agreementRate.toFixed(2)}%`;
+
+        // RAG Specifics
+        if (document.getElementById('total-searches-count')) {
+            document.getElementById('total-searches-count').textContent = stats.total; // Assuming 1 search per question roughly
+        }
+        if (document.getElementById('avg-docs-count')) {
+            const avgDocs = stats.total > 0 ? (stats.totalDocsUsed / stats.total) : 0;
+            document.getElementById('avg-docs-count').textContent = avgDocs.toFixed(1);
+        }
     }
 
     // --- Event Listeners ---
@@ -262,40 +139,13 @@ document.addEventListener('DOMContentLoaded', function() {
                     currentRunResults = data.results;
                     
                     document.getElementById('results-header-text').textContent = `Results for: ${data.name}`;
-                    if (data.settings) {
-                        renderRunConfiguration(data.settings);
-                    }
-                    // Re-calculate stats from the results for consistency
-                    let stats = {
-                        total: currentRunResults.length,
-                        ruleCorrect: 0,
-                        llmCorrect: 0,
-                        llmErrors: 0,
-                        agreements: 0,
-                        totalDocsUsed: 0
+        BenchmarkUtils.renderRunConfiguration(data.settings, ['llm_model', 'llm_base_url', 'rag_settings', 'search_settings']);
+                    // Replace manual stats calculation and rendering with displayRunResults
+                    const runData = {
+                        name: data.name,
+                        results: data.results
                     };
-
-                    currentRunResults.forEach(result => {
-                                            const ruleCorrect = result.hasOwnProperty('is_correct_rule') ? result.is_correct_rule : result.rule_result;
-                                            const llmCorrect = result.hasOwnProperty('is_correct_llm') ? result.is_correct_llm : result.llm_result;
-                        
-                                            if (ruleCorrect) stats.ruleCorrect++;
-                                            if (llmCorrect) stats.llmCorrect++;
-                                            if (llmCorrect === null) stats.llmErrors++;
-                                            if (llmCorrect !== null && ruleCorrect === llmCorrect) {
-                                                stats.agreements++;
-                                            }
-                                            stats.totalDocsUsed += (result.num_docs_used || 0);
-                                        });
-                        
-                    updateSummary(stats);
-
-                    // Render table
-                    const resultsBody = document.getElementById('pipeline-results-body');
-                    resultsBody.innerHTML = '';
-                    currentRunResults.forEach((result, idx) => {
-                        renderResults(result, resultsBody, idx + 1);
-                    });
+                    BenchmarkUtils.displayRunResults(runData, updateSummary, 'rag_adhoc');
                 })
                 .catch(error => {
                     console.error('Error loading run:', error);
@@ -304,7 +154,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     
         function deleteRun(runId) {
-        const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
         BenchmarkUtils.deleteRun(`/benchmark/api/rag_adhoc/delete_run/${runId}/`, csrfToken);
     }
 
@@ -313,7 +163,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const runName = prompt("Please enter a name for this run:", defaultName);
         
         if (runName && currentRunResults.length > 0) {
-            const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
+            const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
             
             fetch(window.benchmarkUrls.ragAdhoc, {
                 method: 'POST',
@@ -340,7 +190,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     async function processRagAdhocQuestion(questionData, groupId = null) {
-        const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
         const createSessionResponse = await fetch(window.benchmarkUrls.createSession, {
             method: 'POST',
             headers: {
@@ -414,7 +264,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const originalBtnHtml = runBtn.innerHTML;
         runBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Running...';
 
-        const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 
         try {
             // 1. Create Session
@@ -455,10 +305,24 @@ document.addEventListener('DOMContentLoaded', function() {
             // 3. Display Results
             resultsDiv.style.display = 'block';
             document.getElementById('single-result-answer').textContent = trialData.answer || 'N/A';
-            document.getElementById('single-result-rule-correct').innerHTML = trialData.is_correct ? '<span class="badge bg-success">Correct</span>' : '<span class="badge bg-danger">Incorrect</span>';
-            // Note: RAG pipeline in views.py currently sets is_correct based on rule AND LLM,
-            // so this will reflect overall correctness based on current backend logic.
-            document.getElementById('single-result-llm-correct').innerHTML = trialData.is_correct ? '<span class="badge bg-success">Correct</span>' : '<span class="badge bg-danger">Incorrect</span>';
+            
+            const singleResultRuleCorrect = document.getElementById('single-result-rule-correct');
+            if (singleResultRuleCorrect) {
+                const ruleBadge = document.createElement('span');
+                ruleBadge.className = trialData.is_correct ? 'badge bg-success' : 'badge bg-danger';
+                ruleBadge.textContent = trialData.is_correct ? 'Correct' : 'Incorrect';
+                singleResultRuleCorrect.innerHTML = ''; // Clear existing content
+                singleResultRuleCorrect.appendChild(ruleBadge);
+            }
+
+            const singleResultLlmCorrect = document.getElementById('single-result-llm-correct');
+            if (singleResultLlmCorrect) {
+                const llmBadge = document.createElement('span');
+                llmBadge.className = trialData.is_correct ? 'badge bg-success' : 'badge bg-danger';
+                llmBadge.textContent = trialData.is_correct ? 'Correct' : 'Incorrect';
+                singleResultLlmCorrect.innerHTML = ''; // Clear existing content
+                singleResultLlmCorrect.appendChild(llmBadge);
+            }
             document.getElementById('single-result-docs-used').textContent = trialData.num_docs_used !== undefined ? trialData.num_docs_used : 'N/A';
             document.getElementById('single-result-details').textContent = trialData.error ? `Error: ${trialData.error}` : 'Run completed.';
 
@@ -483,7 +347,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function stopPipeline(pipelineId) {
         if (!pipelineId) return;
 
-        const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
         const url = window.benchmarkUrls.stopPipeline;
         
         const data = JSON.stringify({ pipeline_id: pipelineId });
@@ -539,7 +403,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Get current RAG settings
         const currentRagSettings = {
-            prompt_template: document.getElementById('rag-prompt-template').value,
+            prompt_template: rag_prompt_template,
         };
         
         // Get current Search settings
@@ -559,12 +423,12 @@ document.addEventListener('DOMContentLoaded', function() {
         };
         
         // Render the configuration immediately upon pipeline start
-        renderRunConfiguration(initialSnapshot);
+        BenchmarkUtils.renderRunConfiguration(initialSnapshot);
 
 
         const datasetId = document.getElementById('dataset-selector').value;
         const formData = new FormData();
-        formData.append('csrfmiddlewaretoken', document.querySelector('input[name="csrfmiddlewaretoken"]').value);
+        formData.append('csrfmiddlewaretoken', document.querySelector('meta[name="csrf-token"]').getAttribute('content'));
         formData.append('dataset_id', datasetId);
         formData.append('llm_base_url', currentLlmSettings.llm_base_url);
         formData.append('llm_api_key', currentLlmSettings.llm_api_key);
@@ -632,7 +496,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                 currentRunResults.push(data);
                                 
                                 processedCount++;
-                                const resultSummary = renderResults(data, resultsBody, processedCount, false);
+                                const resultSummary = BenchmarkUtils.BenchmarkRenderer.renderResultRow(data, resultsBody, processedCount, 'rag_adhoc', false);
                                 
                                 const progress = totalQuestions > 0 ? (processedCount / totalQuestions) * 100 : 0;
                                 progressBar.style.width = `${progress}%`;
@@ -738,7 +602,7 @@ document.addEventListener('DOMContentLoaded', function() {
         resultsContainer.style.display = 'none';
         resultsList.innerHTML = '';
 
-        const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 
         fetch(window.benchmarkUrls.webSearch, {
             method: 'POST',
@@ -752,30 +616,17 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(data => {
             resultsContainer.style.display = 'block';
             if (data.error) {
-                resultsList.innerHTML = `<div class="alert alert-danger">${data.error}</div>`;
+                BenchmarkUtils.BenchmarkRenderer.renderSearchError(resultsList, `Error: ${data.error}`);
             } else if (data.results && data.results.length > 0) {
-                data.results.forEach((res, index) => {
-                    const item = document.createElement('a');
-                    item.href = res.link || '#';
-                    item.target = "_blank";
-                    item.className = "list-group-item list-group-item-action";
-                    item.innerHTML = `
-                        <div class="d-flex w-100 justify-content-between">
-                            <h6 class="mb-1 text-primary">${index + 1}. ${res.title || 'No Title'}</h6>
-                        </div>
-                        <p class="mb-1 small text-muted">${res.snippet || 'No snippet available.'}</p>
-                        <small class="text-truncate d-block text-secondary">${res.link || ''}</small>
-                    `;
-                    resultsList.appendChild(item);
-                });
+                BenchmarkUtils.BenchmarkRenderer.renderSearchResults(data.results, resultsList);
             } else {
-                resultsList.innerHTML = '<div class="alert alert-info">No results found.</div>';
+                BenchmarkUtils.BenchmarkRenderer.renderNoSearchResults(resultsList);
             }
         })
         .catch(error => {
             console.error('Error:', error);
             resultsContainer.style.display = 'block';
-            resultsList.innerHTML = `<div class="alert alert-danger">An error occurred: ${error.message}</div>`;
+            BenchmarkUtils.BenchmarkRenderer.renderSearchError(resultsList, `An error occurred: ${error.message}`);
         })
         .finally(() => {
             btn.disabled = false;
@@ -811,40 +662,8 @@ document.addEventListener('DOMContentLoaded', function() {
             try {
                 const results = JSON.parse(decodeURIComponent(btn.dataset.results));
                 const container = document.getElementById('modal-search-results-container');
-                container.innerHTML = '';
-
-                if (results && results.length > 0) {
-                    results.forEach((res, idx) => {
-                        const linkUrl = res.link || '#';
-                        const linkTitle = res.title || 'No Title';
-                        const snippet = res.snippet || 'No snippet available.';
-                        
-                        let domain = '';
-                        try {
-                            if (res.link) {
-                                const urlObj = new URL(res.link);
-                                domain = urlObj.hostname.replace('www.', '');
-                            }
-                        } catch(err) {}
-
-                        const item = document.createElement('div');
-                        item.className = 'list-group-item p-3';
-                        item.innerHTML = `
-                            <div class="d-flex w-100 justify-content-between mb-1">
-                                <h6 class="mb-0 text-primary fw-bold">
-                                    <span class="text-muted fw-normal me-2">#${idx + 1}</span>
-                                    <a href="${linkUrl}" target="_blank" class="text-decoration-none">${linkTitle}</a>
-                                </h6>
-                                <small class="text-muted text-end ms-2">${domain}</small>
-                            </div>
-                            <p class="mb-1 text-dark" style="font-size: 0.95rem; line-height: 1.4;">${snippet}</p>
-                            <small class="text-muted font-monospace" style="font-size: 0.75rem;"><i class="bi bi-link-45deg"></i> ${linkUrl}</small>
-                        `;
-                        container.appendChild(item);
-                    });
-                } else {
-                    container.innerHTML = '<div class="p-3 text-center text-muted">No results data found.</div>';
-                }
+                
+                BenchmarkUtils.BenchmarkRenderer.renderModalSearchResults(results, container);
 
                 const modal = new bootstrap.Modal(document.getElementById('searchResultsListModal'));
                 modal.show();

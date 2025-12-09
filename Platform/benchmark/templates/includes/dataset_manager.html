@@ -21,18 +21,18 @@
                     {% csrf_token %}
                     <div class="row g-3 align-items-end">
                         <div class="col-md-3">
-                            <label for="dataset_name" class="form-label small text-uppercase fw-bold text-muted">Name</label>
+                            <label for="dataset_name" class="form-label text-uppercase fw-bold text-muted">Name</label>
                             <input type="text" class="form-control" id="dataset_name" name="name" placeholder="e.g., my_questions.jsonl" required>
                         </div>
-                        <div class="col-md-4">
-                            <label for="dataset_description" class="form-label small text-uppercase fw-bold text-muted">Description</label>
+                        <div class="col-12 col-sm-6 col-md-4">
+                            <label for="dataset_description" class="form-label text-uppercase fw-bold text-muted">Description</label>
                             <input type="text" class="form-control" id="dataset_description" name="description" placeholder="Optional notes...">
                         </div>
-                        <div class="col-md-3">
-                            <label for="dataset_file" class="form-label small text-uppercase fw-bold text-muted">JSONL File</label>
+                        <div class="col-12 col-sm-6 col-md-3">
+                            <label for="dataset_file" class="form-label text-uppercase fw-bold text-muted">JSONL File</label>
                             <input type="file" class="form-control" id="dataset_file" name="file" accept=".jsonl,.json" required>
                         </div>
-                        <div class="col-md-2">
+                        <div class="col-12 col-md-2">
                             <button type="submit" class="btn btn-primary w-100"><i class="bi bi-upload me-2"></i>Upload</button>
                         </div>
                     </div>
@@ -50,11 +50,11 @@
                     <table class="table table-hover align-middle">
                         <thead class="table-light small text-muted text-uppercase">
                             <tr>
-                                <th style="width: 5%;">Active</th>
-                                <th style="width: 35%;">Name</th>
-                                <th style="width: 30%;">Description</th>
-                                <th style="width: 20%;">Uploaded</th>
-                                <th style="width: 10%;" class="text-end">Actions</th>
+                                <th>Active</th>
+                                <th>Name</th>
+                                <th>Description</th>
+                                <th>Uploaded</th>
+                                <th class="text-end">Actions</th>
                             </tr>
                         </thead>
                         <tbody id="dataset-table-body" data-count="{{ datasets|length }}">
@@ -77,9 +77,9 @@
                                         </div>
                                     </td>
                                     <td>
-                                        <small class="text-muted d-block text-truncate" style="max-width: 300px;" title="{{ dataset.description }}">
+                                        <span class="text-muted d-block text-truncate" title="{{ dataset.description }}">
                                             {{ dataset.description|default:"-" }}
-                                        </small>
+                                        </span>
                                     </td>
                                     <td><small class="text-muted">{{ dataset.created_at|date:"M d, Y" }}</small></td>
                                     <td class="text-end">

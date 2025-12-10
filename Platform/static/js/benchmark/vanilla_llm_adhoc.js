@@ -175,6 +175,8 @@ document.addEventListener('DOMContentLoaded', function() {
                          return;
                     }
 
+                    if (data.is_meta) return;
+
                     currentRunResults.push(data);
                     
                     processedCount++;

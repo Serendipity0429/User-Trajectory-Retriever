@@ -298,8 +298,25 @@ const BenchmarkUtils = {
                 const ruleCorrect = data.hasOwnProperty('is_correct_rule') ? data.is_correct_rule : data.rule_result;
                 const llmCorrect = data.hasOwnProperty('is_correct_llm') ? data.is_correct_llm : data.llm_result;
                 
-                tr.className = ruleCorrect ? 'table-success-light' : 'table-danger-light';
-                const textColorClass = ruleCorrect ? 'text-success-dark' : 'text-danger-dark';
+                // Use LLM result for styling if available, otherwise fallback to rule or neutral
+                let rowClass = 'table-light';
+                let textClass = 'text-dark';
+
+                if (llmCorrect === true) {
+                    rowClass = 'table-success-light';
+                    textClass = 'text-success-dark';
+                } else if (llmCorrect === false) {
+                    rowClass = 'table-danger-light';
+                    textClass = 'text-danger-dark';
+                } else if (ruleCorrect === true) {
+                     // Fallback to rule if LLM is null (optional, or just leave neutral)
+                     // But user emphasized LLM judge. If LLM is null, maybe just keep neutral/warning.
+                     // Let's stick to strict LLM judge as requested, but maybe show warning if null.
+                     rowClass = 'table-warning-light'; 
+                }
+
+                tr.className = rowClass;
+                const textColorClass = textClass;
 
                 // Cell 1: Index or empty
                 const td1 = document.createElement('td');

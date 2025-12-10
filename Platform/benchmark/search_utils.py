@@ -336,6 +336,7 @@ class SerperSearch(WebSearch):
             res = conn.getresponse()
             data = res.read()
             response_data = json.loads(data.decode("utf-8"))
+            # print_debug(f"Serper API response: {response_data}")
             
             # Normalize results to match the expected format
             results = []

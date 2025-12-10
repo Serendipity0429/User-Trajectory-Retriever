@@ -1,5 +1,5 @@
 from django.core.management.base import BaseCommand
-from user_system.models import User
+from user_system.models import User, InformedConsent
 
 
 class Command(BaseCommand):
@@ -21,6 +21,9 @@ class Command(BaseCommand):
         user = User.objects.create_user(
             username=username, password=password, email="test@nowhere.com"
         )
+        user.consent_agreed = True
+        user.agreed_consent_version = InformedConsent.get_latest()
+        user.save()
 
         profile = user.profile
         profile.name = "Test User"

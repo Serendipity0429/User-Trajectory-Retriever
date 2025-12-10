@@ -57,6 +57,7 @@ INSTALLED_APPS = [
     "msg_system",
     "captcha",
     "benchmark",
+    "dashboard",
 ]
 
 # Captcha Configuration

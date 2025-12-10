@@ -84,7 +84,10 @@ document.addEventListener('DOMContentLoaded', function() {
             if (e.target.id === 'clear-task-filter-btn') {
                 e.preventDefault();
                 const form = document.getElementById('task-filter-form');
-                form.reset();
+                // Manually clear inputs to ensure filters are removed, as reset() reverts to default values (server-rendered)
+                form.querySelectorAll('input:not([type="hidden"]), select').forEach(input => {
+                    input.value = '';
+                });
                 form.dispatchEvent(new Event('submit', { cancelable: true }));
             }
         });

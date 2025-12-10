@@ -104,7 +104,7 @@
                 </li>
                 {% if user.is_superuser %}
                 <li>
-                    <a href="{% url 'user_system:admin_page' %}"><i class="bi bi-person-badge-fill"></i> Admin Page</a>
+                    <a href="{% url 'dashboard:index' %}"><i class="bi bi-person-badge-fill"></i> Admin Page</a>
                 </li>
                 {% endif %}
                 {% if user.is_staff %}
@@ -114,7 +114,7 @@
                 {% endif %}
                 {% if request.session.original_user_token %}
                 <li>
-                    <form id="return-to-admin-form" action="{% url 'user_system:return_to_admin' %}" method="post" style="display: none;">
+                    <form id="return-to-admin-form" action="{% url 'dashboard:return_to_admin' %}" method="post" style="display: none;">
                         {% csrf_token %}
                     </form>
                     <a href="#" onclick="event.preventDefault(); document.getElementById('return-to-admin-form').submit();">

@@ -53,7 +53,8 @@ class MCPClient:
         if not self._process or not self._process.stderr:
             return
         for line in iter(self._process.stderr.readline, b''):
-            logger.debug(f"[MCP-SERVER-STDERR] {line.decode('utf-8').strip()}")
+            pass
+            # print_debug(f"[MCP-SERVER-STDERR] {line.decode('utf-8').strip()}")
 
     def _send_request(self, method, params=None):
         """Builds and sends a JSON-RPC request."""
@@ -73,7 +74,7 @@ class MCPClient:
             body_str = json.dumps(request)
             full_message = (body_str + '\n').encode('utf-8')
             
-            logger.debug(f"[PY-CLIENT-SEND] {body_str}")
+            # print_debug(f"[PY-CLIENT-SEND] {body_str}")
 
             self._process.stdin.write(full_message)
             self._process.stdin.flush()
@@ -94,7 +95,7 @@ class MCPClient:
             if not line_str:
                 continue
 
-            logger.debug(f"[PY-CLIENT-RECV] {line_str}")
+            # print_debug(f"[PY-CLIENT-RECV] {line_str}")
             
             try:
                 return json.loads(line_str)

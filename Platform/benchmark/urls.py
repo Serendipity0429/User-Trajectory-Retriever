@@ -28,14 +28,20 @@ urlpatterns = [
     path('api/multi_turn/load_run/<int:group_id>/', views.load_vanilla_llm_multi_turn_run, name='load_vanilla_llm_multi_turn_run'),
     path('api/multi_turn/load_rag_run/<int:group_id>/', views.load_rag_multi_turn_run, name='load_rag_multi_turn_run'),
 
-    # Multi-turn Pipeline APIs
+    # Vanilla LLM Multi-turn Pipeline APIs
     path('api/run_vanilla_llm_multi_turn_pipeline/', views.run_vanilla_llm_multi_turn_pipeline, name='run_vanilla_llm_multi_turn_pipeline'),
     path('api/stop_vanilla_llm_multi_turn_pipeline/', views.stop_vanilla_llm_multi_turn_pipeline, name='stop_vanilla_llm_multi_turn_pipeline'),
+    
+    # RAG Multi-turn Pipeline APIs
+    path('api/run_rag_multi_turn_pipeline/', views.run_rag_multi_turn_pipeline, name='run_rag_multi_turn_pipeline'),
+    path('api/stop_rag_multi_turn_pipeline/', views.stop_rag_multi_turn_pipeline, name='stop_rag_multi_turn_pipeline'),
 
 
     # Vanilla LLM Ad-hoc pipeline URL
     path('api/run_vanilla_llm_adhoc_pipeline/', views.run_vanilla_llm_adhoc_pipeline, name='run_vanilla_llm_adhoc_pipeline'),
     path('api/stop_vanilla_llm_adhoc_pipeline/', views.stop_vanilla_llm_adhoc_pipeline, name='stop_vanilla_llm_adhoc_pipeline'),
+    
+    # RAG Ad-hoc pipeline URL
     path('api/run_rag_adhoc_pipeline/', views.run_rag_adhoc_pipeline, name='run_rag_adhoc_pipeline'),
     path('api/stop_rag_adhoc_pipeline/', views.stop_rag_adhoc_pipeline, name='stop_rag_adhoc_pipeline'),
 

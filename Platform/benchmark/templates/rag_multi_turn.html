@@ -1,13 +1,13 @@
 {% extends "benchmark_base.html" %}
 {% load static %}
 
-{% block title %}Multi-Turn Web RAG Benchmark{% endblock %}
+{% block title %}Multi-Turn Web RAG Baseline{% endblock %}
 
 {% block content %}
 <div class="container-fluid mt-5 px-lg-4">
     <div class="pb-3 mb-4 border-bottom d-flex justify-content-between align-items-center">
         <div>
-            <h1 class="h2"><i class="bi bi-globe me-2"></i>Multi-Turn Web RAG Benchmark</h1>
+            <h1 class="h2"><i class="bi bi-globe me-2"></i>Multi-Turn Web RAG Baseline</h1>
             <p class="text-muted mb-0">Evaluate RAG performance over multiple turns with optional query reformulation.</p>
         </div>
         <a href="{% url 'benchmark:home' %}" class="btn btn-outline-secondary">
@@ -319,8 +319,11 @@
         createSession: "{% url 'benchmark:create_session' %}",
         getDefaultRagPrompt: "{% url 'benchmark:get_default_rag_prompt' %}",
         saveRagSettings: "{% url 'benchmark:save_rag_settings' %}",
+        createSessionGroup: "{% url 'benchmark:create_session_group' %}",
+        stopRagMultiTurnPipeline: "{% url 'benchmark:stop_rag_multi_turn_pipeline' %}",
+        runPipeline: "{% url 'benchmark:run_rag_multi_turn_pipeline' %}",
     };
 </script>
-<script src="{% static 'js/rag_multi_turn.js' %}"></script>
+<script src="{% static 'js/benchmark/rag_multi_turn.js' %}"></script>
 
 {% endblock %}

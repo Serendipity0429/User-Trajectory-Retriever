@@ -146,8 +146,10 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+
     document.querySelectorAll('.activate-dataset-radio').forEach(radio => {
-        radio.addEventListener('change', function() {
+        radio.addEventListener('change', function(e) {
+            e.stopPropagation(); // Prevent row click from being triggered when radio is directly interacted with
             if (this.checked) {
                 const datasetId = this.value;
                 
@@ -168,6 +170,19 @@ document.addEventListener('DOMContentLoaded', function() {
                     console.error('Error:', error);
                     alert('An error occurred while activating the dataset.');
                 });
+            }
+        });
+    });
+
+    // Add click listener to table rows to activate the radio button
+    document.querySelectorAll('.dataset-row').forEach(row => {
+        row.addEventListener('click', function() {
+            const radio = this.querySelector('.activate-dataset-radio');
+            if (radio && !radio.checked) {
+                radio.checked = true;
+                // Manually trigger the change event as setting .checked = true doesn't always do it
+                const changeEvent = new Event('change');
+                radio.dispatchEvent(changeEvent);
             }
         });
     });

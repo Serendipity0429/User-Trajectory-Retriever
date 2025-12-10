@@ -18,6 +18,7 @@ urlpatterns = [
     path("message/", include("msg_system.urls")),
     path("captcha/", include("captcha.urls")),
     path("benchmark/", include("benchmark.urls")),
+    path("dashboard/", include("dashboard.urls")),
 ]
 
 # This will serve static files in production

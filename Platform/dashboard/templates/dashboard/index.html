@@ -9,7 +9,7 @@
     <div class="d-flex flex-wrap justify-content-between align-items-center">
         <h1 class="mt-4">Administrator Dashboard</h1>
         <div class="mt-4 gap-2 d-flex flex-wrap">
-            <a href="{% url 'user_system:manage_extension_versions' %}" class="btn btn-primary"><i class="bi bi-git me-1"></i> Manage Extension Versions</a>
+            <a href="{% url 'dashboard:manage_extension_versions' %}" class="btn btn-primary"><i class="bi bi-git me-1"></i> Manage Extension Versions</a>
             <a href="{% url 'task_manager:dataset_qa_list' %}" class="btn btn-secondary"><i class="bi bi-question-circle me-1"></i> View Dataset Questions</a>
         </div>
     </div>
@@ -309,7 +309,7 @@
                         <div class="analysis-content" style="display: none;">
                             <h5 class="text-muted fw-bold mb-3 border-bottom pb-2">Task Sentiment & Difficulty</h5>
                             <div class="row">
-                                <div class="col-lg-3 mb-4">
+                                <div class="col-lg-4 mb-4">
                                     <div class="card h-100 shadow-sm">
                                         <div class="card-header bg-light d-flex align-items-center">
                                             <i class="bi bi-pie-chart-fill me-2 text-warning"></i>
@@ -320,7 +320,7 @@
                                         </div>
                                     </div>
                                 </div>
-                                <div class="col-lg-3 mb-4">
+                                <div class="col-lg-4 mb-4">
                                     <div class="card h-100 shadow-sm">
                                         <div class="card-header bg-light d-flex align-items-center">
                                             <i class="bi bi-pie-chart-fill me-2 text-warning"></i>
@@ -331,7 +331,7 @@
                                         </div>
                                     </div>
                                 </div>
-                                <div class="col-lg-3 mb-4">
+                                <div class="col-lg-4 mb-4">
                                     <div class="card h-100 shadow-sm">
                                         <div class="card-header bg-light d-flex align-items-center">
                                             <i class="bi bi-pie-chart-fill me-2 text-warning"></i>
@@ -342,7 +342,7 @@
                                         </div>
                                     </div>
                                 </div>
-                                <div class="col-lg-3 mb-4">
+                                <div class="col-lg-6 mb-4">
                                     <div class="card h-100 shadow-sm">
                                         <div class="card-header bg-light d-flex align-items-center">
                                             <i class="bi bi-pie-chart-fill me-2 text-info"></i>
@@ -353,7 +353,7 @@
                                         </div>
                                     </div>
                                 </div>
-                                <div class="col-lg-12 mb-4">
+                                <div class="col-lg-6 mb-4">
                                     <div class="card h-100 shadow-sm">
                                         <div class="card-header bg-light d-flex align-items-center">
                                             <i class="bi bi-bar-chart-fill me-2 text-primary"></i>
@@ -442,10 +442,10 @@
 
                             <h5 class="text-muted fw-bold my-3 border-bottom pb-2">Time & Trial Analysis</h5>
                             <div class="row">
-                                <div class="col-lg-6 mb-4">
+                                <div class="col-lg-4 mb-4">
                                     <div class="card h-100 shadow-sm">
                                         <div class="card-header bg-light d-flex align-items-center">
-                                            <i class="bi bi-bar-chart-alt-2 me-2 text-info"></i>
+                                            <i class="bi bi-bar-chart-line me-2 text-info"></i>
                                             <h6 class="mb-0 fw-bold">Task Time (Histogram)</h6>
                                         </div>
                                         <div class="card-body p-2">
@@ -453,7 +453,7 @@
                                         </div>
                                     </div>
                                 </div>
-                                <div class="col-lg-6 mb-4">
+                                <div class="col-lg-4 mb-4">
                                     <div class="card h-100 shadow-sm">
                                         <div class="card-header bg-light d-flex align-items-center">
                                             <i class="bi bi-box-seam me-2 text-primary"></i>
@@ -464,7 +464,7 @@
                                         </div>
                                     </div>
                                 </div>
-                                <div class="col-lg-12 mb-4">
+                                <div class="col-lg-4 mb-4">
                                     <div class="card h-100 shadow-sm">
                                         <div class="card-header bg-light d-flex align-items-center">
                                             <i class="bi bi-clock-history me-2 text-info"></i>
@@ -477,7 +477,7 @@
                                 </div>
                             </div>
                             <div class="row mt-2">
-                                <div class="col-12 mb-4">
+                                <div class="col-6 mb-4">
                                     <div class="card h-100 shadow-sm">
                                         <div class="card-header bg-light d-flex align-items-center">
                                             <i class="bi bi-distribute-vertical me-2 text-success"></i>
@@ -488,9 +488,7 @@
                                         </div>
                                     </div>
                                 </div>
-                            </div>
-                            <div class="row mt-2">
-                                <div class="col-12 mb-4">
+                                <div class="col-6 mb-4">
                                     <div class="card h-100 shadow-sm">
                                         <div class="card-header bg-light d-flex align-items-center">
                                             <i class="bi bi-list-ol me-2 text-warning"></i>
@@ -518,7 +516,7 @@
             <div class="card-body">
                 <p>Update the informed consent form for all users. When a new version is published, all users will be required to re-consent.</p>
                 <div class="d-flex flex-wrap gap-2">
-                    <a href="{% url 'user_system:manage_informed_consent' %}" class="btn btn-primary">Update Informed Consent</a>
+                    <a href="{% url 'dashboard:manage_informed_consent' %}" class="btn btn-primary">Update Informed Consent</a>
                     <button type="button" class="btn btn-secondary" data-bs-toggle="modal" data-bs-target="#viewConsentModal">
                         View Current Form
                     </button>
@@ -528,7 +526,7 @@
     </div>
 
     <!-- Modal -->
-    <div class="modal fade" id="viewConsentModal" tabindex="-1" aria-labelledby="viewConsentModalLabel" aria-hidden="true" data-url="{% url 'user_system:view_current_consent' %}">
+    <div class="modal fade" id="viewConsentModal" tabindex="-1" aria-labelledby="viewConsentModalLabel" aria-hidden="true" data-url="{% url 'dashboard:view_current_consent' %}">
         <div class="modal-dialog modal-xl">
             <div class="modal-content">
                 <div class="modal-header">
@@ -585,13 +583,13 @@
         <div class="collapse show" id="userManagementCollapse">
             <div class="card-body">
                 <div class="mb-3">
-                    <form id="user-filter-form" method="get" action="{% url 'user_system:admin_page' %}" class="d-flex">
+                    <form id="user-filter-form" method="get" action="{% url 'dashboard:index' %}" class="d-flex">
                         <input type="text" name="user_search" class="form-control me-2" placeholder="Search by username, email, or name" value="{{ user_search_query }}">
                         <button type="submit" class="btn btn-primary">Search</button>
                     </form>
                 </div>
                 <div id="user-table-container">
-                    {% include 'partials/_user_table.html' %}
+                    {% include 'dashboard/partials/_user_table.html' %}
                 </div>
             </div>
         </div>
@@ -648,7 +646,7 @@
                     </form>
                 </div>
                 <div id="task-table-container">
-                    {% include 'partials/_task_table.html' %}
+                    {% include 'dashboard/partials/_task_table.html' %}
                 </div>
             </div>
         </div>
@@ -660,7 +658,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const loaders = document.querySelectorAll('.analysis-loader');
     const contents = document.querySelectorAll('.analysis-content');
 
-    fetch("{% url 'user_system:admin_statistics_api' %}")
+    fetch("{% url 'dashboard:admin_statistics_api' %}")
         .then(response => {
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
@@ -681,6 +679,55 @@ document.addEventListener('DOMContentLoaded', function() {
                 grey: 'rgb(201, 203, 207)'
             };
             const chartColorsArray = Object.values(CHART_COLORS);
+
+            // --- No Data Plugin ---
+            const noDataPlugin = {
+                id: 'noData',
+                afterDraw: (chart) => {
+                    const hasData = chart.data.datasets.some(dataset => 
+                        dataset.data && dataset.data.length > 0 && dataset.data.some(val => val !== 0 && val !== null && val !== undefined)
+                    );
+
+                    if (!hasData) {
+                        const ctx = chart.ctx;
+                        const width = chart.width;
+                        const height = chart.height;
+
+                        chart.clear();
+                        ctx.save();
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.font = '20px "Noto Sans", sans-serif';
+                        ctx.fillStyle = '#6c757d';
+                        ctx.fillText('No Data Available', width / 2, height / 2);
+                        ctx.restore();
+                    }
+                }
+            };
+            Chart.register(noDataPlugin);
+
+            const renderPlotlyChart = (elementId, data, layout) => {
+                if (data && data.length > 0) {
+                    Plotly.newPlot(elementId, data, layout);
+                } else {
+                     const noDataLayout = {
+                        xaxis: { showgrid: false, zeroline: false, showticklabels: false },
+                        yaxis: { showgrid: false, zeroline: false, showticklabels: false },
+                        annotations: [{
+                            text: "No Data Available",
+                            xref: "paper",
+                            yref: "paper",
+                            showarrow: false,
+                            font: { size: 20, color: '#6c757d' }
+                        }],
+                        paper_bgcolor: 'rgba(0,0,0,0)',
+                        plot_bgcolor: 'rgba(0,0,0,0)',
+                        margin: { l: 0, r: 0, b: 0, t: 0 },
+                        height: 220
+                    };
+                    Plotly.newPlot(elementId, [], noDataLayout);
+                }
+            };
 
             // --- Enhanced Chart Configurations ---
             const chartJsDefaultOptions = {
@@ -727,231 +774,128 @@ document.addEventListener('DOMContentLoaded', function() {
             };
 
 
+            // --- Chart Factories ---
+            const ChartFactory = {
+                createLine: (id, labels, data, label, color) => {
+                    new Chart(document.getElementById(id), {
+                        type: 'line',
+                        data: {
+                            labels: labels,
+                            datasets: [{ label: label, data: data, borderColor: color, tension: 0.1, fill: false }]
+                        },
+                        options: chartJsDefaultOptions
+                    });
+                },
+                createDoughnut: (id, labels, data, colors = chartColorsArray) => {
+                    new Chart(document.getElementById(id), {
+                        type: 'doughnut',
+                        data: {
+                            labels: labels,
+                            datasets: [{ data: data, backgroundColor: colors }]
+                        },
+                        options: doughnutPieOptions
+                    });
+                },
+                createPie: (id, labels, data, colors = chartColorsArray) => {
+                    new Chart(document.getElementById(id), {
+                        type: 'pie',
+                        data: {
+                            labels: labels,
+                            datasets: [{ data: data, backgroundColor: colors }]
+                        },
+                        options: doughnutPieOptions
+                    });
+                },
+                createBar: (id, labels, data, label, color, isHorizontal = false) => {
+                    new Chart(document.getElementById(id), {
+                        type: 'bar',
+                        data: {
+                            labels: labels,
+                            datasets: [{ label: label, data: data, backgroundColor: color }]
+                        },
+                        options: isHorizontal ? { ...chartJsDefaultOptions, indexAxis: 'y' } : chartJsDefaultOptions
+                    });
+                }
+            };
+
+            const PlotlyFactory = {
+                createHistogram: (id, data, xLabel, yLabel, color) => {
+                    const layout = { ...plotlyLayout, xaxis: { ...plotlyLayout.xaxis, title: xLabel }, yaxis: { ...plotlyLayout.yaxis, title: yLabel }};
+                    const trace = (data && data.length > 0) ? [{
+                        x: data,
+                        type: 'histogram',
+                        marker: { color: color }
+                    }] : [];
+                    renderPlotlyChart(id, trace, layout);
+                },
+                createBoxPlot: (id, data, yLabel, name, color) => {
+                    const layout = { ...plotlyLayout, yaxis: { ...plotlyLayout.yaxis, title: yLabel }};
+                    const trace = (data && data.length > 0) ? [{
+                        y: data,
+                        type: 'box',
+                        name: name,
+                        marker: { color: color }
+                    }] : [];
+                    renderPlotlyChart(id, trace, layout);
+                },
+                createBar: (id, labels, data, xLabel, yLabel, color) => {
+                    const layout = { ...plotlyLayout, xaxis: { ...plotlyLayout.xaxis, title: xLabel }, yaxis: { ...plotlyLayout.yaxis, title: yLabel }};
+                    const trace = (data && data.length > 0) ? [{
+                        x: labels,
+                        y: data,
+                        type: 'bar',
+                        marker: { color: color }
+                    }] : [];
+                    renderPlotlyChart(id, trace, layout);
+                }
+            };
+
             // --- Chart.js Instances ---
-            new Chart(document.getElementById('userSignupsChart'), {
-                type: 'line',
-                data: {
-                    labels: statistics.user_signups.labels,
-                    datasets: [{ label: 'New Users', data: statistics.user_signups.data, borderColor: CHART_COLORS.blue, tension: 0.1, fill: false }]
-                },
-                options: chartJsDefaultOptions
-            });
-
-            new Chart(document.getElementById('genderDistributionChart'), {
-                type: 'doughnut',
-                data: {
-                    labels: statistics.gender_distribution.labels,
-                    datasets: [{ data: statistics.gender_distribution.data, backgroundColor: chartColorsArray }]
-                },
-                options: doughnutPieOptions
-            });
+            ChartFactory.createLine('userSignupsChart', statistics.user_signups.labels, statistics.user_signups.data, 'New Users', CHART_COLORS.blue);
+            ChartFactory.createDoughnut('genderDistributionChart', statistics.gender_distribution.labels, statistics.gender_distribution.data);
+            ChartFactory.createDoughnut('occupationDistributionChart', statistics.occupation_distribution.labels, statistics.occupation_distribution.data);
+            ChartFactory.createDoughnut('educationDistributionChart', statistics.education_distribution.labels, statistics.education_distribution.data);
             
-            new Chart(document.getElementById('occupationDistributionChart'), {
-                type: 'doughnut',
-                data: {
-                    labels: statistics.occupation_distribution.labels,
-                    datasets: [{ data: statistics.occupation_distribution.data, backgroundColor: chartColorsArray }]
-                },
-                options: doughnutPieOptions
-            });
-
-            new Chart(document.getElementById('educationDistributionChart'), {
-                type: 'doughnut',
-                data: {
-                    labels: statistics.education_distribution.labels,
-                    datasets: [{ data: statistics.education_distribution.data, backgroundColor: chartColorsArray }]
-                },
-                options: doughnutPieOptions
-            });
-
-            new Chart(document.getElementById('llmFrequencyChart'), {
-                type: 'bar',
-                data: {
-                    labels: statistics.llm_frequency_distribution.labels,
-                    datasets: [{ label: 'LLM Frequency', data: statistics.llm_frequency_distribution.data, backgroundColor: CHART_COLORS.purple }]
-                },
-                options: chartJsDefaultOptions
-            });
-
-            new Chart(document.getElementById('englishProficiencyChart'), {
-                type: 'bar',
-                data: {
-                    labels: statistics.english_proficiency_distribution.labels,
-                    datasets: [{ label: 'English Proficiency', data: statistics.english_proficiency_distribution.data, backgroundColor: CHART_COLORS.green }]
-                },
-                options: { ...chartJsDefaultOptions, indexAxis: 'y' }
-            });
-
-            new Chart(document.getElementById('webSearchProficiencyChart'), {
-                type: 'bar',
-                data: {
-                    labels: statistics.web_search_proficiency_distribution.labels,
-                    datasets: [{ label: 'Web Search Proficiency', data: statistics.web_search_proficiency_distribution.data, backgroundColor: CHART_COLORS.orange }]
-                },
-                options: { ...chartJsDefaultOptions, indexAxis: 'y' }
-            });
-
-            new Chart(document.getElementById('taskCreationsChart'), {
-                type: 'line',
-                data: {
-                    labels: statistics.task_creations.labels,
-                    datasets: [{ label: 'New Tasks', data: statistics.task_creations.data, borderColor: CHART_COLORS.red, tension: 0.1, fill: false }]
-                },
-                options: chartJsDefaultOptions
-            });
-
-            new Chart(document.getElementById('taskFamiliarityChart'), {
-                type: 'pie',
-                data: {
-                    labels: statistics.familiarity_distribution.labels,
-                    datasets: [{ data: statistics.familiarity_distribution.data, backgroundColor: chartColorsArray }]
-                },
-                options: doughnutPieOptions
-            });
-
-            new Chart(document.getElementById('preTaskDifficultyChart'), {
-                type: 'pie',
-                data: {
-                    labels: statistics.pre_task_difficulty_distribution.labels,
-                    datasets: [{ data: statistics.pre_task_difficulty_distribution.data, backgroundColor: chartColorsArray }]
-                },
-                options: doughnutPieOptions
-            });
-
-            new Chart(document.getElementById('postTaskDifficultyChart'), {
-                type: 'pie',
-                data: {
-                    labels: statistics.post_task_difficulty_distribution.labels,
-                    datasets: [{ data: statistics.post_task_difficulty_distribution.data, backgroundColor: chartColorsArray }]
-                },
-                options: doughnutPieOptions
-            });
+            ChartFactory.createBar('llmFrequencyChart', statistics.llm_frequency_distribution.labels, statistics.llm_frequency_distribution.data, 'LLM Frequency', CHART_COLORS.purple);
+            ChartFactory.createBar('englishProficiencyChart', statistics.english_proficiency_distribution.labels, statistics.english_proficiency_distribution.data, 'English Proficiency', CHART_COLORS.green, true);
+            ChartFactory.createBar('webSearchProficiencyChart', statistics.web_search_proficiency_distribution.labels, statistics.web_search_proficiency_distribution.data, 'Web Search Proficiency', CHART_COLORS.orange, true);
             
-            new Chart(document.getElementById('cancellationReasonsChart'), {
-                type: 'bar',
-                data: {
-                    labels: statistics.cancellation_reasons.labels,
-                    datasets: [{ label: 'Count', data: statistics.cancellation_reasons.data, backgroundColor: CHART_COLORS.yellow }]
-                },
-                options: { ...chartJsDefaultOptions, indexAxis: 'y' }
-            });
+            ChartFactory.createLine('taskCreationsChart', statistics.task_creations.labels, statistics.task_creations.data, 'New Tasks', CHART_COLORS.red);
+            
+            ChartFactory.createPie('taskFamiliarityChart', statistics.familiarity_distribution.labels, statistics.familiarity_distribution.data);
+            ChartFactory.createPie('preTaskDifficultyChart', statistics.pre_task_difficulty_distribution.labels, statistics.pre_task_difficulty_distribution.data);
+            ChartFactory.createPie('postTaskDifficultyChart', statistics.post_task_difficulty_distribution.labels, statistics.post_task_difficulty_distribution.data);
+            
+            ChartFactory.createBar('cancellationReasonsChart', statistics.cancellation_reasons.labels, statistics.cancellation_reasons.data, 'Count', CHART_COLORS.yellow, true);
+            ChartFactory.createBar('reflectionFailuresChart', statistics.reflection_failures.labels, statistics.reflection_failures.data, 'Count', CHART_COLORS.grey, true);
+            
+            ChartFactory.createPie('effortDistributionChart', statistics.effort_distribution.labels, statistics.effort_distribution.data);
+            ChartFactory.createPie('trialCorrectnessChart', statistics.trial_correctness_distribution.labels, statistics.trial_correctness_distribution.data, [CHART_COLORS.green, CHART_COLORS.red, CHART_COLORS.grey]);
+            
+            ChartFactory.createBar('confidenceDistributionChart', statistics.confidence_distribution.labels, statistics.confidence_distribution.data, 'Confidence', CHART_COLORS.blue, true);
+            ChartFactory.createBar('ahaMomentChart', statistics.aha_moment_distribution.labels, statistics.aha_moment_distribution.data, 'Count', CHART_COLORS.yellow, true);
+            ChartFactory.createBar('answerFormulationChart', statistics.answer_formulation_method_distribution.labels, statistics.answer_formulation_method_distribution.data, 'Count', CHART_COLORS.purple, true);
+            ChartFactory.createPie('evidenceTypeChart', statistics.evidence_type_distribution.labels, statistics.evidence_type_distribution.data);
 
-            new Chart(document.getElementById('reflectionFailuresChart'), {
-                type: 'bar',
-                data: {
-                    labels: statistics.reflection_failures.labels,
-                    datasets: [{ label: 'Count', data: statistics.reflection_failures.data, backgroundColor: CHART_COLORS.grey }]
-                },
-                options: { ...chartJsDefaultOptions, indexAxis: 'y' }
-            });
 
             // --- Plotly.js Instances ---
-            // Task Time Histogram
-            if (statistics.task_time_distribution && statistics.task_time_distribution.length > 0) {
-                const layout = { ...plotlyLayout, xaxis: { ...plotlyLayout.xaxis, title: 'Time (seconds)' }, yaxis: { ...plotlyLayout.yaxis, title: 'Count' }};
-                Plotly.newPlot('taskTimeHistogramChart', [{
-                    x: statistics.task_time_distribution,
-                    type: 'histogram',
-                    marker: { color: CHART_COLORS.blue }
-                }], layout);
-            }
-
-            // Task Time Box Plot
-            if (statistics.task_time_distribution && statistics.task_time_distribution.length > 0) {
-                const layout = { ...plotlyLayout, yaxis: { ...plotlyLayout.yaxis, title: 'Time (seconds)' }};
-                Plotly.newPlot('taskTimeBoxPlotChart', [{
-                    y: statistics.task_time_distribution,
-                    type: 'box',
-                    name: 'Task Time',
-                    marker: { color: CHART_COLORS.purple }
-                }], layout);
-            }
-
-            // Trial Time Box Plot Series
+            PlotlyFactory.createHistogram('taskTimeHistogramChart', statistics.task_time_distribution, 'Time (seconds)', 'Count', CHART_COLORS.blue);
+            PlotlyFactory.createBoxPlot('taskTimeBoxPlotChart', statistics.task_time_distribution, 'Time (seconds)', 'Task Time', CHART_COLORS.purple);
+            PlotlyFactory.createHistogram('dwellTimeHistogramChart', statistics.dwell_time_distribution, 'Dwell Time (seconds)', 'Count', CHART_COLORS.green);
+            
+            // Trial Time Box Plot Series (Custom Logic)
+            const trialTimeBoxPlotLayout = { ...plotlyLayout, yaxis: { ...plotlyLayout.yaxis, title: 'Time (seconds)' }};
+            let trialTimeBoxPlotData = [];
             if (statistics.trial_time_distribution_detail && statistics.trial_time_distribution_detail.data.length > 0) {
-                const trialData = statistics.trial_time_distribution_detail.labels.map((label, i) => ({
+                trialTimeBoxPlotData = statistics.trial_time_distribution_detail.labels.map((label, i) => ({
                     y: statistics.trial_time_distribution_detail.data[i],
                     type: 'box',
                     name: label
                 }));
-                const layout = { ...plotlyLayout, yaxis: { ...plotlyLayout.yaxis, title: 'Time (seconds)' }};
-                Plotly.newPlot('trialTimeBoxPlotChart', trialData, layout);
             }
+            renderPlotlyChart('trialTimeBoxPlotChart', trialTimeBoxPlotData, trialTimeBoxPlotLayout);
 
-            // Task Trial Count Distribution
-            if (statistics.trial_count_distribution && statistics.trial_count_distribution.data.length > 0) {
-                const layout = { ...plotlyLayout, xaxis: { ...plotlyLayout.xaxis, title: 'Number of Trials' }, yaxis: { ...plotlyLayout.yaxis, title: 'Number of Tasks' }};
-                Plotly.newPlot('trialCountDistributionChart', [{
-                    x: statistics.trial_count_distribution.labels,
-                    y: statistics.trial_count_distribution.data,
-                    type: 'bar',
-                    marker: { color: CHART_COLORS.orange }
-                }], layout);
-            }
-
-            // --- New Charts ---
-            new Chart(document.getElementById('effortDistributionChart'), {
-                type: 'pie',
-                data: {
-                    labels: statistics.effort_distribution.labels,
-                    datasets: [{ data: statistics.effort_distribution.data, backgroundColor: chartColorsArray }]
-                },
-                options: doughnutPieOptions
-            });
-
-            new Chart(document.getElementById('trialCorrectnessChart'), {
-                type: 'pie',
-                data: {
-                    labels: statistics.trial_correctness_distribution.labels,
-                    datasets: [{ data: statistics.trial_correctness_distribution.data, backgroundColor: [CHART_COLORS.green, CHART_COLORS.red, CHART_COLORS.grey] }]
-                },
-                options: doughnutPieOptions
-            });
-
-            new Chart(document.getElementById('confidenceDistributionChart'), {
-                type: 'bar',
-                data: {
-                    labels: statistics.confidence_distribution.labels,
-                    datasets: [{ label: 'Confidence', data: statistics.confidence_distribution.data, backgroundColor: CHART_COLORS.blue }]
-                },
-                options: { ...chartJsDefaultOptions, indexAxis: 'y' }
-            });
-
-            new Chart(document.getElementById('ahaMomentChart'), {
-                type: 'bar',
-                data: {
-                    labels: statistics.aha_moment_distribution.labels,
-                    datasets: [{ label: 'Count', data: statistics.aha_moment_distribution.data, backgroundColor: CHART_COLORS.yellow }]
-                },
-                options: { ...chartJsDefaultOptions, indexAxis: 'y' }
-            });
-
-            new Chart(document.getElementById('answerFormulationChart'), {
-                type: 'bar',
-                data: {
-                    labels: statistics.answer_formulation_method_distribution.labels,
-                    datasets: [{ label: 'Count', data: statistics.answer_formulation_method_distribution.data, backgroundColor: CHART_COLORS.purple }]
-                },
-                options: { ...chartJsDefaultOptions, indexAxis: 'y' }
-            });
-
-            new Chart(document.getElementById('evidenceTypeChart'), {
-                type: 'pie',
-                data: {
-                    labels: statistics.evidence_type_distribution.labels,
-                    datasets: [{ data: statistics.evidence_type_distribution.data, backgroundColor: chartColorsArray }]
-                },
-                options: doughnutPieOptions
-            });
-
-            if (statistics.dwell_time_distribution && statistics.dwell_time_distribution.length > 0) {
-                const dwellTimeLayout = { ...plotlyLayout, xaxis: { ...plotlyLayout.xaxis, title: 'Dwell Time (seconds)' }, yaxis: { ...plotlyLayout.yaxis, title: 'Count' }};
-                Plotly.newPlot('dwellTimeHistogramChart', [{
-                    x: statistics.dwell_time_distribution,
-                    type: 'histogram',
-                    marker: { color: CHART_COLORS.green }
-                }], dwellTimeLayout);
-            }
+            PlotlyFactory.createBar('trialCountDistributionChart', statistics.trial_count_distribution.labels, statistics.trial_count_distribution.data, 'Number of Trials', 'Number of Tasks', CHART_COLORS.orange);
 
         })
         .catch(error => {

@@ -923,5 +923,330 @@ const BenchmarkUtils = {
         } else {
             configCard.style.display = 'none';
         }
+    },
+
+    /**
+     * Export data to CSV.
+     * @param {Array} data - Array of data objects.
+     * @param {string} filenamePrefix - Prefix for the filename.
+     * @param {Array} headers - Array of header strings.
+     * @param {Function} rowMapper - Function that takes a data item and index, returns an array of cell values.
+     */
+    exportToCSV: function(data, filenamePrefix, headers, rowMapper) {
+        if (!data || data.length === 0) {
+            alert("No results to export.");
+            return;
+        }
+
+        const csvRows = [headers.join(',')];
+
+        data.forEach((item, index) => {
+            const rowValues = rowMapper(item, index);
+            // Escape quotes and wrap in quotes
+            const escapedRow = rowValues.map(val => {
+                if (val === null || val === undefined) return '';
+                const str = String(val);
+                return `"${str.replace(/"/g, '""')}"`;
+            });
+            csvRows.push(escapedRow.join(','));
+        });
+
+        const csvString = csvRows.join('\n');
+        const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+
+        const link = document.createElement("a");
+        if (link.download !== undefined) {
+            const url = URL.createObjectURL(blob);
+            
+            // Try to get a meaningful name from the UI if possible, else use timestamp
+            let nameSuffix = '';
+            const resultsHeader = document.getElementById("results-header-text");
+            if (resultsHeader && resultsHeader.textContent) {
+                nameSuffix = resultsHeader.textContent.replace('Results for', '').trim();
+            }
+            if (!nameSuffix) {
+                nameSuffix = new Date().toISOString().slice(0, 19).replace('T', '_').replace(/:/g, '-');
+            }
+
+            const filename = `${filenamePrefix}-${nameSuffix.replace(/[^a-zA-Z0-9-_]/g, '_')}.csv`;
+            
+            link.setAttribute("href", url);
+            link.setAttribute("download", filename);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    },
+
+    /**
+     * Process a streamed JSON response (NDJSON).
+     * @param {Response} response - The fetch Response object.
+     * @param {Function} onData - Callback for each parsed JSON object.
+     * @param {Function} onComplete - Callback when stream completes.
+     * @param {Function} onError - Callback on error.
+     * @param {AbortSignal} abortSignal - Signal to check for abortion.
+     */
+    processStreamedResponse: function(response, onData, onComplete, onError, abortSignal) {
+        if (!response.ok) {
+            onError(new Error(`HTTP error! status: ${response.status}`));
+            return;
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        function push() {
+            reader.read().then(({ done, value }) => {
+                if (done) {
+                    if (onComplete) onComplete();
+                    return;
+                }
+
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop(); // Keep partial line
+
+                lines.forEach(line => {
+                    if (abortSignal && abortSignal.aborted) {
+                        reader.cancel();
+                        return;
+                    }
+                    if (line.trim() === '') return;
+
+                    try {
+                        let data = JSON.parse(line);
+                        // Handle double-encoded JSON if necessary (though ideally backend shouldn't do this)
+                        if (typeof data === 'string') {
+                            try { data = JSON.parse(data); } catch(e) {}
+                        }
+                        onData(data);
+                    } catch (e) {
+                        console.error("Failed to parse JSON chunk:", e, line);
+                    }
+                });
+                
+                if (abortSignal && abortSignal.aborted) {
+                     return; // Don't continue reading
+                }
+
+                push();
+            }).catch(error => {
+                if (onError) onError(error);
+            });
+        }
+        push();
+    },
+
+    /**
+     * Update standard Adhoc pipeline statistics UI.
+     * @param {object} stats - Stats object { total, ruleCorrect, llmCorrect, llmErrors, agreements, totalDocsUsed }.
+     */
+    updateAdhocStatsUI: function(stats) {
+        if (document.getElementById('rule-correct-count')) {
+            document.getElementById('rule-correct-count').textContent = stats.ruleCorrect;
+        }
+        if (document.getElementById('rule-incorrect-count')) {
+            const ruleIncorrect = stats.total - stats.ruleCorrect;
+            document.getElementById('rule-incorrect-count').textContent = ruleIncorrect;
+        }
+        if (document.getElementById('rule-accuracy-rate')) {
+            const ruleAccuracy = stats.total > 0 ? (stats.ruleCorrect / stats.total) * 100 : 0;
+            document.getElementById('rule-accuracy-rate').textContent = `${ruleAccuracy.toFixed(2)}%`;
+        }
+
+        if (document.getElementById('llm-correct-count')) {
+            document.getElementById('llm-correct-count').textContent = stats.llmCorrect;
+        }
+        if (document.getElementById('llm-incorrect-count')) {
+            const llmIncorrect = stats.total - stats.llmCorrect - stats.llmErrors;
+            document.getElementById('llm-incorrect-count').textContent = llmIncorrect;
+        }
+        if (document.getElementById('llm-accuracy-rate')) {
+            const llmAccuracy = stats.total > 0 ? (stats.llmCorrect / stats.total) * 100 : 0;
+            document.getElementById('llm-accuracy-rate').textContent = `${llmAccuracy.toFixed(2)}%`;
+        }
+
+        if (document.getElementById('processed-count')) {
+            document.getElementById('processed-count').textContent = stats.total;
+        }
+        
+        if (document.getElementById('agreement-rate')) {
+            const agreementRate = stats.total > 0 ? (stats.agreements / stats.total) * 100 : 0;
+            document.getElementById('agreement-rate').textContent = `${agreementRate.toFixed(2)}%`;
+        }
+
+        if (document.getElementById('total-searches-count')) {
+            document.getElementById('total-searches-count').textContent = stats.total; 
+        }
+        if (document.getElementById('avg-docs-count')) {
+            const avgDocs = stats.total > 0 ? (stats.totalDocsUsed / stats.total) : 0;
+            document.getElementById('avg-docs-count').textContent = avgDocs.toFixed(1);
+        }
+    },
+
+    MultiTurnUtils: {
+        /**
+         * Update Multi-turn pipeline statistics UI.
+         * @param {Array} results - The array of result objects.
+         * @param {string} groupName - The name of the group.
+         * @param {function} loadSessionCallback - Callback when a row is clicked.
+         */
+        updateStatsUI: function(results, groupName, loadSessionCallback) {
+            const totalQuestions = results.length;
+            // if (totalQuestions === 0) return; // Allow updating to clear stats if empty
+
+            const header = document.getElementById("results-header-text");
+            if (header) header.textContent = `Results for ${groupName}`;
+
+            const correctCount = results.filter(r => r.correct === true).length;
+            const incorrectCount = results.filter(r => r.correct === false).length;
+            const errorCount = results.filter(r => r.correct === 'error').length;
+            
+            const totalTrials = results.reduce((sum, r) => sum + (r.trials || 0), 0);
+            const successfulTrials = results.filter(r => r.correct === true).reduce((sum, r) => sum + r.trials, 0);
+            
+            const firstTryCorrectCount = results.filter(r => r.correct === true && r.trials === 1).length;
+            const giveUpCount = results.filter(r => r.correct === false && r.trials >= r.max_retries).length;
+
+            const answeredQuestions = correctCount + incorrectCount;
+            const accuracy = answeredQuestions > 0 ? (correctCount / answeredQuestions) * 100 : 0;
+            
+            const avgTrialsAll = totalQuestions > 0 ? totalTrials / totalQuestions : 0;
+            const avgTrialsSuccess = correctCount > 0 ? successfulTrials / correctCount : 0;
+            
+            const firstTrySuccessRate = totalQuestions > 0 ? (firstTryCorrectCount / totalQuestions) * 100 : 0;
+            const giveUpRate = totalQuestions > 0 ? (giveUpCount / totalQuestions) * 100 : 0;
+
+            const setText = (id, text) => {
+                const el = document.getElementById(id);
+                if (el) el.textContent = text;
+            };
+
+            setText('stats-accuracy', `${accuracy.toFixed(2)}%`);
+            setText('stats-correct-count', correctCount);
+            setText('stats-incorrect-count', incorrectCount);
+            setText('stats-error-count', errorCount);
+            setText('stats-avg-trials-all', avgTrialsAll.toFixed(2));
+            setText('stats-avg-trials-success', avgTrialsSuccess.toFixed(2));
+            setText('stats-first-try-success', `${firstTrySuccessRate.toFixed(2)}%`);
+            setText('stats-give-up-rate', `${giveUpRate.toFixed(2)}%`);
+
+            const tbody = document.getElementById('stats-details-tbody');
+            if (tbody) {
+                tbody.innerHTML = '';
+                results.forEach((result, index) => {
+                    const row = BenchmarkUtils.BenchmarkRenderer.renderMultiTurnResultRow(result, index, loadSessionCallback);
+                    tbody.appendChild(row);
+                });
+            }
+
+            const statsContainer = document.getElementById('statistics-container');
+            if (statsContainer) statsContainer.style.display = 'block';
+        },
+
+        /**
+         * Add a new session to the session list UI.
+         * @param {string} sessionListId - The ID of the session list container.
+         * @param {string} sessionId - The session ID.
+         * @param {object} questionData - Data about the question (e.g., {question: "..."}).
+         * @param {function} selectAllHandler - Function to handle select all checkbox change.
+         * @param {string} groupId - The group ID (optional).
+         * @param {string} groupName - The group name (optional).
+         * @param {string} statusText - The status text to display.
+         */
+        addNewSessionToList: function(sessionListId, sessionId, questionData, selectAllHandler, groupId = null, groupName = null, statusText = 'Now') {
+            const sessionList = document.getElementById(sessionListId);
+            if (!sessionList) return;
+
+            // Check if session already exists
+            const existingCheckbox = document.querySelector(`.session-checkbox[value="${sessionId}"]`);
+            if (existingCheckbox) {
+                const sessionDetails = document.querySelector(`.session-details[data-session-id="${sessionId}"]`);
+                if (sessionDetails) {
+                     const timeEl = sessionDetails.querySelector('small.text-muted');
+                     if (timeEl) {
+                         timeEl.textContent = statusText;
+                     }
+                }
+                return;
+            }
+
+            // If this is the first session ever, remove "no sessions" and add select-all header
+            if (document.querySelector('.no-sessions')) {
+                const noSessions = document.querySelector('.no-sessions');
+                if (noSessions) noSessions.remove();
+                
+                // Only create if it doesn't exist
+                if (!document.getElementById('select-all-container')) {
+                    const selectAllContainer = document.createElement('div');
+                    selectAllContainer.className = 'list-group-item bg-light';
+                    selectAllContainer.id = 'select-all-container';
+                    selectAllContainer.innerHTML = `
+                        <input class="form-check-input" type="checkbox" id="select-all-checkbox">
+                        <label class="form-check-label ms-2" for="select-all-checkbox">Select All</label>`;
+                    sessionList.prepend(selectAllContainer);
+                    const cb = document.getElementById('select-all-checkbox');
+                    if (cb && selectAllHandler) cb.addEventListener('change', selectAllHandler);
+                }
+            }
+
+            const newSessionItem = document.createElement('div');
+            newSessionItem.className = 'list-group-item d-flex align-items-center session-item-container';
+            newSessionItem.innerHTML = `
+                <input class="form-check-input session-checkbox" type="checkbox" value="${sessionId}" data-session-id="${sessionId}">
+                <div class="ms-3 flex-grow-1 session-details" data-session-id="${sessionId}" style="cursor: pointer;">
+                    <div class="d-flex w-100 justify-content-between">
+                        <h6 class="mb-1">Session #${sessionId}</h6>
+                        <small class="text-muted">${statusText}</small>
+                    </div>
+                    <p class="mb-1 small text-muted">${(questionData.question || '').substring(0, 100)}...</p>
+                </div>`;
+            
+            if (groupId) {
+                let groupContainer = document.getElementById(`session-group-${groupId}`);
+                if (!groupContainer) {
+                    // Create the group container if it doesn't exist
+                    const groupEl = document.createElement('div');
+                    groupEl.className = 'list-group-item';
+                    groupEl.innerHTML = `
+                        <details open>
+                            <summary class="fw-bold" style="cursor: pointer;">
+                                <i class="bi bi-collection me-1"></i>
+                                ${groupName}
+                                <small class="text-muted" id="group-session-count-${groupId}">(1 sessions)</small>
+                            </summary>
+                            <div class="list-group list-group-flush mt-2" id="session-group-${groupId}">
+                            </div>
+                        </details>
+                    `;
+                    const selectAllDiv = document.getElementById('select-all-container');
+                    if (selectAllDiv) {
+                        selectAllDiv.after(groupEl);
+                    } else {
+                        sessionList.prepend(groupEl);
+                    }
+                    groupContainer = document.getElementById(`session-group-${groupId}`);
+                }
+                newSessionItem.classList.add("ps-4");
+                groupContainer.prepend(newSessionItem);
+                
+                // Update session count
+                const countEl = document.getElementById(`group-session-count-${groupId}`);
+                if (countEl) {
+                    const currentCount = groupContainer.children.length;
+                    countEl.textContent = `(${currentCount} sessions)`;
+                }
+
+            } else {
+                const selectAllDiv = document.getElementById('select-all-container');
+                if (selectAllDiv) {
+                    selectAllDiv.after(newSessionItem);
+                } else {
+                    sessionList.appendChild(newSessionItem);
+                }
+            }
+        }
     }
 };

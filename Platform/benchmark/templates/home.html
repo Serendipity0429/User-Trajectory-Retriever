@@ -1,54 +1,49 @@
 {% extends "benchmark_base.html" %}
 {% load static %}
-
 {% block title %}Benchmark Dashboard{% endblock %}
-
 {% block content %}
 <div class="container mt-5 px-lg-4">
     <div class="pb-3 mb-4 border-bottom">
         <h1 class="h2"><i class="bi bi-speedometer2 me-2"></i>Benchmark Dashboard</h1>
-        <p class="text-muted mb-0">Select a benchmark to run or configure LLM settings.</p>
+        <p class="text-muted mb-0">Select a baseline to run or configure LLM settings.</p>
     </div>
-
     <div class="row">
         <!-- Benchmark Types -->
         <div class="col-md-6">
             <div class="card shadow-sm mb-4">
                 <div class="card-header">
-                    <h5 class="mb-0"><i class="bi bi-list-task me-2"></i>Benchmark Types</h5>
+                    <h5 class="mb-0"><i class="bi bi-list-task me-2"></i>Baseline Types</h5>
                 </div>
                 <div class="list-group list-group-flush">
                     <a href="{% url 'benchmark:vanilla_llm_adhoc' %}" class="list-group-item list-group-item-action">
                         <div class="d-flex w-100 justify-content-between">
-                            <h6 class="mb-1">Ad-hoc LLM Benchmark</h6>
+                            <h6 class="mb-1">Ad-hoc LLM Baseline</h6>
                         </div>
                         <p class="mb-1 small text-muted">Run the model against the full QA pipeline and evaluate its performance.</p>
                     </a>
                     <a href="{% url 'benchmark:vanilla_llm_multi_turn' %}" class="list-group-item list-group-item-action">
                         <div class="d-flex w-100 justify-content-between">
-                            <h6 class="mb-1">Multi-Turn LLM Benchmark</h6>
+                            <h6 class="mb-1">Multi-Turn LLM Baseline</h6>
                         </div>
                         <p class="mb-1 small text-muted">Evaluate model performance over multiple turns with corrective feedback.</p>
                     </a>
                     <a href="{% url 'benchmark:rag_adhoc' %}" class="list-group-item list-group-item-action">
                         <div class="d-flex w-100 justify-content-between">
-                            <h6 class="mb-1">Ad-hoc Web Search RAG Benchmark</h6>
+                            <h6 class="mb-1">Ad-hoc Web Search RAG Baseline</h6>
                         </div>
                         <p class="mb-1 small text-muted">Evaluate RAG pipeline performance with web search.</p>
                     </a>
                     <a href="{% url 'benchmark:rag_multi_turn' %}" class="list-group-item list-group-item-action">
                         <div class="d-flex w-100 justify-content-between">
-                            <h6 class="mb-1">Multi-Turn RAG Benchmark</h6>
+                            <h6 class="mb-1">Multi-Turn RAG Baseline</h6>
                         </div>
                         <p class="mb-1 small text-muted">Evaluate model performance over multiple turns with web search.</p>
                     </a>
                 </div>
             </div>
-            
             <!-- Dataset Manager -->
             {% include 'includes/dataset_manager.html' %}
         </div>
-
         <!-- LLM and RAG Configuration -->
         <div class="col-md-6">
             {% include 'includes/llm_config.html' with show_retries=True card_expanded=True %}
@@ -57,88 +52,8 @@
         </div>
     </div>
 </div>
-
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // LLM Settings
-    const llm_base_url = document.getElementById('llm_base_url');
-    const llm_api_key = document.getElementById('llm_api_key');
-    const llm_model = document.getElementById('llm_model');
-    const max_retries = document.getElementById('max_retries');
-
-    function saveLlmSettings() {
-        const data = {
-            llm_base_url: llm_base_url.value,
-            llm_api_key: llm_api_key.value,
-            llm_model: llm_model.value,
-            max_retries: max_retries.value
-        };
-        const csrfToken = '{{ csrf_token }}';
-        BenchmarkUtils.saveSettings(
-            "{% url 'benchmark:save_llm_settings' %}",
-            csrfToken,
-            data,
-            'save-settings-btn'
-        );
-    }
-
-    function restoreLlmDefaults() {
-        BenchmarkUtils.restoreDefaults("{% url 'benchmark:get_llm_env_vars' %}", function(data) {
-            llm_base_url.value = data.llm_base_url;
-            llm_api_key.value = data.llm_api_key;
-            llm_model.value = data.llm_model;
-            // max_retries is not part of the .env restore
-            saveLlmSettings(); 
-        });
-    }
-
-    document.getElementById('save-settings-btn').addEventListener('click', saveLlmSettings);
-    document.getElementById('test-connection-btn').addEventListener('click', () => {
-         const data = {
-            llm_base_url: llm_base_url.value,
-            llm_api_key: llm_api_key.value,
-        };
-        const csrfToken = '{{ csrf_token }}';
-        BenchmarkUtils.testConnection(
-            "{% url 'benchmark:test_llm_connection' %}",
-            csrfToken,
-            data,
-            'test-connection-result',
-            'test-connection-btn'
-        );
-    });
-    document.getElementById('restore-defaults-btn').addEventListener('click', restoreLlmDefaults);
-
-    // RAG Settings
-    const rag_prompt_template = document.getElementById('rag_prompt_template');
-
-    function saveRagSettings() {
-        const data = {
-            prompt_template: rag_prompt_template.value
-        };
-        const csrfToken = '{{ csrf_token }}';
-        BenchmarkUtils.saveSettings(
-            "{% url 'benchmark:save_rag_settings' %}",
-            csrfToken,
-            data,
-            'save-rag-settings-btn'
-        );
-    }
-
-    function restoreRagDefaults() {
-        fetch("{% url 'benchmark:get_default_rag_prompt' %}")
-            .then(response => response.json())
-            .then(data => {
-                if (data.default_prompt) {
-                    rag_prompt_template.value = data.default_prompt;
-                    saveRagSettings();
-                }
-            })
-            .catch(error => console.error('Error restoring defaults:', error));
-    }
-    
-    document.getElementById('save-rag-settings-btn').addEventListener('click', saveRagSettings);
-    document.getElementById('restore-rag-defaults-btn').addEventListener('click', restoreRagDefaults);
 });
 </script>
 {% endblock %}

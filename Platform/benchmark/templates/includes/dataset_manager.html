@@ -16,24 +16,23 @@
             
             <!-- Upload Form Section -->
             <div class="mb-4 border-bottom pb-4">
-                <h6 class="mb-3 text-primary"><i class="bi bi-cloud-upload me-2"></i>Upload New Dataset</h6>
                 <form id="dataset-upload-form" enctype="multipart/form-data" class="needs-validation">
                     {% csrf_token %}
-                    <div class="row g-3 align-items-end">
-                        <div class="col-md-3">
+                    <div class="row g-3">
+                        <div class="col-md-4">
                             <label for="dataset_name" class="form-label text-uppercase fw-bold text-muted">Name</label>
                             <input type="text" class="form-control" id="dataset_name" name="name" placeholder="e.g., my_questions.jsonl" required>
                         </div>
-                        <div class="col-12 col-sm-6 col-md-4">
+                        <div class="col-md-8">
                             <label for="dataset_description" class="form-label text-uppercase fw-bold text-muted">Description</label>
                             <input type="text" class="form-control" id="dataset_description" name="description" placeholder="Optional notes...">
                         </div>
-                        <div class="col-12 col-sm-6 col-md-3">
+                        <div class="col-12">
                             <label for="dataset_file" class="form-label text-uppercase fw-bold text-muted">JSONL File</label>
-                            <input type="file" class="form-control" id="dataset_file" name="file" accept=".jsonl,.json" required>
-                        </div>
-                        <div class="col-12 col-md-2">
-                            <button type="submit" class="btn btn-primary w-100"><i class="bi bi-upload me-2"></i>Upload</button>
+                            <div class="input-group">
+                                <input type="file" class="form-control" id="dataset_file" name="file" accept=".jsonl,.json" required>
+                                <button type="submit" class="btn btn-primary"><i class="bi bi-upload me-2"></i>Upload</button>
+                            </div>
                         </div>
                     </div>
                     <div class="form-text small mt-2"><i class="bi bi-info-circle me-1"></i> Format: JSONL with <code>question</code> and <code>ground_truths</code> keys.</div>
@@ -47,7 +46,7 @@
                     <span class="badge bg-secondary">{{ datasets|length }} Datasets</span>
                 </div>
                 <div class="table-responsive">
-                    <table class="table table-hover align-middle">
+                    <table class="table table-hover align-middle small">
                         <thead class="table-light small text-muted text-uppercase">
                             <tr>
                                 <th>Active</th>
@@ -59,8 +58,8 @@
                         </thead>
                         <tbody id="dataset-table-body" data-count="{{ datasets|length }}">
                             {% for dataset in datasets %}
-                                <tr data-dataset-id="{{ dataset.id }}" class="{% if dataset.is_active %}table-primary{% endif %}">
-                                    <td class="text-center align-middle">
+                                <tr data-dataset-id="{{ dataset.id }}" class="dataset-row {% if dataset.is_active %}table-primary{% endif %}">
+                                    <td class="text-center">
                                         <input class="form-check-input activate-dataset-radio" type="radio" name="active_dataset" value="{{ dataset.id }}" {% if dataset.is_active %}checked{% endif %} title="Set as Active">
                                     </td>
                                     <td>
@@ -108,4 +107,4 @@
 </div>
 
 {% load static %}
-<script src="{% static 'js/dataset_manager.js' %}"></script>
+<script src="{% static 'js/benchmark/dataset_manager.js' %}"></script>

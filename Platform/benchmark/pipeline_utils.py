@@ -315,6 +315,15 @@ class BaseMultiTurnPipeline(BasePipeline):
             try:
                 session = self.create_session(settings, question_text, ground_truths, group)
 
+                yield json.dumps({
+                    'is_meta': True,
+                    'type': 'session_created',
+                    'session_id': session.id,
+                    'question': question_text,
+                    'group_id': group.id,
+                    'group_name': group_name
+                }) + "\n"
+
                 is_session_completed = False
                 trial_number = 1
                 final_is_correct = False
@@ -325,6 +334,15 @@ class BaseMultiTurnPipeline(BasePipeline):
                         break
 
                     trial = self.create_trial(session, trial_number)
+                    
+                    yield json.dumps({
+                        'is_meta': True,
+                        'type': 'trial_started',
+                        'session_id': session.id,
+                        'trial_number': trial_number,
+                        'group_id': group.id
+                    }) + "\n"
+
                     messages = self._construct_messages(session, trial)
                     
                     try:
@@ -346,6 +364,16 @@ class BaseMultiTurnPipeline(BasePipeline):
                     trial.feedback = "Correct" if is_correct else "Incorrect"
                     trial.status = 'completed'
                     trial.save()
+
+                    yield json.dumps({
+                        'is_meta': True,
+                        'type': 'trial_completed',
+                        'session_id': session.id,
+                        'trial_number': trial_number,
+                        'is_correct': is_correct,
+                        'answer': answer,
+                        'group_id': group.id
+                    }) + "\n"
 
                     final_answer = answer
                     final_is_correct = is_correct

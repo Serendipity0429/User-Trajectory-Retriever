@@ -168,6 +168,7 @@ You can manage the extension by following these steps:
 ├── Platform/         # Source code for the Django web platform
 │   ├── annotation_platform/ # Core Django project configuration
 │   ├── benchmark/    # LLM benchmarking and RAG evaluation app
+│   ├── dashboard/    # Admin dashboard and data analysis
 │   ├── discussion/   # Discussion forum app
 │   ├── media/        # User uploaded content
 │   ├── msg_system/   # Private messaging system app

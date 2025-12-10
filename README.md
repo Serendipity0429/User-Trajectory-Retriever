@@ -21,6 +21,10 @@ The system is composed of two main parts:
 -   **Messaging System:** A private messaging system for administrators to communicate with users, send announcements, and provide support.
 -   **Bulletin Notifications:** Automatic notifications are sent to all users via the private messaging system whenever a new bulletin is posted, ensuring timely communication.
 -   **Discussion Forum:** A platform for users to ask questions, share insights, and engage in discussions related to their research and tasks, fostering a collaborative community.
+-   **LLM Benchmarking & RAG Evaluation:** A comprehensive module for evaluating Large Language Models (LLMs) and Retrieval-Augmented Generation (RAG) systems. Includes features for:
+    -   **Adhoc & Multi-turn Evaluation:** evaluating both single-turn and multi-turn interactions.
+    -   **Vanilla LLM & RAG Pipelines:** supporting both direct LLM generation and RAG-based approaches.
+    -   **LLM-as-a-Judge:** Automated evaluation using a stronger LLM to judge the quality of answers.
 -   **Extension Version Management:** Administrators can manage different versions of the browser extension, view version history, and control which version is active.
 -   **AJAX-powered Admin Page:** The admin page uses AJAX for filtering and sorting users and tasks, providing a seamless and responsive experience without page reloads.
 -   **Advanced Data Analysis:** The admin dashboard features a comprehensive data analysis section with a variety of charts to visualize user and task data. These include:
@@ -34,7 +38,7 @@ The system is composed of two main parts:
 
 -   **UI Modernization and Responsiveness:** The entire user interface has been overhauled with a more modern aesthetic, improved layouts, and significantly enhanced responsiveness for mobile and tablet devices.
 -   **Enhanced Admin Dashboard:** The administrator dashboard is now more powerful and user-friendly, featuring collapsible filter sections and dropdown menus for a cleaner experience.
--   **Benchmarking as Django Commands:** The performance benchmarking scripts have been refactored into Django management commands (`pressure_test` and `llm_judge_benchmark`) for easier and more integrated execution.
+-   **Benchmarking as Django Commands:** The performance benchmarking scripts have been refactored into Django management commands (`pressure_test` and `test_llm_judge`) for easier and more integrated execution.
 -   **UI Enhancements:** The user interface has been updated to include a new messaging dropdown in the navigation bar, providing easy access to unread messages.
 -   **Messaging System:** A new private messaging system has been integrated, replacing the previous reliance on Django's built-in messaging framework.
 -   **Discussion Forum:** A new discussion forum has been added to the platform, allowing users to interact with each other, ask questions, and share their findings.
@@ -54,6 +58,7 @@ Before you begin, ensure you have the following installed:
 -   pip (Python package installer)
 -   Conda (optional, but recommended for environment management)
 -   Redis
+-   PostgreSQL (optional, SQLite is used by default for development)
 
 ## Building and Running
 
@@ -89,7 +94,11 @@ All commands should be run from the root of the project directory.
     ```bash
     cp Platform/.env.example Platform/.env
     ```
-    Open the `Platform/.env` file and add your email server configuration. This is required for features like password reset.
+    Open the `Platform/.env` file and configure your settings:
+    -   **Email Configuration:** Required for features like password reset.
+    -   **LLM Configuration:** `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL` for benchmarking features.
+    -   **Search API:** `SERPER_API_KEY` for RAG capabilities.
+    -   **Database:** `DATABASE_TYPE` (sqlite or postgres) and related settings.
 
 4.  **Apply database migrations:**
     ```bash
@@ -158,7 +167,9 @@ You can manage the extension by following these steps:
 ├── ManifestV3/       # Source code for the Chrome browser extension
 ├── Platform/         # Source code for the Django web platform
 │   ├── annotation_platform/ # Core Django project configuration
+│   ├── benchmark/    # LLM benchmarking and RAG evaluation app
 │   ├── discussion/   # Discussion forum app
+│   ├── media/        # User uploaded content
 │   ├── msg_system/   # Private messaging system app
 │   ├── task_manager/ # Task management app
 │   └── user_system/  # User management app

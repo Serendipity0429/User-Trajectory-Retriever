@@ -308,11 +308,11 @@ const BenchmarkUtils = {
      */
     setupBatchSelection: function(listContainerId, selectAllCheckboxId, itemCheckboxClass, deleteButtonId, deleteActionCallback, itemGroupIdClass = null) {
         const listContainer = document.getElementById(listContainerId);
-        const selectAllCheckbox = document.getElementById(selectAllCheckboxId);
         const deleteSelectedBtn = document.getElementById(deleteButtonId);
 
         if (!listContainer || !deleteSelectedBtn) return;
 
+        const getSelectAllCheckbox = () => document.getElementById(selectAllCheckboxId);
         const getCheckboxes = () => listContainer.querySelectorAll(`.${itemCheckboxClass}`);
         const getGroupCheckboxes = () => itemGroupIdClass ? listContainer.querySelectorAll(`.${itemGroupIdClass}`) : [];
 
@@ -322,24 +322,24 @@ const BenchmarkUtils = {
             const anyChecked = anyItemChecked || anyGroupChecked;
             deleteSelectedBtn.style.display = anyChecked ? 'inline-block' : 'none';
 
+            const selectAllCheckbox = getSelectAllCheckbox();
             if (selectAllCheckbox) {
                 const allCheckboxes = Array.from(getCheckboxes()).concat(Array.from(getGroupCheckboxes()));
                 const allChecked = allCheckboxes.length > 0 && allCheckboxes.every(cb => cb.checked);
-                selectAllCheckbox.checked = anyChecked && allChecked; // Only check 'select all' if there's anything selected AND all are selected
+                selectAllCheckbox.checked = anyChecked && allChecked; 
             }
         };
 
         const selectAllHandler = (e) => {
-            if (selectAllCheckbox) {
-                const isChecked = e.target.checked;
-                getCheckboxes().forEach(checkbox => checkbox.checked = isChecked);
-                getGroupCheckboxes().forEach(checkbox => checkbox.checked = isChecked);
-                toggleDeleteButton();
-            }
+            const isChecked = e.target.checked;
+            getCheckboxes().forEach(checkbox => checkbox.checked = isChecked);
+            getGroupCheckboxes().forEach(checkbox => checkbox.checked = isChecked);
+            toggleDeleteButton();
         };
 
-        if (selectAllCheckbox) {
-            selectAllCheckbox.addEventListener('change', selectAllHandler);
+        let currentSelectAllCheckbox = getSelectAllCheckbox();
+        if (currentSelectAllCheckbox) {
+            currentSelectAllCheckbox.addEventListener('change', selectAllHandler);
         }
         
         listContainer.addEventListener('change', function(e) {
@@ -351,7 +351,7 @@ const BenchmarkUtils = {
         deleteSelectedBtn.addEventListener('click', function() {
             const selectedItemIds = Array.from(getCheckboxes())
                 .filter(cb => cb.checked)
-                .map(cb => cb.dataset.runId || cb.dataset.sessionId); // Assumes data-run-id or data-session-id
+                .map(cb => cb.dataset.runId || cb.dataset.sessionId); 
 
             const selectedGroupIds = Array.from(getGroupCheckboxes())
                 .filter(cb => cb.checked)
@@ -364,15 +364,20 @@ const BenchmarkUtils = {
             deleteActionCallback(selectedItemIds, selectedGroupIds);
         });
 
-        // Initialize button state
         toggleDeleteButton();
 
-        // Observer to show/hide "Select All" based on list content (for saved runs/sessions)
         const observer = new MutationObserver(() => {
             const allCheckboxes = Array.from(getCheckboxes()).concat(Array.from(getGroupCheckboxes()));
-            if (selectAllCheckbox) {
-                // Ensure the 'select-all-container' is visible if there are any items
-                const selectAllContainer = selectAllCheckbox.closest('.list-group-item.bg-light');
+            
+            // Check if Select All checkbox has appeared or changed
+            const newSelectAllCheckbox = getSelectAllCheckbox();
+            if (newSelectAllCheckbox && newSelectAllCheckbox !== currentSelectAllCheckbox) {
+                newSelectAllCheckbox.addEventListener('change', selectAllHandler);
+                currentSelectAllCheckbox = newSelectAllCheckbox;
+            }
+
+            if (currentSelectAllCheckbox) {
+                const selectAllContainer = currentSelectAllCheckbox.closest('.list-group-item.bg-light');
                 if (allCheckboxes.length > 0) {
                     if (selectAllContainer) selectAllContainer.style.display = 'flex';
                 } else {
@@ -381,7 +386,7 @@ const BenchmarkUtils = {
             }
             toggleDeleteButton();
         });
-        observer.observe(listContainer, { childList: true });
+        observer.observe(listContainer, { childList: true, subtree: true });
     },
 
     /**

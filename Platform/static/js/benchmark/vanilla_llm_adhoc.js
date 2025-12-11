@@ -20,7 +20,7 @@ document.addEventListener('DOMContentLoaded', function() {
             'saved-runs-list', 
             'no-runs-message', 
             true, // enableSelection
-            toggleDeleteButton // onSelectionChange
+            null // onSelectionChange - handled by setupBatchSelection
         );
          // Reset select all checkbox and hide container initially (will be shown if runs exist)
          const selectAllContainer = document.getElementById('select-all-container');

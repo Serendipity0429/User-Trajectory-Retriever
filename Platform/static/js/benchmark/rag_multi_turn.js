@@ -106,7 +106,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 alert('Error starting session: ' + data.error);
                 return;
             }
-            BenchmarkUtils.MultiTurnUtils.addNewSessionToList('session-list', data.session_id, questionData, selectAllHandler);
+            BenchmarkUtils.MultiTurnUtils.addNewSessionToList('session-list', data.session_id, questionData, null);
             loadSession(data.session_id, data.trial_id);
         })
         .catch(err => {
@@ -452,7 +452,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (data.is_meta) {
                          if (data.type === 'info') statusDiv.textContent = data.message;
                          if (data.type === 'session_created') {
-                             BenchmarkUtils.MultiTurnUtils.addNewSessionToList('session-list', data.session_id, { question: data.question }, selectAllHandler, data.group_id, data.group_name, 'Processing...');
+                             BenchmarkUtils.MultiTurnUtils.addNewSessionToList('session-list', data.session_id, { question: data.question }, null, data.group_id, data.group_name, 'Processing...');
                              loadSession(data.session_id);
                          }
                          if (data.type === 'trial_started' || data.type === 'trial_completed') {
@@ -481,7 +481,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     });
 
                     // Add to Session List
-                    BenchmarkUtils.MultiTurnUtils.addNewSessionToList('session-list', data.session_id, { question: data.question }, selectAllHandler, data.group_id, data.group_name, 'Finished');
+                    BenchmarkUtils.MultiTurnUtils.addNewSessionToList('session-list', data.session_id, { question: data.question }, null, data.group_id, data.group_name, 'Finished');
                 },
                 () => { // onComplete
                     BenchmarkUtils.toggleConfigurationInputs(false);

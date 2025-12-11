@@ -10,6 +10,7 @@ class BenchmarkDataset(models.Model):
     name = models.CharField(max_length=255, unique=True, help_text="A unique name for this dataset.")
     description = models.TextField(blank=True, help_text="Optional description of the dataset.")
     file = models.FileField(upload_to='benchmark_datasets/', help_text="The JSONL file containing the questions.")
+    question_count = models.IntegerField(default=0, help_text="Number of questions in the dataset.")
     created_at = models.DateTimeField(auto_now_add=True)
     is_active = models.BooleanField(default=False, help_text="Set this dataset as the default/active one.")
 

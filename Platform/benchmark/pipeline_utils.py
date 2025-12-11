@@ -50,6 +50,21 @@ Answer:""",
     "rag_reformulation": "Based on the history, provide a better search query to find the correct answer. Output ONLY the query."
 }
 
+def count_questions_in_file(file_path):
+    """
+    Counts the number of non-empty lines in a given file.
+    Assumes each non-empty line represents a question.
+    """
+    count = 0
+    try:
+        with open(file_path, 'r') as f:
+            for line in f:
+                if line.strip():
+                    count += 1
+    except FileNotFoundError:
+        pass
+    return count
+
 class BasePipeline:
     def __init__(self, base_url, api_key, model, pipeline_id=None, dataset_id=None):
         self.client = openai.OpenAI(base_url=base_url, api_key=api_key)
@@ -67,19 +82,27 @@ class BasePipeline:
         if self.pipeline_id:
             redis_client.delete(f"{self.redis_prefix}:{self.pipeline_id}")
 
-    def load_questions(self):
+    def get_questions_file_path(self):
         file_path = None
         if self.dataset_id:
             try:
                 dataset = BenchmarkDataset.objects.get(pk=self.dataset_id)
                 if dataset.file and os.path.exists(dataset.file.path):
                     file_path = dataset.file.path
+                else: # Dataset found, but file missing or invalid
+                    raise ValueError(f"Dataset {self.dataset_id} has no valid file path associated with it.")
             except BenchmarkDataset.DoesNotExist:
-                pass
-                
-        if file_path is None:
+                raise ValueError(f"Dataset with ID {self.dataset_id} not found.")
+        else: # No dataset_id provided, use default
             file_path = HARD_QUESTIONS_PATH
             
+        if not file_path or not os.path.exists(file_path):
+            raise FileNotFoundError(f"Questions file not found at {file_path}")
+
+        return file_path
+
+    def load_questions(self):
+        file_path = self.get_questions_file_path()
         if os.path.exists(file_path):
             with open(file_path, 'r') as f:
                 for line in f:
@@ -110,15 +133,47 @@ class BaseAdhocPipeline(BasePipeline):
         run_object = self.create_run_object()
         yield json.dumps({'is_meta': True, 'type': 'run_created', 'run_id': run_object.id, 'name': run_object.name}) + "\n"
         
+        total_questions = 0
+        questions_iterator = None
+        
+        try:
+            file_path = self.get_questions_file_path()
+            if self.dataset_id: # A specific dataset was requested
+                dataset = BenchmarkDataset.objects.get(pk=self.dataset_id) # Already checked existence in get_questions_file_path
+                if dataset.question_count > 0:
+                    total_questions = dataset.question_count
+                else:
+                    total_questions = count_questions_in_file(file_path)
+            else: # Using HARD_QUESTIONS_PATH (default)
+                total_questions = count_questions_in_file(file_path)
+            
+            questions_iterator = self.load_questions() # This now uses the file_path logic from get_questions_file_path
+        except (ValueError, FileNotFoundError, BenchmarkDataset.DoesNotExist) as e:
+            yield json.dumps({'error': str(e)}) + "\n"
+            self.stop_token() # Ensure stop token is cleared on error
+            return # Terminate pipeline on error
+
+        yield json.dumps({'is_meta': True, 'type': 'total_count', 'count': total_questions}) + "\n"
+
         total_count = 0
         correct_count = 0
 
-        for data in self.load_questions():
+        for data in questions_iterator:
             if not self.check_active():
                 break
 
             question = data['question']
             ground_truths = data.get('ground_truths', [])
+
+            # Notify frontend that we are starting this question
+            yield json.dumps({
+                'is_meta': True, 
+                'type': 'processing_start', 
+                'question': {
+                    'question': question
+                    # We can send more data if needed for display
+                }
+            }) + "\n"
 
             try:
                 result_data, is_correct = self.process_question(run_object, question, ground_truths)

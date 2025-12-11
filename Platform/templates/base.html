@@ -104,7 +104,7 @@
                 </li>
                 {% if user.is_superuser %}
                 <li>
-                    <a href="{% url 'dashboard:index' %}"><i class="bi bi-person-badge-fill"></i> Admin Page</a>
+                    <a href="{% url 'dashboard:index' %}"><i class="bi bi-person-badge-fill"></i> Dashboard</a>
                 </li>
                 {% endif %}
                 {% if user.is_staff %}

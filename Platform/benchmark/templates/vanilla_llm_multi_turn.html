@@ -239,7 +239,15 @@
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <h5 id="session-header" class="mb-0"></h5>
                     <div>
-                        <button id="export-session-btn" class="btn btn-sm btn-outline-secondary"><i class="bi bi-download me-1"></i> Export</button>
+                        <div class="btn-group">
+                            <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="bi bi-download me-1"></i> Export
+                            </button>
+                            <ul class="dropdown-menu">
+                                <li><button class="dropdown-item" id="export-session-json-btn">JSON</button></li>
+                                <li><button class="dropdown-item" id="export-session-csv-btn">CSV</button></li>
+                            </ul>
+                        </div>
                         <button id="delete-session-btn" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash me-1"></i> Delete</button>
                     </div>
                 </div>

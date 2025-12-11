@@ -66,13 +66,8 @@
                 </div>
                 <div class="card-body">
                     <p>Load and view the results of a previously saved run.</p>
-                    <div id="select-all-container" class="mb-2" style="display: none;">
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="select-all-checkbox">
-                            <label class="form-check-label" for="select-all-checkbox">Select All</label>
-                        </div>
-                    </div>
-                    <div id="saved-runs-list" class="list-group mb-3">
+
+                    <div id="saved-runs-list" class="list-group mb-3" style="max-height: 50vh; overflow-y: auto;">
                         <!-- Runs will be dynamically inserted here -->
                     </div>
                     <div id="no-runs-message" class="text-center text-muted" style="display: none;">
@@ -92,7 +87,15 @@
                     <i class="bi bi-arrow-repeat spin"></i>
                 </span>
             </h4>
-            <button id="export-results-btn" class="btn btn-sm btn-outline-success"><i class="bi bi-file-earmark-excel me-1"></i> Export as CSV</button>
+            <div class="btn-group">
+                <button type="button" class="btn btn-sm btn-outline-success dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                    <i class="bi bi-download me-1"></i> Export
+                </button>
+                <ul class="dropdown-menu">
+                    <li><button class="dropdown-item" id="export-results-json-btn">JSON</button></li>
+                    <li><button class="dropdown-item" id="export-results-csv-btn">CSV</button></li>
+                </ul>
+            </div>
         </div>
 
         <!-- Run Configuration Card -->

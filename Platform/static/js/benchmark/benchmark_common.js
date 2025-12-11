@@ -416,6 +416,18 @@ const BenchmarkUtils = {
                 if (data.runs && data.runs.length > 0) {
                     noRunsMessage.style.display = 'none';
                     savedRunsList.style.display = 'block';
+
+                    // Add Select All Container if enabled
+                    if (enableSelection) {
+                        const selectAllContainer = document.createElement('div');
+                        selectAllContainer.className = 'list-group-item bg-light d-flex align-items-center';
+                        selectAllContainer.innerHTML = `
+                            <input class="form-check-input me-3" type="checkbox" id="select-all-checkbox">
+                            <label class="form-check-label fw-bold" for="select-all-checkbox">Select All</label>
+                        `;
+                        savedRunsList.appendChild(selectAllContainer);
+                    }
+
                     data.runs.forEach(run => {
                         const runItem = document.createElement('div');
                         runItem.className = 'list-group-item list-group-item-action d-flex align-items-center';
@@ -545,6 +557,33 @@ const BenchmarkUtils = {
             link.textContent = textContent;
             link.target = target;
             return link;
+        },
+        
+        renderProcessingRow: function(item, resultsBody, colSpan = 7) {
+            const rowId = `processing-row`; // Fixed ID for easier finding
+            const tr = document.createElement('tr');
+            tr.id = rowId;
+            tr.className = 'table-light border-bottom-0 processing-row';
+            
+            const td = document.createElement('td');
+            td.colSpan = colSpan;
+            td.className = 'text-center py-4 text-muted';
+            
+            td.innerHTML = `
+                <div class="d-flex flex-column align-items-center justify-content-center">
+                    <div class="spinner-border text-primary mb-2" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <div class="fw-medium">Processing Question:</div>
+                    <div class="small text-dark fw-bold mt-1" style="max-width: 80%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                        ${item.question || 'Unknown'}
+                    </div>
+                </div>
+            `;
+            
+            tr.appendChild(td);
+            resultsBody.insertAdjacentElement('afterbegin', tr); // Add to top
+            return tr;
         },
         
         // This will be the new centralized render function
@@ -696,7 +735,7 @@ const BenchmarkUtils = {
             const finalRuleCorrect = data.hasOwnProperty('is_correct_rule') ? data.is_correct_rule : data.rule_result;
             const finalLlmCorrect = data.hasOwnProperty('is_correct_llm') ? data.is_correct_llm : data.llm_result;
             
-            return { ruleCorrect: finalRuleCorrect, llmCorrect: finalLlmCorrect };
+            return { ruleCorrect: finalRuleCorrect, llmCorrect: finalLlmCorrect, rowId: rowId };
         },
 
         renderSearchResults: function(results, resultsListElement) {
@@ -1077,6 +1116,12 @@ const BenchmarkUtils = {
 
         resultsHeader.textContent = `Results for: ${runData.name}`;
         resultsBody.innerHTML = '';
+        
+        // Ensure status and processing rows are cleared
+        const statusDiv = document.getElementById('pipeline-status');
+        if (statusDiv) statusDiv.style.display = 'none';
+        const processingRow = document.getElementById('processing-row');
+        if (processingRow) processingRow.remove();
 
         let stats = {
             total: runData.results.length,
@@ -1089,6 +1134,8 @@ const BenchmarkUtils = {
 
         runData.results.forEach((result, index) => {
             const summary = BenchmarkUtils.BenchmarkRenderer.renderResultRow(result, resultsBody, index + 1, pipelineType);
+            result.rowId = summary.rowId; // Attach rowId for future reference (e.g. retry)
+            
             if (summary.ruleCorrect) stats.ruleCorrect++;
             if (summary.llmCorrect) stats.llmCorrect++;
             if (summary.llmCorrect === null) stats.llmErrors++;
@@ -1256,6 +1303,44 @@ const BenchmarkUtils = {
             }
 
             const filename = `${filenamePrefix}-${nameSuffix.replace(/[^a-zA-Z0-9-_]/g, '_')}.csv`;
+            
+            link.setAttribute("href", url);
+            link.setAttribute("download", filename);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    },
+
+    /**
+     * Export data to JSON.
+     * @param {Array} data - Array of data objects.
+     * @param {string} filenamePrefix - Prefix for the filename.
+     */
+    exportToJSON: function(data, filenamePrefix) {
+        if (!data || data.length === 0) {
+            alert("No results to export.");
+            return;
+        }
+
+        const jsonString = JSON.stringify(data, null, 2);
+        const blob = new Blob([jsonString], { type: 'application/json;charset=utf-8;' });
+
+        const link = document.createElement("a");
+        if (link.download !== undefined) {
+            const url = URL.createObjectURL(blob);
+            
+            let nameSuffix = '';
+            const resultsHeader = document.getElementById("results-header-text");
+            if (resultsHeader && resultsHeader.textContent) {
+                nameSuffix = resultsHeader.textContent.replace('Results for', '').trim();
+            }
+            if (!nameSuffix) {
+                nameSuffix = new Date().toISOString().slice(0, 19).replace('T', '_').replace(/:/g, '-');
+            }
+
+            const filename = `${filenamePrefix}-${nameSuffix.replace(/[^a-zA-Z0-9-_]/g, '_')}.json`;
             
             link.setAttribute("href", url);
             link.setAttribute("download", filename);
@@ -1623,4 +1708,796 @@ const BenchmarkUtils = {
             if(document.getElementById('stats-give-up-rate')) document.getElementById('stats-give-up-rate').textContent = `${giveUpRate.toFixed(2)}%`;
         }
     },
+
+    PipelineRunner: {
+        /**
+         * Run a pipeline.
+         * @param {object} options
+         * @param {string} options.url - The URL to post to.
+         * @param {FormData} options.formData - The form data to send.
+         * @param {object} options.ui - UI elements: { runBtn, stopBtn, retryBtn, progressContainer, progressBar, resultsContainer, resultsBody, statusDiv, spinner }
+         * @param {object} options.callbacks - { onData, onMeta, onComplete, onError }
+         * @param {number} options.totalItems - Total items for progress calculation.
+         * @returns {AbortController} - The controller to abort the request.
+         */
+        start: function(options) {
+            const { url, formData, ui, callbacks, totalItems, itemsData } = options;
+            
+            // UI Reset
+            if (ui.runBtn) ui.runBtn.style.display = 'none';
+            if (ui.stopBtn) {
+                ui.stopBtn.style.display = 'block';
+                ui.stopBtn.disabled = false;
+            }
+            if (ui.retryBtn) ui.retryBtn.style.display = 'none';
+            
+            if (ui.progressContainer) ui.progressContainer.style.display = 'block';
+            if (ui.progressBar) {
+                ui.progressBar.style.width = '0%';
+                ui.progressBar.textContent = '0%';
+            }
+            
+            if (ui.resultsContainer) ui.resultsContainer.style.display = 'block';
+            if (ui.resultsBody) ui.resultsBody.innerHTML = '';
+            
+            if (ui.statusDiv) ui.statusDiv.textContent = 'Initializing pipeline...';
+            if (ui.spinner) ui.spinner.style.display = 'inline-block';
+            
+            BenchmarkUtils.toggleConfigurationInputs(true);
+
+            const controller = new AbortController();
+            const signal = controller.signal;
+            controller.pipelineId = formData.get('pipeline_id'); 
+
+            let processedCount = 0;
+
+            const updateStatus = () => {
+                if (ui.statusDiv) {
+                    let text = `Processed ${processedCount} / ${totalItems || '?'} items...`;
+                    if (itemsData && itemsData.length > processedCount) {
+                        const nextItem = itemsData[processedCount];
+                        const qText = nextItem.question || 'Unknown';
+                    }
+                    ui.statusDiv.innerText = text;
+                }
+            };
+
+            updateStatus();
+
+            fetch(url, { method: 'POST', body: formData, signal: signal })
+            .then(response => {
+                BenchmarkUtils.processStreamedResponse(
+                    response,
+                    (data) => { // onData
+                        if (data.is_meta) {
+                             if (callbacks.onMeta) callbacks.onMeta(data);
+                             return;
+                        }
+                        
+                        processedCount++;
+                        if (callbacks.onData) callbacks.onData(data, processedCount);
+
+                        // Update Progress
+                        if (ui.progressBar && totalItems > 0) {
+                            const progress = Math.round((processedCount / totalItems) * 100);
+                            ui.progressBar.style.width = `${progress}%`;
+                            ui.progressBar.textContent = `${progress}%`;
+                        }
+                        
+                        updateStatus();
+                    },
+                    () => { // onComplete
+                        BenchmarkUtils.toggleConfigurationInputs(false);
+                        if (ui.runBtn) ui.runBtn.style.display = 'block';
+                        if (ui.stopBtn) ui.stopBtn.style.display = 'none';
+                        if (ui.spinner) ui.spinner.style.display = 'none';
+                        if (ui.statusDiv) ui.statusDiv.textContent = 'Pipeline finished.';
+                        
+                        if (callbacks.onComplete) callbacks.onComplete(processedCount);
+                    },
+                    (error) => { // onError
+                        if (error.name === 'AbortError') {
+                            if (ui.statusDiv) ui.statusDiv.textContent = "Pipeline stopped by user.";
+                            console.log('Pipeline stopped by user.');
+                        } else {
+                            console.error('Error during stream processing:', error);
+                             if (ui.statusDiv) ui.statusDiv.textContent = `Error: ${error.message}`;
+                        }
+                        
+                        BenchmarkUtils.toggleConfigurationInputs(false);
+                        if (ui.runBtn) ui.runBtn.style.display = 'block';
+                        if (ui.stopBtn) ui.stopBtn.style.display = 'none';
+                        if (ui.spinner) ui.spinner.style.display = 'none';
+                        
+                        if (callbacks.onError) callbacks.onError(error);
+                    },
+                    signal
+                );
+            })
+            .catch(error => {
+                 if (error.name === 'AbortError') {
+                    if (ui.statusDiv) ui.statusDiv.textContent = "Pipeline stopped by user.";
+                 } else {
+                    console.error('Error starting the pipeline:', error);
+                    alert('Failed to start the pipeline.');
+                    if (ui.statusDiv) ui.statusDiv.textContent = "Failed to start pipeline.";
+                 }
+                 BenchmarkUtils.toggleConfigurationInputs(false);
+                 if (ui.runBtn) ui.runBtn.style.display = 'block';
+                 if (ui.stopBtn) ui.stopBtn.style.display = 'none';
+                 if (ui.spinner) ui.spinner.style.display = 'none';
+            });
+            
+            return controller;
+        }
+    },
+
+    AdhocPage: {
+        init: function(config) {
+            const { 
+                pipelineType, 
+                urls, 
+                buildFormData, 
+                csvPrefix = 'adhoc-results'
+            } = config;
+            
+            const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+            BenchmarkUtils.setupConfigurationActionHandlers(urls, csrfToken, true, true);
+            
+            // questionsData removed - we now rely on backend streaming
+            
+            let pipelineController = null;
+            let currentRunResults = [];
+            let currentSettings = {};
+            let failedItems = [];
+
+            // UI Elements
+            const runBtn = document.getElementById('run-pipeline-btn');
+            const stopBtn = document.getElementById('stop-pipeline-btn');
+            const retryBtn = document.getElementById('retry-btn');
+            const resultsBody = document.getElementById('pipeline-results-body');
+            const resultsHeader = document.getElementById('results-header-text');
+
+            // --- Load Runs ---
+            function loadSavedRuns() {
+                BenchmarkUtils.loadSavedRuns(
+                    urls.listRuns, 
+                    loadRun, 
+                    (runId) => BenchmarkUtils.deleteRun(urls.deleteRunPrefix ? `${urls.deleteRunPrefix}${runId}/` : urls.deleteRun(runId), csrfToken), 
+                    'saved-runs-list', 
+                    'no-runs-message', 
+                    true
+                );
+                const selectAllCheckbox = document.getElementById('select-all-checkbox');
+                if (selectAllCheckbox) selectAllCheckbox.checked = false;
+            }
+
+            // --- Load Single Run ---
+            function loadRun(runId) {
+                document.getElementById('pipeline-results-container').style.display = 'block';
+                document.getElementById('progress-container').style.display = 'none';
+                
+                const url = urls.getRunPrefix ? `${urls.getRunPrefix}${runId}/` : urls.getRun(runId);
+
+                fetch(url)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.error) {
+                            alert('Error loading run: ' + data.error);
+                            return;
+                        }
+                        currentRunResults = data.results;
+                        currentSettings = data.settings;
+                        resultsHeader.textContent = `Results for: ${data.name}`;
+                        
+                        const settingsWhitelist = ['llm_model', 'llm_base_url', 'max_retries'];
+                        if (pipelineType === 'rag_adhoc') {
+                            settingsWhitelist.push('rag_settings', 'search_settings');
+                        }
+                        BenchmarkUtils.renderRunConfiguration(data.settings, settingsWhitelist);
+                        
+                        const runData = { name: data.name, results: data.results };
+                        BenchmarkUtils.displayRunResults(runData, BenchmarkUtils.updateAdhocStatsUI, pipelineType);
+                        
+                        if (retryBtn) retryBtn.style.display = 'none';
+                        failedItems = [];
+                    })
+                    .catch(error => {
+                        console.error('Error loading run:', error);
+                        alert(`Failed to load run data.`);
+                    });
+            }
+
+            // --- Batch Delete ---
+            BenchmarkUtils.setupBatchSelection(
+                'saved-runs-list', 'select-all-checkbox', 'run-checkbox', 'delete-selected-btn',
+                (selectedRunIds) => {
+                    if (!confirm(`Are you sure you want to delete ${selectedRunIds.length} run(s)?`)) return;
+                    fetch(urls.batchDeleteRuns, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+                        body: JSON.stringify({ run_ids: selectedRunIds })
+                    })
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.status === 'ok') loadSavedRuns();
+                        else alert('Error deleting runs: ' + data.message);
+                    })
+                    .catch(err => alert('An error occurred during deletion.'));
+                }
+            );
+
+            // --- Stop Pipeline ---
+            function handleStopPipeline() {
+                if (pipelineController) {
+                    pipelineController.abort();
+                }
+                if (pipelineController && pipelineController.pipelineId) {
+                    BenchmarkUtils.stopPipeline(urls.stopPipeline, csrfToken, pipelineController.pipelineId);
+                }
+            }
+            if (stopBtn) stopBtn.addEventListener('click', handleStopPipeline);
+            window.addEventListener('beforeunload', handleStopPipeline);
+
+            // --- Run Pipeline ---
+            function runQAPipeline() {
+                const currentPipelineId = BenchmarkUtils.generateUUID();
+                let stats = { total: 0, ruleCorrect: 0, llmCorrect: 0, llmErrors: 0, agreements: 0, totalDocsUsed: 0 };
+                
+                // Collect Settings Snapshot for UI
+                const currentLlmSettings = {
+                    llm_base_url: document.getElementById('llm_base_url').value,
+                    llm_api_key: document.getElementById('llm_api_key').value,
+                    llm_model: document.getElementById('llm_model').value,
+                };
+                const snapshot = { llm_settings: currentLlmSettings };
+                if (pipelineType === 'rag_adhoc') {
+                    snapshot.rag_settings = { prompt_template: document.getElementById('rag_prompt_template').value };
+                    const searchProviderEl = document.getElementById('search_provider');
+                    const fullContentEl = document.getElementById('serper_fetch_full_content');
+                    snapshot.search_settings = {
+                        search_provider: searchProviderEl ? searchProviderEl.value : null,
+                        serper_fetch_full_content: fullContentEl ? fullContentEl.checked : null,
+                    };
+                }
+                currentSettings = snapshot;
+                BenchmarkUtils.renderRunConfiguration(snapshot);
+
+                // Prepare Form Data
+                const formData = new FormData();
+                formData.append('csrfmiddlewaretoken', csrfToken);
+                formData.append('dataset_id', document.getElementById('dataset-selector').value);
+                formData.append('pipeline_id', currentPipelineId);
+                
+                // Add common LLM fields
+                formData.append('llm_base_url', currentLlmSettings.llm_base_url);
+                formData.append('llm_api_key', currentLlmSettings.llm_api_key);
+                formData.append('llm_model', currentLlmSettings.llm_model);
+
+                // Add custom fields via callback
+                if (buildFormData) buildFormData(formData);
+
+                currentRunResults = [];
+                failedItems = [];
+                resultsHeader.textContent = "Pipeline Results";
+                BenchmarkUtils.updateAdhocStatsUI(stats);
+
+                let totalQuestions = 0; // Will be updated via stream meta
+                
+                // Ensure status div exists for Adhoc (keep existing logic)
+                let statusDiv = document.getElementById('pipeline-status');
+                if (!statusDiv) {
+                    statusDiv = document.createElement('div');
+                    statusDiv.id = 'pipeline-status';
+                    statusDiv.className = 'mt-2 text-muted small';
+                    statusDiv.style.display = 'none';
+                    // Insert after progress container
+                    const progressContainer = document.getElementById('progress-container');
+                    if (progressContainer) {
+                        progressContainer.parentNode.insertBefore(statusDiv, progressContainer.nextSibling);
+                    }
+                }
+                statusDiv.style.display = 'block';
+                statusDiv.innerText = 'Initializing...';
+
+                const uiElements = {
+                    runBtn: runBtn,
+                    stopBtn: stopBtn,
+                    retryBtn: retryBtn,
+                    progressContainer: document.getElementById('progress-container'),
+                    progressBar: document.getElementById('progress-bar'),
+                    resultsContainer: document.getElementById('pipeline-results-container'),
+                    resultsBody: resultsBody,
+                    statusDiv: statusDiv, 
+                    spinner: document.getElementById('running-spinner')
+                };
+
+                // Helper to update processing row
+                let currentProcessingRow = null;
+                const updateRunningRow = (questionItem) => {
+                    // Remove existing
+                    if (currentProcessingRow) {
+                        currentProcessingRow.remove();
+                        currentProcessingRow = null;
+                    }
+                    // Remove any other stray processing rows
+                    const strays = resultsBody.querySelectorAll('.processing-row');
+                    strays.forEach(row => row.remove());
+
+                    if (questionItem) {
+                        const colSpan = (pipelineType === 'rag_adhoc') ? 8 : 7;
+                        currentProcessingRow = BenchmarkUtils.BenchmarkRenderer.renderProcessingRow(questionItem, resultsBody, colSpan);
+                    }
+                };
+
+                pipelineController = BenchmarkUtils.PipelineRunner.start({
+                    url: urls.runPipeline,
+                    formData: formData,
+                    ui: uiElements,
+                    totalItems: 0, // Will update based on meta
+                    itemsData: null, // No longer used
+                    callbacks: {
+                        onMeta: (data) => {
+                            if (data.type === 'total_count') {
+                                totalQuestions = data.count;
+                                // We can manually update totalItems in PipelineRunner context if needed, 
+                                // but simpler to just handle progress bar update here if PipelineRunner doesn't support dynamic total.
+                                // Actually PipelineRunner uses `totalItems` passed in `options`. 
+                                // We can update the UI directly since PipelineRunner is simple.
+                            } else if (data.type === 'processing_start') {
+                                const questionItem = data.question;
+                                updateRunningRow(questionItem);
+                                
+                                // Update status text
+                                if (uiElements.statusDiv) {
+                                    const qText = questionItem.question || 'Unknown';
+                                    const processedCount = currentRunResults.length; // Approximate
+                                    let text = `Processing ${processedCount + 1} / ${totalQuestions || '?'} items...`;
+                                    uiElements.statusDiv.innerText = text;
+                                }
+                            }
+                        },
+                        onData: (data, processedCount) => {
+                            // Remove processing row before adding result
+                            if (currentProcessingRow) {
+                                currentProcessingRow.remove();
+                                currentProcessingRow = null;
+                            }
+                            // Clean up any strays just in case
+                            resultsBody.querySelectorAll('.processing-row').forEach(r => r.remove());
+
+                            currentRunResults.push(data);
+                            const resultSummary = BenchmarkUtils.BenchmarkRenderer.renderResultRow(data, resultsBody, processedCount, pipelineType, false);
+                            
+                            if (resultSummary.rowId) {
+                                data.rowId = resultSummary.rowId;
+                            }
+
+                            if (data.error && resultSummary.rowId) {
+                                failedItems.push({ ...data, rowId: resultSummary.rowId });
+                            }
+
+                            stats.total++;
+                            if (resultSummary.ruleCorrect) stats.ruleCorrect++;
+                            if (resultSummary.llmCorrect) stats.llmCorrect++;
+                            if (resultSummary.llmCorrect === null) stats.llmErrors++;
+                            if (resultSummary.llmCorrect !== null && resultSummary.ruleCorrect === resultSummary.llmCorrect) {
+                                stats.agreements++;
+                            }
+                            stats.totalDocsUsed += (data.num_docs_used || 0);
+                            BenchmarkUtils.updateAdhocStatsUI(stats);
+                            
+                            // Update Progress Bar manually if totalQuestions is known
+                            if (uiElements.progressBar && totalQuestions > 0) {
+                                const progress = Math.round((stats.total / totalQuestions) * 100);
+                                uiElements.progressBar.style.width = `${progress}%`;
+                                uiElements.progressBar.textContent = `${progress}%`;
+                            }
+                        },
+                        onComplete: (processedCount) => {
+                             if (currentProcessingRow) currentProcessingRow.remove();
+                             if (failedItems.length > 0 && retryBtn) {
+                                retryBtn.style.display = 'block';
+                                retryBtn.disabled = false;
+                                retryBtn.innerHTML = `Retry ${failedItems.length} Failed`;
+                            }
+                        },
+                        onError: (error) => {
+                             if (currentProcessingRow) currentProcessingRow.remove();
+                        }
+                    }
+                });
+
+                // Show first item processing (Called AFTER start to avoid being cleared)
+                // Use a small timeout to ensure it runs after the sync UI clear in start()
+                setTimeout(() => {
+                    if (totalQuestions > 0) {
+                        updateRunningRow(0);
+                    }
+                }, 50);
+            }
+            if (runBtn) runBtn.addEventListener('click', runQAPipeline);
+
+            // --- Retry Logic (Placeholder or Basic) ---
+            if (retryBtn) {
+                retryBtn.addEventListener('click', function() {
+                    if (config.onRetry) {
+                        config.onRetry(failedItems, resultsBody, currentRunResults);
+                    } else {
+                        alert("Retry logic is currently specialized per page. Please implement if needed.");
+                    }
+                });
+            }
+
+            // --- CSV Export ---
+            const exportCsvBtn = document.getElementById('export-results-csv-btn');
+            if (exportCsvBtn) {
+                exportCsvBtn.addEventListener('click', function() {
+                    const headers = ["#", "Question", "Model Answer", "Ground Truths", "Num Docs Used", "Rule-based Correct", "LLM Judge Correct", "Agreement"];
+                    const rowMapper = (result, index) => {
+                        const ruleCorrect = result.hasOwnProperty('is_correct_rule') ? result.is_correct_rule : result.rule_result;
+                        const llmCorrect = result.hasOwnProperty('is_correct_llm') ? result.is_correct_llm : result.llm_result;
+                        const agreement = (llmCorrect !== null && ruleCorrect === llmCorrect);
+                        const groundTruths = result.ground_truths || result.answer || [];
+                        return [
+                            index + 1,
+                            result.question || '',
+                            result.answer || '',
+                            Array.isArray(groundTruths) ? groundTruths.join('; ') : groundTruths,
+                            result.num_docs_used || 0,
+                            ruleCorrect ? 'Correct' : 'Incorrect',
+                            llmCorrect === null ? 'Error' : (llmCorrect ? 'Correct' : 'Incorrect'),
+                            agreement ? 'Yes' : 'No'
+                        ];
+                    };
+                    BenchmarkUtils.exportToCSV(currentRunResults, csvPrefix, headers, rowMapper);
+                });
+            }
+
+            // --- JSON Export ---
+            const exportJsonBtn = document.getElementById('export-results-json-btn');
+            if (exportJsonBtn) {
+                exportJsonBtn.addEventListener('click', function() {
+                    const exportData = {
+                        settings: currentSettings,
+                        results: currentRunResults
+                    };
+                    BenchmarkUtils.exportToJSON(exportData, csvPrefix); // Reusing csvPrefix as generic prefix
+                });
+            }
+
+            // --- Initial Load ---
+            loadSavedRuns();
+            
+            // --- Toggles ---
+            document.getElementById('pipeline-results-body').addEventListener('click', function(e) {
+                if (e.target && e.target.classList.contains('toggle-answers-link')) {
+                    e.preventDefault();
+                    const link = e.target;
+                    const listItem = link.parentNode;
+                    const list = listItem.parentNode;
+                    const isExpanded = list.dataset.expanded === 'true';
+                    const items = list.querySelectorAll('.ground-truth-item');
+                    list.dataset.expanded = !isExpanded;
+                    link.textContent = isExpanded ? `... Show ${list.dataset.remaining} more` : '... Show less';
+                    items.forEach((item, index) => {
+                        if (index >= 3) item.style.display = isExpanded ? 'none' : 'list-item';
+                    });
+                }
+                
+                // View Search Results Modal Trigger
+                if (e.target && e.target.closest('.view-all-results-btn')) {
+                    e.preventDefault();
+                    const btn = e.target.closest('.view-all-results-btn');
+                    try {
+                        const results = JSON.parse(decodeURIComponent(btn.dataset.results));
+                        const container = document.getElementById('modal-search-results-container');
+                        BenchmarkUtils.BenchmarkRenderer.renderModalSearchResults(results, container);
+                        const modal = new bootstrap.Modal(document.getElementById('searchResultsListModal'));
+                        modal.show();
+                    } catch (err) { console.error(err); }
+                }
+            });
+        }
+    },
+
+    MultiTurnPage: {
+        init: function(config) {
+            const { 
+                pipelineType, 
+                urls, 
+                buildFormData, 
+                csvPrefix = 'multiturn-results',
+                questionsDataId = 'questions-data' 
+            } = config;
+            
+            const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+            BenchmarkUtils.setupConfigurationActionHandlers(urls, csrfToken, true, true);
+            const questions = JSON.parse(document.getElementById(questionsDataId).textContent);
+            
+            let activeSessionId = null;
+            let currentPipelineResults = [];
+            let pipelineController = null;
+
+            // --- Batch Delete ---
+            BenchmarkUtils.setupBatchSelection(
+                'session-list', 'select-all-checkbox', 'session-checkbox', 'delete-selected-btn',
+                (selectedSessionIds, selectedGroupIds) => {
+                    if (selectedSessionIds.length === 0 && selectedGroupIds.length === 0) return;
+                    if (!confirm(`Delete ${selectedSessionIds.length} sessions and ${selectedGroupIds.length} groups?`)) return;
+                    
+                    const promises = [];
+                    if (selectedSessionIds.length > 0) {
+                        promises.push(fetch(urls.batchDeleteSessions, {
+                            method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+                            body: JSON.stringify({ session_ids: selectedSessionIds })
+                        }).then(res => res.json()));
+                    }
+                    selectedGroupIds.forEach(gid => {
+                        promises.push(fetch(urls.deleteSessionGroup(gid), {
+                            method: 'DELETE', headers: { 'X-CSRFToken': csrfToken }
+                        }).then(res => res.json()));
+                    });
+
+                    Promise.all(promises).then(() => window.location.reload())
+                        .catch(err => alert('Error during deletion.'));
+                }, 'group-select-checkbox'
+            );
+
+            // --- Helper: Load Session ---
+            function loadSession(sessionId, initialTrialId = null) {
+                activeSessionId = sessionId;
+                fetch(urls.getSession(sessionId))
+                    .then(res => res.json())
+                    .then(data => {
+                        BenchmarkUtils.MultiTurnUtils.renderSession(data.session, data.trials, { sessionTrials: [] }); 
+                        window.sessionTrials = data.trials; 
+                        
+                        const settingsWhitelist = ['llm_model', 'llm_base_url', 'max_retries'];
+                         if (pipelineType.includes('rag')) {
+                            settingsWhitelist.push('rag_settings', 'search_settings');
+                        }
+                        BenchmarkUtils.renderRunConfiguration(data.session.settings_snapshot, settingsWhitelist);
+                        
+                        document.getElementById('session-container').style.display = 'block';
+                        document.getElementById('no-session-selected').style.display = 'none';
+                        
+                        const delBtn = document.getElementById('delete-session-btn');
+                        if (data.session.group_id) delBtn.style.display = 'none';
+                        else delBtn.style.display = 'inline-block';
+
+                        if (initialTrialId) executeTrial(initialTrialId, sessionId);
+                        
+                        const lastTrial = data.trials[data.trials.length - 1];
+                         if (lastTrial && lastTrial.status === 'completed' && lastTrial.is_correct === false && !data.session.is_completed) {
+                             if (data.trials.length < data.session.max_retries) {
+                                 setTimeout(() => window.retryTrial(lastTrial.id), 1500);
+                             }
+                         }
+                    });
+            }
+
+            // --- Helper: Execute Trial ---
+            function executeTrial(trialId, sessionId) {
+                 fetch(urls.runTrial(trialId)).then(res => res.json()).then(data => {
+                     if (data.error) alert(`Error in trial #${trialId}: ${data.error}`);
+                     if (sessionId) loadSession(sessionId);
+                 }).catch(() => {
+                     alert('Network error in trial.');
+                     if (sessionId) loadSession(sessionId);
+                 });
+            }
+            
+            // --- Helper: Load Group/Run ---
+            function loadRun(groupId) {
+                 fetch(urls.loadRun(groupId)).then(res => res.json()).then(data => {
+                     if (data.error) { alert(data.error); return; }
+                     currentPipelineResults = data.results;
+                     BenchmarkUtils.MultiTurnUtils.updateStatsUI(data.results, data.group_name, (sid) => {
+                         document.getElementById('session-container').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                         loadSession(sid);
+                     });
+                     
+                     const settingsWhitelist = ['llm_model', 'llm_base_url', 'max_retries'];
+                     if (pipelineType.includes('rag')) settingsWhitelist.push('rag_settings', 'search_settings');
+                     BenchmarkUtils.renderRunConfiguration(data.settings, settingsWhitelist);
+                     document.getElementById('statistics-container').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                 });
+            }
+
+            // --- Single Session Start ---
+            document.getElementById('start-session-btn').addEventListener('click', function() {
+                const questionSelect = document.getElementById('question-select');
+                if (!questionSelect.value) { alert('Select a question.'); return; }
+                const qData = questions[questionSelect.value];
+                
+                const btn = this;
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Starting...';
+                
+                const singleSessionPipelineType = document.getElementById('pipeline-mode-session') ? document.getElementById('pipeline-mode-session').value : pipelineType;
+
+                fetch(urls.createSession, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
+                    body: JSON.stringify({
+                        question: qData.question,
+                        ground_truths: qData.answer,
+                        pipeline_type: singleSessionPipelineType
+                    })
+                }).then(res => res.json()).then(data => {
+                    if (data.error) alert(data.error);
+                    else {
+                        BenchmarkUtils.MultiTurnUtils.addNewSessionToList('session-list', data.session_id, qData, null);
+                        loadSession(data.session_id, data.trial_id);
+                    }
+                }).finally(() => { btn.disabled = false; btn.innerHTML = 'Start'; });
+            });
+
+            // --- Pipeline Run ---
+            document.getElementById('run-pipeline-btn').addEventListener('click', function() {
+                const currentPipelineId = BenchmarkUtils.generateUUID();
+                const ui = {
+                    runBtn: this,
+                    stopBtn: document.getElementById('stop-pipeline-btn'),
+                    progressBar: document.getElementById('pipeline-progress-bar'),
+                    statusDiv: document.getElementById('pipeline-status'),
+                    resultsBody: null, 
+                    spinner: null
+                };
+                
+                document.getElementById('statistics-container').style.display = 'block';
+                document.getElementById('stats-details-tbody').innerHTML = '';
+                document.getElementById('pipeline-progress').style.display = 'block';
+                document.getElementById('results-header-text').textContent = 'Live Pipeline Results';
+
+                const currentLlmSettings = {
+                    llm_base_url: document.getElementById('llm_base_url').value,
+                    llm_api_key: document.getElementById('llm_api_key').value,
+                    llm_model: document.getElementById('llm_model').value,
+                    max_retries: document.getElementById('max_retries') ? document.getElementById('max_retries').value : null,
+                };
+                BenchmarkUtils.renderRunConfiguration({ llm_settings: currentLlmSettings });
+                
+                currentPipelineResults = [];
+                
+                const formData = new FormData();
+                formData.append('csrfmiddlewaretoken', csrfToken);
+                formData.append('dataset_id', document.getElementById('dataset-selector').value);
+                formData.append('pipeline_id', currentPipelineId);
+                formData.append('llm_base_url', currentLlmSettings.llm_base_url);
+                formData.append('llm_api_key', currentLlmSettings.llm_api_key);
+                formData.append('llm_model', currentLlmSettings.llm_model);
+                if (currentLlmSettings.max_retries) formData.append('max_retries', currentLlmSettings.max_retries);
+                
+                if (buildFormData) buildFormData(formData);
+                
+                let totalQuestions = questions.length;
+
+                pipelineController = BenchmarkUtils.PipelineRunner.start({
+                    url: urls.runPipeline,
+                    formData: formData,
+                    ui: ui,
+                    totalItems: totalQuestions,
+                    callbacks: {
+                        onMeta: (data) => {
+                             if (data.type === 'info') ui.statusDiv.textContent = data.message;
+                             if (data.type === 'session_created') {
+                                 BenchmarkUtils.MultiTurnUtils.addNewSessionToList('session-list', data.session_id, { question: data.question }, null, data.group_id, data.group_name, 'Processing...');
+                                 loadSession(data.session_id);
+                             }
+                             if (data.type === 'trial_started' || data.type === 'trial_completed') {
+                                 if (activeSessionId && String(activeSessionId) === String(data.session_id)) loadSession(data.session_id);
+                             }
+                        },
+                        onData: (data) => {
+                             if (data.error) { ui.statusDiv.textContent = `Error: ${data.error}`; return; }
+                             currentPipelineResults.push(data);
+                             BenchmarkUtils.MultiTurnUtils.updateStatsUI(currentPipelineResults, data.group_name || "Current Run", (sid) => {
+                                 document.getElementById('session-container').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                                 loadSession(sid);
+                             });
+                             BenchmarkUtils.MultiTurnUtils.addNewSessionToList('session-list', data.session_id, { question: data.question }, null, data.group_id, data.group_name, 'Finished');
+                        }
+                    }
+                });
+            });
+
+            // --- Stop Pipeline ---
+            function stopPipeline() {
+                if (pipelineController) pipelineController.abort();
+                if (pipelineController && pipelineController.pipelineId) {
+                    let strategyData = { pipeline_id: pipelineController.pipelineId };
+                     const pipelineTypeInput = document.getElementById('pipeline-mode-pipeline');
+                     if (pipelineTypeInput && pipelineType.includes('rag')) {
+                         let s = 'no_reform';
+                         if (pipelineTypeInput.value.includes('reform')) s = 'reform';
+                         if (pipelineTypeInput.value.includes('no_reform')) s = 'no_reform';
+                         strategyData.reformulation_strategy = s;
+                     }
+
+                    fetch(urls.stopPipeline, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+                        body: JSON.stringify(strategyData),
+                        keepalive: true
+                    }).catch(console.error);
+                }
+            }
+            document.getElementById('stop-pipeline-btn').addEventListener('click', stopPipeline);
+            window.addEventListener('beforeunload', stopPipeline);
+
+            // --- List Click Handlers ---
+            document.getElementById('session-list').addEventListener('click', function(e) {
+                const target = e.target.closest('.session-details');
+                if (target) { e.preventDefault(); loadSession(target.dataset.sessionId); }
+                const groupSummary = e.target.closest('.group-summary');
+                if (groupSummary) { e.preventDefault(); loadRun(groupSummary.dataset.groupId); }
+                
+                const deleteGrp = e.target.closest('.delete-group-btn');
+                if (deleteGrp && confirm('Delete group?')) {
+                     fetch(urls.deleteSessionGroup(deleteGrp.dataset.groupId), { method: 'DELETE', headers: { 'X-CSRFToken': csrfToken } })
+                     .then(res => res.json()).then(data => {
+                         if (data.status === 'ok') { deleteGrp.closest('.list-group-item').remove(); window.location.reload(); }
+                     });
+                }
+            });
+            
+            // --- Global Retry Trial Hook ---
+            window.retryTrial = function(trialId) {
+                const trial = window.sessionTrials ? window.sessionTrials.find(t => t.id === trialId) : null;
+                const feedback = trial ? trial.feedback : "";
+                fetch(urls.retrySession(trialId), {
+                    method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
+                    body: JSON.stringify({ feedback: feedback, is_correct: false })
+                }).then(res => res.json()).then(data => {
+                    if (data.error) alert(data.error);
+                    else {
+                        loadSession(activeSessionId);
+                        if (data.status === 'retrying') executeTrial(data.new_trial_id, activeSessionId);
+                    }
+                });
+            };
+            
+            // --- Single Session Delete ---
+            document.getElementById('delete-session-btn').addEventListener('click', function() {
+                 if (activeSessionId && confirm('Delete session?')) {
+                     fetch(urls.deleteSession(activeSessionId), { method: 'DELETE', headers: { 'X-CSRFToken': csrfToken } })
+                     .then(res => res.json()).then(data => {
+                         if (data.status === 'ok') {
+                             document.querySelector(`#session-list [data-session-id='${activeSessionId}']`).remove();
+                             document.getElementById('session-container').style.display = 'none';
+                             document.getElementById('no-session-selected').style.display = 'block';
+                             activeSessionId = null;
+                         }
+                     });
+                 }
+            });
+            
+            // --- Exports ---
+            if (document.getElementById('export-session-json-btn')) {
+                document.getElementById('export-session-json-btn').addEventListener('click', () => {
+                    if (activeSessionId) window.location.href = urls.exportSession(activeSessionId) + '?format=json';
+                });
+            }
+            if (document.getElementById('export-session-csv-btn')) {
+                document.getElementById('export-session-csv-btn').addEventListener('click', () => {
+                    if (activeSessionId) window.location.href = urls.exportSession(activeSessionId) + '?format=csv';
+                });
+            }
+            document.getElementById('export-results-btn').addEventListener('click', () => {
+                const headers = ["#", "Question", "Final Answer", "Ground Truths", "Result", "Trials"];
+                const rowMapper = (result, index) => {
+                    return [
+                        index + 1, result.question, result.final_answer || 'N/A', 
+                        Array.isArray(result.ground_truths) ? result.ground_truths.join('; ') : result.ground_truths,
+                        result.correct === true ? 'Correct' : (result.correct === false ? 'Incorrect' : 'Error'),
+                        result.trials
+                    ];
+                };
+                BenchmarkUtils.exportToCSV(currentPipelineResults, csvPrefix, headers, rowMapper);
+            });
+        }
+    },
+
 };

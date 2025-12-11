@@ -1,6 +1,7 @@
 from django.db import models
 from django.views.decorators.http import require_POST, require_http_methods
 import re
+import csv
 from django.shortcuts import render, get_object_or_404
 from django.http import JsonResponse, StreamingHttpResponse, HttpResponse
 import openai
@@ -126,7 +127,26 @@ def activate_dataset(request, dataset_id):
 def dataset_upload(request):
     form = BenchmarkDatasetForm(request.POST, request.FILES)
     if form.is_valid():
-        dataset = form.save()
+        dataset = form.save(commit=False)
+        try:
+            # Count questions from the uploaded file
+            file = request.FILES['file']
+            # Save the file temporarily to count lines
+            temp_path = os.path.join('/tmp', file.name)
+            with open(temp_path, 'wb+') as destination:
+                for chunk in file.chunks():
+                    destination.write(chunk)
+            
+            dataset.question_count = count_questions_in_file(temp_path)
+            os.remove(temp_path) # Clean up temp file
+            
+            # Reset file pointer for saving
+            file.seek(0) 
+        except Exception as e:
+            print_debug(f"Error counting questions: {e}")
+            dataset.question_count = 0
+        
+        dataset.save()
         return JsonResponse(
             {"status": "ok", "dataset_id": dataset.id, "name": dataset.name}
         )
@@ -175,6 +195,9 @@ def sync_datasets(request):
                         description=f"Auto-detected from {filename}",
                         is_active=is_active,
                     )
+                    # Count questions
+                    dataset.question_count = count_questions_in_file(file_path)
+
                     # Save the file content to the FileField
                     dataset.file.save(filename, ContentFile(content))
                     dataset.save()
@@ -1191,26 +1214,79 @@ def export_session(request, session_id):
             )
         )
 
-    export_data = {
-        "session_id": session.id,
-        "question": session.question,
-        "ground_truths": session.ground_truths,
-        "is_completed": session.is_completed,
-        "pipeline_type": pipeline_type,
-        "created_at": session.created_at.isoformat(),
-        "max_retries": max_retries,
-        "trials": trials,
-    }
+    # Fix datetime serialization
+    for trial in trials:
+        if trial.get("created_at"):
+            trial["created_at"] = trial["created_at"].isoformat()
 
-    response = HttpResponse(
-        json.dumps(export_data, indent=2), content_type="application/json"
-    )
+    export_format = request.GET.get("format", "json")
 
-    response["Content-Disposition"] = (
-        f'attachment; filename="benchmark_session_{session_id}.json"'
-    )
+    if export_format == "csv":
+        response = HttpResponse(content_type="text/csv")
+        response["Content-Disposition"] = (
+            f'attachment; filename="benchmark_session_{session_id}.csv"'
+        )
 
-    return response
+        writer = csv.writer(response)
+        # Define headers
+        headers = [
+            "Session ID",
+            "Question",
+            "Ground Truths",
+            "Pipeline Type",
+            "Session Created At",
+            "Trial Number",
+            "Answer",
+            "Feedback",
+            "Is Correct",
+            "Trial Created At",
+        ]
+        if isinstance(session, RAGMultiTurnSession):
+            headers.extend(["Search Query", "Search Results"])
+
+        writer.writerow(headers)
+
+        for trial in trials:
+            row = [
+                session.id,
+                session.question,
+                session.ground_truths,
+                pipeline_type,
+                session.created_at.isoformat(),
+                trial.get("trial_number"),
+                trial.get("answer"),
+                trial.get("feedback"),
+                trial.get("is_correct"),
+                trial.get("created_at"),  # Already converted to string
+            ]
+            if isinstance(session, RAGMultiTurnSession):
+                row.extend([trial.get("search_query"), trial.get("search_results")])
+
+            writer.writerow(row)
+
+        return response
+
+    else:
+        export_data = {
+            "session_id": session.id,
+            "question": session.question,
+            "ground_truths": session.ground_truths,
+            "is_completed": session.is_completed,
+            "pipeline_type": pipeline_type,
+            "created_at": session.created_at.isoformat(),
+            "max_retries": max_retries,
+            "settings": snapshot,
+            "trials": trials,
+        }
+        response = HttpResponse(
+            json.dumps(export_data, indent=2), content_type="application/json"
+        )
+
+        response["Content-Disposition"] = (
+            f'attachment; filename="benchmark_session_{session_id}.json"'
+        )
+
+        return response
 
 
 @admin_required

@@ -20,3 +20,5 @@ hard_questions.jsonl
 NoUploadPlatform/benchmark/results/
 mcp
 tempCodes
+
+gha-creds-*.json

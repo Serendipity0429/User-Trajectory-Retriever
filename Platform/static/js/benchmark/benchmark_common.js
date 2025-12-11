@@ -186,6 +186,95 @@ const BenchmarkUtils = {
     },
 
     /**
+     * Setup event handlers for configuration actions (test connection, save settings, restore defaults).
+     * @param {object} urls - Object containing URLs for API endpoints (e.g., testLlmConnection, saveLlmSettings).
+     * @param {string} csrfToken - The CSRF token.
+     * @param {boolean} includeRag - Whether to include RAG settings handlers.
+     * @param {boolean} includeSearch - Whether to include Search settings handlers.
+     */
+    setupConfigurationActionHandlers: function(urls, csrfToken, includeRag = false, includeSearch = false) {
+        // LLM Settings
+        if (document.getElementById('test-connection-btn')) {
+            document.getElementById('test-connection-btn').addEventListener('click', function() {
+                const data = {
+                    llm_base_url: document.getElementById('llm_base_url').value,
+                    llm_api_key: document.getElementById('llm_api_key').value,
+                    llm_model: document.getElementById('llm_model').value
+                };
+                BenchmarkUtils.testConnection(urls.testLlmConnection, csrfToken, data, 'connection-status', 'test-connection-btn');
+            });
+        }
+
+        if (document.getElementById('save-llm-settings-btn')) {
+            document.getElementById('save-llm-settings-btn').addEventListener('click', function() {
+                const data = {
+                    llm_base_url: document.getElementById('llm_base_url').value,
+                    llm_api_key: document.getElementById('llm_api_key').value,
+                    llm_model: document.getElementById('llm_model').value,
+                    max_retries: document.getElementById('max_retries') ? document.getElementById('max_retries').value : 3
+                };
+                BenchmarkUtils.saveSettings(urls.saveLlmSettings, csrfToken, data, 'save-llm-settings-btn');
+            });
+        }
+
+        if (document.getElementById('restore-defaults-btn')) {
+            document.getElementById('restore-defaults-btn').addEventListener('click', function() {
+                BenchmarkUtils.restoreDefaults(urls.getLlmEnvVars, (data) => {
+                    if (data.llm_base_url) document.getElementById('llm_base_url').value = data.llm_base_url;
+                    if (data.llm_api_key) document.getElementById('llm_api_key').value = data.llm_api_key;
+                    if (data.llm_model) document.getElementById('llm_model').value = data.llm_model;
+                });
+            });
+        }
+
+        if (includeRag) {
+            // RAG Settings
+            if (document.getElementById('save-rag-settings-btn')) {
+                document.getElementById('save-rag-settings-btn').addEventListener('click', function() {
+                    const data = {
+                        prompt_template: document.getElementById('rag_prompt_template').value
+                    };
+                    BenchmarkUtils.saveSettings(urls.saveRagSettings, csrfToken, data, 'save-rag-settings-btn');
+                });
+            }
+
+            if (document.getElementById('restore-rag-defaults-btn')) {
+                document.getElementById('restore-rag-defaults-btn').addEventListener('click', function() {
+                    fetch(urls.getDefaultRagPrompt)
+                        .then(res => res.json())
+                        .then(data => {
+                            if(data.default_prompt) {
+                                document.getElementById('rag_prompt_template').value = data.default_prompt;
+                            }
+                        })
+                        .catch(err => console.error(err));
+                });
+            }
+        }
+
+        if (includeSearch) {
+            // Search Settings
+            if (document.getElementById('save-search-settings-btn')) {
+                document.getElementById('save-search-settings-btn').addEventListener('click', function() {
+                    let searchProvider = 'serper'; // default
+                    const checkedProvider = document.querySelector('input[name="search_provider"]:checked');
+                    if (checkedProvider) searchProvider = checkedProvider.value;
+
+                    const serperApiKey = document.getElementById('serper_api_key').value;
+                    const serperFetchFullContent = document.getElementById('serper_fetch_full_content') ? document.getElementById('serper_fetch_full_content').checked : false;
+                    
+                    const data = {
+                        search_provider: searchProvider,
+                        serper_api_key: serperApiKey,
+                        serper_fetch_full_content: serperFetchFullContent
+                    };
+                    BenchmarkUtils.saveSettings(urls.saveSearchSettings, csrfToken, data, 'save-search-settings-btn');
+                });
+            }
+        }
+    },
+
+    /**
      * Stop a running pipeline.
      * @param {string} url - The URL to the stop pipeline view.
      * @param {string} csrfToken - The CSRF token.
@@ -206,6 +295,93 @@ const BenchmarkUtils = {
             body: data,
             keepalive: true
         }).catch(e => console.error("Stop request failed", e));
+    },
+
+    /**
+     * Sets up batch selection logic for a list of items with checkboxes.
+     * @param {string} listContainerId - ID of the container holding all selectable items.
+     * @param {string} selectAllCheckboxId - ID of the 'Select All' checkbox.
+     * @param {string} itemCheckboxClass - Class name for individual item checkboxes.
+     * @param {string} deleteButtonId - ID of the button that performs batch deletion.
+     * @param {function} deleteActionCallback - Function to call when the delete button is clicked. Receives an array of selected item IDs and selected group IDs.
+     * @param {string} [itemGroupIdClass] - Optional: Class name for item group checkboxes (e.g., for multi-turn sessions).
+     */
+    setupBatchSelection: function(listContainerId, selectAllCheckboxId, itemCheckboxClass, deleteButtonId, deleteActionCallback, itemGroupIdClass = null) {
+        const listContainer = document.getElementById(listContainerId);
+        const selectAllCheckbox = document.getElementById(selectAllCheckboxId);
+        const deleteSelectedBtn = document.getElementById(deleteButtonId);
+
+        if (!listContainer || !deleteSelectedBtn) return;
+
+        const getCheckboxes = () => listContainer.querySelectorAll(`.${itemCheckboxClass}`);
+        const getGroupCheckboxes = () => itemGroupIdClass ? listContainer.querySelectorAll(`.${itemGroupIdClass}`) : [];
+
+        const toggleDeleteButton = () => {
+            const anyItemChecked = Array.from(getCheckboxes()).some(cb => cb.checked);
+            const anyGroupChecked = Array.from(getGroupCheckboxes()).some(cb => cb.checked);
+            const anyChecked = anyItemChecked || anyGroupChecked;
+            deleteSelectedBtn.style.display = anyChecked ? 'inline-block' : 'none';
+
+            if (selectAllCheckbox) {
+                const allCheckboxes = Array.from(getCheckboxes()).concat(Array.from(getGroupCheckboxes()));
+                const allChecked = allCheckboxes.length > 0 && allCheckboxes.every(cb => cb.checked);
+                selectAllCheckbox.checked = anyChecked && allChecked; // Only check 'select all' if there's anything selected AND all are selected
+            }
+        };
+
+        const selectAllHandler = (e) => {
+            if (selectAllCheckbox) {
+                const isChecked = e.target.checked;
+                getCheckboxes().forEach(checkbox => checkbox.checked = isChecked);
+                getGroupCheckboxes().forEach(checkbox => checkbox.checked = isChecked);
+                toggleDeleteButton();
+            }
+        };
+
+        if (selectAllCheckbox) {
+            selectAllCheckbox.addEventListener('change', selectAllHandler);
+        }
+        
+        listContainer.addEventListener('change', function(e) {
+            if (e.target.classList.contains(itemCheckboxClass) || (itemGroupIdClass && e.target.classList.contains(itemGroupIdClass))) {
+                toggleDeleteButton();
+            }
+        });
+
+        deleteSelectedBtn.addEventListener('click', function() {
+            const selectedItemIds = Array.from(getCheckboxes())
+                .filter(cb => cb.checked)
+                .map(cb => cb.dataset.runId || cb.dataset.sessionId); // Assumes data-run-id or data-session-id
+
+            const selectedGroupIds = Array.from(getGroupCheckboxes())
+                .filter(cb => cb.checked)
+                .map(cb => cb.dataset.groupId);
+
+            if (selectedItemIds.length === 0 && selectedGroupIds.length === 0) {
+                return;
+            }
+
+            deleteActionCallback(selectedItemIds, selectedGroupIds);
+        });
+
+        // Initialize button state
+        toggleDeleteButton();
+
+        // Observer to show/hide "Select All" based on list content (for saved runs/sessions)
+        const observer = new MutationObserver(() => {
+            const allCheckboxes = Array.from(getCheckboxes()).concat(Array.from(getGroupCheckboxes()));
+            if (selectAllCheckbox) {
+                // Ensure the 'select-all-container' is visible if there are any items
+                const selectAllContainer = selectAllCheckbox.closest('.list-group-item.bg-light');
+                if (allCheckboxes.length > 0) {
+                    if (selectAllContainer) selectAllContainer.style.display = 'flex';
+                } else {
+                    if (selectAllContainer) selectAllContainer.style.display = 'none';
+                }
+            }
+            toggleDeleteButton();
+        });
+        observer.observe(listContainer, { childList: true });
     },
 
     /**
@@ -1186,166 +1362,199 @@ const BenchmarkUtils = {
         }
     },
 
-    MultiTurnUtils: {
-        /**
-         * Update Multi-turn pipeline statistics UI.
-         * @param {Array} results - The array of result objects.
-         * @param {string} groupName - The name of the group.
-         * @param {function} loadSessionCallback - Callback when a row is clicked.
-         */
-        updateStatsUI: function(results, groupName, loadSessionCallback) {
-            const totalQuestions = results.length;
-            // if (totalQuestions === 0) return; // Allow updating to clear stats if empty
+    /**
+     * Render a multi-turn session, including question, ground truths, and trials.
+     * @param {object} session - The session object.
+     * @param {Array} trials - Array of trial objects for the session.
+     * @param {object} [options] - Optional settings.
+     * @param {Array} [options.sessionTrials] - Reference to a sessionTrials array for external updates.
+     * @param {string} [options.sessionContainerId='session-container'] - ID of the main session container.
+     * @param {string} [options.noSessionSelectedId='no-session-selected'] - ID of the 'no session selected' message.
+     */
+    renderSession: function(session, trials, options = {}) {
+        const {
+            sessionTrials, // Assuming this is defined in the script that calls this
+            sessionContainerId = 'session-container',
+            noSessionSelectedId = 'no-session-selected'
+        } = options;
 
-            const header = document.getElementById("results-header-text");
-            if (header) header.textContent = `Results for ${groupName}`;
+        // Update external sessionTrials reference if provided
+        if (sessionTrials) {
+            sessionTrials.length = 0; // Clear existing
+            sessionTrials.push(...trials); // Add new
+        }
 
-            const correctCount = results.filter(r => r.correct === true).length;
-            const incorrectCount = results.filter(r => r.correct === false).length;
-            const errorCount = results.filter(r => r.correct === 'error').length;
-            
-            const totalTrials = results.reduce((sum, r) => sum + (r.trials || 0), 0);
-            const successfulTrials = results.filter(r => r.correct === true).reduce((sum, r) => sum + r.trials, 0);
-            
-            const firstTryCorrectCount = results.filter(r => r.correct === true && r.trials === 1).length;
-            const giveUpCount = results.filter(r => r.correct === false && r.trials >= r.max_retries).length;
+        document.getElementById('session-header').textContent = `Session #${session.id}`;
+        document.getElementById('session-question').textContent = session.question;
 
-            const answeredQuestions = correctCount + incorrectCount;
-            const accuracy = answeredQuestions > 0 ? (correctCount / answeredQuestions) * 100 : 0;
-            
-            const avgTrialsAll = totalQuestions > 0 ? totalTrials / totalQuestions : 0;
-            const avgTrialsSuccess = correctCount > 0 ? successfulTrials / correctCount : 0;
-            
-            const firstTrySuccessRate = totalQuestions > 0 ? (firstTryCorrectCount / totalQuestions) * 100 : 0;
-            const giveUpRate = totalQuestions > 0 ? (giveUpCount / totalQuestions) * 100 : 0;
+        const gtContainer = document.getElementById('session-ground-truths');
+        gtContainer.innerHTML = '';
 
-            const setText = (id, text) => {
-                const el = document.getElementById(id);
-                if (el) el.textContent = text;
-            };
+        const GROUNDTRUTH_DISPLAY_LIMIT = 3; 
 
-            setText('stats-accuracy', `${accuracy.toFixed(2)}%`);
-            setText('stats-correct-count', correctCount);
-            setText('stats-incorrect-count', incorrectCount);
-            setText('stats-error-count', errorCount);
-            setText('stats-avg-trials-all', avgTrialsAll.toFixed(2));
-            setText('stats-avg-trials-success', avgTrialsSuccess.toFixed(2));
-            setText('stats-first-try-success', `${firstTrySuccessRate.toFixed(2)}%`);
-            setText('stats-give-up-rate', `${giveUpRate.toFixed(2)}%`);
+        if (session.ground_truths.length > GROUNDTRUTH_DISPLAY_LIMIT) {
+            const initialGroundTruths = session.ground_truths.slice(0, GROUNDTRUTH_DISPLAY_LIMIT);
+            initialGroundTruths.forEach(gt => {
+                const el = document.createElement('span');
+                el.className = 'badge bg-secondary me-1';
+                el.textContent = gt;
+                gtContainer.appendChild(el);
+            });
 
-            const tbody = document.getElementById('stats-details-tbody');
-            if (tbody) {
-                tbody.innerHTML = '';
-                results.forEach((result, index) => {
-                    const row = BenchmarkUtils.BenchmarkRenderer.renderMultiTurnResultRow(result, index, loadSessionCallback);
-                    tbody.appendChild(row);
-                });
-            }
+            const showMoreBtn = document.createElement('button');
+            showMoreBtn.className = 'btn btn-link btn-sm p-0';
+            showMoreBtn.textContent = `Show ${session.ground_truths.length - GROUNDTRUTH_DISPLAY_LIMIT} more`;
+            showMoreBtn.setAttribute('type', 'button');
+            gtContainer.appendChild(showMoreBtn);
 
-            const statsContainer = document.getElementById('statistics-container');
-            if (statsContainer) statsContainer.style.display = 'block';
-        },
+            const fullGroundTruthsDiv = document.createElement('div');
+            fullGroundTruthsDiv.style.display = 'none'; // Initially hidden
+            session.ground_truths.slice(GROUNDTRUTH_DISPLAY_LIMIT).forEach(gt => {
+                const el = document.createElement('span');
+                el.className = 'badge bg-secondary me-1';
+                el.textContent = gt;
+                fullGroundTruthsDiv.appendChild(el);
+            });
+            gtContainer.appendChild(fullGroundTruthsDiv);
 
-        /**
-         * Add a new session to the session list UI.
-         * @param {string} sessionListId - The ID of the session list container.
-         * @param {string} sessionId - The session ID.
-         * @param {object} questionData - Data about the question (e.g., {question: "..."}).
-         * @param {function} selectAllHandler - Function to handle select all checkbox change.
-         * @param {string} groupId - The group ID (optional).
-         * @param {string} groupName - The group name (optional).
-         * @param {string} statusText - The status text to display.
-         */
-        addNewSessionToList: function(sessionListId, sessionId, questionData, selectAllHandler, groupId = null, groupName = null, statusText = 'Now') {
-            const sessionList = document.getElementById(sessionListId);
-            if (!sessionList) return;
+            const showLessBtn = document.createElement('button');
+            showLessBtn.className = 'btn btn-link btn-sm p-0 ms-2';
+            showLessBtn.textContent = `Show less`;
+            showLessBtn.setAttribute('type', 'button');
+            showLessBtn.style.display = 'none'; // Initially hidden
+            gtContainer.appendChild(showLessBtn);
 
-            // Check if session already exists
-            const existingCheckbox = document.querySelector(`.session-checkbox[value="${sessionId}"]`);
-            if (existingCheckbox) {
-                const sessionDetails = document.querySelector(`.session-details[data-session-id="${sessionId}"]`);
-                if (sessionDetails) {
-                     const timeEl = sessionDetails.querySelector('small.text-muted');
-                     if (timeEl) {
-                         timeEl.textContent = statusText;
-                     }
-                }
-                return;
-            }
 
-            // If this is the first session ever, remove "no sessions" and add select-all header
-            if (document.querySelector('.no-sessions')) {
-                const noSessions = document.querySelector('.no-sessions');
-                if (noSessions) noSessions.remove();
-                
-                // Only create if it doesn't exist
-                if (!document.getElementById('select-all-container')) {
-                    const selectAllContainer = document.createElement('div');
-                    selectAllContainer.className = 'list-group-item bg-light';
-                    selectAllContainer.id = 'select-all-container';
-                    selectAllContainer.innerHTML = `
-                        <input class="form-check-input" type="checkbox" id="select-all-checkbox">
-                        <label class="form-check-label ms-2" for="select-all-checkbox">Select All</label>`;
-                    sessionList.prepend(selectAllContainer);
-                    const cb = document.getElementById('select-all-checkbox');
-                    if (cb && selectAllHandler) cb.addEventListener('change', selectAllHandler);
-                }
-            }
+            showMoreBtn.addEventListener('click', () => {
+                fullGroundTruthsDiv.style.display = 'block';
+                showMoreBtn.style.display = 'none';
+                showLessBtn.style.display = 'inline';
+            });
 
-            const newSessionItem = document.createElement('div');
-            newSessionItem.className = 'list-group-item d-flex align-items-center session-item-container';
-            newSessionItem.innerHTML = `
-                <input class="form-check-input session-checkbox" type="checkbox" value="${sessionId}" data-session-id="${sessionId}">
-                <div class="ms-3 flex-grow-1 session-details" data-session-id="${sessionId}" style="cursor: pointer;">
-                    <div class="d-flex w-100 justify-content-between">
-                        <h6 class="mb-1">Session #${sessionId}</h6>
-                        <small class="text-muted">${statusText}</small>
-                    </div>
-                    <p class="mb-1 small text-muted">${(questionData.question || '').substring(0, 100)}...</p>
-                </div>`;
-            
-            if (groupId) {
-                let groupContainer = document.getElementById(`session-group-${groupId}`);
-                if (!groupContainer) {
-                    // Create the group container if it doesn't exist
-                    const groupEl = document.createElement('div');
-                    groupEl.className = 'list-group-item';
-                    groupEl.innerHTML = `
-                        <details open>
-                            <summary class="fw-bold" style="cursor: pointer;">
-                                <i class="bi bi-collection me-1"></i>
-                                ${groupName}
-                                <small class="text-muted" id="group-session-count-${groupId}">(1 sessions)</small>
-                            </summary>
-                            <div class="list-group list-group-flush mt-2" id="session-group-${groupId}">
-                            </div>
-                        </details>
-                    `;
-                    const selectAllDiv = document.getElementById('select-all-container');
-                    if (selectAllDiv) {
-                        selectAllDiv.after(groupEl);
-                    } else {
-                        sessionList.prepend(groupEl);
+            showLessBtn.addEventListener('click', () => {
+                fullGroundTruthsDiv.style.display = 'none';
+                showMoreBtn.style.display = 'inline';
+                showLessBtn.style.display = 'none';
+            });
+
+        } else {
+            session.ground_truths.forEach(gt => {
+                const el = document.createElement('span');
+                el.className = 'badge bg-secondary me-1';
+                el.textContent = gt;
+                gtContainer.appendChild(el);
+            });
+        }
+
+        const trialsContainer = document.getElementById('trials-container');
+        trialsContainer.innerHTML = '';
+        trials.forEach(trial => {
+            trialsContainer.appendChild(BenchmarkUtils.BenchmarkRenderer.renderTrial(trial, session.is_completed, trials.length, session.max_retries));
+        });
+        
+        document.getElementById(sessionContainerId).style.display = 'block';
+        document.getElementById(noSessionSelectedId).style.display = 'none';
+    },
+
+    /**
+     * Add a new session to the session list UI.
+     * @param {string} sessionListId - The ID of the session list container.
+     * @param {string} sessionId - The session ID.
+     * @param {object} questionData - Data about the question (e.g., {question: "..."}).
+     * @param {function} selectAllHandler - Function to handle select all checkbox change.
+     * @param {string} groupId - The group ID (optional).
+     * @param {string} groupName - The group name (optional).
+     * @param {string} statusText - The status text to display.
+     */
+    addNewSessionToList: function(sessionListId, sessionId, questionData, selectAllHandler, groupId = null, groupName = null, statusText = 'Now') {
+        const sessionList = document.getElementById(sessionListId);
+        if (!sessionList) return;
+
+        // Check if session already exists
+        const existingCheckbox = document.querySelector(`.session-checkbox[value="${sessionId}"]`);
+        if (existingCheckbox) {
+            const sessionDetails = document.querySelector(`.session-details[data-session-id="${sessionId}"]`);
+            if (sessionDetails) {
+                    const timeEl = sessionDetails.querySelector('small.text-muted');
+                    if (timeEl) {
+                        timeEl.textContent = statusText;
                     }
-                    groupContainer = document.getElementById(`session-group-${groupId}`);
-                }
-                newSessionItem.classList.add("ps-4");
-                groupContainer.prepend(newSessionItem);
-                
-                // Update session count
-                const countEl = document.getElementById(`group-session-count-${groupId}`);
-                if (countEl) {
-                    const currentCount = groupContainer.children.length;
-                    countEl.textContent = `(${currentCount} sessions)`;
-                }
+            }
+            return;
+        }
 
-            } else {
+        // If this is the first session ever, remove "no sessions" and add select-all header
+        if (document.querySelector('.no-sessions')) {
+            const noSessions = document.querySelector('.no-sessions');
+            if (noSessions) noSessions.remove();
+            
+            // Only create if it doesn't exist
+            if (!document.getElementById('select-all-container')) {
+                const selectAllContainer = document.createElement('div');
+                selectAllContainer.className = 'list-group-item bg-light';
+                selectAllContainer.id = 'select-all-container';
+                selectAllContainer.innerHTML = `
+                    <input class="form-check-input" type="checkbox" id="select-all-checkbox">
+                    <label class="form-check-label ms-2" for="select-all-checkbox">Select All</label>`;
+                sessionList.prepend(selectAllContainer);
+                const cb = document.getElementById('select-all-checkbox');
+                if (cb && selectAllHandler) cb.addEventListener('change', selectAllHandler);
+            }
+        }
+
+        const newSessionItem = document.createElement('div');
+        newSessionItem.className = 'list-group-item d-flex align-items-center session-item-container';
+        newSessionItem.innerHTML = `
+            <input class="form-check-input session-checkbox" type="checkbox" value="${sessionId}" data-session-id="${sessionId}">
+            <div class="ms-3 flex-grow-1 session-details" data-session-id="${sessionId}" style="cursor: pointer;">
+                <div class="d-flex w-100 justify-content-between">
+                    <h6 class="mb-1">Session #${sessionId}</h6>
+                    <small class="text-muted">${statusText}</small>
+                </div>
+                <p class="mb-1 small text-muted">${(questionData.question || '').substring(0, 100)}...</p>
+            </div>`;
+        
+        if (groupId) {
+            let groupContainer = document.getElementById(`session-group-${groupId}`);
+            if (!groupContainer) {
+                // Create the group container if it doesn't exist
+                const groupEl = document.createElement('div');
+                groupEl.className = 'list-group-item';
+                groupEl.innerHTML = `
+                    <details open>
+                        <summary class="fw-bold" style="cursor: pointer;">
+                            <i class="bi bi-collection me-1"></i>
+                            ${groupName}
+                            <small class="text-muted" id="group-session-count-${groupId}">(1 sessions)</small>
+                        </summary>
+                        <div class="list-group list-group-flush mt-2" id="session-group-${groupId}">
+                        </div>
+                    </details>
+                `;
                 const selectAllDiv = document.getElementById('select-all-container');
                 if (selectAllDiv) {
-                    selectAllDiv.after(newSessionItem);
+                    selectAllDiv.after(groupEl);
                 } else {
-                    sessionList.appendChild(newSessionItem);
+                    sessionList.prepend(groupEl);
                 }
+                groupContainer = document.getElementById(`session-group-${groupId}`);
+            }
+            newSessionItem.classList.add("ps-4");
+            groupContainer.prepend(newSessionItem);
+            
+            // Update session count
+            const countEl = document.getElementById(`group-session-count-${groupId}`);
+            if (countEl) {
+                const currentCount = groupContainer.children.length;
+                countEl.textContent = `(${currentCount} sessions)`;
+            }
+
+        } else {
+            const selectAllDiv = document.getElementById('select-all-container');
+            if (selectAllDiv) {
+                selectAllDiv.after(newSessionItem);
+            } else {
+                sessionList.appendChild(newSessionItem);
             }
         }
     }

@@ -14,193 +14,69 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // --- Configuration Management ---
     const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-
-    // LLM Settings
-    if (document.getElementById('test-connection-btn')) {
-        document.getElementById('test-connection-btn').addEventListener('click', function() {
-            const data = {
-                llm_base_url: document.getElementById('llm_base_url').value,
-                llm_api_key: document.getElementById('llm_api_key').value,
-                llm_model: document.getElementById('llm_model').value
-            };
-            BenchmarkUtils.testConnection(window.benchmarkUrls.testLlmConnection, csrfToken, data, 'connection-status', 'test-connection-btn');
-        });
-    }
-
-    if (document.getElementById('save-llm-settings-btn')) {
-        document.getElementById('save-llm-settings-btn').addEventListener('click', function() {
-            const data = {
-                llm_base_url: document.getElementById('llm_base_url').value,
-                llm_api_key: document.getElementById('llm_api_key').value,
-                llm_model: document.getElementById('llm_model').value,
-                max_retries: document.getElementById('max_retries') ? document.getElementById('max_retries').value : 3
-            };
-            BenchmarkUtils.saveSettings(window.benchmarkUrls.saveLlmSettings, csrfToken, data, 'save-llm-settings-btn');
-        });
-    }
-
-    if (document.getElementById('restore-defaults-btn')) {
-        document.getElementById('restore-defaults-btn').addEventListener('click', function() {
-            BenchmarkUtils.restoreDefaults(window.benchmarkUrls.getLlmEnvVars, (data) => {
-                if (data.llm_base_url) document.getElementById('llm_base_url').value = data.llm_base_url;
-                if (data.llm_api_key) document.getElementById('llm_api_key').value = data.llm_api_key;
-                if (data.llm_model) document.getElementById('llm_model').value = data.llm_model;
-            });
-        });
-    }
-
-    // RAG Settings
-    if (document.getElementById('save-rag-settings-btn')) {
-        document.getElementById('save-rag-settings-btn').addEventListener('click', function() {
-            const data = {
-                prompt_template: document.getElementById('rag_prompt_template').value
-            };
-            BenchmarkUtils.saveSettings(window.benchmarkUrls.saveRagSettings, csrfToken, data, 'save-rag-settings-btn');
-        });
-    }
-
-    if (document.getElementById('restore-rag-defaults-btn')) {
-        document.getElementById('restore-rag-defaults-btn').addEventListener('click', function() {
-             fetch(window.benchmarkUrls.getDefaultRagPrompt)
-                .then(res => res.json())
-                .then(data => {
-                    if(data.default_prompt) {
-                         document.getElementById('rag_prompt_template').value = data.default_prompt;
-                    }
-                })
-                .catch(err => console.error(err));
-        });
-    }
-
-    // Search Settings
-    if (document.getElementById('save-search-settings-btn')) {
-        document.getElementById('save-search-settings-btn').addEventListener('click', function() {
-            let searchProvider = 'serper'; // default
-            const checkedProvider = document.querySelector('input[name="search_provider"]:checked');
-            if (checkedProvider) searchProvider = checkedProvider.value;
-
-            const serperApiKey = document.getElementById('serper_api_key').value;
-            const serperFetchFullContent = document.getElementById('serper_fetch_full_content') ? document.getElementById('serper_fetch_full_content').checked : false;
-            
-            const data = {
-                search_provider: searchProvider,
-                serper_api_key: serperApiKey,
-                serper_fetch_full_content: serperFetchFullContent
-            };
-            BenchmarkUtils.saveSettings(window.benchmarkUrls.saveSearchSettings, csrfToken, data, 'save-search-settings-btn');
-        });
-    }
+    BenchmarkUtils.setupConfigurationActionHandlers(window.benchmarkUrls, csrfToken, true, true);
 
     // --- Batch Delete ---
-    const deleteSelectedBtn = document.getElementById('delete-selected-btn');
+    BenchmarkUtils.setupBatchSelection(
+        'session-list',
+        'select-all-checkbox',
+        'session-checkbox',
+        'delete-selected-btn',
+        (selectedSessionIds, selectedGroupIds) => {
+            if (selectedSessionIds.length === 0 && selectedGroupIds.length === 0) return;
 
-    function getSelectAllCheckbox() { return document.getElementById('select-all-checkbox'); }
-    function getSessionCheckboxes() { return document.querySelectorAll('.session-checkbox'); }
-    function getGroupCheckboxes() { return document.querySelectorAll('.group-select-checkbox'); }
+            let confirm_msg = "Are you sure you want to delete the selected items?\n";
+            if (selectedGroupIds.length > 0) {
+                confirm_msg += `\n- ${selectedGroupIds.length} group(s) and all their sessions`;
+            }
+            if (selectedSessionIds.length > 0) {
+                confirm_msg += `\n- ${selectedSessionIds.length} individual session(s)`;
+            }
 
-    function toggleDeleteButton() {
-        const anySessionChecked = Array.from(getSessionCheckboxes()).some(cb => cb.checked);
-        const anyGroupChecked = Array.from(getGroupCheckboxes()).some(cb => cb.checked);
-        const anyChecked = anySessionChecked || anyGroupChecked;
-        deleteSelectedBtn.style.display = anyChecked ? 'inline-block' : 'none';
+            if (!confirm(confirm_msg)) return;
 
-        const selectAllCheckbox = getSelectAllCheckbox();
-        if (selectAllCheckbox) {
-            const allSessionCheckboxes = Array.from(getSessionCheckboxes());
-            const allGroupCheckboxes = Array.from(getGroupCheckboxes());
-            const allCheckboxes = allSessionCheckboxes.concat(allGroupCheckboxes);
-            const allChecked = allCheckboxes.length > 0 && allCheckboxes.every(cb => cb.checked);
-            selectAllCheckbox.checked = anyChecked && allChecked;
-        }
-    }
+            const deletePromises = [];
 
-    function selectAllHandler(e) {
-        const isChecked = e.target.checked;
-        getGroupCheckboxes().forEach(checkbox => checkbox.checked = isChecked);
-        getSessionCheckboxes().forEach(checkbox => checkbox.checked = isChecked);
-        toggleDeleteButton();
-    }
+            if (selectedSessionIds.length > 0) {
+                const promise = fetch('/benchmark/api/multi_turn/batch_delete_sessions/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content') },
+                    body: JSON.stringify({ session_ids: selectedSessionIds })
+                }).then(res => res.json());
+                deletePromises.push(promise);
+            }
 
-    if (getSelectAllCheckbox()) {
-        getSelectAllCheckbox().addEventListener('change', selectAllHandler);
-    }
-    
-    sessionList.addEventListener('change', function(e) {
-        if (e.target.classList.contains('session-checkbox')) {
-            toggleDeleteButton();
-        }
-        if (e.target.classList.contains('group-select-checkbox')) {
-            toggleDeleteButton();
-        }
-    });
-
-    deleteSelectedBtn.addEventListener('click', function() {
-        const selectedSessionIds = Array.from(getSessionCheckboxes())
-            .filter(cb => cb.checked)
-            .map(cb => cb.dataset.sessionId);
-        
-        const selectedGroupIds = Array.from(getGroupCheckboxes())
-            .filter(cb => cb.checked)
-            .map(cb => cb.dataset.groupId);
-
-        const session_count = selectedSessionIds.length;
-        const group_count = selectedGroupIds.length;
-
-        if (session_count === 0 && group_count === 0) {
-            return;
-        }
-
-        let confirm_msg = "Are you sure you want to delete the selected items?\n";
-        if (group_count > 0) {
-            confirm_msg += "\n- " + group_count + " group(s) and all their sessions";
-        }
-        if (session_count > 0) {
-            confirm_msg += "\n- " + session_count + " individual session(s)";
-        }
-
-        if (!confirm(confirm_msg)) {
-            return;
-        }
-
-        const deletePromises = [];
-
-        if (selectedSessionIds.length > 0) {
-            const promise = fetch('/benchmark/api/multi_turn/batch_delete_sessions/', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content') },
-                body: JSON.stringify({ session_ids: selectedSessionIds })
-            }).then(res => res.json());
-            deletePromises.push(promise);
-        }
-
-                    selectedGroupIds.forEach(groupId => {
-                        const promise = fetch(`/benchmark/api/multi_turn/delete_session_group/${groupId}/`, {
-                            method: 'DELETE',
-                            headers: { 'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content') }
-                        }).then(res => res.json());
-                        deletePromises.push(promise);
-                    });
-        Promise.all(deletePromises)
-            .then(results => {
-                let hasError = false;
-                results.forEach(result => {
-                    if (result.status !== 'ok') {
-                        hasError = true;
-                        console.error('Deletion failed for an item:', result);
-                    }
-                });
-
-                if (hasError) {
-                    alert('Some items could not be deleted. Please check the console and refresh the page.');
-                } else {
-                    window.location.reload();
-                }
-            })
-            .catch(err => {
-                console.error('An error occurred during deletion:', err);
-                alert('An error occurred during deletion. Please check the console and refresh the page.');
+            selectedGroupIds.forEach(groupId => {
+                const promise = fetch(`/benchmark/api/multi_turn/delete_session_group/${groupId}/`, {
+                    method: 'DELETE',
+                    headers: { 'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content') }
+                }).then(res => res.json());
+                deletePromises.push(promise);
             });
-    });
+
+            Promise.all(deletePromises)
+                .then(results => {
+                    let hasError = false;
+                    results.forEach(result => {
+                        if (result.status !== 'ok') {
+                            hasError = true;
+                            console.error('Deletion failed for an item:', result);
+                        }
+                    });
+
+                    if (hasError) {
+                        alert('Some items could not be deleted. Please check the console and refresh the page.');
+                    } else {
+                        window.location.reload();
+                    }
+                })
+                .catch(err => {
+                    console.error('An error occurred during deletion:', err);
+                    alert('An error occurred during deletion. Please check the console and refresh the page.');
+                });
+        },
+        'group-select-checkbox' // itemGroupIdClass
+    );
 
     // --- Session Management ---
     startBtn.addEventListener('click', function() {
@@ -285,7 +161,8 @@ document.addEventListener('DOMContentLoaded', function() {
         fetch(`/benchmark/api/multi_turn/get_session/${sessionId}/`)
             .then(res => res.json())
             .then(data => {
-                renderSession(data.session, data.trials);
+                sessionTrials = data.trials; // Keep sessionTrials updated locally for other functions
+                BenchmarkUtils.MultiTurnUtils.renderSession(data.session, data.trials, { sessionTrials: sessionTrials });
                 BenchmarkUtils.renderRunConfiguration(data.session.settings_snapshot, ['llm_model', 'llm_base_url', 'max_retries', 'rag_settings', 'search_settings']);
                 sessionContainer.style.display = 'block';
                 noSessionSelected.style.display = 'none';
@@ -330,78 +207,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     loadSession(sessionId);
                 }
             });
-    }
-
-    // --- Rendering ---
-    function renderSession(session, trials) {
-        sessionTrials = trials;
-        document.getElementById('session-header').textContent = `Session #${session.id}`;
-        document.getElementById('session-question').textContent = session.question;
-
-        const gtContainer = document.getElementById('session-ground-truths');
-        gtContainer.innerHTML = '';
-
-        const GROUNDTRUTH_DISPLAY_LIMIT = 3; 
-
-        if (session.ground_truths.length > GROUNDTRUTH_DISPLAY_LIMIT) {
-            const initialGroundTruths = session.ground_truths.slice(0, GROUNDTRUTH_DISPLAY_LIMIT);
-            initialGroundTruths.forEach(gt => {
-                const el = document.createElement('span');
-                el.className = 'badge bg-secondary me-1';
-                el.textContent = gt;
-                gtContainer.appendChild(el);
-            });
-
-            const showMoreBtn = document.createElement('button');
-            showMoreBtn.className = 'btn btn-link btn-sm p-0';
-            showMoreBtn.textContent = `Show ${session.ground_truths.length - GROUNDTRUTH_DISPLAY_LIMIT} more`;
-            showMoreBtn.setAttribute('type', 'button');
-            gtContainer.appendChild(showMoreBtn);
-
-            const fullGroundTruthsDiv = document.createElement('div');
-            fullGroundTruthsDiv.style.display = 'none'; // Initially hidden
-            session.ground_truths.slice(GROUNDTRUTH_DISPLAY_LIMIT).forEach(gt => {
-                const el = document.createElement('span');
-                el.className = 'badge bg-secondary me-1';
-                el.textContent = gt;
-                fullGroundTruthsDiv.appendChild(el);
-            });
-            gtContainer.appendChild(fullGroundTruthsDiv);
-
-            const showLessBtn = document.createElement('button');
-            showLessBtn.className = 'btn btn-link btn-sm p-0 ms-2';
-            showLessBtn.textContent = `Show less`;
-            showLessBtn.setAttribute('type', 'button');
-            showLessBtn.style.display = 'none'; // Initially hidden
-            gtContainer.appendChild(showLessBtn);
-
-
-            showMoreBtn.addEventListener('click', () => {
-                fullGroundTruthsDiv.style.display = 'block';
-                showMoreBtn.style.display = 'none';
-                showLessBtn.style.display = 'inline';
-            });
-
-            showLessBtn.addEventListener('click', () => {
-                fullGroundTruthsDiv.style.display = 'none';
-                showMoreBtn.style.display = 'inline';
-                showLessBtn.style.display = 'none';
-            });
-
-        } else {
-            session.ground_truths.forEach(gt => {
-                const el = document.createElement('span');
-                el.className = 'badge bg-secondary me-1';
-                el.textContent = gt;
-                gtContainer.appendChild(el);
-            });
-        }
-
-        const trialsContainer = document.getElementById('trials-container');
-        trialsContainer.innerHTML = '';
-        trials.forEach(trial => {
-            trialsContainer.appendChild(BenchmarkUtils.BenchmarkRenderer.renderTrial(trial, session.is_completed, trials.length, session.max_retries));
-        });
     }
 
 

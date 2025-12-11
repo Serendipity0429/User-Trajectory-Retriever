@@ -45,50 +45,13 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // --- Batch Delete Logic ---
-    const deleteSelectedBtn = document.getElementById('delete-selected-btn');
-    const selectAllCheckbox = document.getElementById('select-all-checkbox');
-
-    function getRunCheckboxes() {
-        return document.querySelectorAll('.run-checkbox');
-    }
-
-    function toggleDeleteButton() {
-        const checkboxes = getRunCheckboxes();
-        const anyChecked = Array.from(checkboxes).some(cb => cb.checked);
-        if (deleteSelectedBtn) {
-            deleteSelectedBtn.style.display = anyChecked ? 'inline-block' : 'none';
-        }
-        
-        // Update Select All state
-        if (selectAllCheckbox) {
-            if (checkboxes.length > 0) {
-                const allChecked = Array.from(checkboxes).every(cb => cb.checked);
-                selectAllCheckbox.checked = allChecked;
-            } else {
-                selectAllCheckbox.checked = false;
-            }
-        }
-    }
-
-    if (selectAllCheckbox) {
-        selectAllCheckbox.addEventListener('change', function(e) {
-            const isChecked = e.target.checked;
-            getRunCheckboxes().forEach(cb => cb.checked = isChecked);
-            toggleDeleteButton();
-        });
-    }
-
-    if (deleteSelectedBtn) {
-        deleteSelectedBtn.addEventListener('click', function() {
-            const selectedRunIds = Array.from(getRunCheckboxes())
-                .filter(cb => cb.checked)
-                .map(cb => cb.dataset.runId);
-
-            if (selectedRunIds.length === 0) return;
-
-            if (!confirm(`Are you sure you want to delete ${selectedRunIds.length} run(s)?`)) {
-                return;
-            }
+    BenchmarkUtils.setupBatchSelection(
+        'saved-runs-list',
+        'select-all-checkbox',
+        'run-checkbox',
+        'delete-selected-btn',
+        (selectedRunIds) => {
+            if (!confirm(`Are you sure you want to delete ${selectedRunIds.length} run(s)?`)) return;
 
             fetch(window.benchmarkUrls.batchDeleteRuns, {
                 method: 'POST',
@@ -110,8 +73,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 console.error('Error:', err);
                 alert('An error occurred during deletion.');
             });
-        });
-    }
+        }
+    );
 
     function loadRun(runId) {
         document.getElementById('pipeline-results-container').style.display = 'block';
@@ -398,39 +361,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // --- Configuration Management ---
     const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+    BenchmarkUtils.setupConfigurationActionHandlers(window.benchmarkUrls, csrfToken, false, false);
 
-    // LLM Settings
-    if (document.getElementById('test-connection-btn')) {
-        document.getElementById('test-connection-btn').addEventListener('click', function() {
-            const data = {
-                llm_base_url: document.getElementById('llm_base_url').value,
-                llm_api_key: document.getElementById('llm_api_key').value,
-                llm_model: document.getElementById('llm_model').value
-            };
-            BenchmarkUtils.testConnection(window.benchmarkUrls.testLlmConnection, csrfToken, data, 'connection-status', 'test-connection-btn');
-        });
-    }
-
-    if (document.getElementById('save-llm-settings-btn')) {
-        document.getElementById('save-llm-settings-btn').addEventListener('click', function() {
-            const data = {
-                llm_base_url: document.getElementById('llm_base_url').value,
-                llm_api_key: document.getElementById('llm_api_key').value,
-                llm_model: document.getElementById('llm_model').value
-            };
-            BenchmarkUtils.saveSettings(window.benchmarkUrls.saveLlmSettings, csrfToken, data, 'save-llm-settings-btn');
-        });
-    }
-
-    if (document.getElementById('restore-defaults-btn')) {
-        document.getElementById('restore-defaults-btn').addEventListener('click', function() {
-            BenchmarkUtils.restoreDefaults(window.benchmarkUrls.getLlmEnvVars, (data) => {
-                if (data.llm_base_url) document.getElementById('llm_base_url').value = data.llm_base_url;
-                if (data.llm_api_key) document.getElementById('llm_api_key').value = data.llm_api_key;
-                if (data.llm_model) document.getElementById('llm_model').value = data.llm_model;
-            });
-        });
-    }
     // Delegated event listener for toggling ground truths
     document.getElementById('pipeline-results-body').addEventListener('click', function(e) {
         if (e.target && e.target.classList.contains('toggle-answers-link')) {

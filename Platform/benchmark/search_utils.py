@@ -272,7 +272,7 @@ class MCPSearch(WebSearch):
             # Prefer content if available and longer than snippet, otherwise use snippet
             text = content if content and len(content) > len(snippet) else snippet
             
-            formatted.append(f"{i+1}. {title}\n{text}")
+            formatted.append(f"[{i+1}] {title}\n{text}")
             
         return "\n\n".join(formatted)
 
@@ -387,7 +387,7 @@ class SerperSearch(WebSearch):
             title = r.get('title', 'No Title')
             content = r.get('content', '')
             
-            formatted.append(f"{i+1}. {title}\n{content}")
+            formatted.append(f"[{i+1}] {title}\n{content}")
             
         return "\n\n".join(formatted)
 

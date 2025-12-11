@@ -118,6 +118,7 @@ def clean_project() -> None:
         WORK_DIR / "user_system" / "migrations",
         WORK_DIR / "discussion" / "migrations",
         WORK_DIR / "benchmark" / "migrations",
+        WORK_DIR / "dashboard" / "migrations",
         WORK_DIR / "msg_system" / "migrations",
         WORK_DIR / "media" / "attachments",
         WORK_DIR / "media" / "evidence_images",

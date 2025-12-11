@@ -36,7 +36,7 @@ Now, answer the following question:
 Question: {question}
 Answer:""",
     "adhoc_reasoning": """Your task is to answer the following question.
-First, explain your reasoning step-by-step.
+First, explain your reasoning step-by-step. 
 Then, on a new line, provide the final answer starting with 'Final Answer:'.
 
 Follow these rules for the final answer strictly:
@@ -311,7 +311,8 @@ class RagAdhocPipeline(BaseAdhocPipeline):
             'llm_settings': {
                 'llm_base_url': llm_settings.llm_base_url,
                 'llm_model': llm_settings.llm_model,
-                'max_retries': llm_settings.max_retries
+                'max_retries': llm_settings.max_retries,
+                'allow_reasoning': llm_settings.allow_reasoning
             },
             'rag_settings': {
                 'prompt_template': rag_settings.prompt_template
@@ -405,7 +406,8 @@ class BaseMultiTurnPipeline(BasePipeline):
             'llm_settings': {
                 'llm_base_url': llm_settings.llm_base_url,
                 'llm_model': llm_settings.llm_model,
-                'max_retries': llm_settings.max_retries
+                'max_retries': llm_settings.max_retries,
+                'allow_reasoning': llm_settings.allow_reasoning
             },
             'rag_settings': {
                 'prompt_template': rag_settings.prompt_template
@@ -419,7 +421,29 @@ class BaseMultiTurnPipeline(BasePipeline):
         group = MultiTurnSessionGroup.objects.create(name=group_name, settings_snapshot=snapshot)
         settings = llm_settings # Pass LLM settings to create_session if needed
 
-        for data in self.load_questions():
+        total_questions = 0
+        questions_iterator = None
+        
+        try:
+            file_path = self.get_questions_file_path()
+            if self.dataset_id:
+                dataset = BenchmarkDataset.objects.get(pk=self.dataset_id)
+                if dataset.question_count > 0:
+                    total_questions = dataset.question_count
+                else:
+                    total_questions = count_questions_in_file(file_path)
+            else:
+                total_questions = count_questions_in_file(file_path)
+            
+            questions_iterator = self.load_questions()
+        except (ValueError, FileNotFoundError, BenchmarkDataset.DoesNotExist) as e:
+            yield json.dumps({'error': str(e)}) + "\n"
+            self.stop_token()
+            return
+
+        yield json.dumps({'is_meta': True, 'type': 'total_count', 'count': total_questions}) + "\n"
+
+        for data in questions_iterator:
             if not self.check_active():
                 break
 

@@ -30,7 +30,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
 
-        fetch("/benchmark/api/datasets/sync/", {
+        fetch(BenchmarkUrls.datasets.sync, {
             method: 'POST',
             headers: { 'X-CSRFToken': csrfToken }
         })
@@ -79,7 +79,7 @@ document.addEventListener('DOMContentLoaded', function() {
             btn.disabled = true;
             btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Uploading...';
 
-            fetch("/benchmark/api/datasets/upload/", {
+            fetch(BenchmarkUrls.datasets.upload, {
                 method: 'POST',
                 body: formData,
                 headers: { 'X-CSRFToken': csrfToken }
@@ -112,7 +112,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 this.disabled = true;
                 
-                fetch(`/benchmark/api/datasets/delete/${datasetId}/`, {
+                fetch(BenchmarkUrls.datasets.delete(datasetId), {
                     method: 'DELETE',
                     headers: { 'X-CSRFToken': csrfToken }
                 })
@@ -156,7 +156,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 document.querySelectorAll('#dataset-table-body tr').forEach(row => row.classList.remove('table-primary'));
                 this.closest('tr').classList.add('table-primary');
 
-                fetch(`/benchmark/api/datasets/activate/${datasetId}/`, {
+                fetch(BenchmarkUrls.datasets.activate(datasetId), {
                     method: 'POST',
                     headers: { 'X-CSRFToken': csrfToken }
                 })

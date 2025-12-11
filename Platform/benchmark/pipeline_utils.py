@@ -35,17 +35,48 @@ Incorrect Answers:
 Now, answer the following question:
 Question: {question}
 Answer:""",
+    "adhoc_reasoning": """Your task is to answer the following question.
+First, explain your reasoning step-by-step.
+Then, on a new line, provide the final answer starting with 'Final Answer:'.
+
+Follow these rules for the final answer strictly:
+1. It must be an exact match to the correct answer.
+2. Do not include any punctuation.
+3. Do not include any extra words or sentences.
+
+Question: {question}
+""",
     "multi_turn_initial": """Your task is to answer the following question. Follow these rules strictly:
 1.  Your answer must be an exact match to the correct answer.
 2.  Do not include any punctuation.
 3.  Do not include any extra words or sentences.
 Question: {question}
 Answer:""",
+    "multi_turn_reasoning_initial": """Your task is to answer the following question.
+First, explain your reasoning step-by-step.
+Then, on a new line, provide the final answer starting with 'Final Answer:'.
+
+Follow these rules for the final answer strictly:
+1. It must be an exact match to the correct answer.
+2. Do not include any punctuation.
+3. Do not include any extra words or sentences.
+
+Question: {question}
+""",
     "multi_turn_followup": """Your task is to answer the question again. Follow these rules strictly:
 1.  Your answer must be an exact match to the correct answer.
 2.  Do not include any punctuation.
 3.  Do not include any extra words or sentences.
 Answer:""",
+    "multi_turn_reasoning_followup": """Your task is to answer the question again.
+First, explain your reasoning step-by-step.
+Then, on a new line, provide the final answer starting with 'Final Answer:'.
+
+Follow these rules for the final answer strictly:
+1. It must be an exact match to the correct answer.
+2. Do not include any punctuation.
+3. Do not include any extra words or sentences.
+""",
     "rag_system_context": "Context from web search (Query: {query}):\n{results}\n\n",
     "rag_reformulation": "Based on the history, provide a better search query to find the correct answer. Output ONLY the query."
 }
@@ -206,7 +237,8 @@ class VanillaLLMAdhocPipeline(BaseAdhocPipeline):
             'llm_settings': {
                 'llm_base_url': settings.llm_base_url,
                 'llm_model': settings.llm_model,
-                'max_retries': settings.max_retries
+                'max_retries': settings.max_retries,
+                'allow_reasoning': settings.allow_reasoning
             }
         }
         return VanillaLLMAdhocRun.objects.create(
@@ -217,15 +249,28 @@ class VanillaLLMAdhocPipeline(BaseAdhocPipeline):
         )
 
     def process_question(self, run, question, ground_truths):
-        prompt = PROMPTS["adhoc_answer"].format(question=question)
+        settings = LLMSettings.load()
+        
+        if settings.allow_reasoning:
+            prompt = PROMPTS["adhoc_reasoning"].format(question=question)
+        else:
+            prompt = PROMPTS["adhoc_answer"].format(question=question)
         
         response = self.client.chat.completions.create(
             model=self.model,
             messages=[{"role": "user", "content": prompt}],
             temperature=0,
         )
-        answer = response.choices[0].message.content
+        full_response = response.choices[0].message.content
         
+        if settings.allow_reasoning:
+            if "Final Answer:" in full_response:
+                answer = full_response.split("Final Answer:")[-1].strip()
+            else:
+                answer = full_response.strip().split('\n')[-1].strip()
+        else:
+            answer = full_response
+
         rule_result = check_answer_rule(question, ground_truths, answer)
         llm_result = check_answer_llm(question, ground_truths, answer, client=self.client, model=self.model)
 
@@ -234,6 +279,7 @@ class VanillaLLMAdhocPipeline(BaseAdhocPipeline):
             question=question,
             ground_truths=ground_truths,
             answer=answer,
+            full_response=full_response,
             is_correct_rule=rule_result,
             is_correct_llm=llm_result
         )
@@ -241,6 +287,7 @@ class VanillaLLMAdhocPipeline(BaseAdhocPipeline):
         return {
             'question': question,
             'answer': answer,
+            'full_response': full_response,
             'ground_truths': ground_truths,
             'rule_result': rule_result,
             'llm_result': llm_result
@@ -292,7 +339,17 @@ class RagAdhocPipeline(BaseAdhocPipeline):
             messages=[{"role": "user", "content": prompt}],
             temperature=0,
         )
-        answer = response.choices[0].message.content
+        full_response = response.choices[0].message.content
+
+        # Adhoc RAG also needs to support reasoning parsing
+        settings = LLMSettings.load()
+        if settings.allow_reasoning:
+             if "Final Answer:" in full_response:
+                answer = full_response.split("Final Answer:")[-1].strip()
+             else:
+                answer = full_response.strip().split('\n')[-1].strip()
+        else:
+             answer = full_response
         
         rule_result = check_answer_rule(question, ground_truths, answer)
         llm_result = check_answer_llm(question, ground_truths, answer, client=self.client, model=self.model)
@@ -302,6 +359,7 @@ class RagAdhocPipeline(BaseAdhocPipeline):
             question=question,
             ground_truths=ground_truths,
             answer=answer,
+            full_response=full_response,
             is_correct_rule=rule_result,
             is_correct_llm=llm_result,
             num_docs_used=len(search_results),
@@ -311,6 +369,7 @@ class RagAdhocPipeline(BaseAdhocPipeline):
         return {
             'question': question,
             'answer': answer,
+            'full_response': full_response,
             'ground_truths': ground_truths,
             'rule_result': rule_result,
             'llm_result': llm_result,
@@ -406,15 +465,28 @@ class BaseMultiTurnPipeline(BasePipeline):
                             messages=messages,
                             temperature=0,
                         )
-                        answer = response.choices[0].message.content
+                        full_response = response.choices[0].message.content
                     except Exception as e:
                         trial.status = 'error'
                         trial.save()
                         raise e
+                    
+                    # Check if reasoning is enabled (using snapshot or current settings)
+                    # Ideally we check settings snapshot from group, but for now we can check LLMSettings
+                    allow_reasoning = LLMSettings.load().allow_reasoning
+                    
+                    if allow_reasoning:
+                        if "Final Answer:" in full_response:
+                            parsed_answer = full_response.split("Final Answer:")[-1].strip()
+                        else:
+                            parsed_answer = full_response.strip().split('\n')[-1].strip()
+                    else:
+                        parsed_answer = full_response
 
-                    is_correct = check_answer_llm(session.question, session.ground_truths, answer, client=self.client, model=self.model)
+                    is_correct = check_answer_llm(session.question, session.ground_truths, parsed_answer, client=self.client, model=self.model)
 
-                    trial.answer = answer
+                    trial.answer = parsed_answer
+                    trial.full_response = full_response
                     trial.is_correct = is_correct
                     trial.feedback = "Correct" if is_correct else "Incorrect"
                     trial.status = 'completed'
@@ -426,11 +498,12 @@ class BaseMultiTurnPipeline(BasePipeline):
                         'session_id': session.id,
                         'trial_number': trial_number,
                         'is_correct': is_correct,
-                        'answer': answer,
+                        'answer': parsed_answer, # Send parsed answer for display/check validity
+                        'full_response': full_response,
                         'group_id': group.id
                     }) + "\n"
 
-                    final_answer = answer
+                    final_answer = parsed_answer
                     final_is_correct = is_correct
 
                     if is_correct:
@@ -510,9 +583,13 @@ class VanillaLLMMultiTurnPipeline(BaseMultiTurnPipeline):
     def _construct_messages(self, session, trial):
         trial_number = trial.trial_number
         messages = []
+        settings = LLMSettings.load()
         
         if trial_number == 1:
-            answer_prompt = PROMPTS["multi_turn_initial"].format(question=session.question)
+            if settings.allow_reasoning:
+                answer_prompt = PROMPTS["multi_turn_reasoning_initial"].format(question=session.question)
+            else:
+                answer_prompt = PROMPTS["multi_turn_initial"].format(question=session.question)
             messages.append({"role": "user", "content": answer_prompt})
         else:
             messages.append({"role": "user", "content": f"Question: {session.question}"})
@@ -523,7 +600,10 @@ class VanillaLLMMultiTurnPipeline(BaseMultiTurnPipeline):
                 if prev_trial.is_correct == False:
                     messages.append({"role": "user", "content": "Your previous answer was incorrect."})
             
-            messages.append({"role": "user", "content": PROMPTS["multi_turn_followup"]})
+            if settings.allow_reasoning:
+                messages.append({"role": "user", "content": PROMPTS["multi_turn_reasoning_followup"]})
+            else:
+                messages.append({"role": "user", "content": PROMPTS["multi_turn_followup"]})
             
         return messages
 
@@ -598,6 +678,10 @@ class RagMultiTurnPipeline(BaseMultiTurnPipeline):
             if prev_trial.is_correct == False:
                 messages.append({"role": "user", "content": "Your previous answer was incorrect."})
 
-        messages.append({"role": "user", "content": "Answer the question based on the context. Return ONLY the exact answer."})
+        settings = LLMSettings.load()
+        if settings.allow_reasoning:
+            messages.append({"role": "user", "content": "Answer the question based on the context.\nFirst, explain your reasoning step-by-step.\nThen, on a new line, provide the final answer starting with 'Final Answer:'.\n\nFollow these rules for the final answer strictly:\n1. It must be an exact match to the correct answer.\n2. Do not include any punctuation.\n3. Do not include any extra words or sentences."})
+        else:
+            messages.append({"role": "user", "content": "Answer the question based on the context. Return ONLY the exact answer."})
         
         return messages

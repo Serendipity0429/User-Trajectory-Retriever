@@ -1,17 +1,6 @@
 document.addEventListener('DOMContentLoaded', function() {
     BenchmarkUtils.AdhocPage.init({
         pipelineType: 'rag_adhoc',
-        urls: {
-            ...BenchmarkUrls, // Include common settings
-            listRuns: BenchmarkUrls.ragAdhoc.listRuns,
-            batchDeleteRuns: BenchmarkUrls.ragAdhoc.batchDeleteRuns,
-            deleteRun: BenchmarkUrls.ragAdhoc.deleteRun,
-            deleteRunPrefix: null,
-            getRun: BenchmarkUrls.ragAdhoc.getRun,
-            getRunPrefix: null,
-            runPipeline: BenchmarkUrls.ragAdhoc.runPipeline,
-            stopPipeline: BenchmarkUrls.ragAdhoc.stopPipeline,
-        },
         csvPrefix: 'rag-adhoc',
         buildFormData: function(formData) {
             formData.append('rag_prompt_template', document.getElementById('rag_prompt_template').value);

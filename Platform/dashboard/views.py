@@ -508,9 +508,9 @@ def view_user_info(request, user_id):
     user_info = get_object_or_404(User, id=user_id)
     return render(
         request,
-        "dashboard/view_user_info.html",
+        "info.html",
         {
-            "user_info": user_info,
+            "cur_user": user_info,
         },
     )
 

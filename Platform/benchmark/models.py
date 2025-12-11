@@ -39,6 +39,7 @@ class LLMSettings(models.Model):
     llm_model = models.CharField(max_length=100, blank=True, help_text="e.g., gpt-4o")
     llm_api_key = models.CharField(max_length=255, blank=True, help_text="Your API Key")
     max_retries = models.PositiveIntegerField(default=3, help_text="Maximum number of retries allowed for the LLM.")
+    allow_reasoning = models.BooleanField(default=False, help_text="Allow the LLM to output its chain of thought reasoning before the final answer.")
 
     def save(self, *args, **kwargs):
         if not self.pk and LLMSettings.objects.exists():
@@ -86,7 +87,7 @@ class VanillaLLMMultiTurnSession(models.Model):
 
 class VanillaLLMMultiTurnTrial(models.Model):
     """
-    Represents a single trial (turn) within a Vanilla LLM session.
+    Represents a single trial (turn) within a benchmark session for Vanilla LLM.
     """
     STATUS_CHOICES = [
         ('processing', 'Processing'),
@@ -96,8 +97,9 @@ class VanillaLLMMultiTurnTrial(models.Model):
     session = models.ForeignKey(VanillaLLMMultiTurnSession, related_name='trials', on_delete=models.CASCADE)
     trial_number = models.PositiveIntegerField()
     answer = models.TextField(blank=True, null=True)
+    full_response = models.TextField(blank=True, null=True) # Full CoT
     feedback = models.TextField(blank=True, null=True)
-    is_correct = models.BooleanField(null=True, blank=True) # Can be null if not yet evaluated
+    is_correct = models.BooleanField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='processing')
 
@@ -106,7 +108,7 @@ class VanillaLLMMultiTurnTrial(models.Model):
         ordering = ['trial_number']
 
     def __str__(self):
-        return f"Trial {self.trial_number} for Vanilla LLM Session {self.session.id}"
+        return f"Trial {self.trial_number} for Session {self.session.id}"
 
 class RAGMultiTurnSession(models.Model):
     """
@@ -139,7 +141,8 @@ class RAGMultiTurnTrial(models.Model):
     ]
     session = models.ForeignKey(RAGMultiTurnSession, related_name='trials', on_delete=models.CASCADE)
     trial_number = models.PositiveIntegerField()
-    answer = models.TextField(blank=True, null=True)
+    answer = models.TextField(blank=True, null=True) # Parsed Answer
+    full_response = models.TextField(blank=True, null=True) # Full CoT
     feedback = models.TextField(blank=True, null=True)
     is_correct = models.BooleanField(null=True, blank=True) # Can be null if not yet evaluated
     created_at = models.DateTimeField(auto_now_add=True)
@@ -181,7 +184,8 @@ class VanillaLLMAdhocResult(models.Model):
     run = models.ForeignKey(VanillaLLMAdhocRun, related_name='results', on_delete=models.CASCADE)
     question = models.TextField()
     ground_truths = models.JSONField(default=list)
-    answer = models.TextField()
+    answer = models.TextField() # This stores the Parsed Final Answer
+    full_response = models.TextField(blank=True, null=True) # This stores the Full Chain of Thought
     is_correct_rule = models.BooleanField(default=False)
     is_correct_llm = models.BooleanField(default=False)
 
@@ -256,7 +260,8 @@ class RagAdhocResult(models.Model):
     run = models.ForeignKey(RagAdhocRun, related_name='results', on_delete=models.CASCADE)
     question = models.TextField()
     ground_truths = models.JSONField(default=list)
-    answer = models.TextField()
+    answer = models.TextField() # Parsed Answer
+    full_response = models.TextField(blank=True, null=True) # Full CoT
     is_correct_rule = models.BooleanField(default=False)
     is_correct_llm = models.BooleanField(null=True, default=None) # Allow null for errors/uncertainty
     num_docs_used = models.IntegerField(default=0)

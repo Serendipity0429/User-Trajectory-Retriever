@@ -13,6 +13,14 @@ const BenchmarkUrls = {
     getDefaultRagPrompt: `${API_PREFIX}/rag_adhoc/get_default_prompt/`,
     webSearch: `${API_PREFIX}/web_search/`,
 
+    // Datasets
+    datasets: {
+        sync: `${API_PREFIX}/datasets/sync/`,
+        upload: `${API_PREFIX}/datasets/upload/`,
+        delete: (id) => `${API_PREFIX}/datasets/delete/${id}/`,
+        activate: (id) => `${API_PREFIX}/datasets/activate/${id}/`
+    },
+
     // Ad-hoc: Vanilla LLM
     vanillaLlmAdhoc: {
         listRuns: `${API_PREFIX}/vanilla_llm_adhoc/list_runs/`,
@@ -135,7 +143,7 @@ const BenchmarkUtils = {
             }
         })
         .catch(error => {
-            resultDiv.innerHTML = `<div class="alert alert-danger" role="alert alert-dismissible fade show" role="alert" id="test-connection-result"><button type="button" class="btn-close" aria-label="Close">A network error occurred.</div>`;
+            resultDiv.innerHTML = `<div class="alert alert-danger" role="alert alert-dismissible fade show" role="alert" id="test-connection-result"><button type="button" class="btn-close" aria-label="Close"></button>A network error occurred.</div>`;
             console.error('Error:', error);
         })
         .finally(() => {
@@ -297,7 +305,7 @@ const BenchmarkUtils = {
      * @param {boolean} includeRag - Whether to include RAG settings handlers.
      * @param {boolean} includeSearch - Whether to include Search settings handlers.
      */
-    setupConfigurationActionHandlers: function(urls, csrfToken, includeRag = false, includeSearch = false) {
+    setupConfigurationActionHandlers: function(csrfToken, includeRag = false, includeSearch = false) {
         // LLM Settings
         const testConnection = function() {
             const data = {
@@ -305,7 +313,7 @@ const BenchmarkUtils = {
                 llm_api_key: document.getElementById('llm_api_key').value,
                 llm_model: document.getElementById('llm_model').value
             };
-            BenchmarkUtils.testConnection(urls.testLlmConnection, csrfToken, data, 'test-connection-result', 'test-connection-btn');
+            BenchmarkUtils.testConnection(BenchmarkUrls.testLlmConnection, csrfToken, data, 'test-connection-result', 'test-connection-btn');
         };
 
         if (document.getElementById('test-connection-btn')) {
@@ -324,9 +332,10 @@ const BenchmarkUtils = {
                     llm_base_url: currentBaseUrl,
                     llm_api_key: document.getElementById('llm_api_key').value,
                     llm_model: document.getElementById('llm_model').value,
-                    max_retries: document.getElementById('max_retries') ? document.getElementById('max_retries').value : 3
+                    max_retries: document.getElementById('max_retries') ? document.getElementById('max_retries').value : 3,
+                    allow_reasoning: document.getElementById('allow_reasoning') ? document.getElementById('allow_reasoning').checked : false
                 };
-                BenchmarkUtils.saveSettings(urls.saveLlmSettings, csrfToken, data, 'save-llm-settings-btn');
+                BenchmarkUtils.saveSettings(BenchmarkUrls.saveLlmSettings, csrfToken, data, 'save-llm-settings-btn');
                 
                 // Test connection if base URL changed
                 if (currentBaseUrl !== lastSavedBaseUrl) {
@@ -338,7 +347,7 @@ const BenchmarkUtils = {
 
         if (document.getElementById('restore-defaults-btn')) {
             document.getElementById('restore-defaults-btn').addEventListener('click', function() {
-                BenchmarkUtils.restoreDefaults(urls.getLlmEnvVars, (data) => {
+                BenchmarkUtils.restoreDefaults(BenchmarkUrls.getLlmEnvVars, (data) => {
                     if (data.llm_base_url) document.getElementById('llm_base_url').value = data.llm_base_url;
                     if (data.llm_api_key) document.getElementById('llm_api_key').value = data.llm_api_key;
                     if (data.llm_model) document.getElementById('llm_model').value = data.llm_model;
@@ -359,13 +368,13 @@ const BenchmarkUtils = {
                     const data = {
                         prompt_template: document.getElementById('rag_prompt_template').value
                     };
-                    BenchmarkUtils.saveSettings(urls.saveRagSettings, csrfToken, data, 'save-rag-settings-btn');
+                    BenchmarkUtils.saveSettings(BenchmarkUrls.saveRagSettings, csrfToken, data, 'save-rag-settings-btn');
                 });
             }
 
             if (document.getElementById('restore-rag-defaults-btn')) {
                 document.getElementById('restore-rag-defaults-btn').addEventListener('click', function() {
-                    fetch(urls.getDefaultRagPrompt)
+                    fetch(BenchmarkUrls.getDefaultRagPrompt)
                         .then(res => res.json())
                         .then(data => {
                             if(data.default_prompt) {
@@ -399,7 +408,7 @@ const BenchmarkUtils = {
                         serper_api_key: serperApiKey,
                         serper_fetch_full_content: serperFetchFullContent
                     };
-                    BenchmarkUtils.saveSettings(urls.saveSearchSettings, csrfToken, data, 'save-search-settings-btn');
+                    BenchmarkUtils.saveSettings(BenchmarkUrls.saveSearchSettings, csrfToken, data, 'save-search-settings-btn');
                 });
             }
         }
@@ -767,11 +776,42 @@ const BenchmarkUtils = {
                 td2.appendChild(divQuestion);
                 tr.appendChild(td2);
 
-                // Cell 3: Answer
+                // Cell 3: Answer (with Toggle for Reasoning)
                 const td3 = document.createElement('td');
                 td3.className = 'px-4';
+                
+                // Main parsed answer
                 const divAnswer = this.createTextElement('div', `compact-cell ${textColorClass}`, data.answer);
                 td3.appendChild(divAnswer);
+
+                // If full_response is present and different from answer, show toggle
+                if (data.full_response && data.full_response !== data.answer) {
+                    const toggleBtn = document.createElement('button');
+                    toggleBtn.className = 'btn btn-link btn-sm p-0 text-decoration-none small mt-1';
+                    toggleBtn.innerHTML = '<i class="bi bi-caret-right-fill"></i> Show Reasoning';
+                    toggleBtn.style.fontSize = '0.75rem';
+                    
+                    const reasoningDiv = document.createElement('div');
+                    reasoningDiv.className = 'mt-2 p-2 bg-light border rounded small text-secondary';
+                    reasoningDiv.style.display = 'none';
+                    reasoningDiv.style.whiteSpace = 'pre-wrap'; // Preserve formatting
+                    reasoningDiv.textContent = data.full_response;
+
+                    toggleBtn.onclick = (e) => {
+                        e.stopPropagation(); // Prevent row click
+                        if (reasoningDiv.style.display === 'none') {
+                            reasoningDiv.style.display = 'block';
+                            toggleBtn.innerHTML = '<i class="bi bi-caret-down-fill"></i> Hide Reasoning';
+                        } else {
+                            reasoningDiv.style.display = 'none';
+                            toggleBtn.innerHTML = '<i class="bi bi-caret-right-fill"></i> Show Reasoning';
+                        }
+                    };
+
+                    td3.appendChild(toggleBtn);
+                    td3.appendChild(reasoningDiv);
+                }
+                
                 tr.appendChild(td3);
 
                 // Cell 4: Ground Truths
@@ -1177,14 +1217,32 @@ const BenchmarkUtils = {
                     }
                 }
     
+                // Determine if we have reasoning to show
+                let reasoningSection = '';
+                if (trial.full_response && trial.full_response !== trial.answer) {
+                    // We generate a unique ID for the collapse element
+                    const collapseId = `reasoning-collapse-${trial.id || Math.random().toString(36).substr(2, 9)}`;
+                    reasoningSection = `
+                        <div class="mt-2">
+                            <button class="btn btn-sm btn-link text-decoration-none p-0 collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#${collapseId}" aria-expanded="false" aria-controls="${collapseId}">
+                                <i class="bi bi-caret-right-fill"></i> Show Chain of Thought
+                            </button>
+                            <div class="collapse mt-2" id="${collapseId}">
+                                <div class="card card-body bg-light border-0 small text-secondary" style="white-space: pre-wrap;">${trial.full_response}</div>
+                            </div>
+                        </div>
+                    `;
+                }
+
                 trialBody = `
                             ${searchSection}
                             <div class="p-3 bg-white rounded border-start border-4 border-primary shadow-sm mb-3">
                                 <div class="d-flex align-items-start">
                                     <i class="bi bi-chat-quote text-primary opacity-50 fs-3 me-3"></i>
-                                    <div>
+                                    <div class="w-100">
                                         <span class="text-uppercase text-muted fw-bold d-block mb-1" style="font-size: 0.65rem; letter-spacing: 1px;">LLM Answer</span>
                                         <p class="mb-0 fs-6 text-dark">${trial.answer}</p>
+                                        ${reasoningSection}
                                     </div>
                                 </div>
                             </div>`;
@@ -1959,15 +2017,11 @@ const BenchmarkUtils = {
 
     AdhocPage: {
         init: function(config) {
-            const { 
-                pipelineType, 
-                urls, 
-                buildFormData, 
-                csvPrefix = 'adhoc-results'
-            } = config;
+            const { pipelineType, csvPrefix = 'adhoc-results', buildFormData } = config;
             
             const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-            BenchmarkUtils.setupConfigurationActionHandlers(urls, csrfToken, true, true);
+            if (!csrfToken) console.error("CSRF Token is missing or empty!");
+            BenchmarkUtils.setupConfigurationActionHandlers(csrfToken, true, true);
             
             // questionsData removed - we now rely on backend streaming
             
@@ -1985,12 +2039,15 @@ const BenchmarkUtils = {
 
             // --- Load Runs ---
             function loadSavedRuns() {
+                const listRunsUrl = (pipelineType === 'vanilla_adhoc') ? BenchmarkUrls.vanillaLlmAdhoc.listRuns : BenchmarkUrls.ragAdhoc.listRuns;
+                const deleteRunFunc = (runId) => (pipelineType === 'vanilla_adhoc') ? BenchmarkUrls.vanillaLlmAdhoc.deleteRun(runId) : BenchmarkUrls.ragAdhoc.deleteRun(runId);
+
                 BenchmarkUtils.loadSavedRuns(
-                    urls.listRuns, 
-                    loadRun, 
-                    (runId) => BenchmarkUtils.deleteRun(urls.deleteRunPrefix ? `${urls.deleteRunPrefix}${runId}/` : urls.deleteRun(runId), csrfToken), 
-                    'saved-runs-list', 
-                    'no-runs-message', 
+                    listRunsUrl,
+                    loadRun,
+                    (runId) => BenchmarkUtils.deleteRun(deleteRunFunc(runId), csrfToken),
+                    'saved-runs-list',
+                    'no-runs-message',
                     true
                 );
                 const selectAllCheckbox = document.getElementById('select-all-checkbox');
@@ -2002,7 +2059,7 @@ const BenchmarkUtils = {
                 document.getElementById('pipeline-results-container').style.display = 'block';
                 document.getElementById('progress-container').style.display = 'none';
                 
-                const url = urls.getRunPrefix ? `${urls.getRunPrefix}${runId}/` : urls.getRun(runId);
+                const url = (pipelineType === 'vanilla_adhoc') ? BenchmarkUrls.vanillaLlmAdhoc.getRun(runId) : BenchmarkUrls.ragAdhoc.getRun(runId);
 
                 fetch(url)
                     .then(response => response.json())
@@ -2038,7 +2095,7 @@ const BenchmarkUtils = {
                 'saved-runs-list', 'select-all-checkbox', 'run-checkbox', 'delete-selected-btn',
                 (selectedRunIds) => {
                     if (!confirm(`Are you sure you want to delete ${selectedRunIds.length} run(s)?`)) return;
-                    fetch(urls.batchDeleteRuns, {
+                    fetch((pipelineType === 'vanilla_adhoc' ? BenchmarkUrls.vanillaLlmAdhoc.batchDeleteRuns : BenchmarkUrls.ragAdhoc.batchDeleteRuns), {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
                         body: JSON.stringify({ run_ids: selectedRunIds })
@@ -2058,7 +2115,7 @@ const BenchmarkUtils = {
                     pipelineController.abort();
                 }
                 if (pipelineController && pipelineController.pipelineId) {
-                    BenchmarkUtils.stopPipeline(urls.stopPipeline, csrfToken, pipelineController.pipelineId);
+                    BenchmarkUtils.stopPipeline((pipelineType === 'vanilla_adhoc' ? BenchmarkUrls.vanillaLlmAdhoc.stopPipeline : BenchmarkUrls.ragAdhoc.stopPipeline), csrfToken, pipelineController.pipelineId);
                 }
             }
             if (stopBtn) stopBtn.addEventListener('click', handleStopPipeline);
@@ -2156,7 +2213,7 @@ const BenchmarkUtils = {
                 };
 
                 pipelineController = BenchmarkUtils.PipelineRunner.start({
-                    url: urls.runPipeline,
+                    url: (pipelineType === 'vanilla_adhoc' ? BenchmarkUrls.vanillaLlmAdhoc.runPipeline : BenchmarkUrls.ragAdhoc.runPipeline),
                     formData: formData,
                     ui: uiElements,
                     totalItems: 0, // Will update based on meta
@@ -2330,14 +2387,14 @@ const BenchmarkUtils = {
         init: function(config) {
             const { 
                 pipelineType, 
-                urls, 
-                buildFormData, 
                 csvPrefix = 'multiturn-results',
-                questionsDataId = 'questions-data' 
+                questionsDataId = 'questions-data',
+                buildFormData 
             } = config;
             
             const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-            BenchmarkUtils.setupConfigurationActionHandlers(urls, csrfToken, true, true);
+            if (!csrfToken) console.error("CSRF Token is missing or empty!");
+            BenchmarkUtils.setupConfigurationActionHandlers(csrfToken, true, true);
             const questions = JSON.parse(document.getElementById(questionsDataId).textContent);
             
             let activeSessionId = null;
@@ -2353,13 +2410,13 @@ const BenchmarkUtils = {
                     
                     const promises = [];
                     if (selectedSessionIds.length > 0) {
-                        promises.push(fetch(urls.batchDeleteSessions, {
+                        promises.push(fetch(BenchmarkUrls.multiTurn.batchDeleteSessions, {
                             method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
                             body: JSON.stringify({ session_ids: selectedSessionIds })
                         }).then(res => res.json()));
                     }
                     selectedGroupIds.forEach(gid => {
-                        promises.push(fetch(urls.deleteSessionGroup(gid), {
+                        promises.push(fetch(BenchmarkUrls.multiTurn.deleteSessionGroup(gid), {
                             method: 'DELETE', headers: { 'X-CSRFToken': csrfToken }
                         }).then(res => res.json()));
                     });
@@ -2372,7 +2429,7 @@ const BenchmarkUtils = {
             // --- Helper: Load Session ---
             function loadSession(sessionId, initialTrialId = null) {
                 activeSessionId = sessionId;
-                fetch(urls.getSession(sessionId))
+                fetch(BenchmarkUrls.multiTurn.getSession(sessionId))
                     .then(res => res.json())
                     .then(data => {
                         BenchmarkUtils.MultiTurnUtils.renderSession(data.session, data.trials, { sessionTrials: [] }); 
@@ -2404,7 +2461,7 @@ const BenchmarkUtils = {
 
             // --- Helper: Execute Trial ---
             function executeTrial(trialId, sessionId) {
-                 fetch(urls.runTrial(trialId)).then(res => res.json()).then(data => {
+                 fetch(BenchmarkUrls.multiTurn.runTrial(trialId)).then(res => res.json()).then(data => {
                      if (data.error) alert(`Error in trial #${trialId}: ${data.error}`);
                      if (sessionId) loadSession(sessionId);
                  }).catch(() => {
@@ -2415,7 +2472,8 @@ const BenchmarkUtils = {
             
             // --- Helper: Load Group/Run ---
             function loadRun(groupId) {
-                 fetch(urls.loadRun(groupId)).then(res => res.json()).then(data => {
+                 const loadRunUrl = (pipelineType.includes('rag') ? BenchmarkUrls.ragMultiTurn.loadRun(groupId) : BenchmarkUrls.vanillaLlmMultiTurn.loadRun(groupId));
+                 fetch(loadRunUrl).then(res => res.json()).then(data => {
                      if (data.error) { alert(data.error); return; }
                      currentPipelineResults = data.results;
                      BenchmarkUtils.MultiTurnUtils.updateStatsUI(data.results, data.group_name, (sid) => {
@@ -2442,7 +2500,7 @@ const BenchmarkUtils = {
                 
                 const singleSessionPipelineType = document.getElementById('pipeline-mode-session') ? document.getElementById('pipeline-mode-session').value : pipelineType;
 
-                fetch(urls.createSession, {
+                fetch(BenchmarkUrls.multiTurn.createSession, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
                     body: JSON.stringify({
@@ -2497,10 +2555,8 @@ const BenchmarkUtils = {
                 
                 if (buildFormData) buildFormData(formData);
                 
-                let totalQuestions = questions.length;
-
                 pipelineController = BenchmarkUtils.PipelineRunner.start({
-                    url: urls.runPipeline,
+                    url: (pipelineType.includes('rag') ? BenchmarkUrls.ragMultiTurn.runPipeline : BenchmarkUrls.vanillaLlmMultiTurn.runPipeline),
                     formData: formData,
                     ui: ui,
                     totalItems: totalQuestions,
@@ -2541,7 +2597,8 @@ const BenchmarkUtils = {
                          strategyData.reformulation_strategy = s;
                      }
 
-                    fetch(urls.stopPipeline, {
+                     const stopUrl = (pipelineType.includes('rag') ? BenchmarkUrls.ragMultiTurn.stopPipeline : BenchmarkUrls.vanillaLlmMultiTurn.stopPipeline);
+                    fetch(stopUrl, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
                         body: JSON.stringify(strategyData),
@@ -2561,7 +2618,7 @@ const BenchmarkUtils = {
                 
                 const deleteGrp = e.target.closest('.delete-group-btn');
                 if (deleteGrp && confirm('Delete group?')) {
-                     fetch(urls.deleteSessionGroup(deleteGrp.dataset.groupId), { method: 'DELETE', headers: { 'X-CSRFToken': csrfToken } })
+                     fetch(BenchmarkUrls.multiTurn.deleteSessionGroup(deleteGrp.dataset.groupId), { method: 'DELETE', headers: { 'X-CSRFToken': csrfToken } })
                      .then(res => res.json()).then(data => {
                          if (data.status === 'ok') { deleteGrp.closest('.list-group-item').remove(); window.location.reload(); }
                      });
@@ -2572,7 +2629,7 @@ const BenchmarkUtils = {
             window.retryTrial = function(trialId) {
                 const trial = window.sessionTrials ? window.sessionTrials.find(t => t.id === trialId) : null;
                 const feedback = trial ? trial.feedback : "";
-                fetch(urls.retrySession(trialId), {
+                fetch(BenchmarkUrls.multiTurn.retrySession(trialId), {
                     method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
                     body: JSON.stringify({ feedback: feedback, is_correct: false })
                 }).then(res => res.json()).then(data => {
@@ -2587,7 +2644,7 @@ const BenchmarkUtils = {
             // --- Single Session Delete ---
             document.getElementById('delete-session-btn').addEventListener('click', function() {
                  if (activeSessionId && confirm('Delete session?')) {
-                     fetch(urls.deleteSession(activeSessionId), { method: 'DELETE', headers: { 'X-CSRFToken': csrfToken } })
+                     fetch(BenchmarkUrls.multiTurn.deleteSession(activeSessionId), { method: 'DELETE', headers: { 'X-CSRFToken': csrfToken } })
                      .then(res => res.json()).then(data => {
                          if (data.status === 'ok') {
                              document.querySelector(`#session-list [data-session-id='${activeSessionId}']`).remove();
@@ -2602,12 +2659,12 @@ const BenchmarkUtils = {
             // --- Exports ---
             if (document.getElementById('export-session-json-btn')) {
                 document.getElementById('export-session-json-btn').addEventListener('click', () => {
-                    if (activeSessionId) window.location.href = urls.exportSession(activeSessionId) + '?format=json';
+                    if (activeSessionId) window.location.href = BenchmarkUrls.multiTurn.exportSession(activeSessionId) + '?format=json';
                 });
             }
             if (document.getElementById('export-session-csv-btn')) {
                 document.getElementById('export-session-csv-btn').addEventListener('click', () => {
-                    if (activeSessionId) window.location.href = urls.exportSession(activeSessionId) + '?format=csv';
+                    if (activeSessionId) window.location.href = BenchmarkUrls.multiTurn.exportSession(activeSessionId) + '?format=csv';
                 });
             }
             document.getElementById('export-results-btn').addEventListener('click', () => {

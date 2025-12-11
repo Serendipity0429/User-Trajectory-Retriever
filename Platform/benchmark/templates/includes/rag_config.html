@@ -14,61 +14,6 @@
                 <button type="button" class="btn btn-outline-primary me-2" id="save-rag-settings-btn"><i class="bi bi-save me-1"></i> Save</button>
                 <button type="button" class="btn btn-outline-secondary" id="restore-rag-defaults-btn"><i class="bi bi-arrow-counterclockwise me-1"></i> Restore Default</button>
             </div>
-            <script>
-            document.addEventListener('DOMContentLoaded', function() {
-                const ragPromptEl = document.getElementById('rag_prompt_template');
-                const saveRagBtn = document.getElementById('save-rag-settings-btn');
-                const restoreRagBtn = document.getElementById('restore-rag-defaults-btn');
-
-                function saveRagSettings() {
-                    if (!window.benchmarkUrls || !window.benchmarkUrls.saveRagSettings) {
-                         console.error("Benchmark URLs not initialized");
-                         return;
-                    }
-                    const data = {
-                        prompt_template: ragPromptEl ? ragPromptEl.value : '',
-                    };
-                    const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-                    BenchmarkUtils.saveSettings(window.benchmarkUrls.saveRagSettings, csrfToken, data, 'save-rag-settings-btn');
-                }
-
-                function restoreDefaultRagPrompt() {
-                    if (!window.benchmarkUrls || !window.benchmarkUrls.getDefaultRagPrompt) return;
-                    
-                    const originalText = restoreRagBtn.innerHTML;
-                    restoreRagBtn.disabled = true;
-                    restoreRagBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Restoring...';
-
-                    fetch(window.benchmarkUrls.getDefaultRagPrompt)
-                        .then(response => response.json())
-                        .then(data => {
-                            if (data.default_prompt) {
-                                if (ragPromptEl) ragPromptEl.value = data.default_prompt;
-                                saveRagSettings(); 
-                            } else {
-                                alert('Error fetching default prompt.');
-                            }
-                        })
-                        .catch(error => {
-                            console.error('Error:', error);
-                            alert('Failed to load default prompt.');
-                        })
-                        .finally(() => {
-                            restoreRagBtn.disabled = false;
-                            restoreRagBtn.innerHTML = originalText;
-                        });
-                }
-
-                if (saveRagBtn) saveRagBtn.addEventListener('click', saveRagSettings);
-                if (restoreRagBtn) restoreRagBtn.addEventListener('click', restoreDefaultRagPrompt);
-
-                // Autosave
-                if (typeof BenchmarkUtils !== 'undefined' && BenchmarkUtils.debounce && ragPromptEl) {
-                    const autosaveRagSettings = BenchmarkUtils.debounce(saveRagSettings, 1000);
-                    ragPromptEl.addEventListener('input', autosaveRagSettings);
-                }
-            });
-            </script>
         </div>
     </div>
 </div>

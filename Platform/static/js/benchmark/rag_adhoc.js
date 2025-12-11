@@ -1,4 +1,5 @@
 document.addEventListener('DOMContentLoaded', function() {
+    BenchmarkUtils.setupConfigurationHandlers();
     const questionsData = JSON.parse(document.getElementById('questions-data') ? document.getElementById('questions-data').textContent : '[]');
     // Removed questionSelector and runSingleQuestionBtn
 
@@ -7,11 +8,77 @@ document.addEventListener('DOMContentLoaded', function() {
     let failedItems = [];
 
     // --- Configuration Management ---
-    
+    const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 
-    
+    // LLM Settings
+    document.getElementById('test-connection-btn').addEventListener('click', function() {
+        const data = {
+            llm_base_url: document.getElementById('llm_base_url').value,
+            llm_api_key: document.getElementById('llm_api_key').value,
+            llm_model: document.getElementById('llm_model').value
+        };
+        BenchmarkUtils.testConnection(window.benchmarkUrls.testLlmConnection, csrfToken, data, 'connection-status', 'test-connection-btn');
+    });
 
-    
+    document.getElementById('save-llm-settings-btn').addEventListener('click', function() {
+        const data = {
+            llm_base_url: document.getElementById('llm_base_url').value,
+            llm_api_key: document.getElementById('llm_api_key').value,
+            llm_model: document.getElementById('llm_model').value,
+            max_retries: document.getElementById('max_retries') ? document.getElementById('max_retries').value : 3
+        };
+        BenchmarkUtils.saveSettings(window.benchmarkUrls.saveLlmSettings, csrfToken, data, 'save-llm-settings-btn');
+    });
+
+    document.getElementById('restore-defaults-btn').addEventListener('click', function() {
+        BenchmarkUtils.restoreDefaults(window.benchmarkUrls.getLlmEnvVars, (data) => {
+            if (data.llm_base_url) document.getElementById('llm_base_url').value = data.llm_base_url;
+            if (data.llm_api_key) document.getElementById('llm_api_key').value = data.llm_api_key;
+            if (data.llm_model) document.getElementById('llm_model').value = data.llm_model;
+        });
+    });
+
+    // RAG Settings
+    if (document.getElementById('save-rag-settings-btn')) {
+        document.getElementById('save-rag-settings-btn').addEventListener('click', function() {
+            const data = {
+                prompt_template: document.getElementById('rag_prompt_template').value
+            };
+            BenchmarkUtils.saveSettings(window.benchmarkUrls.saveRagSettings, csrfToken, data, 'save-rag-settings-btn');
+        });
+    }
+
+    if (document.getElementById('restore-rag-defaults-btn')) {
+        document.getElementById('restore-rag-defaults-btn').addEventListener('click', function() {
+             fetch(window.benchmarkUrls.getDefaultRagPrompt)
+                .then(res => res.json())
+                .then(data => {
+                    if(data.default_prompt) {
+                         document.getElementById('rag_prompt_template').value = data.default_prompt;
+                    }
+                })
+                .catch(err => console.error(err));
+        });
+    }
+
+    // Search Settings
+    if (document.getElementById('save-search-settings-btn')) {
+        document.getElementById('save-search-settings-btn').addEventListener('click', function() {
+            let searchProvider = 'serper'; // default
+            const checkedProvider = document.querySelector('input[name="search_provider"]:checked');
+            if (checkedProvider) searchProvider = checkedProvider.value;
+
+            const serperApiKey = document.getElementById('serper_api_key').value;
+            const serperFetchFullContent = document.getElementById('serper_fetch_full_content') ? document.getElementById('serper_fetch_full_content').checked : false;
+            
+            const data = {
+                search_provider: searchProvider,
+                serper_api_key: serperApiKey,
+                serper_fetch_full_content: serperFetchFullContent
+            };
+            BenchmarkUtils.saveSettings(window.benchmarkUrls.saveSearchSettings, csrfToken, data, 'save-search-settings-btn');
+        });
+    }
 
     // --- Event Listeners ---
     loadSavedRuns();
@@ -118,6 +185,7 @@ document.addEventListener('DOMContentLoaded', function() {
         failedItems = [];
         document.getElementById('results-header-text').textContent = "RAG Pipeline Results";
         document.getElementById('running-spinner').style.display = 'inline-block';
+        BenchmarkUtils.toggleConfigurationInputs(true);
 
         // Controller to stop the fetch
         pipelineController = new AbortController();
@@ -208,6 +276,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     BenchmarkUtils.updateAdhocStatsUI(stats);
                 },
                 () => { // onComplete
+                    BenchmarkUtils.toggleConfigurationInputs(false);
                     runBtn.style.display = 'block';
                     stopBtn.style.display = 'none';
                     document.getElementById('running-spinner').style.display = 'none';
@@ -224,6 +293,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     } else {
                         console.error('Error during stream processing:', error);
                     }
+                    BenchmarkUtils.toggleConfigurationInputs(false);
                     runBtn.style.display = 'block';
                     stopBtn.style.display = 'none';
                     document.getElementById('running-spinner').style.display = 'none';
@@ -239,6 +309,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 console.error('Error starting the pipeline:', error);
                 alert('Failed to start the pipeline.');
             }
+            BenchmarkUtils.toggleConfigurationInputs(false);
             runBtn.style.display = 'block';
             stopBtn.style.display = 'none';
             document.getElementById('running-spinner').style.display = 'none';

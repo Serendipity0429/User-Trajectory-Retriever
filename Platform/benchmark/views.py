@@ -635,6 +635,50 @@ def delete_rag_adhoc_run(request, run_id):
         return JsonResponse({"status": "error", "message": str(e)}, status=500)
 
 
+@admin_required
+@require_POST
+def batch_delete_rag_adhoc_runs(request):
+    try:
+        data = json.loads(request.body)
+        run_ids = data.get("run_ids", [])
+        if not run_ids:
+            return JsonResponse(
+                {"status": "error", "message": "No run IDs provided."}, status=400
+            )
+
+        runs = RagAdhocRun.objects.filter(id__in=run_ids)
+        deleted_count = runs.count()
+        runs.delete()
+
+        return JsonResponse(
+            {"status": "ok", "message": f"{deleted_count} runs deleted."}
+        )
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)}, status=500)
+
+
+@admin_required
+@require_POST
+def batch_delete_vanilla_llm_adhoc_runs(request):
+    try:
+        data = json.loads(request.body)
+        run_ids = data.get("run_ids", [])
+        if not run_ids:
+            return JsonResponse(
+                {"status": "error", "message": "No run IDs provided."}, status=400
+            )
+
+        runs = VanillaLLMAdhocRun.objects.filter(id__in=run_ids)
+        deleted_count = runs.count()
+        runs.delete()
+
+        return JsonResponse(
+            {"status": "ok", "message": f"{deleted_count} runs deleted."}
+        )
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)}, status=500)
+
+
 @require_POST
 def create_session_group(request):
     try:

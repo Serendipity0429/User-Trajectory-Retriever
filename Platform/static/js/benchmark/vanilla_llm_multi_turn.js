@@ -1,9 +1,47 @@
 document.addEventListener('DOMContentLoaded', function() {
+    BenchmarkUtils.setupConfigurationHandlers();
     const questions = JSON.parse(document.getElementById('questions-data').textContent);
     let activeSessionId = null;
     let sessionTrials = [];
     let pipelineController = { aborted: false };
     let currentPipelineResults = [];
+
+    // --- Configuration Management ---
+    const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+
+    // LLM Settings
+    if (document.getElementById('test-connection-btn')) {
+        document.getElementById('test-connection-btn').addEventListener('click', function() {
+            const data = {
+                llm_base_url: document.getElementById('llm_base_url').value,
+                llm_api_key: document.getElementById('llm_api_key').value,
+                llm_model: document.getElementById('llm_model').value
+            };
+            BenchmarkUtils.testConnection(window.benchmarkUrls.testLlmConnection, csrfToken, data, 'connection-status', 'test-connection-btn');
+        });
+    }
+
+    if (document.getElementById('save-llm-settings-btn')) {
+        document.getElementById('save-llm-settings-btn').addEventListener('click', function() {
+            const data = {
+                llm_base_url: document.getElementById('llm_base_url').value,
+                llm_api_key: document.getElementById('llm_api_key').value,
+                llm_model: document.getElementById('llm_model').value,
+                max_retries: document.getElementById('max_retries') ? document.getElementById('max_retries').value : 3
+            };
+            BenchmarkUtils.saveSettings(window.benchmarkUrls.saveLlmSettings, csrfToken, data, 'save-llm-settings-btn');
+        });
+    }
+
+    if (document.getElementById('restore-defaults-btn')) {
+        document.getElementById('restore-defaults-btn').addEventListener('click', function() {
+            BenchmarkUtils.restoreDefaults(window.benchmarkUrls.getLlmEnvVars, (data) => {
+                if (data.llm_base_url) document.getElementById('llm_base_url').value = data.llm_base_url;
+                if (data.llm_api_key) document.getElementById('llm_api_key').value = data.llm_api_key;
+                if (data.llm_model) document.getElementById('llm_model').value = data.llm_model;
+            });
+        });
+    }
 
     const startBtn = document.getElementById('start-session-btn');
     const questionSelect = document.getElementById('question-select');
@@ -473,6 +511,7 @@ document.addEventListener('DOMContentLoaded', function() {
         progressBar.style.width = '0%';
         progressBar.textContent = '0%';
         statusDiv.textContent = 'Initializing pipeline...';
+        BenchmarkUtils.toggleConfigurationInputs(true);
 
         currentPipelineResults = [];
         let completedCount = 0;
@@ -561,6 +600,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     BenchmarkUtils.MultiTurnUtils.addNewSessionToList('session-list', data.session_id, { question: data.question }, selectAllHandler, data.group_id, data.group_name, 'Finished');
                 },
                 () => { // onComplete
+                    BenchmarkUtils.toggleConfigurationInputs(false);
                     runBtn.style.display = 'block';
                     stopBtn.style.display = 'none';
                     statusDiv.textContent = `Pipeline finished. Processed ${completedCount} questions.`;
@@ -573,6 +613,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         console.error('Error during stream processing:', error);
                         statusDiv.textContent = `Error: ${error.message}`;
                     }
+                    BenchmarkUtils.toggleConfigurationInputs(false);
                     runBtn.style.display = 'block';
                     stopBtn.style.display = 'none';
                     pipelineController.id = null;
@@ -589,6 +630,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 alert('Failed to start the pipeline.');
                 statusDiv.textContent = "Failed to start pipeline.";
             }
+            BenchmarkUtils.toggleConfigurationInputs(false);
             runBtn.style.display = 'block';
             stopBtn.style.display = 'none';
             pipelineController.id = null;

@@ -1,4 +1,5 @@
 document.addEventListener('DOMContentLoaded', function() {
+    BenchmarkUtils.setupConfigurationHandlers();
     const questionsData = JSON.parse(document.getElementById('questions-data') ? document.getElementById('questions-data').textContent : '[]');
     // Removed questionSelector and runSingleQuestionBtn as they are no longer used
 
@@ -119,6 +120,7 @@ document.addEventListener('DOMContentLoaded', function() {
         failedItems = [];
         document.getElementById('results-header-text').textContent = "QA Pipeline Results";
         document.getElementById('running-spinner').style.display = 'inline-block';
+        BenchmarkUtils.toggleConfigurationInputs(true);
 
         // Controller to stop the fetch
         pipelineController = new AbortController();
@@ -196,6 +198,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     BenchmarkUtils.updateAdhocStatsUI(stats);
                 },
                 () => { // onComplete
+                    BenchmarkUtils.toggleConfigurationInputs(false);
                     runBtn.style.display = 'block';
                     stopBtn.style.display = 'none';
                     document.getElementById('running-spinner').style.display = 'none';
@@ -212,6 +215,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     } else {
                         console.error('Error during stream processing:', error);
                     }
+                    BenchmarkUtils.toggleConfigurationInputs(false);
                     runBtn.style.display = 'block';
                     stopBtn.style.display = 'none';
                     document.getElementById('running-spinner').style.display = 'none';
@@ -227,6 +231,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 console.error('Error starting the pipeline:', error);
                 alert('Failed to start the pipeline.');
             }
+            BenchmarkUtils.toggleConfigurationInputs(false);
             runBtn.style.display = 'block';
             stopBtn.style.display = 'none';
             document.getElementById('running-spinner').style.display = 'none';
@@ -294,8 +299,41 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // Config buttons
-    // Autosave for LLM Settings
+    // --- Configuration Management ---
+    const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+
+    // LLM Settings
+    if (document.getElementById('test-connection-btn')) {
+        document.getElementById('test-connection-btn').addEventListener('click', function() {
+            const data = {
+                llm_base_url: document.getElementById('llm_base_url').value,
+                llm_api_key: document.getElementById('llm_api_key').value,
+                llm_model: document.getElementById('llm_model').value
+            };
+            BenchmarkUtils.testConnection(window.benchmarkUrls.testLlmConnection, csrfToken, data, 'connection-status', 'test-connection-btn');
+        });
+    }
+
+    if (document.getElementById('save-llm-settings-btn')) {
+        document.getElementById('save-llm-settings-btn').addEventListener('click', function() {
+            const data = {
+                llm_base_url: document.getElementById('llm_base_url').value,
+                llm_api_key: document.getElementById('llm_api_key').value,
+                llm_model: document.getElementById('llm_model').value
+            };
+            BenchmarkUtils.saveSettings(window.benchmarkUrls.saveLlmSettings, csrfToken, data, 'save-llm-settings-btn');
+        });
+    }
+
+    if (document.getElementById('restore-defaults-btn')) {
+        document.getElementById('restore-defaults-btn').addEventListener('click', function() {
+            BenchmarkUtils.restoreDefaults(window.benchmarkUrls.getLlmEnvVars, (data) => {
+                if (data.llm_base_url) document.getElementById('llm_base_url').value = data.llm_base_url;
+                if (data.llm_api_key) document.getElementById('llm_api_key').value = data.llm_api_key;
+                if (data.llm_model) document.getElementById('llm_model').value = data.llm_model;
+            });
+        });
+    }
     // Delegated event listener for toggling ground truths
     document.getElementById('pipeline-results-body').addEventListener('click', function(e) {
         if (e.target && e.target.classList.contains('toggle-answers-link')) {

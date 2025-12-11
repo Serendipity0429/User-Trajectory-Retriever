@@ -738,6 +738,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 },
                 scales: {
                     x: {
+                        beginAtZero: true, // Ensure value axis starts at zero
                         ticks: { font: { size: 14 } },
                         title: { display: true, font: { size: 16 } }
                     },
@@ -807,13 +808,33 @@ document.addEventListener('DOMContentLoaded', function() {
                     });
                 },
                 createBar: (id, labels, data, label, color, isHorizontal = false) => {
+                    const options = isHorizontal ? {
+                        indexAxis: 'y',
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { labels: { font: { size: 14 } } }
+                        },
+                        scales: {
+                            x: {
+                                beginAtZero: true,
+                                ticks: { font: { size: 14 } },
+                                title: { display: true, font: { size: 16 } }
+                            },
+                            y: {
+                                ticks: { font: { size: 14 } },
+                                title: { display: true, font: { size: 16 } }
+                            }
+                        }
+                    } : chartJsDefaultOptions;
+
                     new Chart(document.getElementById(id), {
                         type: 'bar',
                         data: {
                             labels: labels,
                             datasets: [{ label: label, data: data, backgroundColor: color }]
                         },
-                        options: isHorizontal ? { ...chartJsDefaultOptions, indexAxis: 'y' } : chartJsDefaultOptions
+                        options: options
                     });
                 }
             };
@@ -856,7 +877,7 @@ document.addEventListener('DOMContentLoaded', function() {
             ChartFactory.createDoughnut('occupationDistributionChart', statistics.occupation_distribution.labels, statistics.occupation_distribution.data);
             ChartFactory.createDoughnut('educationDistributionChart', statistics.education_distribution.labels, statistics.education_distribution.data);
             
-            ChartFactory.createBar('llmFrequencyChart', statistics.llm_frequency_distribution.labels, statistics.llm_frequency_distribution.data, 'LLM Frequency', CHART_COLORS.purple);
+            ChartFactory.createBar('llmFrequencyChart', statistics.llm_frequency_distribution.labels, statistics.llm_frequency_distribution.data, 'LLM Frequency', CHART_COLORS.purple, true);
             ChartFactory.createBar('englishProficiencyChart', statistics.english_proficiency_distribution.labels, statistics.english_proficiency_distribution.data, 'English Proficiency', CHART_COLORS.green, true);
             ChartFactory.createBar('webSearchProficiencyChart', statistics.web_search_proficiency_distribution.labels, statistics.web_search_proficiency_distribution.data, 'Web Search Proficiency', CHART_COLORS.orange, true);
             

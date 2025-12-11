@@ -404,7 +404,7 @@ def test_llm_connection(request):
         return JsonResponse(
             {
                 "status": "ok",
-                "message": f"Connection successful! Found {len(models.data)} models.",
+                "message": f"Connection successful! Found {len(models.data)} models: {', '.join([model.id for model in models.data])}",
             }
         )
     except openai.APIConnectionError as e:

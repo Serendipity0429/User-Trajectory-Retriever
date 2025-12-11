@@ -119,6 +119,73 @@ const BenchmarkUtils = {
     },
 
     /**
+     * Disable or enable configuration inputs.
+     * @param {boolean} disabled - Whether to disable the inputs.
+     */
+    toggleConfigurationInputs: function(disabled) {
+        const ids = [
+            // LLM
+            'llm_base_url', 'llm_model', 'llm_api_key', 'max_retries',
+            'save-llm-settings-btn', 'restore-defaults-btn', 'test-connection-btn',
+            // RAG
+            'rag_prompt_template', 'save-rag-settings-btn', 'restore-rag-defaults-btn',
+            // Search
+            'search_provider', 'serper_api_key', 'serper_fetch_full_content', 'save-search-settings-btn'
+        ];
+
+        ids.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) {
+                el.disabled = disabled;
+            }
+        });
+    },
+
+    /**
+     * Setup common configuration UI handlers (toggles, visibility).
+     */
+    setupConfigurationHandlers: function() {
+        // Toggle LLM API Key Visibility
+        const llmApiKey = document.getElementById('llm_api_key');
+        const toggleLlmKeyBtn = document.getElementById('toggle-llm-key-visibility');
+        if (toggleLlmKeyBtn && llmApiKey) {
+            toggleLlmKeyBtn.addEventListener('click', function() {
+                const type = llmApiKey.getAttribute('type') === 'password' ? 'text' : 'password';
+                llmApiKey.setAttribute('type', type);
+                this.querySelector('i').classList.toggle('bi-eye');
+                this.querySelector('i').classList.toggle('bi-eye-slash');
+            });
+        }
+
+        // Toggle Serper API Key Visibility
+        const serperApiKey = document.getElementById('serper_api_key');
+        const toggleSerperKeyBtn = document.getElementById('toggle-serper-key-visibility');
+        if (toggleSerperKeyBtn && serperApiKey) {
+            toggleSerperKeyBtn.addEventListener('click', function() {
+                const type = serperApiKey.getAttribute('type') === 'password' ? 'text' : 'password';
+                serperApiKey.setAttribute('type', type);
+                this.querySelector('i').classList.toggle('bi-eye');
+                this.querySelector('i').classList.toggle('bi-eye-slash');
+            });
+        }
+
+        // Search Provider Toggle
+        const searchProvider = document.getElementById('search_provider');
+        const serperApiKeyContainer = document.getElementById('serper_api_key_container');
+        if (searchProvider && serperApiKeyContainer) {
+            searchProvider.addEventListener('change', function() {
+                if (this.value === 'serper') {
+                    serperApiKeyContainer.style.display = 'block';
+                } else {
+                    serperApiKeyContainer.style.display = 'none';
+                }
+            });
+            // Trigger once on load
+            searchProvider.dispatchEvent(new Event('change'));
+        }
+    },
+
+    /**
      * Stop a running pipeline.
      * @param {string} url - The URL to the stop pipeline view.
      * @param {string} csrfToken - The CSRF token.

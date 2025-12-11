@@ -1,5 +1,6 @@
 from django.core.management.base import BaseCommand
 from user_system.models import User, InformedConsent
+import random
 
 
 class Command(BaseCommand):
@@ -27,18 +28,49 @@ class Command(BaseCommand):
 
         profile = user.profile
         profile.name = "Test User"
-        profile.gender = "O"
-        profile.age = 25
-        profile.phone = "1234567890"
-        profile.occupation = "engineer"
-        profile.education = "master"
-        profile.field_of_expertise = "Computer Science"
-        profile.llm_frequency = "frequently"
-        profile.llm_history = "long"
-        profile.english_proficiency = "advanced"
-        profile.web_search_proficiency = "advanced"
-        profile.web_agent_familiarity = "moderately_familiar"
-        profile.web_agent_frequency = "sometimes"
+        profile.gender = random.choice(["M", "F", "O"])
+        profile.age = random.randint(18, 80)
+        profile.phone = "".join([str(random.randint(0, 9)) for _ in range(10)])
+        profile.occupation = random.choice(
+            ["student", "engineer", "teacher", "other"]
+        )
+        profile.education = random.choice(
+            ["high_school", "bachelor", "master", "phd", "other"]
+        )
+        profile.field_of_expertise = random.choice(
+            [
+                "Computer Science",
+                "Physics",
+                "Literature",
+                "Mathematics",
+                "Biology",
+                "History",
+            ]
+        )
+        profile.llm_frequency = random.choice(
+            ["frequently", "usually", "sometimes", "rarely"]
+        )
+        profile.llm_history = random.choice(
+            ["very short", "short", "long", "very long"]
+        )
+        profile.english_proficiency = random.choice(
+            ["native", "fluent", "advanced", "intermediate", "beginner"]
+        )
+        profile.web_search_proficiency = random.choice(
+            ["expert", "advanced", "intermediate", "beginner"]
+        )
+        profile.web_agent_familiarity = random.choice(
+            [
+                "not_familiar",
+                "slightly_familiar",
+                "moderately_familiar",
+                "very_familiar",
+                "expert",
+            ]
+        )
+        profile.web_agent_frequency = random.choice(
+            ["frequently", "usually", "sometimes", "rarely", "never"]
+        )
         profile.save()
 
         self.stdout.write(

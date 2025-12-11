@@ -7,7 +7,7 @@
 <div class="container-fluid mt-4 px-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h1 class="h2 text-gray-800">Dataset Questions and Answers</h1>
-        <a href="{% url 'user_system:admin_page' %}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i> Back to Dashboard</a>
+        <a href="{% url 'dashboard:index' %}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i> Back to Dashboard</a>
     </div>
     
     {% for dataset in datasets %}

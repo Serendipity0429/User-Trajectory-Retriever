@@ -53,7 +53,12 @@
     </div>
 </div>
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-});
+    window.benchmarkUrls = {
+        ...window.benchmarkCommonUrls,
+        getDefaultRagPrompt: "{% url 'benchmark:get_default_rag_prompt' %}",
+        saveRagSettings: "{% url 'benchmark:save_rag_settings' %}",
+        saveSearchSettings: "{% url 'benchmark:save_search_settings' %}",
+    };
 </script>
+<script src="{% static 'js/benchmark/dashboard.js' %}"></script>
 {% endblock %}

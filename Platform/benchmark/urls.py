@@ -53,6 +53,7 @@ urlpatterns = [
     path('api/vanilla_llm_adhoc/list_runs/', views.list_vanilla_llm_adhoc_runs, name='list_vanilla_llm_adhoc_runs'),
     path('api/vanilla_llm_adhoc/get_run/<int:run_id>/', views.get_vanilla_llm_adhoc_run, name='get_vanilla_llm_adhoc_run'),
     path('api/vanilla_llm_adhoc/delete_run/<int:run_id>/', views.delete_vanilla_llm_adhoc_run, name='delete_vanilla_llm_adhoc_run'),
+    path('api/vanilla_llm_adhoc/batch_delete_runs/', views.batch_delete_vanilla_llm_adhoc_runs, name='batch_delete_vanilla_llm_adhoc_runs'),
     path('api/web_search/', views.web_search, name='web_search'),
 
     # RAG APIs
@@ -62,6 +63,7 @@ urlpatterns = [
     path('api/rag_adhoc/list_runs/', views.list_rag_adhoc_runs, name='list_rag_adhoc_runs'),
     path('api/rag_adhoc/get_run/<int:run_id>/', views.get_rag_adhoc_run, name='get_rag_adhoc_run'),
     path('api/rag_adhoc/delete_run/<int:run_id>/', views.delete_rag_adhoc_run, name='delete_rag_adhoc_run'),
+    path('api/rag_adhoc/batch_delete_runs/', views.batch_delete_rag_adhoc_runs, name='batch_delete_rag_adhoc_runs'),
     path('api/rag_adhoc/get_default_prompt/', views.get_default_rag_prompt, name='get_default_rag_prompt'),
 
     # Dataset APIs

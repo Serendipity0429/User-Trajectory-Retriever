@@ -193,4 +193,6 @@ class InformedConsent(models.Model):
         obj = cls.objects.order_by("-version").first()
         if obj:
             return obj
-        return cls(version=1, content=DEFAULT_CONSENT_CONTENT)
+        consent = cls(version=1, content=DEFAULT_CONSENT_CONTENT)
+        consent.save()
+        return consent

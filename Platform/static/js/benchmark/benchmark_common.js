@@ -215,8 +215,10 @@ const BenchmarkUtils = {
      * @param {function} deleteRunCallback - Function to call when delete is clicked.
      * @param {string} listId - ID of the list element.
      * @param {string} noRunsId - ID of the no runs message element.
+     * @param {boolean} enableSelection - Whether to render checkboxes for batch selection.
+     * @param {function} onSelectionChange - Callback when selection changes (checkbox clicked).
      */
-    loadSavedRuns: function(listUrl, loadRunCallback, deleteRunCallback, listId = 'saved-runs-list', noRunsId = 'no-runs-message') {
+    loadSavedRuns: function(listUrl, loadRunCallback, deleteRunCallback, listId = 'saved-runs-list', noRunsId = 'no-runs-message', enableSelection = false, onSelectionChange = null) {
         const savedRunsList = document.getElementById(listId);
         const noRunsMessage = document.getElementById(noRunsId);
         savedRunsList.innerHTML = ''; 
@@ -229,8 +231,22 @@ const BenchmarkUtils = {
                     savedRunsList.style.display = 'block';
                     data.runs.forEach(run => {
                         const runItem = document.createElement('div');
-                        runItem.className = 'list-group-item list-group-item-action d-flex justify-content-between align-items-center';
+                        runItem.className = 'list-group-item list-group-item-action d-flex align-items-center';
                         
+                        // Checkbox (if enabled)
+                        if (enableSelection) {
+                            const checkbox = document.createElement('input');
+                            checkbox.type = 'checkbox';
+                            checkbox.className = 'form-check-input me-3 run-checkbox';
+                            checkbox.value = run.id;
+                            checkbox.dataset.runId = run.id;
+                            checkbox.onclick = (e) => {
+                                e.stopPropagation();
+                                if (onSelectionChange) onSelectionChange();
+                            };
+                            runItem.appendChild(checkbox);
+                        }
+
                         const runNameContainer = document.createElement('div');
                         runNameContainer.style.cursor = 'pointer';
                         runNameContainer.className = 'flex-grow-1';

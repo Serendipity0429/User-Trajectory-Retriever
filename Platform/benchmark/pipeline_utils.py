@@ -341,10 +341,11 @@ class RagAdhocPipeline(BaseAdhocPipeline):
 
         # Adhoc RAG also needs to support reasoning parsing
         settings = LLMSettings.load()
+        print_debug("RAG Adhoc Full Response:", full_response)
         if settings.allow_reasoning:
-             answer = extract_final_answer(full_response)
+            answer = extract_final_answer(full_response)
         else:
-             answer = full_response
+            answer = full_response
         
         rule_result = check_answer_rule(question, ground_truths, answer)
         llm_result = check_answer_llm(question, ground_truths, answer, client=self.client, model=self.model)
@@ -557,16 +558,23 @@ class BaseMultiTurnPipeline(BasePipeline):
                 model=self.model,
                 messages=messages
             )
-            answer = response.choices[0].message.content
+            full_response = response.choices[0].message.content
         except Exception as e:
             trial.status = 'error'
             trial.save()
             raise e
 
         # Logic for checking answer
+        settings = LLMSettings.load()
+        if settings.allow_reasoning:
+            answer = extract_final_answer(full_response)
+        else:
+            answer = full_response
+            
         is_correct = check_answer_llm(session.question, session.ground_truths, answer, client=self.client, model=self.model)
 
         trial.answer = answer
+        trial.full_response = full_response # Save full response too
         trial.is_correct = is_correct
         trial.feedback = "Correct" if is_correct else "Incorrect"
         trial.status = 'completed'

@@ -239,6 +239,7 @@ def vanilla_llm_adhoc(request):
                     "ground_truths",
                     "is_correct_rule",
                     "is_correct_llm",
+                    "full_response",
                 )
             )
         except (ValueError, TypeError):
@@ -624,6 +625,7 @@ def get_rag_adhoc_run(request, run_id):
             run.results.values(
                 "question",
                 "answer",
+                "full_response",
                 "ground_truths",
                 "is_correct_rule",
                 "is_correct_llm",
@@ -831,6 +833,7 @@ def get_session(request, session_id):
                 "status",
                 "search_query",
                 "search_results",
+                "full_response",
             )
         )
 
@@ -844,6 +847,7 @@ def get_session(request, session_id):
                 "is_correct",
                 "created_at",
                 "status",
+                "full_response",
             )
         )
 

@@ -1397,6 +1397,18 @@ const BenchmarkUtils = {
             const val = getValue(llmSettings, 'max_retries', 'max_retries');
             if (val) addItem('Max Retries', val, 'bi-arrow-repeat');
         }
+        if (shouldShow('allow_reasoning')) {
+            let val = getValue(llmSettings, 'allow_reasoning', 'allow_reasoning');
+            // If pulling from DOM checkbox
+            if (val === 'on' || val === true) val = 'Enabled';
+            else if (val === false) val = 'Disabled';
+            
+            // If pulling from snapshot (boolean)
+            if (val === true) val = 'Enabled';
+            if (val === false) val = 'Disabled';
+
+            if (val) addItem('Reasoning', val, 'bi-lightbulb');
+        }
         if (shouldShow('llm_base_url')) {
             const val = getValue(llmSettings, 'llm_base_url', 'llm_base_url');
             if (val) addItem('Base URL', val, 'bi-link-45deg');
@@ -1904,7 +1916,8 @@ const BenchmarkUtils = {
          * @returns {AbortController} - The controller to abort the request.
          */
         start: function(options) {
-            const { url, formData, ui, callbacks, totalItems, itemsData } = options;
+            let { totalItems } = options;
+            const { url, formData, ui, callbacks, itemsData } = options;
             
             // UI Reset
             if (ui.runBtn) ui.runBtn.style.display = 'none';
@@ -1953,6 +1966,10 @@ const BenchmarkUtils = {
                     response,
                     (data) => { // onData
                         if (data.is_meta) {
+                             if (data.type === 'total_count') {
+                                 totalItems = data.count;
+                                 updateStatus();
+                             }
                              if (callbacks.onMeta) callbacks.onMeta(data);
                              return;
                         }
@@ -2072,7 +2089,7 @@ const BenchmarkUtils = {
                         currentSettings = data.settings;
                         resultsHeader.textContent = `Results for: ${data.name}`;
                         
-                        const settingsWhitelist = ['llm_model', 'llm_base_url', 'max_retries'];
+                        const settingsWhitelist = ['llm_model', 'llm_base_url', 'max_retries', 'allow_reasoning'];
                         if (pipelineType === 'rag_adhoc') {
                             settingsWhitelist.push('rag_settings', 'search_settings');
                         }
@@ -2395,7 +2412,7 @@ const BenchmarkUtils = {
             const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
             if (!csrfToken) console.error("CSRF Token is missing or empty!");
             BenchmarkUtils.setupConfigurationActionHandlers(csrfToken, true, true);
-            const questions = JSON.parse(document.getElementById(questionsDataId).textContent);
+            // questions data removed - parsing only on demand
             
             let activeSessionId = null;
             let currentPipelineResults = [];
@@ -2435,7 +2452,7 @@ const BenchmarkUtils = {
                         BenchmarkUtils.MultiTurnUtils.renderSession(data.session, data.trials, { sessionTrials: [] }); 
                         window.sessionTrials = data.trials; 
                         
-                        const settingsWhitelist = ['llm_model', 'llm_base_url', 'max_retries'];
+                        const settingsWhitelist = ['llm_model', 'llm_base_url', 'max_retries', 'allow_reasoning'];
                          if (pipelineType.includes('rag')) {
                             settingsWhitelist.push('rag_settings', 'search_settings');
                         }
@@ -2481,7 +2498,7 @@ const BenchmarkUtils = {
                          loadSession(sid);
                      });
                      
-                     const settingsWhitelist = ['llm_model', 'llm_base_url', 'max_retries'];
+                     const settingsWhitelist = ['llm_model', 'llm_base_url', 'max_retries', 'allow_reasoning'];
                      if (pipelineType.includes('rag')) settingsWhitelist.push('rag_settings', 'search_settings');
                      BenchmarkUtils.renderRunConfiguration(data.settings, settingsWhitelist);
                      document.getElementById('statistics-container').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -2492,7 +2509,17 @@ const BenchmarkUtils = {
             document.getElementById('start-session-btn').addEventListener('click', function() {
                 const questionSelect = document.getElementById('question-select');
                 if (!questionSelect.value) { alert('Select a question.'); return; }
-                const qData = questions[questionSelect.value];
+                
+                let qData = null;
+                try {
+                     const questionsDataEl = document.getElementById(questionsDataId);
+                     if (questionsDataEl) {
+                         const questions = JSON.parse(questionsDataEl.textContent);
+                         qData = questions[questionSelect.value];
+                     }
+                } catch (e) { console.error("Error parsing questions data", e); }
+                
+                if (!qData) { alert('Could not load question data.'); return; }
                 
                 const btn = this;
                 btn.disabled = true;
@@ -2559,7 +2586,7 @@ const BenchmarkUtils = {
                     url: (pipelineType.includes('rag') ? BenchmarkUrls.ragMultiTurn.runPipeline : BenchmarkUrls.vanillaLlmMultiTurn.runPipeline),
                     formData: formData,
                     ui: ui,
-                    totalItems: totalQuestions,
+                    totalItems: 0, // Dynamic total items
                     callbacks: {
                         onMeta: (data) => {
                              if (data.type === 'info') ui.statusDiv.textContent = data.message;

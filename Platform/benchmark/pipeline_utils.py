@@ -659,31 +659,41 @@ class RagMultiTurnPipeline(BaseMultiTurnPipeline):
         trial_number = trial.trial_number
         messages = []
         current_search_query = session.question
+        search_results = None
         
-        if self.reformulation_strategy == 'reform' and trial_number > 1:
-            reform_messages = [{"role": "system", "content": "You are a helpful assistant that reformulates search queries based on conversation history."}]
-            reform_messages.append({"role": "user", "content": f"Original Question: {session.question}"})
-            
-            prev_trials = session.trials.filter(trial_number__lt=trial_number).order_by('trial_number')
-            for prev_trial in prev_trials:
-                if prev_trial.answer:
-                    reform_messages.append({"role": "assistant", "content": f"Previous Answer: {prev_trial.answer}"})
-                reform_messages.append({"role": "user", "content": "The previous answer was incorrect."})
-            
-            reform_messages.append({"role": "user", "content": PROMPTS["rag_reformulation"]})
-            
-            try:
-                reform_response = self.client.chat.completions.create(
-                    model=self.model,
-                    messages=reform_messages,
-                    temperature=0,
-                )
-                current_search_query = reform_response.choices[0].message.content.strip()
-            except Exception as e:
-                print_debug(f"Reformulation failed: {e}")
-                pass
+        # Optimization: Reuse search results from the first trial if no reformulation is used
+        if self.reformulation_strategy == 'no_reform' and trial_number > 1:
+            first_trial = session.trials.filter(trial_number=1).first()
+            if first_trial:
+                search_results = first_trial.search_results
+                current_search_query = first_trial.search_query
 
-        search_results = self.search_engine.search(current_search_query)
+        if search_results is None:
+            if self.reformulation_strategy == 'reform' and trial_number > 1:
+                reform_messages = [{"role": "system", "content": "You are a helpful assistant that reformulates search queries based on conversation history."}]
+                reform_messages.append({"role": "user", "content": f"Original Question: {session.question}"})
+                
+                prev_trials = session.trials.filter(trial_number__lt=trial_number).order_by('trial_number')
+                for prev_trial in prev_trials:
+                    if prev_trial.answer:
+                        reform_messages.append({"role": "assistant", "content": f"Previous Answer: {prev_trial.answer}"})
+                    reform_messages.append({"role": "user", "content": "The previous answer was incorrect."})
+                
+                reform_messages.append({"role": "user", "content": PROMPTS["rag_reformulation"]})
+                
+                try:
+                    reform_response = self.client.chat.completions.create(
+                        model=self.model,
+                        messages=reform_messages,
+                        temperature=0,
+                    )
+                    current_search_query = reform_response.choices[0].message.content.strip()
+                except Exception as e:
+                    print_debug(f"Reformulation failed: {e}")
+                    pass
+
+            search_results = self.search_engine.search(current_search_query)
+
         formatted_results = self.search_engine.format_results(search_results)
         
         # Save search info to the passed trial object directly

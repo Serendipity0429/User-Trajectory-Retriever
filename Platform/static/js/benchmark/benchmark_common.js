@@ -201,7 +201,7 @@ const BenchmarkUtils = {
                     llm_api_key: document.getElementById('llm_api_key').value,
                     llm_model: document.getElementById('llm_model').value
                 };
-                BenchmarkUtils.testConnection(urls.testLlmConnection, csrfToken, data, 'connection-status', 'test-connection-btn');
+                BenchmarkUtils.testConnection(urls.testLlmConnection, csrfToken, data, 'test-connection-result', 'test-connection-btn');
             });
         }
 
@@ -257,8 +257,14 @@ const BenchmarkUtils = {
             if (document.getElementById('save-search-settings-btn')) {
                 document.getElementById('save-search-settings-btn').addEventListener('click', function() {
                     let searchProvider = 'serper'; // default
+                    const dropdownProvider = document.getElementById('search_provider');
                     const checkedProvider = document.querySelector('input[name="search_provider"]:checked');
-                    if (checkedProvider) searchProvider = checkedProvider.value;
+                    
+                    if (dropdownProvider && dropdownProvider.tagName === 'SELECT') {
+                         searchProvider = dropdownProvider.value;
+                    } else if (checkedProvider) {
+                         searchProvider = checkedProvider.value;
+                    }
 
                     const serperApiKey = document.getElementById('serper_api_key').value;
                     const serperFetchFullContent = document.getElementById('serper_fetch_full_content') ? document.getElementById('serper_fetch_full_content').checked : false;
@@ -1367,200 +1373,254 @@ const BenchmarkUtils = {
         }
     },
 
-    /**
-     * Render a multi-turn session, including question, ground truths, and trials.
-     * @param {object} session - The session object.
-     * @param {Array} trials - Array of trial objects for the session.
-     * @param {object} [options] - Optional settings.
-     * @param {Array} [options.sessionTrials] - Reference to a sessionTrials array for external updates.
-     * @param {string} [options.sessionContainerId='session-container'] - ID of the main session container.
-     * @param {string} [options.noSessionSelectedId='no-session-selected'] - ID of the 'no session selected' message.
-     */
-    renderSession: function(session, trials, options = {}) {
-        const {
-            sessionTrials, // Assuming this is defined in the script that calls this
-            sessionContainerId = 'session-container',
-            noSessionSelectedId = 'no-session-selected'
-        } = options;
+    MultiTurnUtils: {
+        /**
+         * Render a multi-turn session, including question, ground truths, and trials.
+         * @param {object} session - The session object.
+         * @param {Array} trials - Array of trial objects for the session.
+         * @param {object} [options] - Optional settings.
+         * @param {Array} [options.sessionTrials] - Reference to a sessionTrials array for external updates.
+         * @param {string} [options.sessionContainerId='session-container'] - ID of the main session container.
+         * @param {string} [options.noSessionSelectedId='no-session-selected'] - ID of the 'no session selected' message.
+         */
+        renderSession: function(session, trials, options = {}) {
+            const {
+                sessionTrials, // Assuming this is defined in the script that calls this
+                sessionContainerId = 'session-container',
+                noSessionSelectedId = 'no-session-selected'
+            } = options;
 
-        // Update external sessionTrials reference if provided
-        if (sessionTrials) {
-            sessionTrials.length = 0; // Clear existing
-            sessionTrials.push(...trials); // Add new
-        }
-
-        document.getElementById('session-header').textContent = `Session #${session.id}`;
-        document.getElementById('session-question').textContent = session.question;
-
-        const gtContainer = document.getElementById('session-ground-truths');
-        gtContainer.innerHTML = '';
-
-        const GROUNDTRUTH_DISPLAY_LIMIT = 3; 
-
-        if (session.ground_truths.length > GROUNDTRUTH_DISPLAY_LIMIT) {
-            const initialGroundTruths = session.ground_truths.slice(0, GROUNDTRUTH_DISPLAY_LIMIT);
-            initialGroundTruths.forEach(gt => {
-                const el = document.createElement('span');
-                el.className = 'badge bg-secondary me-1';
-                el.textContent = gt;
-                gtContainer.appendChild(el);
-            });
-
-            const showMoreBtn = document.createElement('button');
-            showMoreBtn.className = 'btn btn-link btn-sm p-0';
-            showMoreBtn.textContent = `Show ${session.ground_truths.length - GROUNDTRUTH_DISPLAY_LIMIT} more`;
-            showMoreBtn.setAttribute('type', 'button');
-            gtContainer.appendChild(showMoreBtn);
-
-            const fullGroundTruthsDiv = document.createElement('div');
-            fullGroundTruthsDiv.style.display = 'none'; // Initially hidden
-            session.ground_truths.slice(GROUNDTRUTH_DISPLAY_LIMIT).forEach(gt => {
-                const el = document.createElement('span');
-                el.className = 'badge bg-secondary me-1';
-                el.textContent = gt;
-                fullGroundTruthsDiv.appendChild(el);
-            });
-            gtContainer.appendChild(fullGroundTruthsDiv);
-
-            const showLessBtn = document.createElement('button');
-            showLessBtn.className = 'btn btn-link btn-sm p-0 ms-2';
-            showLessBtn.textContent = `Show less`;
-            showLessBtn.setAttribute('type', 'button');
-            showLessBtn.style.display = 'none'; // Initially hidden
-            gtContainer.appendChild(showLessBtn);
-
-
-            showMoreBtn.addEventListener('click', () => {
-                fullGroundTruthsDiv.style.display = 'block';
-                showMoreBtn.style.display = 'none';
-                showLessBtn.style.display = 'inline';
-            });
-
-            showLessBtn.addEventListener('click', () => {
-                fullGroundTruthsDiv.style.display = 'none';
-                showMoreBtn.style.display = 'inline';
-                showLessBtn.style.display = 'none';
-            });
-
-        } else {
-            session.ground_truths.forEach(gt => {
-                const el = document.createElement('span');
-                el.className = 'badge bg-secondary me-1';
-                el.textContent = gt;
-                gtContainer.appendChild(el);
-            });
-        }
-
-        const trialsContainer = document.getElementById('trials-container');
-        trialsContainer.innerHTML = '';
-        trials.forEach(trial => {
-            trialsContainer.appendChild(BenchmarkUtils.BenchmarkRenderer.renderTrial(trial, session.is_completed, trials.length, session.max_retries));
-        });
-        
-        document.getElementById(sessionContainerId).style.display = 'block';
-        document.getElementById(noSessionSelectedId).style.display = 'none';
-    },
-
-    /**
-     * Add a new session to the session list UI.
-     * @param {string} sessionListId - The ID of the session list container.
-     * @param {string} sessionId - The session ID.
-     * @param {object} questionData - Data about the question (e.g., {question: "..."}).
-     * @param {function} selectAllHandler - Function to handle select all checkbox change.
-     * @param {string} groupId - The group ID (optional).
-     * @param {string} groupName - The group name (optional).
-     * @param {string} statusText - The status text to display.
-     */
-    addNewSessionToList: function(sessionListId, sessionId, questionData, selectAllHandler, groupId = null, groupName = null, statusText = 'Now') {
-        const sessionList = document.getElementById(sessionListId);
-        if (!sessionList) return;
-
-        // Check if session already exists
-        const existingCheckbox = document.querySelector(`.session-checkbox[value="${sessionId}"]`);
-        if (existingCheckbox) {
-            const sessionDetails = document.querySelector(`.session-details[data-session-id="${sessionId}"]`);
-            if (sessionDetails) {
-                    const timeEl = sessionDetails.querySelector('small.text-muted');
-                    if (timeEl) {
-                        timeEl.textContent = statusText;
-                    }
+            // Update external sessionTrials reference if provided
+            if (sessionTrials) {
+                sessionTrials.length = 0; // Clear existing
+                sessionTrials.push(...trials); // Add new
             }
-            return;
-        }
 
-        // If this is the first session ever, remove "no sessions" and add select-all header
-        if (document.querySelector('.no-sessions')) {
-            const noSessions = document.querySelector('.no-sessions');
-            if (noSessions) noSessions.remove();
+            document.getElementById('session-header').textContent = `Session #${session.id}`;
+            document.getElementById('session-question').textContent = session.question;
+
+            const gtContainer = document.getElementById('session-ground-truths');
+            gtContainer.innerHTML = '';
+
+            const GROUNDTRUTH_DISPLAY_LIMIT = 3; 
+
+            if (session.ground_truths.length > GROUNDTRUTH_DISPLAY_LIMIT) {
+                const initialGroundTruths = session.ground_truths.slice(0, GROUNDTRUTH_DISPLAY_LIMIT);
+                initialGroundTruths.forEach(gt => {
+                    const el = document.createElement('span');
+                    el.className = 'badge bg-secondary me-1';
+                    el.textContent = gt;
+                    gtContainer.appendChild(el);
+                });
+
+                const showMoreBtn = document.createElement('button');
+                showMoreBtn.className = 'btn btn-link btn-sm p-0';
+                showMoreBtn.textContent = `Show ${session.ground_truths.length - GROUNDTRUTH_DISPLAY_LIMIT} more`;
+                showMoreBtn.setAttribute('type', 'button');
+                gtContainer.appendChild(showMoreBtn);
+
+                const fullGroundTruthsDiv = document.createElement('div');
+                fullGroundTruthsDiv.style.display = 'none'; // Initially hidden
+                session.ground_truths.slice(GROUNDTRUTH_DISPLAY_LIMIT).forEach(gt => {
+                    const el = document.createElement('span');
+                    el.className = 'badge bg-secondary me-1';
+                    el.textContent = gt;
+                    fullGroundTruthsDiv.appendChild(el);
+                });
+                gtContainer.appendChild(fullGroundTruthsDiv);
+
+                const showLessBtn = document.createElement('button');
+                showLessBtn.className = 'btn btn-link btn-sm p-0 ms-2';
+                showLessBtn.textContent = `Show less`;
+                showLessBtn.setAttribute('type', 'button');
+                showLessBtn.style.display = 'none'; // Initially hidden
+                gtContainer.appendChild(showLessBtn);
+
+
+                showMoreBtn.addEventListener('click', () => {
+                    fullGroundTruthsDiv.style.display = 'block';
+                    showMoreBtn.style.display = 'none';
+                    showLessBtn.style.display = 'inline';
+                });
+
+                showLessBtn.addEventListener('click', () => {
+                    fullGroundTruthsDiv.style.display = 'none';
+                    showMoreBtn.style.display = 'inline';
+                    showLessBtn.style.display = 'none';
+                });
+
+            } else {
+                session.ground_truths.forEach(gt => {
+                    const el = document.createElement('span');
+                    el.className = 'badge bg-secondary me-1';
+                    el.textContent = gt;
+                    gtContainer.appendChild(el);
+                });
+            }
+
+            const trialsContainer = document.getElementById('trials-container');
+            trialsContainer.innerHTML = '';
+            trials.forEach(trial => {
+                trialsContainer.appendChild(BenchmarkUtils.BenchmarkRenderer.renderTrial(trial, session.is_completed, trials.length, session.max_retries));
+            });
             
-            // Only create if it doesn't exist
-            if (!document.getElementById('select-all-container')) {
-                const selectAllContainer = document.createElement('div');
-                selectAllContainer.className = 'list-group-item bg-light';
-                selectAllContainer.id = 'select-all-container';
-                selectAllContainer.innerHTML = `
-                    <input class="form-check-input" type="checkbox" id="select-all-checkbox">
-                    <label class="form-check-label ms-2" for="select-all-checkbox">Select All</label>`;
-                sessionList.prepend(selectAllContainer);
-                const cb = document.getElementById('select-all-checkbox');
-                if (cb && selectAllHandler) cb.addEventListener('change', selectAllHandler);
-            }
-        }
+            document.getElementById(sessionContainerId).style.display = 'block';
+            document.getElementById(noSessionSelectedId).style.display = 'none';
+        },
 
-        const newSessionItem = document.createElement('div');
-        newSessionItem.className = 'list-group-item d-flex align-items-center session-item-container';
-        newSessionItem.innerHTML = `
-            <input class="form-check-input session-checkbox" type="checkbox" value="${sessionId}" data-session-id="${sessionId}">
-            <div class="ms-3 flex-grow-1 session-details" data-session-id="${sessionId}" style="cursor: pointer;">
-                <div class="d-flex w-100 justify-content-between">
-                    <h6 class="mb-1">Session #${sessionId}</h6>
-                    <small class="text-muted">${statusText}</small>
-                </div>
-                <p class="mb-1 small text-muted">${(questionData.question || '').substring(0, 100)}...</p>
-            </div>`;
-        
-        if (groupId) {
-            let groupContainer = document.getElementById(`session-group-${groupId}`);
-            if (!groupContainer) {
-                // Create the group container if it doesn't exist
-                const groupEl = document.createElement('div');
-                groupEl.className = 'list-group-item';
-                groupEl.innerHTML = `
-                    <details open>
-                        <summary class="fw-bold" style="cursor: pointer;">
-                            <i class="bi bi-collection me-1"></i>
-                            ${groupName}
-                            <small class="text-muted" id="group-session-count-${groupId}">(1 sessions)</small>
-                        </summary>
-                        <div class="list-group list-group-flush mt-2" id="session-group-${groupId}">
-                        </div>
-                    </details>
-                `;
+        /**
+         * Add a new session to the session list UI.
+         * @param {string} sessionListId - The ID of the session list container.
+         * @param {string} sessionId - The session ID.
+         * @param {object} questionData - Data about the question (e.g., {question: "..."}).
+         * @param {function} selectAllHandler - Function to handle select all checkbox change.
+         * @param {string} groupId - The group ID (optional).
+         * @param {string} groupName - The group name (optional).
+         * @param {string} statusText - The status text to display.
+         */
+        addNewSessionToList: function(sessionListId, sessionId, questionData, selectAllHandler, groupId = null, groupName = null, statusText = 'Now') {
+            const sessionList = document.getElementById(sessionListId);
+            if (!sessionList) return;
+
+            // Check if session already exists
+            const existingCheckbox = document.querySelector(`.session-checkbox[value="${sessionId}"]`);
+            if (existingCheckbox) {
+                const sessionDetails = document.querySelector(`.session-details[data-session-id="${sessionId}"]`);
+                if (sessionDetails) {
+                        const timeEl = sessionDetails.querySelector('small.text-muted');
+                        if (timeEl) {
+                            timeEl.textContent = statusText;
+                        }
+                }
+                return;
+            }
+
+            // If this is the first session ever, remove "no sessions" and add select-all header
+            if (document.querySelector('.no-sessions')) {
+                const noSessions = document.querySelector('.no-sessions');
+                if (noSessions) noSessions.remove();
+                
+                // Only create if it doesn't exist
+                if (!document.getElementById('select-all-container')) {
+                    const selectAllContainer = document.createElement('div');
+                    selectAllContainer.className = 'list-group-item bg-light';
+                    selectAllContainer.id = 'select-all-container';
+                    selectAllContainer.innerHTML = `
+                        <input class="form-check-input" type="checkbox" id="select-all-checkbox">
+                        <label class="form-check-label ms-2" for="select-all-checkbox">Select All</label>`;
+                    sessionList.prepend(selectAllContainer);
+                    const cb = document.getElementById('select-all-checkbox');
+                    if (cb && selectAllHandler) cb.addEventListener('change', selectAllHandler);
+                }
+            }
+
+            const newSessionItem = document.createElement('div');
+            newSessionItem.className = 'list-group-item d-flex align-items-center session-item-container';
+            newSessionItem.innerHTML = `
+                <input class="form-check-input session-checkbox" type="checkbox" value="${sessionId}" data-session-id="${sessionId}">
+                <div class="ms-3 flex-grow-1 session-details" data-session-id="${sessionId}" style="cursor: pointer;">
+                    <div class="d-flex w-100 justify-content-between">
+                        <h6 class="mb-1">Session #${sessionId}</h6>
+                        <small class="text-muted">${statusText}</small>
+                    </div>
+                    <p class="mb-1 small text-muted">${(questionData.question || '').substring(0, 100)}...</p>
+                </div>`;
+            
+            if (groupId) {
+                let groupContainer = document.getElementById(`session-group-${groupId}`);
+                if (!groupContainer) {
+                    // Create the group container if it doesn't exist
+                    const groupEl = document.createElement('div');
+                    groupEl.className = 'list-group-item';
+                    groupEl.innerHTML = `
+                        <details open>
+                            <summary class="fw-bold" style="cursor: pointer;">
+                                <i class="bi bi-collection me-1"></i>
+                                ${groupName}
+                                <small class="text-muted" id="group-session-count-${groupId}">(1 sessions)</small>
+                            </summary>
+                            <div class="list-group list-group-flush mt-2" id="session-group-${groupId}">
+                            </div>
+                        </details>
+                    `;
+                    const selectAllDiv = document.getElementById('select-all-container');
+                    if (selectAllDiv) {
+                        selectAllDiv.after(groupEl);
+                    } else {
+                        sessionList.prepend(groupEl);
+                    }
+                    groupContainer = document.getElementById(`session-group-${groupId}`);
+                }
+                newSessionItem.classList.add("ps-4");
+                groupContainer.prepend(newSessionItem);
+                
+                // Update session count
+                const countEl = document.getElementById(`group-session-count-${groupId}`);
+                if (countEl) {
+                    const currentCount = groupContainer.children.length;
+                    countEl.textContent = `(${currentCount} sessions)`;
+                }
+
+            } else {
                 const selectAllDiv = document.getElementById('select-all-container');
                 if (selectAllDiv) {
-                    selectAllDiv.after(groupEl);
+                    selectAllDiv.after(newSessionItem);
                 } else {
-                    sessionList.prepend(groupEl);
+                    sessionList.appendChild(newSessionItem);
                 }
-                groupContainer = document.getElementById(`session-group-${groupId}`);
             }
-            newSessionItem.classList.add("ps-4");
-            groupContainer.prepend(newSessionItem);
-            
-            // Update session count
-            const countEl = document.getElementById(`group-session-count-${groupId}`);
-            if (countEl) {
-                const currentCount = groupContainer.children.length;
-                countEl.textContent = `(${currentCount} sessions)`;
+        },
+
+        /**
+         * Update statistics UI for multi-turn benchmarks.
+         * @param {Array} results - Array of result objects.
+         * @param {string} groupName - Name of the group/run.
+         * @param {function} loadSessionCallback - Callback to load a session.
+         */
+        updateStatsUI: function(results, groupName, loadSessionCallback) {
+            const statsBody = document.getElementById('stats-details-tbody');
+            if (statsBody) {
+                statsBody.innerHTML = '';
+                results.forEach((res, idx) => {
+                    const tr = BenchmarkUtils.BenchmarkRenderer.renderMultiTurnResultRow(res, idx, loadSessionCallback);
+                    statsBody.appendChild(tr);
+                });
             }
 
-        } else {
-            const selectAllDiv = document.getElementById('select-all-container');
-            if (selectAllDiv) {
-                selectAllDiv.after(newSessionItem);
-            } else {
-                sessionList.appendChild(newSessionItem);
-            }
+            const total = results.length;
+            if (total === 0) return;
+
+            const correct = results.filter(r => r.correct === true).length;
+            const incorrect = results.filter(r => r.correct === false).length;
+            const error = results.filter(r => r.correct !== true && r.correct !== false).length;
+
+            const accuracy = (correct / total) * 100;
+
+            if(document.getElementById('stats-accuracy')) document.getElementById('stats-accuracy').textContent = `${accuracy.toFixed(2)}%`;
+            if(document.getElementById('stats-correct-count')) document.getElementById('stats-correct-count').textContent = correct;
+            if(document.getElementById('stats-incorrect-count')) document.getElementById('stats-incorrect-count').textContent = incorrect;
+            if(document.getElementById('stats-error-count')) document.getElementById('stats-error-count').textContent = error;
+
+            // Average trials
+            const totalTrials = results.reduce((sum, r) => sum + (r.trials || 0), 0);
+            const avgTrials = totalTrials / total;
+            if(document.getElementById('stats-avg-trials-all')) document.getElementById('stats-avg-trials-all').textContent = avgTrials.toFixed(2);
+
+            const successResults = results.filter(r => r.correct === true);
+            const successTrials = successResults.reduce((sum, r) => sum + (r.trials || 0), 0);
+            const avgSuccessTrials = successResults.length > 0 ? successTrials / successResults.length : 0;
+            if(document.getElementById('stats-avg-trials-success')) document.getElementById('stats-avg-trials-success').textContent = avgSuccessTrials.toFixed(2);
+
+            // First try success
+            const firstTrySuccess = results.filter(r => r.correct === true && r.trials === 1).length;
+            const firstTryRate = (firstTrySuccess / total) * 100;
+            if(document.getElementById('stats-first-try-success')) document.getElementById('stats-first-try-success').textContent = `${firstTryRate.toFixed(2)}%`;
+
+            // Give up rate (max retries reached and still incorrect)
+            // Assuming max retries is constant or we check if correct is false
+            const giveUp = results.filter(r => r.correct === false).length; // Simple approximation
+            const giveUpRate = (giveUp / total) * 100;
+            if(document.getElementById('stats-give-up-rate')) document.getElementById('stats-give-up-rate').textContent = `${giveUpRate.toFixed(2)}%`;
         }
-    }
+    },
 };

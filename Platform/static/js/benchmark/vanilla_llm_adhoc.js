@@ -28,22 +28,6 @@ document.addEventListener('DOMContentLoaded', function() {
          if (selectAllCheckbox) selectAllCheckbox.checked = false;
     }
 
-    // Observer to show/hide "Select All" based on list content
-    const savedRunsList = document.getElementById('saved-runs-list');
-    const selectAllContainer = document.getElementById('select-all-checkbox') ? document.getElementById('select-all-container') : null;
-    
-    if (savedRunsList && selectAllContainer) {
-        const observer = new MutationObserver((mutations) => {
-            if (savedRunsList.children.length > 0) {
-                selectAllContainer.style.display = 'block';
-            } else {
-                selectAllContainer.style.display = 'none';
-            }
-            toggleDeleteButton(); // Re-evaluate button state
-        });
-        observer.observe(savedRunsList, { childList: true });
-    }
-
     // --- Batch Delete Logic ---
     BenchmarkUtils.setupBatchSelection(
         'saved-runs-list',

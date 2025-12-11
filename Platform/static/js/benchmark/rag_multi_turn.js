@@ -3,6 +3,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const questions = JSON.parse(document.getElementById('questions-data').textContent);
     let activeSessionId = null;
     let sessionTrials = [];
+    let currentSession = null;
     let pipelineController = { aborted: false };
     let currentPipelineResults = [];
 
@@ -161,8 +162,7 @@ document.addEventListener('DOMContentLoaded', function() {
         fetch(`/benchmark/api/multi_turn/get_session/${sessionId}/`)
             .then(res => res.json())
             .then(data => {
-                sessionTrials = data.trials; // Keep sessionTrials updated locally for other functions
-                BenchmarkUtils.MultiTurnUtils.renderSession(data.session, data.trials, { sessionTrials: sessionTrials });
+                renderSession(data.session, data.trials);
                 BenchmarkUtils.renderRunConfiguration(data.session.settings_snapshot, ['llm_model', 'llm_base_url', 'max_retries', 'rag_settings', 'search_settings']);
                 sessionContainer.style.display = 'block';
                 noSessionSelected.style.display = 'none';
@@ -207,6 +207,78 @@ document.addEventListener('DOMContentLoaded', function() {
                     loadSession(sessionId);
                 }
             });
+    }
+
+    // --- Rendering ---
+    function renderSession(session, trials) {
+        sessionTrials = trials;
+        document.getElementById('session-header').textContent = `Session #${session.id}`;
+        document.getElementById('session-question').textContent = session.question;
+
+        const gtContainer = document.getElementById('session-ground-truths');
+        gtContainer.innerHTML = '';
+
+        const GROUNDTRUTH_DISPLAY_LIMIT = 3; 
+
+        if (session.ground_truths.length > GROUNDTRUTH_DISPLAY_LIMIT) {
+            const initialGroundTruths = session.ground_truths.slice(0, GROUNDTRUTH_DISPLAY_LIMIT);
+            initialGroundTruths.forEach(gt => {
+                const el = document.createElement('span');
+                el.className = 'badge bg-secondary me-1';
+                el.textContent = gt;
+                gtContainer.appendChild(el);
+            });
+
+            const showMoreBtn = document.createElement('button');
+            showMoreBtn.className = 'btn btn-link btn-sm p-0';
+            showMoreBtn.textContent = `Show ${session.ground_truths.length - GROUNDTRUTH_DISPLAY_LIMIT} more`;
+            showMoreBtn.setAttribute('type', 'button');
+            gtContainer.appendChild(showMoreBtn);
+
+            const fullGroundTruthsDiv = document.createElement('div');
+            fullGroundTruthsDiv.style.display = 'none'; // Initially hidden
+            session.ground_truths.slice(GROUNDTRUTH_DISPLAY_LIMIT).forEach(gt => {
+                const el = document.createElement('span');
+                el.className = 'badge bg-secondary me-1';
+                el.textContent = gt;
+                fullGroundTruthsDiv.appendChild(el);
+            });
+            gtContainer.appendChild(fullGroundTruthsDiv);
+
+            const showLessBtn = document.createElement('button');
+            showLessBtn.className = 'btn btn-link btn-sm p-0 ms-2';
+            showLessBtn.textContent = `Show less`;
+            showLessBtn.setAttribute('type', 'button');
+            showLessBtn.style.display = 'none'; // Initially hidden
+            gtContainer.appendChild(showLessBtn);
+
+
+            showMoreBtn.addEventListener('click', () => {
+                fullGroundTruthsDiv.style.display = 'block';
+                showMoreBtn.style.display = 'none';
+                showLessBtn.style.display = 'inline';
+            });
+
+            showLessBtn.addEventListener('click', () => {
+                fullGroundTruthsDiv.style.display = 'none';
+                showMoreBtn.style.display = 'inline';
+                showLessBtn.style.display = 'none';
+            });
+
+        } else {
+            session.ground_truths.forEach(gt => {
+                const el = document.createElement('span');
+                el.className = 'badge bg-secondary me-1';
+                el.textContent = gt;
+                gtContainer.appendChild(el);
+            });
+        }
+
+        const trialsContainer = document.getElementById('trials-container');
+        trialsContainer.innerHTML = '';
+        trials.forEach(trial => {
+            trialsContainer.appendChild(BenchmarkUtils.BenchmarkRenderer.renderTrial(trial, session.is_completed, trials.length, session.max_retries));
+        });
     }
 
 

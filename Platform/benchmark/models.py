@@ -148,7 +148,7 @@ class RAGMultiTurnTrial(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='processing')
     search_query = models.TextField(blank=True, null=True)
-    search_results = models.JSONField(default=list, blank=True)
+    search_results = models.JSONField(default=list, blank=True, null=True)
 
     class Meta:
         unique_together = ('session', 'trial_number')

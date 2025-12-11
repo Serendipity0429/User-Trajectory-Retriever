@@ -12,7 +12,7 @@ from .models import (
     MultiTurnSessionGroup, VanillaLLMMultiTurnSession, VanillaLLMMultiTurnTrial,
     RAGMultiTurnSession, RAGMultiTurnTrial
 )
-from .utils import print_debug, extract_final_answer
+from .utils import print_debug, extract_final_answer, count_questions_in_file
 
 
 HARD_QUESTIONS_PATH = os.path.join(os.path.dirname(__file__), '..', 'data', 'hard_questions_refined.jsonl')
@@ -81,21 +81,6 @@ Follow these rules for the final answer strictly:
     "rag_reformulation": "Based on the history, provide a better search query to find the correct answer. Output ONLY the query."
 }
 
-def count_questions_in_file(file_path):
-    """
-    Counts the number of non-empty lines in a given file.
-    Assumes each non-empty line represents a question.
-    """
-    count = 0
-    try:
-        with open(file_path, 'r') as f:
-            for line in f:
-                if line.strip():
-                    count += 1
-    except FileNotFoundError:
-        pass
-    return count
-
 class BasePipeline:
     def __init__(self, base_url, api_key, model, pipeline_id=None, dataset_id=None):
         self.client = openai.OpenAI(base_url=base_url, api_key=api_key)
@@ -144,6 +129,30 @@ class BasePipeline:
                         yield data
                     except json.JSONDecodeError:
                         continue
+
+    def get_llm_response(self, messages, temperature=0):
+        """
+        Sends messages to LLM and parses the response based on current settings.
+        Returns: (parsed_answer, full_response)
+        """
+        settings = LLMSettings.load()
+        try:
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                temperature=temperature,
+            )
+            full_response = response.choices[0].message.content
+        except Exception as e:
+            # Let the caller handle or wrap exceptions
+            raise e
+
+        if settings.allow_reasoning:
+            answer = extract_final_answer(full_response)
+        else:
+            answer = full_response
+            
+        return answer, full_response
     
     def run(self):
         yield json.dumps({'is_meta': True, 'type': 'info', 'message': 'Pipeline started'}) + "\n"
@@ -256,17 +265,7 @@ class VanillaLLMAdhocPipeline(BaseAdhocPipeline):
         else:
             prompt = PROMPTS["adhoc_answer"].format(question=question)
         
-        response = self.client.chat.completions.create(
-            model=self.model,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0,
-        )
-        full_response = response.choices[0].message.content
-        
-        if settings.allow_reasoning:
-            answer = extract_final_answer(full_response)
-        else:
-            answer = full_response
+        answer, full_response = self.get_llm_response([{"role": "user", "content": prompt}])
 
         rule_result = check_answer_rule(question, ground_truths, answer)
         llm_result = check_answer_llm(question, ground_truths, answer, client=self.client, model=self.model)
@@ -332,20 +331,11 @@ class RagAdhocPipeline(BaseAdhocPipeline):
         
         prompt = self.prompt_template.replace('{question}', question).replace('{search_results}', formatted_results)
         
-        response = self.client.chat.completions.create(
-            model=self.model,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0,
-        )
-        full_response = response.choices[0].message.content
-
+        answer, full_response = self.get_llm_response([{"role": "user", "content": prompt}])
+        
         # Adhoc RAG also needs to support reasoning parsing
         settings = LLMSettings.load()
         print_debug("RAG Adhoc Full Response:", full_response)
-        if settings.allow_reasoning:
-            answer = extract_final_answer(full_response)
-        else:
-            answer = full_response
         
         rule_result = check_answer_rule(question, ground_truths, answer)
         llm_result = check_answer_llm(question, ground_truths, answer, client=self.client, model=self.model)
@@ -479,12 +469,7 @@ class BaseMultiTurnPipeline(BasePipeline):
                     messages = self._construct_messages(session, trial)
                     
                     try:
-                        response = self.client.chat.completions.create(
-                            model=self.model,
-                            messages=messages,
-                            temperature=0,
-                        )
-                        full_response = response.choices[0].message.content
+                        parsed_answer, full_response = self.get_llm_response(messages)
                     except Exception as e:
                         trial.status = 'error'
                         trial.save()
@@ -492,13 +477,7 @@ class BaseMultiTurnPipeline(BasePipeline):
                     
                     # Check if reasoning is enabled (using snapshot or current settings)
                     # Ideally we check settings snapshot from group, but for now we can check LLMSettings
-                    allow_reasoning = LLMSettings.load().allow_reasoning
                     
-                    if allow_reasoning:
-                        parsed_answer = extract_final_answer(full_response)
-                    else:
-                        parsed_answer = full_response
-
                     is_correct = check_answer_llm(session.question, session.ground_truths, parsed_answer, client=self.client, model=self.model)
 
                     trial.answer = parsed_answer
@@ -554,22 +533,13 @@ class BaseMultiTurnPipeline(BasePipeline):
         messages = self._construct_messages(session, trial)
         
         try:
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=messages
-            )
-            full_response = response.choices[0].message.content
+            answer, full_response = self.get_llm_response(messages)
         except Exception as e:
             trial.status = 'error'
             trial.save()
             raise e
 
         # Logic for checking answer
-        settings = LLMSettings.load()
-        if settings.allow_reasoning:
-            answer = extract_final_answer(full_response)
-        else:
-            answer = full_response
             
         is_correct = check_answer_llm(session.question, session.ground_truths, answer, client=self.client, model=self.model)
 

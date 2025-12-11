@@ -704,7 +704,7 @@ class RagMultiTurnPipeline(BaseMultiTurnPipeline):
 
         settings = LLMSettings.load()
         if settings.allow_reasoning:
-            messages.append({"role": "user", "content": "Answer the question based on the context.\nFirst, explain your reasoning step-by-step.\nThen, on a new line, provide the final answer starting with 'Final Answer:'.\n\nFollow these rules for the final answer strictly:\n1. It must be an exact match to the correct answer.\n2. Do not include any punctuation.\n3. Do not include any extra words or sentences."})
+            messages.append({"role": "user", "content": "Answer the question based on the context. Reference the provided source (like [1]) to avoid hallucination.\nFirst, explain your reasoning step-by-step.\nThen, on a new line, provide the final answer starting with 'Final Answer:'.\n\nFollow these rules for the final answer strictly:\n1. It must be an exact match to the correct answer.\n2. Do not include any punctuation.\n3. Do not include any extra words or sentences."})
         else:
             messages.append({"role": "user", "content": "Answer the question based on the context. Return ONLY the exact answer."})
         

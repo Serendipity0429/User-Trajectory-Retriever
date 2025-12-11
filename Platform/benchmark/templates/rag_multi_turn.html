@@ -321,18 +321,6 @@
 {% endblock %}
 
 {% block benchmark_extra_js %}
-<script>
-    window.benchmarkUrls = {
-        ...window.benchmarkCommonUrls,
-        createSession: "{% url 'benchmark:create_session' %}",
-        getDefaultRagPrompt: "{% url 'benchmark:get_default_rag_prompt' %}",
-        saveRagSettings: "{% url 'benchmark:save_rag_settings' %}",
-        saveSearchSettings: "{% url 'benchmark:save_search_settings' %}",
-        createSessionGroup: "{% url 'benchmark:create_session_group' %}",
-        stopRagMultiTurnPipeline: "{% url 'benchmark:stop_rag_multi_turn_pipeline' %}",
-        runPipeline: "{% url 'benchmark:run_rag_multi_turn_pipeline' %}",
-    };
-</script>
 <script src="{% static 'js/benchmark/rag_multi_turn.js' %}"></script>
 
 {% endblock %}

@@ -2,17 +2,18 @@ document.addEventListener('DOMContentLoaded', function() {
     BenchmarkUtils.MultiTurnPage.init({
         pipelineType: 'vanilla_llm_multi_turn',
         urls: {
-            batchDeleteSessions: '/benchmark/api/multi_turn/batch_delete_sessions/',
-            deleteSessionGroup: (id) => `/benchmark/api/multi_turn/delete_session_group/${id}/`,
-            createSession: window.benchmarkUrls.createSession,
-            getSession: (id) => `/benchmark/api/multi_turn/get_session/${id}/`,
-            runTrial: (id) => `/benchmark/api/multi_turn/run_trial/${id}/`,
-            retrySession: (id) => `/benchmark/api/multi_turn/retry_session/${id}/`,
-            deleteSession: (id) => `/benchmark/api/multi_turn/delete_session/${id}/`,
-            exportSession: (id) => `/benchmark/api/multi_turn/export_session/${id}/`,
-            loadRun: (id) => `/benchmark/api/multi_turn/load_run/${id}/`,
-            runPipeline: window.benchmarkUrls.runPipeline,
-            stopPipeline: window.benchmarkUrls.stopVanillaLlmMultiTurnPipeline,
+            ...BenchmarkUrls, // Include common urls
+            batchDeleteSessions: BenchmarkUrls.multiTurn.batchDeleteSessions,
+            deleteSessionGroup: BenchmarkUrls.multiTurn.deleteSessionGroup,
+            createSession: BenchmarkUrls.multiTurn.createSession,
+            getSession: BenchmarkUrls.multiTurn.getSession,
+            runTrial: BenchmarkUrls.multiTurn.runTrial,
+            retrySession: BenchmarkUrls.multiTurn.retrySession,
+            deleteSession: BenchmarkUrls.multiTurn.deleteSession,
+            exportSession: BenchmarkUrls.multiTurn.exportSession,
+            loadRun: BenchmarkUrls.vanillaLlmMultiTurn.loadRun,
+            runPipeline: BenchmarkUrls.vanillaLlmMultiTurn.runPipeline,
+            stopPipeline: BenchmarkUrls.vanillaLlmMultiTurn.stopPipeline,
         },
         csvPrefix: 'vanilla-multiturn'
     });

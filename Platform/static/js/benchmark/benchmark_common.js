@@ -1,3 +1,66 @@
+// Centralized URL configuration
+const API_PREFIX = '/benchmark/api';
+
+const BenchmarkUrls = {
+    // LLM & Settings
+    saveLlmSettings: `${API_PREFIX}/save_llm_settings/`,
+    getLlmEnvVars: `${API_PREFIX}/get_llm_env_vars/`,
+    testLlmConnection: `${API_PREFIX}/test_llm_connection/`,
+    
+    // RAG & Search Settings
+    saveRagSettings: `${API_PREFIX}/save_rag_settings/`,
+    saveSearchSettings: `${API_PREFIX}/save_search_settings/`,
+    getDefaultRagPrompt: `${API_PREFIX}/rag_adhoc/get_default_prompt/`,
+    webSearch: `${API_PREFIX}/web_search/`,
+
+    // Ad-hoc: Vanilla LLM
+    vanillaLlmAdhoc: {
+        listRuns: `${API_PREFIX}/vanilla_llm_adhoc/list_runs/`,
+        getRun: (id) => `${API_PREFIX}/vanilla_llm_adhoc/get_run/${id}/`,
+        deleteRun: (id) => `${API_PREFIX}/vanilla_llm_adhoc/delete_run/${id}/`,
+        batchDeleteRuns: `${API_PREFIX}/vanilla_llm_adhoc/batch_delete_runs/`,
+        runPipeline: `${API_PREFIX}/run_vanilla_llm_adhoc_pipeline/`,
+        stopPipeline: `${API_PREFIX}/stop_vanilla_llm_adhoc_pipeline/`
+    },
+
+    // Ad-hoc: RAG
+    ragAdhoc: {
+        listRuns: `${API_PREFIX}/rag_adhoc/list_runs/`,
+        getRun: (id) => `${API_PREFIX}/rag_adhoc/get_run/${id}/`,
+        deleteRun: (id) => `${API_PREFIX}/rag_adhoc/delete_run/${id}/`,
+        batchDeleteRuns: `${API_PREFIX}/rag_adhoc/batch_delete_runs/`,
+        runPipeline: `${API_PREFIX}/run_rag_adhoc_pipeline/`,
+        stopPipeline: `${API_PREFIX}/stop_rag_adhoc_pipeline/`
+    },
+
+    // Multi-turn Common
+    multiTurn: {
+        createSession: `${API_PREFIX}/multi_turn/create_session/`,
+        createSessionGroup: `${API_PREFIX}/multi_turn/create_session_group/`,
+        batchDeleteSessions: `${API_PREFIX}/multi_turn/batch_delete_sessions/`,
+        deleteSessionGroup: (id) => `${API_PREFIX}/multi_turn/delete_session_group/${id}/`,
+        getSession: (id) => `${API_PREFIX}/multi_turn/get_session/${id}/`,
+        runTrial: (id) => `${API_PREFIX}/multi_turn/run_trial/${id}/`,
+        retrySession: (id) => `${API_PREFIX}/multi_turn/retry_session/${id}/`,
+        deleteSession: (id) => `${API_PREFIX}/multi_turn/delete_session/${id}/`,
+        exportSession: (id) => `${API_PREFIX}/multi_turn/export_session/${id}/`,
+    },
+
+    // Multi-turn: Vanilla LLM
+    vanillaLlmMultiTurn: {
+        loadRun: (id) => `${API_PREFIX}/multi_turn/load_run/${id}/`,
+        runPipeline: `${API_PREFIX}/run_vanilla_llm_multi_turn_pipeline/`,
+        stopPipeline: `${API_PREFIX}/stop_vanilla_llm_multi_turn_pipeline/`
+    },
+
+    // Multi-turn: RAG
+    ragMultiTurn: {
+        loadRun: (id) => `${API_PREFIX}/multi_turn/load_rag_run/${id}/`,
+        runPipeline: `${API_PREFIX}/run_rag_multi_turn_pipeline/`,
+        stopPipeline: `${API_PREFIX}/stop_rag_multi_turn_pipeline/`
+    }
+};
+
 const BenchmarkUtils = {
     /**
      * Test the LLM connection.
@@ -27,18 +90,60 @@ const BenchmarkUtils = {
         .then(response => response.json().then(data => ({status: response.status, body: data})))
         .then(({status, body}) => {
             if (status === 200) {
-                resultDiv.innerHTML = `<div class="alert alert-success" role="alert">${body.message}</div>`;
+                resultDiv.innerHTML = `<div class="alert alert-success alert-dismissible fade show" role="alert" id="test-connection-result"><button type="button" class="btn-close" aria-label="Close"></button>${body.message}</div>`;
+                
+                // If models are returned, enable datalist for the input
+                if (body.models && Array.isArray(body.models) && body.models.length > 0) {
+                    let modelInput = document.getElementById('llm_model');
+                    if (modelInput) {
+                        // If it was previously converted to select (by old logic), revert to input
+                        if (modelInput.tagName === 'SELECT') {
+                            const input = document.createElement('input');
+                            input.type = 'text';
+                            input.id = modelInput.id;
+                            input.className = modelInput.className.replace('form-select', 'form-control');
+                            input.value = modelInput.value;
+                            modelInput.parentNode.replaceChild(input, modelInput);
+                            modelInput = input;
+                        }
+
+                        const datalistId = 'llm_model_datalist';
+                        let datalist = document.getElementById(datalistId);
+                        
+                        if (!datalist) {
+                            datalist = document.createElement('datalist');
+                            datalist.id = datalistId;
+                            modelInput.parentNode.appendChild(datalist);
+                            modelInput.setAttribute('list', datalistId);
+                        } else {
+                            datalist.innerHTML = '';
+                        }
+                        
+                        // Sort models
+                        body.models.sort();
+
+                        // Populate options
+                        body.models.forEach(modelName => {
+                            const option = document.createElement('option');
+                            option.value = modelName;
+                            datalist.appendChild(option);
+                        });
+                    }
+                }
             } else {
-                resultDiv.innerHTML = `<div class="alert alert-danger" role="alert">${body.message}</div>`;
+                resultDiv.innerHTML = `<div class="alert alert-danger" role="alert alert-dismissible fade show" role="alert" id="test-connection-result"><button type="button" class="btn-close" aria-label="Close"></button>${body.error || 'An error occurred while testing the connection.'}</div>`;
             }
         })
         .catch(error => {
-            resultDiv.innerHTML = `<div class="alert alert-danger" role="alert">A network error occurred.</div>`;
+            resultDiv.innerHTML = `<div class="alert alert-danger" role="alert alert-dismissible fade show" role="alert" id="test-connection-result"><button type="button" class="btn-close" aria-label="Close">A network error occurred.</div>`;
             console.error('Error:', error);
         })
         .finally(() => {
             btn.disabled = false;
             btn.innerHTML = originalText;
+            document.getElementById('test-connection-result').addEventListener('click', function(e) {
+                resultDiv.innerHTML = '';
+            }); 
         });
     },
 
@@ -194,26 +299,40 @@ const BenchmarkUtils = {
      */
     setupConfigurationActionHandlers: function(urls, csrfToken, includeRag = false, includeSearch = false) {
         // LLM Settings
+        const testConnection = function() {
+            const data = {
+                llm_base_url: document.getElementById('llm_base_url').value,
+                llm_api_key: document.getElementById('llm_api_key').value,
+                llm_model: document.getElementById('llm_model').value
+            };
+            BenchmarkUtils.testConnection(urls.testLlmConnection, csrfToken, data, 'test-connection-result', 'test-connection-btn');
+        };
+
         if (document.getElementById('test-connection-btn')) {
-            document.getElementById('test-connection-btn').addEventListener('click', function() {
-                const data = {
-                    llm_base_url: document.getElementById('llm_base_url').value,
-                    llm_api_key: document.getElementById('llm_api_key').value,
-                    llm_model: document.getElementById('llm_model').value
-                };
-                BenchmarkUtils.testConnection(urls.testLlmConnection, csrfToken, data, 'test-connection-result', 'test-connection-btn');
-            });
+            document.getElementById('test-connection-btn').addEventListener('click', testConnection);
         }
+        
+        // Trigger on page load
+        testConnection(); 
+
+        let lastSavedBaseUrl = document.getElementById('llm_base_url') ? document.getElementById('llm_base_url').value : '';
 
         if (document.getElementById('save-llm-settings-btn')) {
             document.getElementById('save-llm-settings-btn').addEventListener('click', function() {
+                const currentBaseUrl = document.getElementById('llm_base_url').value;
                 const data = {
-                    llm_base_url: document.getElementById('llm_base_url').value,
+                    llm_base_url: currentBaseUrl,
                     llm_api_key: document.getElementById('llm_api_key').value,
                     llm_model: document.getElementById('llm_model').value,
                     max_retries: document.getElementById('max_retries') ? document.getElementById('max_retries').value : 3
                 };
                 BenchmarkUtils.saveSettings(urls.saveLlmSettings, csrfToken, data, 'save-llm-settings-btn');
+                
+                // Test connection if base URL changed
+                if (currentBaseUrl !== lastSavedBaseUrl) {
+                    testConnection();
+                    lastSavedBaseUrl = currentBaseUrl;
+                }
             });
         }
 
@@ -223,6 +342,12 @@ const BenchmarkUtils = {
                     if (data.llm_base_url) document.getElementById('llm_base_url').value = data.llm_base_url;
                     if (data.llm_api_key) document.getElementById('llm_api_key').value = data.llm_api_key;
                     if (data.llm_model) document.getElementById('llm_model').value = data.llm_model;
+                    
+                    // Update lastSavedBaseUrl and test connection
+                    if (document.getElementById('llm_base_url')) {
+                        lastSavedBaseUrl = document.getElementById('llm_base_url').value;
+                        testConnection();
+                    }
                 });
             });
         }

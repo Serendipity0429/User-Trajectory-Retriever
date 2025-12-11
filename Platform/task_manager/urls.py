@@ -13,10 +13,6 @@ urlpatterns = [
     path("get_task_info/", views.get_task_info, name="get_task_info"),
     path("initialize/", views.initialize, name="initialize"),
     path(
-        "show_tool_use_page/", views.show_tool_use_page, name="show_tool_use_page"
-    ),  # Show tool use page
-    path("tool_use/", views.tool_use, name="tool_use"),  # Tool use
-    path(
         "stop_annotation/", views.stop_annotation_api, name="stop_annotation"
     ),  # Stop annotation API
     path("auth_redirect/", views.auth_redirect, name="auth_redirect"),  # Auth redirect

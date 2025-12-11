@@ -341,7 +341,7 @@ def check_answer_rule(question, authentic_answers, user_answer):
     return False
 
 
-def check_answer_llm(question, authentic_answers, user_answer, client = None, model=None):
+def check_answer_llm(question, authentic_answers, user_answer, client = None, model=None, max_retries=3):
     """
     Checks if the user's answer is correct using an LLM-as-a-judge.
     """
@@ -365,7 +365,7 @@ def check_answer_llm(question, authentic_answers, user_answer, client = None, mo
 2.  **Tolerances:** Your comparison must be case-insensitive. You should ignore minor differences in punctuation (e.g., commas, periods) and whitespace. For example, "New York NY" should be considered a match for "New York, NY".
 3.  **Completeness:** The user's answer must not be missing essential information. For example, if an authentic answer is "Michael Jordan", "Jordan" would be considered incorrect because it is incomplete.
 4.  **Strict Adherence:** Base your judgment *only* on the provided text. Do not use external knowledge.
-5.  **Output Format:** Your response must be a single word: `yes` or `no`.
+5.  **Output Format:** Your response must be a single word: `yes` or `no`. Do not provide any explanation or markdown formatting.
 
 **Evaluation Task:**
 
@@ -378,14 +378,25 @@ def check_answer_llm(question, authentic_answers, user_answer, client = None, mo
 
 Is the user's answer correct?"""
 
-    completion = client.chat.completions.create(
-        model=model, messages=[{"role": "user", "content": prompt}], temperature=0
-    )
+    try_count = 0
+    while try_count < max_retries:
+        try_count += 1
+        completion = client.chat.completions.create(
+            model=model, messages=[{"role": "user", "content": prompt}], temperature=0
+        )
 
-    judgment = completion.choices[0].message.content.strip().lower()
-    print_debug(f"LLM response: {judgment}")
+        judgment = completion.choices[0].message.content.strip().lower()
+        print_debug(f"LLM response: {judgment}")
 
-    return judgment == "yes"
+        # Remove markdown and punctuation for a cleaner check
+        cleaned_judgment = re.sub(r"[^a-z]", "", judgment)
+
+        if cleaned_judgment == "yes":
+            return True
+        if cleaned_judgment == "no":
+            return False
+    
+    raise ValueError("LLM did not return a valid judgment after multiple attempts.")
 
 
 def check_answer(entry, user_answer, llm=True):

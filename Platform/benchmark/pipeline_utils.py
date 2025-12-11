@@ -12,7 +12,7 @@ from .models import (
     MultiTurnSessionGroup, VanillaLLMMultiTurnSession, VanillaLLMMultiTurnTrial,
     RAGMultiTurnSession, RAGMultiTurnTrial
 )
-from .utils import print_debug
+from .utils import print_debug, extract_final_answer
 
 
 HARD_QUESTIONS_PATH = os.path.join(os.path.dirname(__file__), '..', 'data', 'hard_questions_refined.jsonl')
@@ -264,10 +264,7 @@ class VanillaLLMAdhocPipeline(BaseAdhocPipeline):
         full_response = response.choices[0].message.content
         
         if settings.allow_reasoning:
-            if "Final Answer:" in full_response:
-                answer = full_response.split("Final Answer:")[-1].strip()
-            else:
-                answer = full_response.strip().split('\n')[-1].strip()
+            answer = extract_final_answer(full_response)
         else:
             answer = full_response
 
@@ -345,10 +342,7 @@ class RagAdhocPipeline(BaseAdhocPipeline):
         # Adhoc RAG also needs to support reasoning parsing
         settings = LLMSettings.load()
         if settings.allow_reasoning:
-             if "Final Answer:" in full_response:
-                answer = full_response.split("Final Answer:")[-1].strip()
-             else:
-                answer = full_response.strip().split('\n')[-1].strip()
+             answer = extract_final_answer(full_response)
         else:
              answer = full_response
         
@@ -500,10 +494,7 @@ class BaseMultiTurnPipeline(BasePipeline):
                     allow_reasoning = LLMSettings.load().allow_reasoning
                     
                     if allow_reasoning:
-                        if "Final Answer:" in full_response:
-                            parsed_answer = full_response.split("Final Answer:")[-1].strip()
-                        else:
-                            parsed_answer = full_response.strip().split('\n')[-1].strip()
+                        parsed_answer = extract_final_answer(full_response)
                     else:
                         parsed_answer = full_response
 

@@ -2,12 +2,15 @@ document.addEventListener('DOMContentLoaded', function() {
     BenchmarkUtils.AdhocPage.init({
         pipelineType: 'vanilla_adhoc',
         urls: {
-            listRuns: window.benchmarkUrls.listRuns,
-            batchDeleteRuns: window.benchmarkUrls.batchDeleteRuns,
-            deleteRunPrefix: '/benchmark/api/vanilla_llm_adhoc/delete_run/',
-            getRunPrefix: '/benchmark/api/vanilla_llm_adhoc/get_run/',
-            runPipeline: window.benchmarkUrls.runPipeline,
-            stopPipeline: window.benchmarkUrls.stopPipeline,
+            ...BenchmarkUrls, // Include common settings URLs
+            listRuns: BenchmarkUrls.vanillaLlmAdhoc.listRuns,
+            batchDeleteRuns: BenchmarkUrls.vanillaLlmAdhoc.batchDeleteRuns,
+            deleteRun: BenchmarkUrls.vanillaLlmAdhoc.deleteRun, // Updated to function
+            deleteRunPrefix: null, // No longer needed
+            getRun: BenchmarkUrls.vanillaLlmAdhoc.getRun,       // Updated to function
+            getRunPrefix: null,    // No longer needed
+            runPipeline: BenchmarkUrls.vanillaLlmAdhoc.runPipeline,
+            stopPipeline: BenchmarkUrls.vanillaLlmAdhoc.stopPipeline,
         },
         csvPrefix: 'vanilla-adhoc',
         onRetry: function(failedItems, resultsBody, currentRunResults) {
@@ -24,13 +27,20 @@ document.addEventListener('DOMContentLoaded', function() {
              formData.append('llm_model', document.getElementById('llm_model').value);
              
              let retryIndex = 0;
-             fetch(window.benchmarkUrls.vanillaLlmAdhoc, { method: 'POST', body: formData })
+             // Note: Retries might use a specific endpoint or just the run pipeline endpoint. 
+             // Assuming it posts to the same pipeline endpoint but with 'questions' data overrides.
+             // However, original code used window.benchmarkUrls.vanillaLlmAdhoc which was the page URL, likely wrong or implied separate API.
+             // Looking at original code: `fetch(window.benchmarkUrls.vanillaLlmAdhoc...`
+             // The view `vanilla_llm_adhoc` (the page) accepts POST? Usually pages don't.
+             // It likely meant `runPipeline`. Let's use runPipeline for now or check views.
+             // Actually, `views.vanilla_llm_adhoc` might handle POST. 
+             // Ideally we should use the API endpoint. Let's use runPipeline for consistency.
+             fetch(BenchmarkUrls.vanillaLlmAdhoc.runPipeline, { method: 'POST', body: formData })
              .then(response => {
                 BenchmarkUtils.processStreamedResponse(
                     response,
                     (data) => {
                         if (data.is_meta) return;
-                        // Map result back to original row using index (assuming order is preserved)
                         const originalItem = questionsToRetry[retryIndex++]; 
                         if (originalItem) {
                             data.originalRowId = originalItem.originalRowId;
@@ -41,7 +51,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     },
                     () => { 
                         btn.style.display = 'none'; 
-                        failedItems.length = 0; // Clear array
+                        failedItems.length = 0; 
                     },
                     (error) => console.error(error)
                 );

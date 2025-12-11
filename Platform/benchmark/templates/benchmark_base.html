@@ -12,13 +12,7 @@
 {% block scripts %}
     <script src="{% static 'js/benchmark/benchmark_common.js' %}"></script>
     <script>
-        window.benchmarkCommonUrls = {
-            saveLlmSettings: "{% url 'benchmark:save_llm_settings' %}",
-            getLlmEnvVars: "{% url 'benchmark:get_llm_env_vars' %}",
-            testLlmConnection: "{% url 'benchmark:test_llm_connection' %}",
-            createSession: "{% url 'benchmark:create_session' %}",
-            createSessionGroup: "{% url 'benchmark:create_session_group' %}",
-        };
+        // BenchmarkGlobals removed - URLs are now managed in benchmark_common.js
     </script>
     {% block benchmark_extra_js %}{% endblock benchmark_extra_js %}
 {% endblock scripts %}

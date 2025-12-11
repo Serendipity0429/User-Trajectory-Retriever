@@ -22,6 +22,6 @@ NoUploadPlatform/benchmark/results/
 .gemini
 mcp
 tempCodes
-
-.gemini/
+.github
+.gemini
 gha-creds-*.json

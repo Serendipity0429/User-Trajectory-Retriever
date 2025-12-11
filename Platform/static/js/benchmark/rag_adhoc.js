@@ -2,12 +2,15 @@ document.addEventListener('DOMContentLoaded', function() {
     BenchmarkUtils.AdhocPage.init({
         pipelineType: 'rag_adhoc',
         urls: {
-            listRuns: window.benchmarkUrls.listRuns,
-            batchDeleteRuns: window.benchmarkUrls.batchDeleteRuns,
-            deleteRunPrefix: '/benchmark/api/rag_adhoc/delete_run/',
-            getRunPrefix: '/benchmark/api/rag_adhoc/get_run/',
-            runPipeline: window.benchmarkUrls.runPipeline,
-            stopPipeline: window.benchmarkUrls.stopPipeline,
+            ...BenchmarkUrls, // Include common settings
+            listRuns: BenchmarkUrls.ragAdhoc.listRuns,
+            batchDeleteRuns: BenchmarkUrls.ragAdhoc.batchDeleteRuns,
+            deleteRun: BenchmarkUrls.ragAdhoc.deleteRun,
+            deleteRunPrefix: null,
+            getRun: BenchmarkUrls.ragAdhoc.getRun,
+            getRunPrefix: null,
+            runPipeline: BenchmarkUrls.ragAdhoc.runPipeline,
+            stopPipeline: BenchmarkUrls.ragAdhoc.stopPipeline,
         },
         csvPrefix: 'rag-adhoc',
         buildFormData: function(formData) {
@@ -40,7 +43,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 
-            fetch(window.benchmarkUrls.webSearch, {
+            fetch(BenchmarkUrls.webSearch, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

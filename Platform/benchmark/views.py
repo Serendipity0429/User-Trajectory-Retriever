@@ -423,11 +423,14 @@ def test_llm_connection(request):
 
         # Test the connection by listing models
         models = client.models.list()
+        
+        model_list = [model.id for model in models.data]
 
         return JsonResponse(
             {
                 "status": "ok",
-                "message": f"Connection successful! Found {len(models.data)} models: {', '.join([model.id for model in models.data])}",
+                "message": f"Connection successful! Found {len(models.data)} models.",
+                "models": model_list
             }
         )
     except openai.APIConnectionError as e:

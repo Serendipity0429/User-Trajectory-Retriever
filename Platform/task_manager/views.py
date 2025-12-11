@@ -955,37 +955,6 @@ def show_task(request, task_id):
 
 
 @permission_classes([IsAuthenticated])
-def show_tool_use_page(request):
-    user = request.user
-    return render(
-        request,
-        "show_tool_use_page.html",
-        {
-            "cur_user": user,
-        },
-    )
-
-
-@permission_classes([IsAuthenticated])
-def tool_use(request):
-    if request.method == "POST":
-        tool = request.POST["tool"]
-
-        for_url = ""
-
-        if tool == "math":
-            for_url = "https://www.wolframalpha.com/"
-
-        elif tool == "graph":
-            for_url = "https://www.geogebra.org/classic"
-
-        elif tool == "code":
-            for_url = "https://www.jdoodle.com/start-coding"
-
-        return HttpResponseRedirect(for_url)
-
-
-@permission_classes([IsAuthenticated])
 @wait_until_data_stored
 def cancel_annotation(request, task_id):
     print_debug("function cancel_annotation")

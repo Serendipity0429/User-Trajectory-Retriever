@@ -304,14 +304,5 @@
     </div>
 {% endblock %}
 {% block benchmark_extra_js %}
-<script>
-    window.benchmarkUrls = {
-        ...window.benchmarkCommonUrls,
-        createSession: "{% url 'benchmark:create_session' %}",
-        createSessionGroup: "{% url 'benchmark:create_session_group' %}",
-        stopVanillaLlmMultiTurnPipeline: "{% url 'benchmark:stop_vanilla_llm_multi_turn_pipeline' %}",
-        runPipeline: "{% url 'benchmark:run_vanilla_llm_multi_turn_pipeline' %}",
-    };
-</script>
 <script src="{% static 'js/benchmark/vanilla_llm_multi_turn.js' %}"></script>
 {% endblock benchmark_extra_js %}

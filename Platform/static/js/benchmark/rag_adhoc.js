@@ -85,7 +85,104 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // --- Save/Load/Delete Run Functions ---
     function loadSavedRuns() {
-        BenchmarkUtils.loadSavedRuns(window.benchmarkUrls.listRuns, loadRun, deleteRun);
+        BenchmarkUtils.loadSavedRuns(
+            window.benchmarkUrls.listRuns, 
+            loadRun, 
+            deleteRun, 
+            'saved-runs-list', 
+            'no-runs-message', 
+            true, // enableSelection
+            toggleDeleteButton // onSelectionChange
+        );
+        // Reset select all checkbox and hide container initially (will be shown if runs exist)
+        const selectAllContainer = document.getElementById('select-all-container');
+        const selectAllCheckbox = document.getElementById('select-all-checkbox');
+        if (selectAllCheckbox) selectAllCheckbox.checked = false;
+        
+        // We need to wait for the fetch in loadSavedRuns to complete to show/hide the container.
+        // Since loadSavedRuns is async but doesn't return a promise we can wait on, 
+        // we can check existence of items after a short delay or modify loadSavedRuns to return promise.
+        // For now, let's use a MutationObserver on the list.
+    }
+
+    // Observer to show/hide "Select All" based on list content
+    const savedRunsList = document.getElementById('saved-runs-list');
+    const selectAllContainer = document.getElementById('select-all-container');
+    const observer = new MutationObserver((mutations) => {
+        if (savedRunsList.children.length > 0) {
+            selectAllContainer.style.display = 'block';
+        } else {
+            selectAllContainer.style.display = 'none';
+        }
+        toggleDeleteButton(); // Re-evaluate button state
+    });
+    observer.observe(savedRunsList, { childList: true });
+
+    // --- Batch Delete Logic ---
+    const deleteSelectedBtn = document.getElementById('delete-selected-btn');
+    const selectAllCheckbox = document.getElementById('select-all-checkbox');
+
+    function getRunCheckboxes() {
+        return document.querySelectorAll('.run-checkbox');
+    }
+
+    function toggleDeleteButton() {
+        const checkboxes = getRunCheckboxes();
+        const anyChecked = Array.from(checkboxes).some(cb => cb.checked);
+        deleteSelectedBtn.style.display = anyChecked ? 'inline-block' : 'none';
+        
+        // Update Select All state
+        if (checkboxes.length > 0) {
+            const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+            selectAllCheckbox.checked = allChecked;
+        } else {
+            selectAllCheckbox.checked = false;
+        }
+    }
+
+    if (selectAllCheckbox) {
+        selectAllCheckbox.addEventListener('change', function(e) {
+            const isChecked = e.target.checked;
+            getRunCheckboxes().forEach(cb => cb.checked = isChecked);
+            toggleDeleteButton();
+        });
+    }
+
+    if (deleteSelectedBtn) {
+        deleteSelectedBtn.addEventListener('click', function() {
+            const selectedRunIds = Array.from(getRunCheckboxes())
+                .filter(cb => cb.checked)
+                .map(cb => cb.dataset.runId);
+
+            if (selectedRunIds.length === 0) return;
+
+            if (!confirm(`Are you sure you want to delete ${selectedRunIds.length} run(s)?`)) {
+                return;
+            }
+
+            fetch(window.benchmarkUrls.batchDeleteRuns, {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json', 
+                    'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content') 
+                },
+                body: JSON.stringify({ run_ids: selectedRunIds })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === 'ok') {
+                    loadSavedRuns();
+                    // clear current results if deleted
+                    // Optional: check if current displayed run is among deleted
+                } else {
+                    alert('Error deleting runs: ' + data.message);
+                }
+            })
+            .catch(err => {
+                console.error('Error:', err);
+                alert('An error occurred during deletion.');
+            });
+        });
     }
     
         function loadRun(runId) {

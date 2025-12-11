@@ -6,5 +6,5 @@ document.addEventListener('DOMContentLoaded', function() {
     const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 
     // Use centralized configuration handlers for LLM, RAG, and Search
-    BenchmarkUtils.setupConfigurationActionHandlers(window.benchmarkUrls, csrfToken, true, true);
+    BenchmarkUtils.setupConfigurationActionHandlers(csrfToken, true, true);
 });

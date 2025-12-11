@@ -1,20 +1,6 @@
 document.addEventListener('DOMContentLoaded', function() {
     BenchmarkUtils.MultiTurnPage.init({
         pipelineType: 'rag_multi_turn',
-        urls: {
-            ...BenchmarkUrls, // Include common urls
-            batchDeleteSessions: BenchmarkUrls.multiTurn.batchDeleteSessions,
-            deleteSessionGroup: BenchmarkUrls.multiTurn.deleteSessionGroup,
-            createSession: BenchmarkUrls.multiTurn.createSession,
-            getSession: BenchmarkUrls.multiTurn.getSession,
-            runTrial: BenchmarkUrls.multiTurn.runTrial,
-            retrySession: BenchmarkUrls.multiTurn.retrySession,
-            deleteSession: BenchmarkUrls.multiTurn.deleteSession,
-            exportSession: BenchmarkUrls.multiTurn.exportSession,
-            loadRun: BenchmarkUrls.ragMultiTurn.loadRun,
-            runPipeline: BenchmarkUrls.ragMultiTurn.runPipeline,
-            stopPipeline: BenchmarkUrls.ragMultiTurn.stopPipeline,
-        },
         csvPrefix: 'rag-multiturn',
         buildFormData: function(formData) {
              const pipelineTypeInput = document.getElementById('pipeline-mode-pipeline');

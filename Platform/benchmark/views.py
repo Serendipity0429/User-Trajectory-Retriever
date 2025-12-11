@@ -16,6 +16,7 @@ from user_system.utils import print_debug
 import httpx
 from task_manager.utils import check_answer_rule, check_answer_llm, redis_client
 from .search_utils import get_search_engine
+from .utils import count_questions_in_file
 from .models import (
     LLMSettings,
     RagSettings,
@@ -390,6 +391,7 @@ def save_llm_settings(request):
         settings_obj.llm_model = data.get("llm_model", "")
         settings_obj.llm_api_key = data.get("llm_api_key", "")
         settings_obj.max_retries = data.get("max_retries", 3)
+        settings_obj.allow_reasoning = data.get("allow_reasoning", False)
         settings_obj.save()
         return JsonResponse({"status": "ok"})
     except OperationalError:
@@ -1453,20 +1455,12 @@ def list_vanilla_llm_adhoc_runs(request):
 def get_vanilla_llm_adhoc_run(request, run_id):
     try:
         run = get_object_or_404(VanillaLLMAdhocRun, pk=run_id)
-        results = list(
-            run.results.values(
-                "question",
-                "answer",
-                "ground_truths",
-                "is_correct_rule",
-                "is_correct_llm",
-            )
-        )
-
-        # Prefer snapshot settings, fallback to empty dict
+        results = list(run.results.values("question", "answer", "full_response", "ground_truths", "is_correct_rule", "is_correct_llm"))
+        
         settings_data = {}
-        if run.settings_snapshot and "llm_settings" in run.settings_snapshot:
-            settings_data = run.settings_snapshot["llm_settings"]
+        if run.settings_snapshot:
+            settings_data = run.settings_snapshot
+            
         run_data = {
             "id": run.id,
             "name": run.name,

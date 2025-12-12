@@ -78,6 +78,20 @@ class BasePipeline:
                     except json.JSONDecodeError:
                         continue
 
+    def get_total_questions(self):
+        try:
+            file_path = self.get_questions_file_path()
+            if self.dataset_id:
+                try:
+                    dataset = BenchmarkDataset.objects.get(pk=self.dataset_id)
+                    if dataset.question_count > 0:
+                        return dataset.question_count
+                except BenchmarkDataset.DoesNotExist:
+                    pass
+            return count_questions_in_file(file_path)
+        except Exception:
+            return 0
+
     def get_llm_response(self, messages, temperature=0):
         """
         Sends messages to LLM and parses the response based on current settings.
@@ -94,7 +108,7 @@ class BasePipeline:
             # Let the caller handle or wrap exceptions
             raise e
 
-        if self.llm_settings.allow_reasoning and 'rag' in self.redis_prefix:
+        if self.llm_settings.allow_reasoning:
             answer = extract_final_answer(full_response)
         else:
             answer = full_response
@@ -127,16 +141,7 @@ class BaseAdhocPipeline(BasePipeline):
         questions_iterator = None
         
         try:
-            file_path = self.get_questions_file_path()
-            if self.dataset_id: # A specific dataset was requested
-                dataset = BenchmarkDataset.objects.get(pk=self.dataset_id) # Already checked existence in get_questions_file_path
-                if dataset.question_count > 0:
-                    total_questions = dataset.question_count
-                else:
-                    total_questions = count_questions_in_file(file_path)
-            else: # Using HARD_QUESTIONS_PATH (default)
-                total_questions = count_questions_in_file(file_path)
-            
+            total_questions = self.get_total_questions()
             questions_iterator = self.load_questions() # This now uses the file_path logic from get_questions_file_path
         except (ValueError, FileNotFoundError, BenchmarkDataset.DoesNotExist) as e:
             yield {'error': str(e)}
@@ -332,7 +337,7 @@ class BaseMultiTurnPipeline(BasePipeline):
     def create_trial(self, session, trial_number):
         raise NotImplementedError("Subclasses must implement create_trial")
     
-    def _construct_messages(self, session, trial):
+    def _construct_messages(self, session, trial, completed_trials):
         raise NotImplementedError("Subclasses must implement _construct_messages")
 
     def _process_single_session(self, group, question_text, ground_truths):
@@ -356,6 +361,7 @@ class BaseMultiTurnPipeline(BasePipeline):
             trial_number = 1
             final_is_correct = False
             final_answer = ""
+            completed_trials = []
             
             while trial_number <= self.max_retries and not is_session_completed:
                 if not self.check_active():
@@ -371,7 +377,7 @@ class BaseMultiTurnPipeline(BasePipeline):
                     'group_id': group.id
                 }
 
-                messages = self._construct_messages(session, trial)
+                messages = self._construct_messages(session, trial, completed_trials)
                 
                 try:
                     parsed_answer, full_response = self.get_llm_response(messages)
@@ -380,7 +386,12 @@ class BaseMultiTurnPipeline(BasePipeline):
                     trial.save()
                     raise e
                 
-                is_correct = check_answer_llm(session.question, session.ground_truths, parsed_answer, client=self.client, model=self.model)
+                try:
+                    is_correct = check_answer_llm(session.question, session.ground_truths, parsed_answer, client=self.client, model=self.model)
+                except Exception as e:
+                    print_debug(f"Judge failed: {e}")
+                    is_correct = None
+
 
                 trial.answer = parsed_answer
                 trial.full_response = full_response
@@ -388,6 +399,8 @@ class BaseMultiTurnPipeline(BasePipeline):
                 trial.feedback = "Correct" if is_correct else "Incorrect"
                 trial.status = 'completed'
                 trial.save()
+                
+                completed_trials.append(trial)
 
                 yield {
                     'is_meta': True,
@@ -437,16 +450,7 @@ class BaseMultiTurnPipeline(BasePipeline):
         questions_iterator = None
         
         try:
-            file_path = self.get_questions_file_path()
-            if self.dataset_id:
-                dataset = BenchmarkDataset.objects.get(pk=self.dataset_id)
-                if dataset.question_count > 0:
-                    total_questions = dataset.question_count
-                else:
-                    total_questions = count_questions_in_file(file_path)
-            else:
-                total_questions = count_questions_in_file(file_path)
-            
+            total_questions = self.get_total_questions()
             questions_iterator = self.load_questions()
         except (ValueError, FileNotFoundError, BenchmarkDataset.DoesNotExist) as e:
             yield {'error': str(e)}
@@ -470,7 +474,12 @@ class BaseMultiTurnPipeline(BasePipeline):
         """
         Executes a single turn for a given session and trial object.
         """
-        messages = self._construct_messages(session, trial)
+        completed_trials = list(session.trials.filter(
+            trial_number__lt=trial.trial_number, 
+            status='completed'
+        ).order_by('trial_number'))
+        
+        messages = self._construct_messages(session, trial, completed_trials)
         
         try:
             answer, full_response = self.get_llm_response(messages)
@@ -527,29 +536,29 @@ class VanillaLLMMultiTurnPipeline(BaseMultiTurnPipeline):
             status='processing'
         )
 
-    def _construct_messages(self, session, trial):
-        trial_number = trial.trial_number
+    def _construct_messages(self, session, trial, completed_trials):
         messages = []
         
         # session.run is the MultiTurnRun object
         settings_snapshot = session.run.settings_snapshot
         allow_reasoning = settings_snapshot.get('llm_settings', {}).get('allow_reasoning', False)
 
-        if trial_number == 1:
-            if allow_reasoning:
-                answer_prompt = PROMPTS["multi_turn_reasoning_initial"].format(question=session.question)
-            else:
-                answer_prompt = PROMPTS["multi_turn_initial"].format(question=session.question)
-            messages.append({"role": "user", "content": answer_prompt})
+        # 1. Initial Prompt
+        if allow_reasoning:
+            initial_prompt = PROMPTS["multi_turn_reasoning_initial"].format(question=session.question)
         else:
-            messages.append({"role": "user", "content": f"Question: {session.question}"})
-            prev_trials = session.trials.filter(trial_number__lt=trial_number).order_by('trial_number')
-            for prev_trial in prev_trials:
-                if prev_trial.answer:
-                    messages.append({"role": "assistant", "content": prev_trial.answer})
-                if prev_trial.is_correct == False:
-                    messages.append({"role": "user", "content": "Your previous answer was incorrect."})
-            
+            initial_prompt = PROMPTS["multi_turn_initial"].format(question=session.question)
+        
+        messages.append({"role": "user", "content": initial_prompt})
+
+        # 2. History
+        for past_trial in completed_trials:
+            if past_trial.answer:
+                messages.append({"role": "assistant", "content": past_trial.answer})
+            messages.append({"role": "user", "content": "Your previous answer was incorrect."})
+
+        # 3. Follow-up instructions (only if we have history)
+        if completed_trials:
             if allow_reasoning:
                 messages.append({"role": "user", "content": PROMPTS["multi_turn_reasoning_followup"]})
             else:
@@ -604,8 +613,7 @@ class RagMultiTurnPipeline(BaseMultiTurnPipeline):
             status='processing'
         )
 
-    def _construct_messages(self, session, trial):
-        trial_number = trial.trial_number
+    def _construct_messages(self, session, trial, completed_trials):
         messages = []
         current_search_query = session.question
         search_results = None
@@ -613,24 +621,33 @@ class RagMultiTurnPipeline(BaseMultiTurnPipeline):
         settings_snapshot = session.run.settings_snapshot
         allow_reasoning = settings_snapshot.get('llm_settings', {}).get('allow_reasoning', False)
 
+        first_trial = completed_trials[0] if completed_trials else None
+        last_trial = completed_trials[-1] if completed_trials else None
+
         # Optimization: Reuse search results from the first trial if no reformulation is used
-        if self.reformulation_strategy == 'no_reform' and trial_number > 1:
-            first_trial = session.trials.filter(trial_number=1).first()
+        if self.reformulation_strategy == 'no_reform' and trial.trial_number > 1:
             if first_trial:
                 search_results = first_trial.search_results
                 current_search_query = first_trial.search_query
 
+        # Check if trial already has search results (e.g. from history reconstruction or manual run)
+        if search_results is None and trial.search_results:
+            search_results = trial.search_results
+            current_search_query = trial.search_query
+
         if search_results is None:
-            if self.reformulation_strategy == 'reform' and trial_number > 1:
-                reform_messages = [{"role": "system", "content": "You are a helpful assistant that reformulates search queries based on conversation history."}]
-                reform_messages.append({"role": "user", "content": f"Original Question: {session.question}"})
+            if self.reformulation_strategy == 'reform' and trial.trial_number > 1:
+                reform_messages = [
+                    {"role": "system", "content": "You are a helpful assistant that reformulates search queries based on conversation history."},
+                    {"role": "user", "content": f"Original Question: {session.question}"}
+                ]
                 
-                prev_trials = session.trials.filter(trial_number__lt=trial_number).order_by('trial_number')
-                for prev_trial in prev_trials:
-                    if prev_trial.answer:
-                        reform_messages.append({"role": "assistant", "content": f"Previous Answer: {prev_trial.answer}"})
+                # Reconstruct history from previous_messages and last_trial
+                for past_trial in completed_trials:
+                    if past_trial.answer:
+                         reform_messages.append({"role": "assistant", "content": f"Previous Answer: {past_trial.answer}"})
                     reform_messages.append({"role": "user", "content": "The previous answer was incorrect."})
-                
+
                 reform_messages.append({"role": "user", "content": PROMPTS["rag_reformulation"]})
                 
                 try:
@@ -655,14 +672,13 @@ class RagMultiTurnPipeline(BaseMultiTurnPipeline):
 
         system_prompt = PROMPTS["rag_system_context"].format(query=current_search_query, results=formatted_results)
         messages.append({"role": "system", "content": system_prompt})
+
         messages.append({"role": "user", "content": f"Question: {session.question}"})
-        
-        prev_trials = session.trials.filter(trial_number__lt=trial_number).order_by('trial_number')
-        for prev_trial in prev_trials:
-            if prev_trial.answer:
-                messages.append({"role": "assistant", "content": prev_trial.answer})
-            if prev_trial.is_correct == False:
-                messages.append({"role": "user", "content": "Your previous answer was incorrect."})
+
+        for past_trial in completed_trials:
+            if past_trial.answer:
+                messages.append({"role": "assistant", "content": past_trial.answer})
+            messages.append({"role": "user", "content": "Your previous answer was incorrect."})
 
         if allow_reasoning:
             messages.append({"role": "user", "content": "Answer the question based on the context. Reference the provided source (like [1]) to avoid hallucination.\nFirst, explain your reasoning step-by-step.\nThen, on a new line, provide the final answer starting with 'Final Answer:'.\n\nFollow these rules for the final answer strictly:\n1. It must be an exact match to the correct answer.\n2. Do not include any punctuation.\n3. Do not include any extra words or sentences."})

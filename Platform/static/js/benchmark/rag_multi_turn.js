@@ -3,7 +3,7 @@ document.addEventListener('DOMContentLoaded', function() {
         pipelineType: 'rag_multi_turn',
         csvPrefix: 'rag-multiturn',
         buildFormData: function(formData) {
-             const pipelineTypeInput = document.getElementById('pipeline-mode-pipeline');
+             const pipelineTypeInput = document.getElementById('rag_mode_select');
              if (pipelineTypeInput) {
                  const val = pipelineTypeInput.value;
                  let reformStrategy = 'no_reform';

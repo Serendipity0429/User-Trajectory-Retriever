@@ -48,8 +48,8 @@ Question: {question}
 1.  Your answer must be an exact match to the correct answer.
 2.  Do not include any punctuation.
 3.  Do not include any extra words or sentences.
-Answer:",
-    "multi_turn_reasoning_followup": "Your task is to answer the question again.
+Answer:""",
+    "multi_turn_reasoning_followup": """Your task is to answer the question again.
 First, explain your reasoning step-by-step.
 Then, on a new line, provide the final answer starting with 'Final Answer:'.
 

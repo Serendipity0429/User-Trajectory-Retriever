@@ -5,6 +5,13 @@
     <div id="collapseRagConfig" class="collapse">
         <div class="card-body">
             <div class="mb-3">
+                <label for="rag_mode_select" class="form-label">RAG Mode</label>
+                <select id="rag_mode_select" class="form-select">
+                    <option value="rag_multi_turn_no_reform" selected>No Query Reformulation</option>
+                    <option value="rag_multi_turn_reform">With Query Reformulation</option>
+                </select>
+            </div>
+            <div class="mb-3">
                 <label for="rag_prompt_template" class="form-label">Prompt Template</label>
                 <textarea class="form-control" id="rag_prompt_template" rows="10" style="font-family: monospace; font-size: 0.85rem;">{{ rag_settings.prompt_template|safe }}</textarea>
                 <div class="form-text">Use <code>{question}</code> and <code>{search_results}</code> as placeholders.</div>

@@ -1,0 +1,245 @@
+<style>
+    /* Custom Scrollbar for Modal Content */
+    .modal-body::-webkit-scrollbar, 
+    textarea::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+    }
+    .modal-body::-webkit-scrollbar-track, 
+    textarea::-webkit-scrollbar-track {
+        background: #f1f1f1; 
+        border-radius: 4px;
+    }
+    .modal-body::-webkit-scrollbar-thumb, 
+    textarea::-webkit-scrollbar-thumb {
+        background: #c1c1c1; 
+        border-radius: 4px;
+    }
+    .modal-body::-webkit-scrollbar-thumb:hover, 
+    textarea::-webkit-scrollbar-thumb:hover {
+        background: #a8a8a8; 
+    }
+
+    /* Custom style for form-range track inside modal */
+    .modal-body .form-range::-webkit-slider-runnable-track {
+        background: #d0d0d0; /* A slightly darker grey than bg-light */
+    }
+    .modal-body .form-range::-moz-range-track {
+        background: #d0d0d0; /* For Firefox */
+    }
+    .modal-body .form-range::-ms-track {
+        background: #d0d0d0; /* For Edge/IE */
+    }
+</style>
+
+<div class="modal fade" id="settingsModal" tabindex="-1" aria-labelledby="settingsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="settingsModalLabel"><i class="bi bi-sliders me-2"></i>Global Settings</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-0">
+                <div class="p-4 border-bottom bg-light">
+                    <ul class="nav nav-pills nav-fill" id="settingsTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="llm-tab" data-bs-toggle="tab" data-bs-target="#llm-settings" type="button" role="tab" aria-controls="llm-settings" aria-selected="true"><i class="bi bi-cpu me-2"></i>LLM Model</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="search-tab" data-bs-toggle="tab" data-bs-target="#search-settings" type="button" role="tab" aria-controls="search-settings" aria-selected="false"><i class="bi bi-globe2 me-2"></i>Search Provider</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="rag-tab" data-bs-toggle="tab" data-bs-target="#rag-settings" type="button" role="tab" aria-controls="rag-settings" aria-selected="false"><i class="bi bi-layers me-2"></i>RAG Pipeline</button>
+                        </li>
+                    </ul>
+                </div>
+                
+                <div class="tab-content p-4" id="settingsTabsContent">
+                    <!-- LLM Settings -->
+                    <div class="tab-pane show active" id="llm-settings" role="tabpanel" aria-labelledby="llm-tab">
+                        <div class="card border-0 shadow-sm mb-4">
+                            <div class="card-body bg-light rounded-3">
+                                <h6 class="text-primary fw-bold mb-3"><i class="bi bi-hdd-network me-2"></i>Connection Details</h6>
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label for="llm_base_url" class="form-label small text-muted fw-bold">Base URL</label>
+                                        <div class="input-group input-group-sm">
+                                            <span class="input-group-text bg-white"><i class="bi bi-link-45deg"></i></span>
+                                            <input type="text" class="form-control" id="llm_base_url" placeholder="Optional: e.g., http://localhost:11434/v1" value="{{ llm_settings.llm_base_url|safe }}">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="llm_model" class="form-label small text-muted fw-bold">Model Name</label>
+                                        <div class="input-group input-group-sm">
+                                            <span class="input-group-text bg-white"><i class="bi bi-box"></i></span>
+                                            <input type="text" class="form-control" id="llm_model" placeholder="e.g., gpt-4o" value="{{ llm_settings.llm_model|safe }}">
+                                        </div>
+                                    </div>
+                                    <div class="col-12">
+                                        <label for="llm_api_key" class="form-label small text-muted fw-bold">API Key</label>
+                                        <div class="input-group input-group-sm">
+                                            <span class="input-group-text bg-white"><i class="bi bi-key"></i></span>
+                                            <input type="password" class="form-control" id="llm_api_key" placeholder="Enter your API Key" value="{{ llm_settings.llm_api_key|safe }}">
+                                            <button class="btn btn-outline-secondary bg-white text-muted" type="button" id="toggle-llm-key-visibility">
+                                                <i class="bi bi-eye"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Test Connection Section -->
+                                    <div class="col-12 mt-3 pt-3 border-top d-flex justify-content-between align-items-center flex-wrap">
+                                         <div id="test-connection-result" class="small flex-grow-1 me-3 order-2 order-sm-1 mt-2 mt-sm-0"></div>
+                                         <button type="button" class="btn btn-sm btn-outline-primary order-1 order-sm-2 ms-auto" id="test-connection-btn">
+                                            <i class="bi bi-wifi me-1"></i> Test Connection
+                                         </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card border-0 shadow-sm">
+                            <div class="card-body bg-light rounded-3">
+                                <h6 class="text-primary fw-bold mb-3"><i class="bi bi-sliders2 me-2"></i>Inference Parameters</h6>
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label for="temperature" class="form-label small text-muted fw-bold d-flex justify-content-between mb-1">
+                                            <span>Temperature</span>
+                                            <span id="temperature_val" class="badge bg-white text-primary border">{{ llm_settings.temperature|default:0.0 }}</span>
+                                        </label>
+                                        <input type="range" class="form-range mb-1" id="temperature" min="0" max="2" step="0.1" value="{{ llm_settings.temperature|default:0.0 }}" oninput="document.getElementById('temperature_val').textContent = this.value">
+                                        <div class="text-muted" style="font-size: 0.9rem;">Controls randomness (0 = deterministic, 2 = creative).</div>
+                                    </div>
+                                    
+                                    <div class="col-md-6">
+                                        <label for="top_p" class="form-label small text-muted fw-bold d-flex justify-content-between mb-1">
+                                            <span>Top P (Nucleus)</span>
+                                            <span id="top_p_val" class="badge bg-white text-primary border">{{ llm_settings.top_p|default:1.0 }}</span>
+                                        </label>
+                                        <input type="range" class="form-range mb-1" id="top_p" min="0" max="1" step="0.05" value="{{ llm_settings.top_p|default:1.0 }}" oninput="document.getElementById('top_p_val').textContent = this.value">
+                                        <div class="text-muted" style="font-size: 0.9rem;">Limits token choices to top probability mass (1.0 = all).</div>
+                                    </div>
+
+                                    <div class="col-md-6">
+                                        <label for="max_tokens" class="form-label small text-muted fw-bold mb-1">Max Tokens</label>
+                                        <input type="number" class="form-control form-control-sm" id="max_tokens" placeholder="No limit" value="{{ llm_settings.max_tokens|default_if_none:'' }}">
+                                        <div class="text-muted mt-1" style="font-size: 0.9rem;">Maximum number of tokens to generate.</div>
+                                    </div>
+
+                                    {% if show_retries %}
+                                    <div class="col-md-6">
+                                        <label for="max_retries" class="form-label small text-muted fw-bold mb-1">Max Retries</label>
+                                        <input type="number" class="form-control form-control-sm" id="max_retries" value="{{ llm_settings.max_retries }}">
+                                        <div class="text-muted mt-1" style="font-size: 0.9rem;">Attempts to retry failed API calls or errors.</div>
+                                    </div>
+                                    {% endif %}
+
+                                    <div class="col-12 mt-3 pt-3 border-top">
+                                        <div class="form-check form-switch d-flex align-items-center">
+                                            <input class="form-check-input me-2" type="checkbox" role="switch" id="allow_reasoning" {% if llm_settings.allow_reasoning %}checked{% endif %} style="width: 2.5em; height: 1.25em;">
+                                            <div>
+                                                <label class="form-check-label fw-bold text-dark mb-0" for="allow_reasoning">Enable Chain-of-Thought (CoT)</label>
+                                                <div class="text-muted" style="font-size: 0.75rem;">Request step-by-step reasoning trace from the model.</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+
+
+                    </div>
+
+                    <!-- Search Settings -->
+                    <div class="tab-pane" id="search-settings" role="tabpanel" aria-labelledby="search-tab">
+                        <div class="card border-0 shadow-sm mb-4">
+                            <div class="card-body bg-light rounded-3">
+                                <h6 class="text-primary fw-bold mb-3"><i class="bi bi-search me-2"></i>Backend Provider</h6>
+                                <div class="mb-3">
+                                    <label for="search_provider" class="form-label small text-muted fw-bold">Select Provider</label>
+                                    <select class="form-select" id="search_provider">
+                                        <option value="mcp" {% if search_settings.search_provider == 'mcp' %}selected{% endif %}>MCP Server (Default)</option>
+                                        <option value="serper" {% if search_settings.search_provider == 'serper' %}selected{% endif %}>Serper API (Google Search)</option>
+                                    </select>
+                                    <div class="form-text small text-muted mt-2"><i class="bi bi-info-circle me-1"></i> The search backend used for retrieving context in RAG pipelines.</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="serper_api_key_container" class="card border-0 shadow-sm" style="{% if search_settings.search_provider != 'serper' %}display: none;{% endif %}">
+                            <div class="card-body bg-light rounded-3">
+                                <h6 class="text-primary fw-bold mb-3"><i class="bi bi-google me-2"></i>Serper Configuration</h6>
+                                <label for="serper_api_key" class="form-label small text-muted fw-bold">Serper API Key</label>
+                                <div class="input-group mb-3">
+                                    <span class="input-group-text bg-white"><i class="bi bi-key"></i></span>
+                                    <input type="password" class="form-control" id="serper_api_key" value="{{ search_settings.serper_api_key }}" placeholder="Enter Serper API Key">
+                                    <button class="btn btn-outline-secondary bg-white text-muted" type="button" id="toggle-serper-key-visibility">
+                                        <i class="bi bi-eye"></i>
+                                    </button>
+                                </div>
+                                
+                                <div class="form-check form-switch d-flex align-items-start mt-3 pt-3 border-top border-white">
+                                    <input class="form-check-input me-2" type="checkbox" role="switch" id="serper_fetch_full_content" {% if search_settings.serper_fetch_full_content %}checked{% endif %}>
+                                    <div>
+                                        <label class="form-check-label fw-bold text-dark" for="serper_fetch_full_content">Fetch Full Page Content</label>
+                                        <div class="form-text small text-muted mb-0">Visits each result page to extract full text. Slower but provides richer context.</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- RAG Settings -->
+                    <div class="tab-pane" id="rag-settings" role="tabpanel" aria-labelledby="rag-tab">
+                        <div class="card border-0 shadow-sm mb-4">
+                            <div class="card-body bg-light rounded-3">
+                                <h6 class="text-primary fw-bold mb-3"><i class="bi bi-diagram-3 me-2"></i>Pipeline Strategy</h6>
+                                <div class="mb-3">
+                                    <label for="rag_mode_select" class="form-label small text-muted fw-bold">RAG Mode</label>
+                                    <select id="rag_mode_select" class="form-select">
+                                        <option value="rag_multi_turn_no_reform" selected>No Query Reformulation (Direct Search)</option>
+                                        <option value="rag_multi_turn_reform">With Query Reformulation (LLM Refined)</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card border-0 shadow-sm mb-4">
+                            <div class="card-body bg-light rounded-3">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <h6 class="text-primary fw-bold mb-0"><i class="bi bi-code-square me-2"></i>System Prompt Template</h6>
+                                </div>
+                                <div class="mb-2">
+                                    <textarea class="form-control border-secondary" id="rag_prompt_template" rows="10" style="font-family: 'Menlo', 'Monaco', 'Courier New', monospace; font-size: 0.85rem; background-color: #f8f9fa;">{{ rag_settings.prompt_template|safe }}</textarea>
+                                </div>
+                                <div class="form-text small text-muted">
+                                    <i class="bi bi-exclamation-circle me-1"></i> Required placeholders: <code>{question}</code>, <code>{search_results}</code>.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer d-flex">
+                <div id="unsaved-changes-alert" class="text-warning small fw-bold" style="display: none;">
+                    <i class="bi bi-exclamation-triangle-fill me-1"></i> Unsaved changes
+                </div>
+                <div class="ms-auto">
+                    <button type="button" class="btn btn-outline-danger me-2" id="global-restore-btn"><i class="bi bi-arrow-counterclockwise me-1"></i> Restore Defaults</button>
+                    <button type="button" class="btn btn-secondary me-2" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary" id="save-all-settings-btn">
+                        <i class="bi bi-save me-1"></i> Save All Settings
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+    // Initialize settings logic when modal is loaded
+    document.addEventListener('DOMContentLoaded', function() {
+        if (typeof BenchmarkSettings !== 'undefined') {
+            BenchmarkSettings.init();
+        }
+    });
+</script>

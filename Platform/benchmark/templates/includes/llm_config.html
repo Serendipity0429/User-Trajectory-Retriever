@@ -4,6 +4,8 @@
     </div>
     <div id="collapseConfig" class="collapse {% if card_expanded %}show{% endif %}">
         <div class="card-body">
+            
+            <h6 class="text-muted mb-3 text-uppercase small fw-bold">API Settings</h6>
             <div class="row">
                 <div class="col-md-6 mb-3">
                     <label for="llm_base_url" class="form-label">Base URL</label>
@@ -13,7 +15,7 @@
                     <label for="llm_model" class="form-label">Model Name</label>
                     <input type="text" class="form-control" id="llm_model" placeholder="e.g., gpt-4o" value="{{ llm_settings.llm_model|safe }}">
                 </div>
-                <div class="col-md-12">
+                <div class="col-md-12 mb-3">
                     <label for="llm_api_key" class="form-label">API Key</label>
                     <div class="input-group">
                         <span class="input-group-text"><i class="bi bi-key"></i></span>
@@ -23,21 +25,65 @@
                         </button>
                     </div>
                 </div>
-                <div class="col-md-12 mt-3">
-                    <div class="form-check">
-                        <input class="form-check-input" type="checkbox" id="allow_reasoning" {% if llm_settings.allow_reasoning %}checked{% endif %}>
-                        <label class="form-check-label" for="allow_reasoning">
-                            Allow Reasoning Chain
-                        </label>
-                    </div>
+            </div>
+
+            <h6 class="text-muted mb-3 mt-4 text-uppercase small fw-bold">LLM Parameters</h6>
+            <div class="row g-3">
+                <!-- Temperature -->
+                <div class="col-md-6">
+                    <label for="temperature" class="form-label d-flex justify-content-between">
+                        <span>Temperature</span>
+                        <span id="temperature_val" class="badge bg-light text-dark border">{{ llm_settings.temperature|default:0.0 }}</span>
+                    </label>
+                    <input type="range" class="form-range" id="temperature" min="0" max="2" step="0.1" value="{{ llm_settings.temperature|default:0.0 }}" oninput="document.getElementById('temperature_val').textContent = this.value">
+                    <div class="form-text small">Controls randomness. Lower values are more deterministic.</div>
                 </div>
+                
+                <!-- Top P -->
+                <div class="col-md-6">
+                    <label for="top_p" class="form-label d-flex justify-content-between">
+                        <span>Top P</span>
+                        <span id="top_p_val" class="badge bg-light text-dark border">{{ llm_settings.top_p|default:1.0 }}</span>
+                    </label>
+                    <input type="range" class="form-range" id="top_p" min="0" max="1" step="0.05" value="{{ llm_settings.top_p|default:1.0 }}" oninput="document.getElementById('top_p_val').textContent = this.value">
+                    <div class="form-text small">Nucleus sampling. Lower values limit the token pool.</div>
+                </div>
+
+                <!-- Max Tokens -->
+                <div class="col-md-6">
+                    <label for="max_tokens" class="form-label">Max Tokens</label>
+                    <input type="number" class="form-control" id="max_tokens" placeholder="Leave empty for no limit" value="{{ llm_settings.max_tokens|default_if_none:'' }}">
+                    <div class="form-text small">Limit the number of generated tokens. Leave empty to set no limit.</div>
+                </div>
+
+                <!-- Max Retries -->
                 {% if show_retries %}
-                <div class="col-md-12 mt-3">
+                <div class="col-md-6">
                     <label for="max_retries" class="form-label">Max Retries</label>
                     <input type="number" class="form-control" id="max_retries" value="{{ llm_settings.max_retries }}">
+                    <div class="form-text small">Number of attempts if the API call fails or result is invalid.</div>
                 </div>
+                {% else %}
+                <div class="col-md-6"></div>
                 {% endif %}
+
+                <!-- Reasoning -->
+                <div class="col-12 mt-3">
+                    <div class="card bg-light border-0 p-3">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" role="switch" id="allow_reasoning" {% if llm_settings.allow_reasoning %}checked{% endif %}>
+                            <label class="form-check-label fw-bold text-dark" for="allow_reasoning">
+                                Enable Chain-of-Thought (CoT) Reasoning
+                            </label>
+                        </div>
+                        <div class="text-muted small mt-2 ms-1">
+                            When enabled, the model will generate a step-by-step reasoning trace before providing the final answer. 
+                            This typically improves accuracy for complex reasoning tasks but increases token usage and latency.
+                        </div>
+                    </div>
+                </div>
             </div>
+
             <hr>
             <div class="d-flex justify-content-end">
                 <button type="button" class="btn btn-outline-primary me-2" id="save-llm-settings-btn"><i class="bi bi-save me-1"></i> Save</button>

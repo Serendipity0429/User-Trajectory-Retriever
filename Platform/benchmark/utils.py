@@ -42,4 +42,4 @@ def extract_final_answer(text):
         return text.split(marker)[-1].strip()
     else:
         # If the marker is not found, return an empty string
-        return ""
+        return text

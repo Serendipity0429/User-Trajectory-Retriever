@@ -92,17 +92,28 @@ class BasePipeline:
         except Exception:
             return 0
 
-    def get_llm_response(self, messages, temperature=0):
+    def get_llm_response(self, messages, temperature=None):
         """
         Sends messages to LLM and parses the response based on current settings.
         Returns: (parsed_answer, full_response)
         """
+        if temperature is None:
+            temperature = getattr(self.llm_settings, 'temperature', 0.0)
+            
+        top_p = getattr(self.llm_settings, 'top_p', 1.0)
+        max_tokens = getattr(self.llm_settings, 'max_tokens', None)
+
+        kwargs = {
+            "model": self.model,
+            "messages": messages,
+            "temperature": temperature,
+            "top_p": top_p
+        }
+        if max_tokens:
+            kwargs['max_tokens'] = max_tokens
+
         try:
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=messages,
-                temperature=temperature,
-            )
+            response = self.client.chat.completions.create(**kwargs)
             full_response = response.choices[0].message.content
         except Exception as e:
             # Let the caller handle or wrap exceptions
@@ -203,7 +214,10 @@ class VanillaLLMAdhocPipeline(BaseAdhocPipeline):
                 'llm_base_url': self.llm_settings.llm_base_url,
                 'llm_model': self.llm_settings.llm_model,
                 'max_retries': self.llm_settings.max_retries,
-                'allow_reasoning': self.llm_settings.allow_reasoning
+                'allow_reasoning': self.llm_settings.allow_reasoning,
+                'temperature': getattr(self.llm_settings, 'temperature', 0.0),
+                'top_p': getattr(self.llm_settings, 'top_p', 1.0),
+                'max_tokens': getattr(self.llm_settings, 'max_tokens', None)
             }
         }
         
@@ -268,7 +282,10 @@ class RagAdhocPipeline(BaseAdhocPipeline):
                 'llm_base_url': self.llm_settings.llm_base_url,
                 'llm_model': self.llm_settings.llm_model,
                 'max_retries': self.llm_settings.max_retries,
-                'allow_reasoning': self.llm_settings.allow_reasoning
+                'allow_reasoning': self.llm_settings.allow_reasoning,
+                'temperature': getattr(self.llm_settings, 'temperature', 0.0),
+                'top_p': getattr(self.llm_settings, 'top_p', 1.0),
+                'max_tokens': getattr(self.llm_settings, 'max_tokens', None)
             },
             'rag_settings': {
                 'prompt_template': self.rag_settings.prompt_template
@@ -294,7 +311,10 @@ class RagAdhocPipeline(BaseAdhocPipeline):
         search_results = self.search_engine.search(question)
         formatted_results = self.search_engine.format_results(search_results)
         
-        prompt = self.prompt_template.replace('{question}', question).replace('{search_results}', formatted_results)
+        if self.llm_settings.allow_reasoning:
+            prompt = PROMPTS["rag_adhoc_reasoning"].format(question=question, search_results=formatted_results)
+        else:
+            prompt = self.prompt_template.replace('{question}', question).replace('{search_results}', formatted_results)
         
         answer, full_response = self.get_llm_response([{"role": "user", "content": prompt}])
         
@@ -516,7 +536,10 @@ class VanillaLLMMultiTurnPipeline(BaseMultiTurnPipeline):
                 'llm_base_url': self.llm_settings.llm_base_url,
                 'llm_model': self.llm_settings.llm_model,
                 'max_retries': self.llm_settings.max_retries,
-                'allow_reasoning': self.llm_settings.allow_reasoning
+                'allow_reasoning': self.llm_settings.allow_reasoning,
+                'temperature': getattr(self.llm_settings, 'temperature', 0.0),
+                'top_p': getattr(self.llm_settings, 'top_p', 1.0),
+                'max_tokens': getattr(self.llm_settings, 'max_tokens', None)
             }
         }
 
@@ -585,7 +608,10 @@ class RagMultiTurnPipeline(BaseMultiTurnPipeline):
                 'llm_base_url': self.llm_settings.llm_base_url,
                 'llm_model': self.llm_settings.llm_model,
                 'max_retries': self.llm_settings.max_retries,
-                'allow_reasoning': self.llm_settings.allow_reasoning
+                'allow_reasoning': self.llm_settings.allow_reasoning,
+                'temperature': getattr(self.llm_settings, 'temperature', 0.0),
+                'top_p': getattr(self.llm_settings, 'top_p', 1.0),
+                'max_tokens': getattr(self.llm_settings, 'max_tokens', None)
             },
             'rag_settings': {
                 'prompt_template': rag_settings.prompt_template

@@ -198,7 +198,7 @@
                                 </div>
                             </summary>
                             <div class="list-group list-group-flush mt-2">
-                                {% for session in group.vanilla_sessions.all %}
+                                {% for session in group.sessions.all %}
                                 <div class="list-group-item session-item-container ps-4 session-details" data-session-id="{{ session.id }}" style="cursor: pointer;">
                                     <div class="d-flex w-100 justify-content-between">
                                         <h6 class="mb-1">Session #{{ session.id }}</h6>
@@ -288,7 +288,7 @@
         <div class="modal-dialog modal-lg modal-dialog-scrollable">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">Search Results</h5>
+                        <h5 class="modal-title" id="searchResultsListModalLabel">Search Results</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">

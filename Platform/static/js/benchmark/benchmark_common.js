@@ -69,6 +69,61 @@ const BenchmarkUrls = {
     }
 };
 
+const BenchmarkState = {
+    config: {
+        lastSavedBaseUrl: '',
+    },
+    activeRun: {
+        id: null,
+        type: null, // 'vanilla_adhoc', 'rag_adhoc', 'multi_turn'
+        data: null
+    },
+    ui: {}
+};
+
+const BenchmarkComponents = {
+    createBadge: function(text, isCorrect, showNAForNull = false) {
+        const span = document.createElement('span');
+        span.className = 'badge';
+        if (isCorrect === null && showNAForNull) {
+            span.classList.add('bg-secondary');
+            span.textContent = 'N/A';
+        } else if (isCorrect) {
+            span.classList.add('bg-success');
+            span.textContent = text || 'Correct';
+        } else {
+            span.classList.add('bg-danger');
+            span.textContent = text || 'Incorrect';
+        }
+        return span;
+    },
+
+    createIcon: function(className) {
+        const i = document.createElement('i');
+        i.className = className;
+        return i;
+    },
+
+    createTextElement: function(tagName, className, textContent, title = '') {
+        const element = document.createElement(tagName);
+        element.className = className;
+        element.textContent = textContent;
+        if (title) {
+            element.title = title;
+        }
+        return element;
+    },
+
+    createLink: function(href, className, textContent, target = '_self') {
+        const link = document.createElement('a');
+        link.href = href;
+        link.className = className;
+        link.textContent = textContent;
+        link.target = target;
+        return link;
+    }
+};
+
 const BenchmarkUtils = {
     /**
      * Test the LLM connection.
@@ -323,7 +378,7 @@ const BenchmarkUtils = {
         // Trigger on page load
         testConnection(); 
 
-        let lastSavedBaseUrl = document.getElementById('llm_base_url') ? document.getElementById('llm_base_url').value : '';
+        BenchmarkState.config.lastSavedBaseUrl = document.getElementById('llm_base_url') ? document.getElementById('llm_base_url').value : '';
 
         if (document.getElementById('save-llm-settings-btn')) {
             document.getElementById('save-llm-settings-btn').addEventListener('click', function() {
@@ -338,9 +393,9 @@ const BenchmarkUtils = {
                 BenchmarkUtils.saveSettings(BenchmarkUrls.saveLlmSettings, csrfToken, data, 'save-llm-settings-btn');
                 
                 // Test connection if base URL changed
-                if (currentBaseUrl !== lastSavedBaseUrl) {
+                if (currentBaseUrl !== BenchmarkState.config.lastSavedBaseUrl) {
                     testConnection();
-                    lastSavedBaseUrl = currentBaseUrl;
+                    BenchmarkState.config.lastSavedBaseUrl = currentBaseUrl;
                 }
             });
         }
@@ -354,7 +409,7 @@ const BenchmarkUtils = {
                     
                     // Update lastSavedBaseUrl and test connection
                     if (document.getElementById('llm_base_url')) {
-                        lastSavedBaseUrl = document.getElementById('llm_base_url').value;
+                        BenchmarkState.config.lastSavedBaseUrl = document.getElementById('llm_base_url').value;
                         testConnection();
                     }
                 });
@@ -652,46 +707,7 @@ const BenchmarkUtils = {
         };
     },
     BenchmarkRenderer: {
-        createBadge: function(text, isCorrect, showNAForNull = false) {
-            const span = document.createElement('span');
-            span.className = 'badge';
-            if (isCorrect === null && showNAForNull) {
-                span.classList.add('bg-secondary');
-                span.textContent = 'N/A';
-            } else if (isCorrect) {
-                span.classList.add('bg-success');
-                span.textContent = text || 'Correct';
-            } else {
-                span.classList.add('bg-danger');
-                span.textContent = text || 'Incorrect';
-            }
-            return span;
-        },
-
-        createIcon: function(className) {
-            const i = document.createElement('i');
-            i.className = className;
-            return i;
-        },
-
-        createTextElement: function(tagName, className, textContent, title = '') {
-            const element = document.createElement(tagName);
-            element.className = className;
-            element.textContent = textContent;
-            if (title) {
-                element.title = title;
-            }
-            return element;
-        },
-
-        createLink: function(href, className, textContent, target = '_self') {
-            const link = document.createElement('a');
-            link.href = href;
-            link.className = className;
-            link.textContent = textContent;
-            link.target = target;
-            return link;
-        },
+        ...BenchmarkComponents,
         
         renderProcessingRow: function(item, resultsBody, colSpan = 7) {
             const rowId = `processing-row`; // Fixed ID for easier finding
@@ -786,30 +802,32 @@ const BenchmarkUtils = {
 
                 // If full_response is present and different from answer, show toggle
                 if (data.full_response && data.full_response !== data.answer) {
+                    const reasoningContainer = document.createElement('div');
+                    reasoningContainer.className = 'mt-1';
+
                     const toggleBtn = document.createElement('button');
-                    toggleBtn.className = 'btn btn-link btn-sm p-0 text-decoration-none small mt-1';
+                    toggleBtn.className = 'btn btn-link btn-sm p-0 text-decoration-none small';
                     toggleBtn.innerHTML = '<i class="bi bi-caret-right-fill"></i> Show Reasoning';
                     toggleBtn.style.fontSize = '0.75rem';
                     
                     const reasoningDiv = document.createElement('div');
-                    reasoningDiv.className = 'mt-2 p-2 bg-light border rounded small text-secondary';
+                    reasoningDiv.className = 'mt-1 p-2 bg-light border rounded small text-secondary';
                     reasoningDiv.style.display = 'none';
                     reasoningDiv.style.whiteSpace = 'pre-wrap'; // Preserve formatting
                     reasoningDiv.textContent = data.full_response;
 
                     toggleBtn.onclick = (e) => {
                         e.stopPropagation(); // Prevent row click
-                        if (reasoningDiv.style.display === 'none') {
-                            reasoningDiv.style.display = 'block';
-                            toggleBtn.innerHTML = '<i class="bi bi-caret-down-fill"></i> Hide Reasoning';
-                        } else {
-                            reasoningDiv.style.display = 'none';
-                            toggleBtn.innerHTML = '<i class="bi bi-caret-right-fill"></i> Show Reasoning';
-                        }
+                        const isHidden = reasoningDiv.style.display === 'none';
+                        reasoningDiv.style.display = isHidden ? 'block' : 'none';
+                        toggleBtn.innerHTML = isHidden ? 
+                            '<i class="bi bi-caret-down-fill"></i> Hide Reasoning' : 
+                            '<i class="bi bi-caret-right-fill"></i> Show Reasoning';
                     };
 
-                    td3.appendChild(toggleBtn);
-                    td3.appendChild(reasoningDiv);
+                    reasoningContainer.appendChild(toggleBtn);
+                    reasoningContainer.appendChild(reasoningDiv);
+                    td3.appendChild(reasoningContainer);
                 }
                 
                 tr.appendChild(td3);
@@ -954,7 +972,9 @@ const BenchmarkUtils = {
             resultsListElement.appendChild(alertDiv);
         },
 
-        renderModalSearchResults: function(results, container) {
+        renderModalSearchResults: function(results, container, modalId = 'searchResultsListModal') {
+            const modalTitle = document.getElementById('searchResultsListModalLabel');
+            if (modalTitle) modalTitle.textContent = 'Search Results';
             container.innerHTML = ''; // Clear existing content
 
             if (results && results.length > 0) {
@@ -1024,6 +1044,32 @@ const BenchmarkUtils = {
                 noResultsDiv.textContent = 'No results data found.';
                 container.appendChild(noResultsDiv);
             }
+        },
+
+        /**
+         * Renders a modal with the full RAG prompt content.
+         * @param {string} promptContent - The full RAG prompt text.
+         * @param {string} containerId - The ID of the modal body container.
+         * @param {string} modalId - The ID of the modal itself.
+         * @param {string} title - The title to display in the modal header.
+         */
+        renderPromptModal: function(promptContent, containerId, modalId = 'searchResultsListModal', title = 'RAG Prompt') {
+            const modalTitle = document.getElementById('searchResultsListModalLabel');
+            if (modalTitle) modalTitle.textContent = title;
+
+            const container = document.getElementById(containerId);
+            if (!container) return;
+
+            container.innerHTML = ''; // Clear existing content
+
+            const pre = document.createElement('pre');
+            pre.className = 'p-3 bg-light border rounded small text-secondary';
+            pre.style.whiteSpace = 'pre-wrap';
+            pre.textContent = promptContent;
+            container.appendChild(pre);
+
+            const modal = new bootstrap.Modal(document.getElementById(modalId));
+            modal.show();
         },
 
         renderMultiTurnResultRow: function(result, index, loadSessionCallback) {
@@ -1421,8 +1467,38 @@ const BenchmarkUtils = {
                 prompt = document.getElementById('rag_prompt_template').value;
             }
             if (prompt) {
-                const snippet = prompt.substring(0, 30) + '...';
-                addItem('RAG Prompt', snippet, 'bi-chat-text');
+                const col = document.createElement('div');
+                col.className = 'col-md-4 col-sm-6';
+
+                const divFlex = document.createElement('div');
+                divFlex.className = 'd-flex align-items-center bg-white p-2 rounded border';
+
+                const iconElement = document.createElement('i');
+                iconElement.className = 'bi bi-chat-text text-secondary me-2 fs-5';
+                divFlex.appendChild(iconElement);
+
+                const divOverflow = document.createElement('div');
+                divOverflow.className = 'overflow-hidden flex-grow-1';
+
+                const divLabel = document.createElement('div');
+                divLabel.className = 'text-muted text-uppercase';
+                divLabel.style.fontSize = '0.65rem';
+                divLabel.style.letterSpacing = '0.5px';
+                divLabel.textContent = 'RAG Prompt';
+                divOverflow.appendChild(divLabel);
+
+                const button = document.createElement('button');
+                button.className = 'btn btn-sm btn-outline-secondary mt-1';
+                button.type = 'button';
+                button.textContent = 'View Full Prompt';
+                button.onclick = () => {
+                    BenchmarkUtils.BenchmarkRenderer.renderPromptModal(prompt, 'modal-search-results-container', 'searchResultsListModal', 'RAG Prompt');
+                };
+
+                divOverflow.appendChild(button);
+                divFlex.appendChild(divOverflow);
+                col.appendChild(divFlex);
+                configDetails.appendChild(col);
             }
         }
         
@@ -2525,7 +2601,7 @@ const BenchmarkUtils = {
                 btn.disabled = true;
                 btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Starting...';
                 
-                const singleSessionPipelineType = document.getElementById('pipeline-mode-session') ? document.getElementById('pipeline-mode-session').value : pipelineType;
+                const singleSessionPipelineType = document.getElementById('rag_mode_select') ? document.getElementById('rag_mode_select').value : pipelineType;
 
                 fetch(BenchmarkUrls.multiTurn.createSession, {
                     method: 'POST',
@@ -2616,7 +2692,7 @@ const BenchmarkUtils = {
                 if (pipelineController) pipelineController.abort();
                 if (pipelineController && pipelineController.pipelineId) {
                     let strategyData = { pipeline_id: pipelineController.pipelineId };
-                     const pipelineTypeInput = document.getElementById('pipeline-mode-pipeline');
+                     const pipelineTypeInput = document.getElementById('rag_mode_select');
                      if (pipelineTypeInput && pipelineType.includes('rag')) {
                          let s = 'no_reform';
                          if (pipelineTypeInput.value.includes('reform')) s = 'reform';
@@ -2638,17 +2714,44 @@ const BenchmarkUtils = {
 
             // --- List Click Handlers ---
             document.getElementById('session-list').addEventListener('click', function(e) {
-                const target = e.target.closest('.session-details');
-                if (target) { e.preventDefault(); loadSession(target.dataset.sessionId); }
-                const groupSummary = e.target.closest('.group-summary');
-                if (groupSummary) { e.preventDefault(); loadRun(groupSummary.dataset.groupId); }
-                
+                // Handle Delete Group Button
                 const deleteGrp = e.target.closest('.delete-group-btn');
-                if (deleteGrp && confirm('Delete group?')) {
-                     fetch(BenchmarkUrls.multiTurn.deleteSessionGroup(deleteGrp.dataset.groupId), { method: 'DELETE', headers: { 'X-CSRFToken': csrfToken } })
-                     .then(res => res.json()).then(data => {
-                         if (data.status === 'ok') { deleteGrp.closest('.list-group-item').remove(); window.location.reload(); }
-                     });
+                if (deleteGrp) {
+                    e.preventDefault(); 
+                    e.stopPropagation();
+                    if (confirm('Delete group?')) {
+                         fetch(BenchmarkUrls.multiTurn.deleteSessionGroup(deleteGrp.dataset.groupId), { method: 'DELETE', headers: { 'X-CSRFToken': csrfToken } })
+                         .then(res => res.json()).then(data => {
+                             if (data.status === 'ok') { deleteGrp.closest('.list-group-item').remove(); window.location.reload(); }
+                         });
+                    }
+                    return;
+                }
+
+                // Handle Checkboxes
+                if (e.target.closest('input[type="checkbox"]')) {
+                    return; 
+                }
+
+                // Handle Session Click
+                const target = e.target.closest('.session-details');
+                if (target) { 
+                    e.preventDefault(); 
+                    loadSession(target.dataset.sessionId); 
+                    return;
+                }
+                
+                // Handle Group Summary Click
+                const groupSummary = e.target.closest('.group-summary');
+                if (groupSummary) { 
+                    // Do NOT preventDefault() to allow <details> toggle behavior
+                    if (groupSummary.dataset && groupSummary.dataset.groupId) {
+                        try {
+                            loadRun(groupSummary.dataset.groupId); 
+                        } catch (err) {
+                            console.error("loadRun error:", err);
+                        }
+                    }
                 }
             });
             

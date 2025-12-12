@@ -7,79 +7,26 @@ from task_manager.utils import check_answer_rule, check_answer_llm, redis_client
 from .search_utils import get_search_engine
 from .models import (
     LLMSettings, RagSettings, BenchmarkDataset, SearchSettings,
-    VanillaLLMAdhocRun, VanillaLLMAdhocResult,
-    RagAdhocRun, RagAdhocResult,
-    MultiTurnSessionGroup, VanillaLLMMultiTurnSession, VanillaLLMMultiTurnTrial,
-    RAGMultiTurnSession, RAGMultiTurnTrial
+    AdhocRun, AdhocResult,
+    MultiTurnRun, MultiTurnSession, MultiTurnTrial
 )
 from .utils import print_debug, extract_final_answer, count_questions_in_file
+from .prompts import PROMPTS
 
+REDIS_PREFIX_ACTIVE = "pipeline_active"
+REDIS_PREFIX_VANILLA_ADHOC = "vanilla_llm_adhoc_pipeline_active"
+REDIS_PREFIX_RAG_ADHOC = "rag_adhoc_pipeline_active"
+REDIS_PREFIX_MULTI_TURN = "multi_turn_pipeline_active"
+REDIS_PREFIX_VANILLA_MULTI_TURN = "vanilla_llm_multi_turn_pipeline_active"
 
 HARD_QUESTIONS_PATH = os.path.join(os.path.dirname(__file__), '..', 'data', 'hard_questions_refined.jsonl')
 
-PROMPTS = {
-    "adhoc_answer": """Your task is to answer the following question. Follow these rules strictly:
-1.  Your answer must be an exact match to the correct answer.
-2.  Do not include any punctuation.
-3.  Do not include any extra words or sentences.
-
-For example:
-Question: What is the capital of France?
-Correct Answer: Paris
-
-Incorrect Answers:
-- "The capital of France is Paris." (contains extra words)
-- "Paris is the capital of France." (contains extra words)
-- "Paris." (contains a period)
-
-Now, answer the following question:
-Question: {question}
-Answer:""",
-    "adhoc_reasoning": """Your task is to answer the following question.
-First, explain your reasoning step-by-step. 
-Then, on a new line, provide the final answer starting with 'Final Answer:'.
-
-Follow these rules for the final answer strictly:
-1. It must be an exact match to the correct answer.
-2. Do not include any punctuation.
-3. Do not include any extra words or sentences.
-
-Question: {question}
-""",
-    "multi_turn_initial": """Your task is to answer the following question. Follow these rules strictly:
-1.  Your answer must be an exact match to the correct answer.
-2.  Do not include any punctuation.
-3.  Do not include any extra words or sentences.
-Question: {question}
-Answer:""",
-    "multi_turn_reasoning_initial": """Your task is to answer the following question.
-First, explain your reasoning step-by-step.
-Then, on a new line, provide the final answer starting with 'Final Answer:'.
-
-Follow these rules for the final answer strictly:
-1. It must be an exact match to the correct answer.
-2. Do not include any punctuation.
-3. Do not include any extra words or sentences.
-
-Question: {question}
-""",
-    "multi_turn_followup": """Your task is to answer the question again. Follow these rules strictly:
-1.  Your answer must be an exact match to the correct answer.
-2.  Do not include any punctuation.
-3.  Do not include any extra words or sentences.
-Answer:""",
-    "multi_turn_reasoning_followup": """Your task is to answer the question again.
-First, explain your reasoning step-by-step.
-Then, on a new line, provide the final answer starting with 'Final Answer:'.
-
-Follow these rules for the final answer strictly:
-1. It must be an exact match to the correct answer.
-2. Do not include any punctuation.
-3. Do not include any extra words or sentences.
-""",
-    "rag_system_context": "Context from web search (Query: {query}):\n{results}\n\n",
-    "rag_reformulation": "Based on the history, provide a better search query to find the correct answer. Output ONLY the query."
-}
+def serialize_events(generator):
+    """
+    Helper function to serialize events from the pipeline generator.
+    """
+    for event in generator:
+        yield json.dumps(event) + "\n"
 
 class BasePipeline:
     def __init__(self, base_url, api_key, model, pipeline_id=None, dataset_id=None):
@@ -87,7 +34,8 @@ class BasePipeline:
         self.model = model
         self.pipeline_id = pipeline_id
         self.dataset_id = dataset_id
-        self.redis_prefix = "pipeline_active"
+        self.redis_prefix = REDIS_PREFIX_ACTIVE
+        self.llm_settings = LLMSettings.load()
 
     def check_active(self):
         if not self.pipeline_id:
@@ -135,7 +83,6 @@ class BasePipeline:
         Sends messages to LLM and parses the response based on current settings.
         Returns: (parsed_answer, full_response)
         """
-        settings = LLMSettings.load()
         try:
             response = self.client.chat.completions.create(
                 model=self.model,
@@ -147,7 +94,7 @@ class BasePipeline:
             # Let the caller handle or wrap exceptions
             raise e
 
-        if settings.allow_reasoning:
+        if self.llm_settings.allow_reasoning and 'rag' in self.redis_prefix:
             answer = extract_final_answer(full_response)
         else:
             answer = full_response
@@ -155,8 +102,11 @@ class BasePipeline:
         return answer, full_response
     
     def run(self):
-        yield json.dumps({'is_meta': True, 'type': 'info', 'message': 'Pipeline started'}) + "\n"
+        yield {'is_meta': True, 'type': 'info', 'message': 'Pipeline started'}
         pass
+        
+    def get_settings_snapshot(self):
+        raise NotImplementedError("Subclasses must implement get_settings_snapshot")
 
 
 class BaseAdhocPipeline(BasePipeline):
@@ -171,7 +121,7 @@ class BaseAdhocPipeline(BasePipeline):
 
     def run(self):
         run_object = self.create_run_object()
-        yield json.dumps({'is_meta': True, 'type': 'run_created', 'run_id': run_object.id, 'name': run_object.name}) + "\n"
+        yield {'is_meta': True, 'type': 'run_created', 'run_id': run_object.id, 'name': run_object.name}
         
         total_questions = 0
         questions_iterator = None
@@ -189,11 +139,11 @@ class BaseAdhocPipeline(BasePipeline):
             
             questions_iterator = self.load_questions() # This now uses the file_path logic from get_questions_file_path
         except (ValueError, FileNotFoundError, BenchmarkDataset.DoesNotExist) as e:
-            yield json.dumps({'error': str(e)}) + "\n"
+            yield {'error': str(e)}
             self.stop_token() # Ensure stop token is cleared on error
             return # Terminate pipeline on error
 
-        yield json.dumps({'is_meta': True, 'type': 'total_count', 'count': total_questions}) + "\n"
+        yield {'is_meta': True, 'type': 'total_count', 'count': total_questions}
 
         total_count = 0
         correct_count = 0
@@ -206,14 +156,14 @@ class BaseAdhocPipeline(BasePipeline):
             ground_truths = data.get('ground_truths', [])
 
             # Notify frontend that we are starting this question
-            yield json.dumps({
+            yield {
                 'is_meta': True, 
                 'type': 'processing_start', 
                 'question': {
                     'question': question
                     # We can send more data if needed for display
                 }
-            }) + "\n"
+            }
 
             try:
                 result_data, is_correct = self.process_question(run_object, question, ground_truths)
@@ -222,10 +172,10 @@ class BaseAdhocPipeline(BasePipeline):
                     correct_count += 1
                 total_count += 1
 
-                yield json.dumps(result_data) + "\n"
+                yield result_data
 
             except Exception as e:
-                yield json.dumps({'error': str(e), 'question': question}) + "\n"
+                yield {'error': str(e), 'question': question}
 
         run_object.total_questions = total_count
         run_object.correct_answers = correct_count
@@ -237,30 +187,35 @@ class BaseAdhocPipeline(BasePipeline):
 class VanillaLLMAdhocPipeline(BaseAdhocPipeline):
     def __init__(self, base_url, api_key, model, pipeline_id=None, dataset_id=None):
         super().__init__(base_url, api_key, model, pipeline_id, dataset_id)
-        self.redis_prefix = "vanilla_llm_adhoc_pipeline_active"
-
-    def create_run_object(self):
-        settings = LLMSettings.load()
-        run_name = f"Vanilla LLM Ad-hoc Run {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-        snapshot = {
+        self.redis_prefix = REDIS_PREFIX_VANILLA_ADHOC
+        
+    def __str__(self):
+        return "Vanilla LLM Ad-hoc Pipeline"
+        
+    def get_settings_snapshot(self):
+        return {
             'llm_settings': {
-                'llm_base_url': settings.llm_base_url,
-                'llm_model': settings.llm_model,
-                'max_retries': settings.max_retries,
-                'allow_reasoning': settings.allow_reasoning
+                'llm_base_url': self.llm_settings.llm_base_url,
+                'llm_model': self.llm_settings.llm_model,
+                'max_retries': self.llm_settings.max_retries,
+                'allow_reasoning': self.llm_settings.allow_reasoning
             }
         }
-        return VanillaLLMAdhocRun.objects.create(
+        
+    def create_run_object(self):
+        run_name = f"{str(self)} - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+        snapshot = self.get_settings_snapshot()
+        return AdhocRun.objects.create(
             name=run_name,
             settings_snapshot=snapshot,
             total_questions=0,
-            correct_answers=0
+            correct_answers=0,
+            run_type='vanilla'
         )
 
     def process_question(self, run, question, ground_truths):
-        settings = LLMSettings.load()
-        
-        if settings.allow_reasoning:
+
+        if self.llm_settings.allow_reasoning:
             prompt = PROMPTS["adhoc_reasoning"].format(question=question)
         else:
             prompt = PROMPTS["adhoc_answer"].format(question=question)
@@ -270,7 +225,7 @@ class VanillaLLMAdhocPipeline(BaseAdhocPipeline):
         rule_result = check_answer_rule(question, ground_truths, answer)
         llm_result = check_answer_llm(question, ground_truths, answer, client=self.client, model=self.model)
 
-        VanillaLLMAdhocResult.objects.create(
+        AdhocResult.objects.create(
             run=run,
             question=question,
             ground_truths=ground_truths,
@@ -295,34 +250,39 @@ class RagAdhocPipeline(BaseAdhocPipeline):
         super().__init__(base_url, api_key, model, pipeline_id, dataset_id)
         self.prompt_template = rag_prompt_template
         self.search_engine = get_search_engine()
-        self.redis_prefix = "rag_adhoc_pipeline_active"
-
-    def create_run_object(self):
-        llm_settings = LLMSettings.load()
-        rag_settings = RagSettings.load()
-        search_settings = SearchSettings.load()
+        self.redis_prefix = REDIS_PREFIX_RAG_ADHOC
+        self.rag_settings = RagSettings.load()
+        self.search_settings = SearchSettings.load()
         
-        run_name = f"RAG Ad-hoc Run {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-        snapshot = {
+    def __str__(self):
+        return "RAG Ad-hoc Pipeline"
+
+    def get_settings_snapshot(self):
+        return {
             'llm_settings': {
-                'llm_base_url': llm_settings.llm_base_url,
-                'llm_model': llm_settings.llm_model,
-                'max_retries': llm_settings.max_retries,
-                'allow_reasoning': llm_settings.allow_reasoning
+                'llm_base_url': self.llm_settings.llm_base_url,
+                'llm_model': self.llm_settings.llm_model,
+                'max_retries': self.llm_settings.max_retries,
+                'allow_reasoning': self.llm_settings.allow_reasoning
             },
             'rag_settings': {
-                'prompt_template': rag_settings.prompt_template
+                'prompt_template': self.rag_settings.prompt_template
             },
             'search_settings': {
-                'search_provider': search_settings.search_provider,
-                'serper_fetch_full_content': search_settings.serper_fetch_full_content
+                'search_provider': self.search_settings.search_provider,
+                'serper_fetch_full_content': self.search_settings.serper_fetch_full_content
             }
         }
-        return RagAdhocRun.objects.create(
+
+    def create_run_object(self):
+        run_name = f"RAG Ad-hoc Run {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+        snapshot = self.get_settings_snapshot()
+        return AdhocRun.objects.create(
             name=run_name,
             settings_snapshot=snapshot,
             total_questions=0,
-            correct_answers=0
+            correct_answers=0,
+            run_type='rag'
         )
 
     def process_question(self, run, question, ground_truths):
@@ -333,14 +293,10 @@ class RagAdhocPipeline(BaseAdhocPipeline):
         
         answer, full_response = self.get_llm_response([{"role": "user", "content": prompt}])
         
-        # Adhoc RAG also needs to support reasoning parsing
-        settings = LLMSettings.load()
-        print_debug("RAG Adhoc Full Response:", full_response)
-        
         rule_result = check_answer_rule(question, ground_truths, answer)
         llm_result = check_answer_llm(question, ground_truths, answer, client=self.client, model=self.model)
 
-        RagAdhocResult.objects.create(
+        AdhocResult.objects.create(
             run=run,
             question=question,
             ground_truths=ground_truths,
@@ -368,7 +324,7 @@ class BaseMultiTurnPipeline(BasePipeline):
     def __init__(self, base_url, api_key, model, max_retries, pipeline_id=None, dataset_id=None):
         super().__init__(base_url, api_key, model, pipeline_id, dataset_id)
         self.max_retries = max_retries
-        self.redis_prefix = "multi_turn_pipeline_active"
+        self.redis_prefix = REDIS_PREFIX_MULTI_TURN
 
     def create_session(self, settings, question_text, ground_truths, group):
         raise NotImplementedError("Subclasses must implement create_session")
@@ -379,33 +335,104 @@ class BaseMultiTurnPipeline(BasePipeline):
     def _construct_messages(self, session, trial):
         raise NotImplementedError("Subclasses must implement _construct_messages")
 
-    def run(self):
-        group_name = f"Pipeline Run ({self.__class__.__name__}) - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}" 
-        
-        # Load settings for snapshot
-        llm_settings = LLMSettings.load()
-        rag_settings = RagSettings.load()
-        search_settings = SearchSettings.load()
+    def _process_single_session(self, group, question_text, ground_truths):
+        """
+        Process a single question session, including retries.
+        Yields events for each step.
+        """
+        try:
+            session = self.create_session(self.llm_settings, question_text, ground_truths, group)
 
-        snapshot = {
-            'llm_settings': {
-                'llm_base_url': llm_settings.llm_base_url,
-                'llm_model': llm_settings.llm_model,
-                'max_retries': llm_settings.max_retries,
-                'allow_reasoning': llm_settings.allow_reasoning
-            },
-            'rag_settings': {
-                'prompt_template': rag_settings.prompt_template
-            },
-            'search_settings': {
-                'search_provider': search_settings.search_provider,
-                'serper_fetch_full_content': search_settings.serper_fetch_full_content
+            yield {
+                'is_meta': True,
+                'type': 'session_created',
+                'session_id': session.id,
+                'question': question_text,
+                'group_id': group.id,
+                'group_name': group.name
             }
-        }
 
-        group = MultiTurnSessionGroup.objects.create(name=group_name, settings_snapshot=snapshot)
-        settings = llm_settings # Pass LLM settings to create_session if needed
+            is_session_completed = False
+            trial_number = 1
+            final_is_correct = False
+            final_answer = ""
+            
+            while trial_number <= self.max_retries and not is_session_completed:
+                if not self.check_active():
+                    break
 
+                trial = self.create_trial(session, trial_number)
+                
+                yield {
+                    'is_meta': True,
+                    'type': 'trial_started',
+                    'session_id': session.id,
+                    'trial_number': trial_number,
+                    'group_id': group.id
+                }
+
+                messages = self._construct_messages(session, trial)
+                
+                try:
+                    parsed_answer, full_response = self.get_llm_response(messages)
+                except Exception as e:
+                    trial.status = 'error'
+                    trial.save()
+                    raise e
+                
+                is_correct = check_answer_llm(session.question, session.ground_truths, parsed_answer, client=self.client, model=self.model)
+
+                trial.answer = parsed_answer
+                trial.full_response = full_response
+                trial.is_correct = is_correct
+                trial.feedback = "Correct" if is_correct else "Incorrect"
+                trial.status = 'completed'
+                trial.save()
+
+                yield {
+                    'is_meta': True,
+                    'type': 'trial_completed',
+                    'session_id': session.id,
+                    'trial_number': trial_number,
+                    'is_correct': is_correct,
+                    'answer': parsed_answer, # Send parsed answer for display/check validity
+                    'full_response': full_response,
+                    'group_id': group.id
+                }
+
+                final_answer = parsed_answer
+                final_is_correct = is_correct
+
+                if is_correct:
+                    is_session_completed = True
+                else:
+                    trial_number += 1
+            
+            session.is_completed = True
+            session.save()
+
+            yield {
+                'question': question_text,
+                'correct': final_is_correct,
+                'trials': trial_number if final_is_correct else (trial_number - 1),
+                'session_id': session.id,
+                'final_answer': final_answer,
+                'ground_truths': ground_truths,
+                'max_retries': self.max_retries,
+                'group_name': group.name,
+                'group_id': group.id
+            }
+
+        except Exception as e:
+            yield {'error': str(e), 'question': question_text}
+
+    def run(self):
+        group_name = f"{str(self)}- {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}" 
+        
+        snapshot = self.get_settings_snapshot()
+
+        group = MultiTurnRun.objects.create(name=group_name, settings_snapshot=snapshot)
+        
         total_questions = 0
         questions_iterator = None
         
@@ -422,11 +449,11 @@ class BaseMultiTurnPipeline(BasePipeline):
             
             questions_iterator = self.load_questions()
         except (ValueError, FileNotFoundError, BenchmarkDataset.DoesNotExist) as e:
-            yield json.dumps({'error': str(e)}) + "\n"
+            yield {'error': str(e)}
             self.stop_token()
             return
 
-        yield json.dumps({'is_meta': True, 'type': 'total_count', 'count': total_questions}) + "\n"
+        yield {'is_meta': True, 'type': 'total_count', 'count': total_questions}
 
         for data in questions_iterator:
             if not self.check_active():
@@ -435,94 +462,7 @@ class BaseMultiTurnPipeline(BasePipeline):
             question_text = data['question']
             ground_truths = data.get('ground_truths', [])
             
-            try:
-                session = self.create_session(settings, question_text, ground_truths, group)
-
-                yield json.dumps({
-                    'is_meta': True,
-                    'type': 'session_created',
-                    'session_id': session.id,
-                    'question': question_text,
-                    'group_id': group.id,
-                    'group_name': group_name
-                }) + "\n"
-
-                is_session_completed = False
-                trial_number = 1
-                final_is_correct = False
-                final_answer = ""
-                
-                while trial_number <= self.max_retries and not is_session_completed:
-                    if not self.check_active():
-                        break
-
-                    trial = self.create_trial(session, trial_number)
-                    
-                    yield json.dumps({
-                        'is_meta': True,
-                        'type': 'trial_started',
-                        'session_id': session.id,
-                        'trial_number': trial_number,
-                        'group_id': group.id
-                    }) + "\n"
-
-                    messages = self._construct_messages(session, trial)
-                    
-                    try:
-                        parsed_answer, full_response = self.get_llm_response(messages)
-                    except Exception as e:
-                        trial.status = 'error'
-                        trial.save()
-                        raise e
-                    
-                    # Check if reasoning is enabled (using snapshot or current settings)
-                    # Ideally we check settings snapshot from group, but for now we can check LLMSettings
-                    
-                    is_correct = check_answer_llm(session.question, session.ground_truths, parsed_answer, client=self.client, model=self.model)
-
-                    trial.answer = parsed_answer
-                    trial.full_response = full_response
-                    trial.is_correct = is_correct
-                    trial.feedback = "Correct" if is_correct else "Incorrect"
-                    trial.status = 'completed'
-                    trial.save()
-
-                    yield json.dumps({
-                        'is_meta': True,
-                        'type': 'trial_completed',
-                        'session_id': session.id,
-                        'trial_number': trial_number,
-                        'is_correct': is_correct,
-                        'answer': parsed_answer, # Send parsed answer for display/check validity
-                        'full_response': full_response,
-                        'group_id': group.id
-                    }) + "\n"
-
-                    final_answer = parsed_answer
-                    final_is_correct = is_correct
-
-                    if is_correct:
-                        is_session_completed = True
-                    else:
-                        trial_number += 1
-                
-                session.is_completed = True
-                session.save()
-
-                yield json.dumps({
-                    'question': question_text,
-                    'correct': final_is_correct,
-                    'trials': trial_number if final_is_correct else (trial_number - 1),
-                    'session_id': session.id,
-                    'final_answer': final_answer,
-                    'ground_truths': ground_truths,
-                    'max_retries': self.max_retries,
-                    'group_name': group_name,
-                    'group_id': group.id
-                }) + "\n"
-
-            except Exception as e:
-                yield json.dumps({'error': str(e), 'question': question_text}) + "\n"
+            yield from self._process_single_session(group, question_text, ground_truths)
         
         self.stop_token()
 
@@ -556,18 +496,32 @@ class BaseMultiTurnPipeline(BasePipeline):
 class VanillaLLMMultiTurnPipeline(BaseMultiTurnPipeline):
     def __init__(self, base_url, api_key, model, max_retries, pipeline_id=None, dataset_id=None):
         super().__init__(base_url, api_key, model, max_retries, pipeline_id, dataset_id)
-        self.redis_prefix = "vanilla_llm_multi_turn_pipeline_active"
+        self.redis_prefix = REDIS_PREFIX_VANILLA_MULTI_TURN
+        
+    def __str__(self):
+        return "Vanilla LLM Multi-Turn Pipeline"
+
+    def get_settings_snapshot(self):
+        return {
+            'llm_settings': {
+                'llm_base_url': self.llm_settings.llm_base_url,
+                'llm_model': self.llm_settings.llm_model,
+                'max_retries': self.llm_settings.max_retries,
+                'allow_reasoning': self.llm_settings.allow_reasoning
+            }
+        }
 
     def create_session(self, settings, question_text, ground_truths, group):
-        return VanillaLLMMultiTurnSession.objects.create(
+        return MultiTurnSession.objects.create(
             question=question_text,
             ground_truths=ground_truths,
-            group=group,
-            run_tag=self.pipeline_id
+            run=group, 
+            run_tag=self.pipeline_id,
+            pipeline_type='vanilla'
         )
 
     def create_trial(self, session, trial_number):
-        return VanillaLLMMultiTurnTrial.objects.create(
+        return MultiTurnTrial.objects.create(
             session=session,
             trial_number=trial_number,
             status='processing'
@@ -576,10 +530,13 @@ class VanillaLLMMultiTurnPipeline(BaseMultiTurnPipeline):
     def _construct_messages(self, session, trial):
         trial_number = trial.trial_number
         messages = []
-        settings = LLMSettings.load()
         
+        # session.run is the MultiTurnRun object
+        settings_snapshot = session.run.settings_snapshot
+        allow_reasoning = settings_snapshot.get('llm_settings', {}).get('allow_reasoning', False)
+
         if trial_number == 1:
-            if settings.allow_reasoning:
+            if allow_reasoning:
                 answer_prompt = PROMPTS["multi_turn_reasoning_initial"].format(question=session.question)
             else:
                 answer_prompt = PROMPTS["multi_turn_initial"].format(question=session.question)
@@ -593,7 +550,7 @@ class VanillaLLMMultiTurnPipeline(BaseMultiTurnPipeline):
                 if prev_trial.is_correct == False:
                     messages.append({"role": "user", "content": "Your previous answer was incorrect."})
             
-            if settings.allow_reasoning:
+            if allow_reasoning:
                 messages.append({"role": "user", "content": PROMPTS["multi_turn_reasoning_followup"]})
             else:
                 messages.append({"role": "user", "content": PROMPTS["multi_turn_followup"]})
@@ -607,18 +564,41 @@ class RagMultiTurnPipeline(BaseMultiTurnPipeline):
         self.search_engine = get_search_engine()
         self.reformulation_strategy = reformulation_strategy
         self.redis_prefix = f"rag_multi_turn_{self.reformulation_strategy}_pipeline_active"
+    
+    def __str__(self):
+        return f"RAG Multi-Turn Pipeline ({self.reformulation_strategy})"
+
+    def get_settings_snapshot(self):
+        rag_settings = RagSettings.load()
+        search_settings = SearchSettings.load()
+        return {
+            'llm_settings': {
+                'llm_base_url': self.llm_settings.llm_base_url,
+                'llm_model': self.llm_settings.llm_model,
+                'max_retries': self.llm_settings.max_retries,
+                'allow_reasoning': self.llm_settings.allow_reasoning
+            },
+            'rag_settings': {
+                'prompt_template': rag_settings.prompt_template
+            },
+            'search_settings': {
+                'search_provider': search_settings.search_provider,
+                'serper_fetch_full_content': search_settings.serper_fetch_full_content
+            }
+        }
 
     def create_session(self, settings, question_text, ground_truths, group):
-        return RAGMultiTurnSession.objects.create(
+        return MultiTurnSession.objects.create(
             question=question_text,
             ground_truths=ground_truths,
-            group=group,
+            run=group,
             reformulation_strategy=self.reformulation_strategy,
-            run_tag=self.pipeline_id
+            run_tag=self.pipeline_id,
+            pipeline_type='rag'
         )
 
     def create_trial(self, session, trial_number):
-        return RAGMultiTurnTrial.objects.create(
+        return MultiTurnTrial.objects.create(
             session=session,
             trial_number=trial_number,
             status='processing'
@@ -630,6 +610,9 @@ class RagMultiTurnPipeline(BaseMultiTurnPipeline):
         current_search_query = session.question
         search_results = None
         
+        settings_snapshot = session.run.settings_snapshot
+        allow_reasoning = settings_snapshot.get('llm_settings', {}).get('allow_reasoning', False)
+
         # Optimization: Reuse search results from the first trial if no reformulation is used
         if self.reformulation_strategy == 'no_reform' and trial_number > 1:
             first_trial = session.trials.filter(trial_number=1).first()
@@ -681,8 +664,7 @@ class RagMultiTurnPipeline(BaseMultiTurnPipeline):
             if prev_trial.is_correct == False:
                 messages.append({"role": "user", "content": "Your previous answer was incorrect."})
 
-        settings = LLMSettings.load()
-        if settings.allow_reasoning:
+        if allow_reasoning:
             messages.append({"role": "user", "content": "Answer the question based on the context. Reference the provided source (like [1]) to avoid hallucination.\nFirst, explain your reasoning step-by-step.\nThen, on a new line, provide the final answer starting with 'Final Answer:'.\n\nFollow these rules for the final answer strictly:\n1. It must be an exact match to the correct answer.\n2. Do not include any punctuation.\n3. Do not include any extra words or sentences."})
         else:
             messages.append({"role": "user", "content": "Answer the question based on the context. Return ONLY the exact answer."})

@@ -241,14 +241,20 @@ class MCPSearch(WebSearch):
         if not self._client:
             return [{"error": "MCP client not initialized."}]
 
+        fetch_full_content = getattr(self, 'fetch_full_content', True)
+
         search_args = {
             "query": query,
             "limit": 5,
-            "includeContent": True
         }
+        
+        tool_name = "get-web-search-summaries"
+        if fetch_full_content:
+            tool_name = "full-web-search"
+            search_args["includeContent"] = True # Only include this for full-web-search
 
         try:
-            search_result = self._client.call_tool("full-web-search", search_args)
+            search_result = self._client.call_tool(tool_name, search_args)
         except Exception as e:
             print_debug(f"Error calling MCP tool: {e}")
             return [{"error": f"Error calling MCP tool: {str(e)}"}]
@@ -257,7 +263,7 @@ class MCPSearch(WebSearch):
             text_content = search_result['content'][0]['text']
             return self._parse_mcp_text_response(text_content)
         else:
-            return [{"error": "Did not receive a valid search result."}]
+            return [{"error": "Did not receive a valid search result or content is empty."}]
     
     def close(self):
         if self._client:
@@ -451,6 +457,8 @@ def get_search_engine() -> WebSearch:
     
     if settings.search_provider == 'serper':
         api_key = os.getenv('SERPER_API_KEY') or settings.serper_api_key
-        return SerperSearch(api_key=api_key, fetch_full_content=settings.serper_fetch_full_content)
+        return SerperSearch(api_key=api_key, fetch_full_content=settings.fetch_full_content)
     else:
-        return MCPSearch()
+        mcp = MCPSearch()
+        mcp.fetch_full_content = settings.fetch_full_content
+        return mcp

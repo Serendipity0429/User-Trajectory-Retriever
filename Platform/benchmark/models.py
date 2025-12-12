@@ -62,7 +62,7 @@ class SearchSettings(SingletonModel):
     ]
     search_provider = models.CharField(max_length=20, choices=PROVIDER_CHOICES, default='mcp', help_text="Select the search provider.")
     serper_api_key = models.CharField(max_length=255, blank=True, help_text="API Key for Serper.dev")
-    serper_fetch_full_content = models.BooleanField(default=True, help_text="If enabled, fetches full page content for Serper results.")
+    fetch_full_content = models.BooleanField(default=True, help_text="If enabled, fetches full page content for search results (Serper & MCP).")
 
     def __str__(self):
         return "Search Settings"

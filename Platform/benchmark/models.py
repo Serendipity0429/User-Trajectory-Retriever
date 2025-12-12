@@ -77,6 +77,11 @@ class LLMSettings(SingletonModel):
     llm_api_key = models.CharField(max_length=255, blank=True, help_text="Your API Key")
     max_retries = models.PositiveIntegerField(default=3, help_text="Maximum number of retries allowed for the LLM.")
     allow_reasoning = models.BooleanField(default=False, help_text="Allow the LLM to output its chain of thought reasoning before the final answer.")
+    
+    # Advanced Parameters
+    temperature = models.FloatField(default=0.0, help_text="Sampling temperature (0.0 to 2.0).")
+    top_p = models.FloatField(default=1.0, help_text="Nucleus sampling probability (0.0 to 1.0).")
+    max_tokens = models.PositiveIntegerField(null=True, blank=True, help_text="Maximum number of tokens to generate.")
 
     def __str__(self):
         return "LLM Settings"

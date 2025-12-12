@@ -388,7 +388,10 @@ const BenchmarkUtils = {
                     llm_api_key: document.getElementById('llm_api_key').value,
                     llm_model: document.getElementById('llm_model').value,
                     max_retries: document.getElementById('max_retries') ? document.getElementById('max_retries').value : 3,
-                    allow_reasoning: document.getElementById('allow_reasoning') ? document.getElementById('allow_reasoning').checked : false
+                    allow_reasoning: document.getElementById('allow_reasoning') ? document.getElementById('allow_reasoning').checked : false,
+                    temperature: document.getElementById('temperature') ? document.getElementById('temperature').value : 0.0,
+                    top_p: document.getElementById('top_p') ? document.getElementById('top_p').value : 1.0,
+                    max_tokens: document.getElementById('max_tokens') ? document.getElementById('max_tokens').value : null
                 };
                 BenchmarkUtils.saveSettings(BenchmarkUrls.saveLlmSettings, csrfToken, data, 'save-llm-settings-btn');
                 
@@ -805,28 +808,15 @@ const BenchmarkUtils = {
                     const reasoningContainer = document.createElement('div');
                     reasoningContainer.className = 'mt-1';
 
-                    const toggleBtn = document.createElement('button');
-                    toggleBtn.className = 'btn btn-link btn-sm p-0 text-decoration-none small';
-                    toggleBtn.innerHTML = '<i class="bi bi-caret-right-fill"></i> Show Reasoning';
-                    toggleBtn.style.fontSize = '0.75rem';
-                    
-                    const reasoningDiv = document.createElement('div');
-                    reasoningDiv.className = 'mt-1 p-2 bg-light border rounded small text-secondary';
-                    reasoningDiv.style.display = 'none';
-                    reasoningDiv.style.whiteSpace = 'pre-wrap'; // Preserve formatting
-                    reasoningDiv.textContent = data.full_response;
+                    const viewReasoningBtn = document.createElement('button');
+                    viewReasoningBtn.className = 'btn btn-link btn-sm p-0 text-decoration-none small view-reasoning-btn';
+                    viewReasoningBtn.dataset.reasoning = data.full_response;
+                    viewReasoningBtn.type = 'button';
+                    viewReasoningBtn.innerHTML = '<i class="bi bi-card-text"></i> View Reasoning';
+                    viewReasoningBtn.style.fontSize = '0.9rem';
+                    viewReasoningBtn.classList.add(textColorClass);
 
-                    toggleBtn.onclick = (e) => {
-                        e.stopPropagation(); // Prevent row click
-                        const isHidden = reasoningDiv.style.display === 'none';
-                        reasoningDiv.style.display = isHidden ? 'block' : 'none';
-                        toggleBtn.innerHTML = isHidden ? 
-                            '<i class="bi bi-caret-down-fill"></i> Hide Reasoning' : 
-                            '<i class="bi bi-caret-right-fill"></i> Show Reasoning';
-                    };
-
-                    reasoningContainer.appendChild(toggleBtn);
-                    reasoningContainer.appendChild(reasoningDiv);
+                    reasoningContainer.appendChild(viewReasoningBtn);
                     td3.appendChild(reasoningContainer);
                 }
                 
@@ -972,8 +962,8 @@ const BenchmarkUtils = {
             resultsListElement.appendChild(alertDiv);
         },
 
-        renderModalSearchResults: function(results, container, modalId = 'searchResultsListModal') {
-            const modalTitle = document.getElementById('searchResultsListModalLabel');
+        renderModalSearchResults: function(results, container, modalId = 'benchmarkGenericModal') {
+            const modalTitle = document.getElementById(modalId + 'Label');
             if (modalTitle) modalTitle.textContent = 'Search Results';
             container.innerHTML = ''; // Clear existing content
 
@@ -1053,8 +1043,8 @@ const BenchmarkUtils = {
          * @param {string} modalId - The ID of the modal itself.
          * @param {string} title - The title to display in the modal header.
          */
-        renderPromptModal: function(promptContent, containerId, modalId = 'searchResultsListModal', title = 'RAG Prompt') {
-            const modalTitle = document.getElementById('searchResultsListModalLabel');
+        renderPromptModal: function(promptContent, containerId, modalId = 'benchmarkGenericModal', title = 'RAG Prompt') {
+            const modalTitle = document.getElementById(modalId + 'Label');
             if (modalTitle) modalTitle.textContent = title;
 
             const container = document.getElementById(containerId);
@@ -1492,7 +1482,7 @@ const BenchmarkUtils = {
                 button.type = 'button';
                 button.textContent = 'View Full Prompt';
                 button.onclick = () => {
-                    BenchmarkUtils.BenchmarkRenderer.renderPromptModal(prompt, 'modal-search-results-container', 'searchResultsListModal', 'RAG Prompt');
+                    BenchmarkUtils.BenchmarkRenderer.renderPromptModal(prompt, 'modal-generic-content-container', 'benchmarkGenericModal', 'RAG Prompt');
                 };
 
                 divOverflow.appendChild(button);
@@ -2114,6 +2104,7 @@ const BenchmarkUtils = {
             
             const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
             if (!csrfToken) console.error("CSRF Token is missing or empty!");
+            BenchmarkUtils.setupConfigurationHandlers();
             BenchmarkUtils.setupConfigurationActionHandlers(csrfToken, true, true);
             
             // questionsData removed - we now rely on backend streaming
@@ -2466,11 +2457,19 @@ const BenchmarkUtils = {
                     const btn = e.target.closest('.view-all-results-btn');
                     try {
                         const results = JSON.parse(decodeURIComponent(btn.dataset.results));
-                        const container = document.getElementById('modal-search-results-container');
+                        const container = document.getElementById('modal-generic-content-container');
                         BenchmarkUtils.BenchmarkRenderer.renderModalSearchResults(results, container);
-                        const modal = new bootstrap.Modal(document.getElementById('searchResultsListModal'));
+                        const modal = new bootstrap.Modal(document.getElementById('benchmarkGenericModal'));
                         modal.show();
                     } catch (err) { console.error(err); }
+                }
+
+                // View Reasoning Modal Trigger
+                if (e.target && e.target.closest('.view-reasoning-btn')) {
+                    e.preventDefault();
+                    const btn = e.target.closest('.view-reasoning-btn');
+                    const reasoning = btn.dataset.reasoning;
+                    BenchmarkUtils.BenchmarkRenderer.renderPromptModal(reasoning, 'modal-generic-content-container', 'benchmarkGenericModal', 'Reasoning Chain');
                 }
             });
         }
@@ -2487,6 +2486,7 @@ const BenchmarkUtils = {
             
             const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
             if (!csrfToken) console.error("CSRF Token is missing or empty!");
+            BenchmarkUtils.setupConfigurationHandlers();
             BenchmarkUtils.setupConfigurationActionHandlers(csrfToken, true, true);
             // questions data removed - parsing only on demand
             

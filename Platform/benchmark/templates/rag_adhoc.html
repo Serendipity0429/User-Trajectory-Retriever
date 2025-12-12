@@ -71,19 +71,6 @@
         </div>
     </div>
 
-    <!-- Configuration Cards -->
-    <div class="row justify-content-center">
-        <div class="col-md-4">
-            {% include 'includes/rag_config.html' %}
-        </div>
-        <div class="col-md-4">
-            {% include 'includes/search_config.html' %}
-        </div>
-        <div class="col-md-4">
-            {% include 'includes/llm_config.html' with show_retries=False card_expanded=False %}
-        </div>
-    </div>
-
     <div class="row justify-content-center mt-4">
         <!-- Web Search Test Card -->
         <div class="col-md-12">
@@ -104,6 +91,20 @@
                     </div>
                 </div>
             </div>
+        </div>
+    </div>
+
+
+    <!-- Configuration Cards -->
+    <div class="row justify-content-center">
+        <div class="col-md-4">
+            {% include 'includes/rag_config.html' %}
+        </div>
+        <div class="col-md-4">
+            {% include 'includes/search_config.html' %}
+        </div>
+        <div class="col-md-4">
+            {% include 'includes/llm_config.html' with show_retries=False card_expanded=False %}
         </div>
     </div>
 
@@ -266,16 +267,16 @@
     </div>
 </div>
 
-    <!-- Search Results List Modal -->
-    <div class="modal fade" id="searchResultsListModal" tabindex="-1" aria-hidden="true">
+    <!-- Generic Details Modal -->
+    <div class="modal fade" id="benchmarkGenericModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-lg modal-dialog-scrollable">
             <div class="modal-content">
                 <div class="modal-header">
-                        <h5 class="modal-title" id="searchResultsListModalLabel">Search Results</h5>
+                        <h5 class="modal-title" id="benchmarkGenericModalLabel">Details</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    <div id="modal-search-results-container" class="list-group list-group-flush">
+                    <div id="modal-generic-content-container" class="list-group list-group-flush">
                         <!-- Results will be injected here -->
                     </div>
                 </div>

@@ -383,6 +383,16 @@ def save_llm_settings(request):
         settings_obj.llm_api_key = data.get("llm_api_key", "")
         settings_obj.max_retries = data.get("max_retries", 3)
         settings_obj.allow_reasoning = data.get("allow_reasoning", False)
+        
+        # Advanced params
+        settings_obj.temperature = float(data.get("temperature", 0.0))
+        settings_obj.top_p = float(data.get("top_p", 1.0))
+        max_tokens_val = data.get("max_tokens")
+        if max_tokens_val is not None and max_tokens_val != "":
+            settings_obj.max_tokens = int(max_tokens_val)
+        else:
+            settings_obj.max_tokens = None
+            
         settings_obj.save()
         return JsonResponse({"status": "ok"})
     except OperationalError:

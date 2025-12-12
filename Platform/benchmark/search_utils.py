@@ -4,6 +4,11 @@ import subprocess
 import json
 import os
 import threading
+import requests
+from bs4 import BeautifulSoup
+import re
+import random
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from .utils import print_debug
 
 class WebSearch(ABC):
@@ -276,44 +281,102 @@ class MCPSearch(WebSearch):
             
         return "\n\n".join(formatted)
 
+class WebCrawler:
+    def __init__(self, timeout=6, max_content_length=500000):
+        self.timeout = timeout
+        self.max_content_length = max_content_length
+        self.user_agents = [
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+        ]
+
+    def extract(self, url: str) -> str:
+        try:
+            headers = {
+                'User-Agent': random.choice(self.user_agents),
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'DNT': '1',
+                'Connection': 'keep-alive',
+                'Upgrade-Insecure-Requests': '1',
+            }
+            response = requests.get(url, headers=headers, timeout=self.timeout)
+            response.raise_for_status()
+            return self._parse_content(response.text)
+        except Exception as e:
+            print_debug(f"WebCrawler error for {url}: {e}")
+            return ""
+
+    def _parse_content(self, html: str) -> str:
+        if not html:
+            return ""
+        soup = BeautifulSoup(html, 'html.parser')
+        
+        # Remove unwanted elements
+        for element in soup(['script', 'style', 'noscript', 'iframe', 'img', 'video', 'audio', 'canvas', 'svg', 'object', 'embed', 'applet', 'form', 'input', 'textarea', 'select', 'button', 'label', 'fieldset', 'legend', 'optgroup', 'option', 'nav', 'header', 'footer', 'aside']):
+            element.decompose()
+            
+        # Try to find main content
+        main_content = ""
+        # Priority selectors for main content
+        content_selectors = [
+            'article', 'main', '[role="main"]', '.content', '.post-content', 
+            '.entry-content', '.article-content', '#content', '#main'
+        ]
+        
+        for selector in content_selectors:
+            found = soup.select_one(selector)
+            if found:
+                text = found.get_text(separator=' ', strip=True)
+                if len(text) > 100:
+                    main_content = text
+                    break
+        
+        if not main_content:
+            main_content = soup.get_text(separator=' ', strip=True)
+            
+        return self._clean_text(main_content)
+
+    def _clean_text(self, text: str) -> str:
+        # Remove excessive whitespace
+        text = re.sub(r'\s+', ' ', text)
+        return text.strip()[:self.max_content_length]
+
+    def batch_extract(self, items: list, max_workers: int = None) -> list:
+        if not items:
+            return items
+            
+        if max_workers is None:
+            # Default to number of CPUs, but cap at len(items)
+            import multiprocessing
+            try:
+                cpu_count = multiprocessing.cpu_count()
+            except ImportError:
+                cpu_count = 4 # Fallback
+            max_workers = min(cpu_count, len(items))
+        
+        # Ensure at least 1 worker
+        max_workers = max(1, max_workers)
+        
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            future_to_item = {executor.submit(self.extract, item.get('url')): item for item in items if item.get('url')}
+            for future in as_completed(future_to_item):
+                item = future_to_item[future]
+                try:
+                    content = future.result()
+                    if content:
+                        item['content'] = content
+                except Exception as e:
+                    print_debug(f"Error fetching content for {item.get('url')}: {e}")
+        return items
+
 class SerperSearch(WebSearch):
     def __init__(self, api_key, fetch_full_content=True):
         self.api_key = api_key
         self.fetch_full_content = fetch_full_content
-
-    def _fetch_page_content(self, url: str) -> str:
-        """Helper to fetch and parse main content from a URL."""
-        import requests
-        from bs4 import BeautifulSoup
-
-        try:
-            # Use a generic user agent to avoid being blocked by some sites
-            headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-            }
-            response = requests.get(url, headers=headers, timeout=5)
-            response.raise_for_status()
-            
-            soup = BeautifulSoup(response.content, 'html.parser')
-            
-            # Remove script and style elements
-            for script in soup(["script", "style"]):
-                script.decompose()
-
-            # Get text
-            text = soup.get_text()
-
-            # Break into lines and remove leading/trailing space on each
-            lines = (line.strip() for line in text.splitlines())
-            # Break multi-headlines into a line each
-            chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
-            # Drop blank lines
-            text = '\n'.join(chunk for chunk in chunks if chunk)
-            
-            return text[:5000] # Limit content length to avoid context window issues
-        except Exception as e:
-            print_debug(f"Failed to fetch content for {url}: {e}")
-            return ""
+        self.crawler = WebCrawler()
 
     def search(self, query: str) -> list:
         if not self.api_key:
@@ -321,7 +384,6 @@ class SerperSearch(WebSearch):
             
         import http.client
         import json
-        from concurrent.futures import ThreadPoolExecutor, as_completed
 
         try:
             conn = http.client.HTTPSConnection("google.serper.dev")
@@ -361,16 +423,7 @@ class SerperSearch(WebSearch):
 
             # Parallel fetch
             if items_to_fetch:
-                with ThreadPoolExecutor(max_workers=5) as executor:
-                    future_to_item = {executor.submit(self._fetch_page_content, item['url']): item for item in items_to_fetch}
-                    for future in as_completed(future_to_item):
-                        item = future_to_item[future]
-                        try:
-                            full_text = future.result()
-                            if full_text:
-                                item['content'] = full_text
-                        except Exception as e:
-                            print_debug(f"Error fetching content for {item['url']}: {e}")
+                self.crawler.batch_extract(items_to_fetch)
 
             return results
 

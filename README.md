@@ -4,12 +4,10 @@ A comprehensive platform for recording, replaying, and annotating user trajector
 
 ## Overview
 
-User-Trajectory-Retriever is a powerful tool designed for researchers studying user behavior on the web. It allows for the detailed recording of user interactions—such as mouse movements, clicks, and scrolls—during specific tasks. The collected data can then be visualized, replayed, and annotated through a dedicated web platform, providing valuable insights into user engagement and decision-making processes.
+This project is a comprehensive platform for recording, replaying, and annotating user trajectories for web interaction research. It consists of two main components:
 
-The system is composed of two main parts:
-
-1.  **A Chrome Browser Extension (`ManifestV3`):** Records user interaction data in real-time using the `rrweb` library. It's lightweight and designed to have minimal impact on the user's browsing experience.
-2.  **A Django Web Platform (`Platform`):** Manages users, tasks, and collected data. It provides a comprehensive interface for replaying and annotating the recorded user sessions, managing research projects, and analyzing data.
+1.  **Django Web Platform (`Platform`):** A monolithic application built with Python and the Django Web Framework. It serves as the backend for managing users, tasks, and collected data, and provides a web interface for replaying and annotating the recorded user sessions. The platform uses a SQLite database by default but is configured to support PostgreSQL for production. It includes a REST API built with Django Rest Framework for communication with the browser extension.
+2.  **Chrome Browser Extension (`ManifestV3`):** A lightweight extension built with vanilla JavaScript that records user interaction data in real-time. It uses the `rrweb` library to capture DOM snapshots and interaction events. The extension communicates with the Django backend to send the recorded data and receive task information.
 
 ## Features
 
@@ -33,17 +31,23 @@ The system is composed of two main parts:
     -   **Task Metrics:** Distributions for task familiarity, difficulty, effort, and completion times.
     -   **User Feedback:** Visualizations for user confidence, "aha moments", and reasons for task cancellation or reflection failures.
     -   **Behavioral Analysis:** Histograms and box plots for task and trial completion times, as well as dwell time on pages.
+-   **API:** A REST API built with Django Rest Framework facilitates communication between the browser extension and the backend platform for data exchange and task management.
 
 ## Recent Updates
 
--   **UI Modernization and Responsiveness:** The entire user interface has been overhauled with a more modern aesthetic, improved layouts, and significantly enhanced responsiveness for mobile and tablet devices.
--   **Enhanced Admin Dashboard:** The administrator dashboard is now more powerful and user-friendly, featuring collapsible filter sections and dropdown menus for a cleaner experience.
--   **Benchmarking as Django Commands:** The performance benchmarking scripts have been refactored into Django management commands (`pressure_test` and `test_llm_judge`) for easier and more integrated execution.
--   **UI Enhancements:** The user interface has been updated to include a new messaging dropdown in the navigation bar, providing easy access to unread messages.
--   **Messaging System:** A new private messaging system has been integrated, replacing the previous reliance on Django's built-in messaging framework.
--   **Discussion Forum:** A new discussion forum has been added to the platform, allowing users to interact with each other, ask questions, and share their findings.
--   **UI Enhancements:** The user interface has been updated for a more modern look and feel, including the addition of a dark mode.
--   **Performance Improvements:** The rrweb player is now lazy-loaded, improving the initial page load time.
+-   **Advanced Benchmarking & RAG:**
+    -   **Chain of Thought (CoT):** Added support for CoT reasoning in LLM pipelines, with robust answer parsing.
+    -   **Refactored Pipelines:** Unified benchmark models and pipelines for better maintainability and extensibility.
+    -   **Multi-turn Improvements:** Enhanced RAG multi-turn pipelines with search result caching and improved source referencing.
+    -   **UI Overhaul:** Refactored and improved the benchmarking UI, including centralized logic for configuration and session rendering.
+-   **Codebase Modernization:**
+    -   **Dashboard App:** The admin dashboard has been moved to a dedicated `dashboard` app for better modularity.
+    -   **Centralized Logic:** Consolidated common JavaScript logic and LLM response handling to reduce duplication.
+-   **New Features:**
+    -   **Batch Operations:** Added functionality for batch deleting benchmark runs.
+    -   **Data Export:** Implemented CSV export for benchmark results to facilitate offline analysis.
+
+
 
 ## System Architecture
 
@@ -66,15 +70,9 @@ To get the system up and running, you need to set up both the backend platform a
 
 ### Backend (Django Platform)
 
-All commands should be run from the root of the project directory.
+All commands should be run from the root of the project directory. The backend server is located in the `Platform/` directory.
 
-1.  **Clone the repository:**
-    ```bash
-    git clone https://github.com/your-username/User-Trajectory-Retriever.git
-    cd User-Trajectory-Retriever
-    ```
-
-2.  **Create a virtual environment and install dependencies:**
+1.  **Create a virtual environment and install dependencies:**
 
     **Using `conda` (Recommended):**
     ```bash
@@ -90,34 +88,36 @@ All commands should be run from the root of the project directory.
     pip install -r requirements.txt
     ```
 
-3.  **Configure environment variables:**
+2.  **Configure environment variables:**
+    Create a `.env` file in the `Platform/` directory by copying the `.env.example` file.
     ```bash
     cp Platform/.env.example Platform/.env
     ```
-    Open the `Platform/.env` file and configure your settings:
-    -   **Email Configuration:** Required for features like password reset.
-    -   **LLM Configuration:** `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL` for benchmarking features.
-    -   **Search API:** `SERPER_API_KEY` for RAG capabilities.
-    -   **Database:** `DATABASE_TYPE` (sqlite or postgres) and related settings.
+    Update the `.env` file with your configuration:
+    -   **Email:** for password resets.
+    -   **LLM:** `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL` for benchmarking.
+    -   **Search:** `SERPER_API_KEY` for RAG.
+    -   **Database:** Set `DATABASE_TYPE=postgres` to use PostgreSQL (default is `sqlite`).
 
-4.  **Apply database migrations:**
+3.  **Apply database migrations:**
+    *Note: The user prefers to run migrations manually. Notify the user when migrations are needed.*
     ```bash
     python Platform/manage.py migrate
     ```
 
-5.  **Create a superuser:**
+4.  **Create a superuser:**
     ```bash
     python Platform/manage.py createsuperuser
     ```
     Follow the prompts to create an administrator account.
 
-6.  **Start the development server:**
+5.  **Start the development server:**
     ```bash
     python Platform/manage.py runserver
     ```
     The platform should now be running at `http://127.0.0.1:8000/`.
 
-7.  **Running in Production (with Gunicorn):**
+6.  **Running in Production (with Gunicorn):**
     For a more robust setup suitable for production, you can use Gunicorn. Make sure you have installed all the dependencies from `requirements.txt`.
     ```bash
     cd Platform
@@ -132,7 +132,7 @@ The extension is located in the `ManifestV3/` directory.
 1.  Open Google Chrome and navigate to `chrome://extensions`.
 2.  Enable **Developer mode** using the toggle in the top-right corner.
 3.  Click the **Load unpacked** button.
-4.  Select the `ManifestV3` folder from the cloned repository.
+4.  Select the `ManifestV3` folder.
 5.  The extension should now be installed and active in your browser.
 
 ## Usage

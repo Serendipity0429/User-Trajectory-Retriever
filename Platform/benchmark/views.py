@@ -314,13 +314,28 @@ def load_run(request, run_tag):
 
 
 @admin_required
-def get_llm_env_vars(request):
+def get_default_settings(request):
     try:
-        settings = get_llm_settings_with_fallback()
+        # LLM Defaults
+        llm_settings = get_llm_settings_with_fallback()
+        
+        # RAG & Search Defaults
+        rag_settings = RagSettings.load()
+        search_settings = SearchSettings.load()
+
         config_data = {
-            "llm_base_url": config("LLM_BASE_URL", default=settings.llm_base_url),
-            "llm_api_key": config("LLM_API_KEY", default=settings.llm_api_key),
-            "llm_model": config("LLM_MODEL", default=settings.llm_model),
+            # LLM
+            "llm_base_url": config("LLM_BASE_URL", default=llm_settings.llm_base_url),
+            "llm_api_key": config("LLM_API_KEY", default=llm_settings.llm_api_key),
+            "llm_model": config("LLM_MODEL", default=llm_settings.llm_model),
+            
+            # RAG
+            "rag_prompt_template": RagSettings._meta.get_field("prompt_template").get_default(),
+            
+            # Search
+            "search_provider": SearchSettings._meta.get_field("search_provider").get_default(),
+            "serper_api_key": config("SERPER_API_KEY", default=search_settings.serper_api_key),
+            "serper_fetch_full_content": SearchSettings._meta.get_field("serper_fetch_full_content").get_default(),
         }
         return JsonResponse(config_data)
     except OperationalError:

@@ -4,7 +4,7 @@ const API_PREFIX = '/benchmark/api';
 const BenchmarkUrls = {
     // LLM & Settings
     saveLlmSettings: `${API_PREFIX}/save_llm_settings/`,
-    getLlmEnvVars: `${API_PREFIX}/get_llm_env_vars/`,
+    getDefaultSettings: `${API_PREFIX}/get_default_settings/`,
     testLlmConnection: `${API_PREFIX}/test_llm_connection/`,
     
     // RAG & Search Settings
@@ -72,6 +72,8 @@ const BenchmarkUrls = {
 const BenchmarkState = {
     config: {
         lastSavedBaseUrl: '',
+        settingsInitialState: {}, // Stores the initial state of settings for change detection
+        hasUnsavedChanges: false,
     },
     activeRun: {
         id: null,
@@ -153,7 +155,7 @@ const BenchmarkUtils = {
         .then(response => response.json().then(data => ({status: response.status, body: data})))
         .then(({status, body}) => {
             if (status === 200) {
-                resultDiv.innerHTML = `<div class="alert alert-success alert-dismissible fade show" role="alert" id="test-connection-result"><button type="button" class="btn-close" aria-label="Close"></button>${body.message}</div>`;
+                resultDiv.innerHTML = `<span class="text-success small fw-semibold"><i class="bi bi-check-circle-fill me-1"></i>${body.message}</span>`;
                 
                 // If models are returned, enable datalist for the input
                 if (body.models && Array.isArray(body.models) && body.models.length > 0) {
@@ -194,19 +196,16 @@ const BenchmarkUtils = {
                     }
                 }
             } else {
-                resultDiv.innerHTML = `<div class="alert alert-danger" role="alert alert-dismissible fade show" role="alert" id="test-connection-result"><button type="button" class="btn-close" aria-label="Close"></button>${body.error || 'An error occurred while testing the connection.'}</div>`;
+                resultDiv.innerHTML = `<span class="text-danger small fw-semibold"><i class="bi bi-exclamation-circle-fill me-1"></i>${body.error || 'An error occurred while testing the connection.'}</span>`;
             }
         })
         .catch(error => {
-            resultDiv.innerHTML = `<div class="alert alert-danger" role="alert alert-dismissible fade show" role="alert" id="test-connection-result"><button type="button" class="btn-close" aria-label="Close"></button>A network error occurred.</div>`;
+            resultDiv.innerHTML = `<span class="text-danger small fw-semibold"><i class="bi bi-exclamation-circle-fill me-1"></i>A network error occurred.</span>`;
             console.error('Error:', error);
         })
         .finally(() => {
             btn.disabled = false;
             btn.innerHTML = originalText;
-            document.getElementById('test-connection-result').addEventListener('click', function(e) {
-                resultDiv.innerHTML = '';
-            }); 
         });
     },
 
@@ -241,6 +240,8 @@ const BenchmarkUtils = {
                     btn.innerHTML = originalText;
                     btn.className = originalClass; 
                 }, 1500);
+                BenchmarkState.config.hasUnsavedChanges = false; // Reset flag on successful save
+                BenchmarkUtils.saveInitialSettings(); // Update initial state
             } else {
                 alert('Error saving settings: ' + (resData.message || 'Unknown error'));
             }
@@ -252,61 +253,117 @@ const BenchmarkUtils = {
     },
 
     /**
-     * Restore default settings from .env via server.
-     * @param {string} url - The URL to fetch default settings.
-     * @param {function} callback - Callback function receiving the data.
+     * Captures the current state of settings inputs.
      */
-    restoreDefaults: function(url, callback) {
-        fetch(url)
+    saveInitialSettings: function() {
+        BenchmarkState.config.settingsInitialState = {
+            llm_base_url: document.getElementById('llm_base_url') ? document.getElementById('llm_base_url').value : '',
+            llm_api_key: document.getElementById('llm_api_key') ? document.getElementById('llm_api_key').value : '',
+            llm_model: document.getElementById('llm_model') ? document.getElementById('llm_model').value : '',
+            max_retries: document.getElementById('max_retries') ? document.getElementById('max_retries').value : '',
+            allow_reasoning: document.getElementById('allow_reasoning') ? document.getElementById('allow_reasoning').checked : false,
+            temperature: document.getElementById('temperature') ? document.getElementById('temperature').value : '',
+            top_p: document.getElementById('top_p') ? document.getElementById('top_p').value : '',
+            max_tokens: document.getElementById('max_tokens') ? document.getElementById('max_tokens').value : '',
+            
+            rag_prompt_template: document.getElementById('rag_prompt_template') ? document.getElementById('rag_prompt_template').value : '',
+            
+            search_provider: document.getElementById('search_provider') ? document.getElementById('search_provider').value : '',
+            serper_api_key: document.getElementById('serper_api_key') ? document.getElementById('serper_api_key').value : '',
+            serper_fetch_full_content: document.getElementById('serper_fetch_full_content') ? document.getElementById('serper_fetch_full_content').checked : false,
+        };
+        BenchmarkState.config.hasUnsavedChanges = false;
+        if(document.getElementById('unsaved-changes-alert')) document.getElementById('unsaved-changes-alert').style.display = 'none';
+    },
+
+    /**
+     * Checks for unsaved changes by comparing current values with initial state.
+     */
+    checkUnsavedChanges: function() {
+        const initial = BenchmarkState.config.settingsInitialState || {};
+        const current = {
+            llm_base_url: document.getElementById('llm_base_url') ? document.getElementById('llm_base_url').value : '',
+            llm_api_key: document.getElementById('llm_api_key') ? document.getElementById('llm_api_key').value : '',
+            llm_model: document.getElementById('llm_model') ? document.getElementById('llm_model').value : '',
+            max_retries: document.getElementById('max_retries') ? document.getElementById('max_retries').value : '',
+            allow_reasoning: document.getElementById('allow_reasoning') ? document.getElementById('allow_reasoning').checked : false,
+            temperature: document.getElementById('temperature') ? document.getElementById('temperature').value : '',
+            top_p: document.getElementById('top_p') ? document.getElementById('top_p').value : '',
+            max_tokens: document.getElementById('max_tokens') ? document.getElementById('max_tokens').value : '',
+            
+            rag_prompt_template: document.getElementById('rag_prompt_template') ? document.getElementById('rag_prompt_template').value : '',
+            
+            search_provider: document.getElementById('search_provider') ? document.getElementById('search_provider').value : '',
+            serper_api_key: document.getElementById('serper_api_key') ? document.getElementById('serper_api_key').value : '',
+            serper_fetch_full_content: document.getElementById('serper_fetch_full_content') ? document.getElementById('serper_fetch_full_content').checked : false,
+        };
+
+        let hasChanges = false;
+        for (const key in current) {
+            // Loose equality to handle string vs number differences (e.g. "3" vs 3)
+            if (current[key] != initial[key]) {
+                hasChanges = true;
+                break;
+            }
+        }
+
+        BenchmarkState.config.hasUnsavedChanges = hasChanges;
+        const alertEl = document.getElementById('unsaved-changes-alert');
+        if (alertEl) {
+            alertEl.style.display = hasChanges ? 'block' : 'none';
+        }
+    },
+
+    /**
+     * Restore default settings from .env via server.
+     */
+    restoreDefaults: function() {
+        fetch(BenchmarkUrls.getDefaultSettings)
             .then(response => response.json())
             .then(data => {
                 if(data.error) {
-                    alert('Error loading .env variables: ' + data.error);
+                    alert('Error loading default settings: ' + data.error);
                 } else {
-                    callback(data);
+                    // Apply LLM settings
+                    if (document.getElementById('llm_base_url') && data.llm_base_url) document.getElementById('llm_base_url').value = data.llm_base_url;
+                    if (document.getElementById('llm_api_key') && data.llm_api_key) document.getElementById('llm_api_key').value = data.llm_api_key;
+                    if (document.getElementById('llm_model') && data.llm_model) document.getElementById('llm_model').value = data.llm_model;
+                    // Add advanced LLM settings
+                    if (document.getElementById('max_retries') && data.max_retries) document.getElementById('max_retries').value = data.max_retries;
+                    if (document.getElementById('allow_reasoning') && data.allow_reasoning !== undefined) document.getElementById('allow_reasoning').checked = data.allow_reasoning;
+                    if (document.getElementById('temperature') && data.temperature !== undefined) document.getElementById('temperature').value = data.temperature;
+                    if (document.getElementById('top_p') && data.top_p !== undefined) document.getElementById('top_p').value = data.top_p;
+                    if (document.getElementById('max_tokens') && data.max_tokens !== undefined) document.getElementById('max_tokens').value = data.max_tokens;
+
+
+                    // Apply RAG settings
+                    if (document.getElementById('rag_prompt_template') && data.rag_prompt_template) document.getElementById('rag_prompt_template').value = data.rag_prompt_template;
+                    
+                    // Apply Search settings
+                    if (document.getElementById('search_provider') && data.search_provider) {
+                        document.getElementById('search_provider').value = data.search_provider;
+                        // Trigger change to update UI for serper_api_key container visibility
+                        document.getElementById('search_provider').dispatchEvent(new Event('change'));
+                    }
+                    if (document.getElementById('serper_api_key') && data.serper_api_key) document.getElementById('serper_api_key').value = data.serper_api_key;
+                    if (document.getElementById('serper_fetch_full_content') && data.serper_fetch_full_content !== undefined) document.getElementById('serper_fetch_full_content').checked = data.serper_fetch_full_content;
+
+                    // Update lastSavedBaseUrl and test connection
+                    if (document.getElementById('llm_base_url')) {
+                        BenchmarkState.config.lastSavedBaseUrl = document.getElementById('llm_base_url').value;
+                        BenchmarkUtils.testConnection(BenchmarkUrls.testLlmConnection, document.querySelector('meta[name="csrf-token"]').getAttribute('content'), {
+                            llm_base_url: document.getElementById('llm_base_url').value,
+                            llm_api_key: document.getElementById('llm_api_key').value,
+                            llm_model: document.getElementById('llm_model').value
+                        }, 'test-connection-result', 'test-connection-btn');
+                    }
+                    BenchmarkUtils.saveInitialSettings(); // Update initial state after restoring defaults
                 }
             })
             .catch(error => {
                 console.error('Error restoring defaults:', error);
                 alert('Failed to restore defaults.');
             });
-    },
-
-    /**
-     * Generate a UUID.
-     * @returns {string} UUID.
-     */
-    generateUUID: function() {
-        if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-            return crypto.randomUUID();
-        }
-        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-            var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
-            return v.toString(16);
-        });
-    },
-
-    /**
-     * Disable or enable configuration inputs.
-     * @param {boolean} disabled - Whether to disable the inputs.
-     */
-    toggleConfigurationInputs: function(disabled) {
-        const ids = [
-            // LLM
-            'llm_base_url', 'llm_model', 'llm_api_key', 'max_retries',
-            'save-llm-settings-btn', 'restore-defaults-btn', 'test-connection-btn',
-            // RAG
-            'rag_prompt_template', 'save-rag-settings-btn', 'restore-rag-defaults-btn',
-            // Search
-            'search_provider', 'serper_api_key', 'serper_fetch_full_content', 'save-search-settings-btn'
-        ];
-
-        ids.forEach(id => {
-            const el = document.getElementById(id);
-            if (el) {
-                el.disabled = disabled;
-            }
-        });
     },
 
     /**
@@ -354,11 +411,7 @@ const BenchmarkUtils = {
     },
 
     /**
-     * Setup event handlers for configuration actions (test connection, save settings, restore defaults).
-     * @param {object} urls - Object containing URLs for API endpoints (e.g., testLlmConnection, saveLlmSettings).
-     * @param {string} csrfToken - The CSRF token.
-     * @param {boolean} includeRag - Whether to include RAG settings handlers.
-     * @param {boolean} includeSearch - Whether to include Search settings handlers.
+     * Setup event handlers for configuration actions.
      */
     setupConfigurationActionHandlers: function(csrfToken, includeRag = false, includeSearch = false) {
         // LLM Settings
@@ -377,14 +430,47 @@ const BenchmarkUtils = {
         
         // Trigger on page load
         testConnection(); 
+        BenchmarkUtils.saveInitialSettings();
 
-        BenchmarkState.config.lastSavedBaseUrl = document.getElementById('llm_base_url') ? document.getElementById('llm_base_url').value : '';
+        // Check unsaved changes on input
+        const checkChanges = () => BenchmarkUtils.checkUnsavedChanges();
+        const settingsIds = [
+            'llm_base_url', 'llm_model', 'llm_api_key', 'max_retries', 'allow_reasoning',
+            'temperature', 'top_p', 'max_tokens',
+            'rag_prompt_template',
+            'search_provider', 'serper_api_key', 'serper_fetch_full_content'
+        ];
+        settingsIds.forEach(id => {
+            const el = document.getElementById(id);
+            if(el) {
+                el.addEventListener('input', checkChanges);
+                el.addEventListener('change', checkChanges);
+            }
+        });
 
-        if (document.getElementById('save-llm-settings-btn')) {
-            document.getElementById('save-llm-settings-btn').addEventListener('click', function() {
-                const currentBaseUrl = document.getElementById('llm_base_url').value;
-                const data = {
-                    llm_base_url: currentBaseUrl,
+        // Global Reset Button
+        const globalRestoreBtn = document.getElementById('global-restore-btn');
+        if (globalRestoreBtn) {
+            globalRestoreBtn.addEventListener('click', function() {
+                if(confirm('Are you sure you want to restore ALL settings to their defaults?')) {
+                     BenchmarkUtils.restoreDefaults();
+                }
+            });
+        }
+
+        // Global Save All Handler
+        if (document.getElementById('save-all-settings-btn')) {
+            document.getElementById('save-all-settings-btn').addEventListener('click', function() {
+                const btn = this;
+                const originalText = btn.innerHTML;
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Saving...';
+
+                const promises = [];
+
+                // LLM
+                const llmData = {
+                    llm_base_url: document.getElementById('llm_base_url').value,
                     llm_api_key: document.getElementById('llm_api_key').value,
                     llm_model: document.getElementById('llm_model').value,
                     max_retries: document.getElementById('max_retries') ? document.getElementById('max_retries').value : 3,
@@ -393,87 +479,88 @@ const BenchmarkUtils = {
                     top_p: document.getElementById('top_p') ? document.getElementById('top_p').value : 1.0,
                     max_tokens: document.getElementById('max_tokens') ? document.getElementById('max_tokens').value : null
                 };
-                BenchmarkUtils.saveSettings(BenchmarkUrls.saveLlmSettings, csrfToken, data, 'save-llm-settings-btn');
-                
-                // Test connection if base URL changed
-                if (currentBaseUrl !== BenchmarkState.config.lastSavedBaseUrl) {
-                    testConnection();
-                    BenchmarkState.config.lastSavedBaseUrl = currentBaseUrl;
+                promises.push(fetch(BenchmarkUrls.saveLlmSettings, {
+                    method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
+                    body: JSON.stringify(llmData)
+                }).then(r => r.json()));
+
+                // Search
+                if (document.getElementById('search_provider')) {
+                    let searchProvider = document.getElementById('search_provider').value;
+                    const searchData = {
+                        search_provider: searchProvider,
+                        serper_api_key: document.getElementById('serper_api_key').value,
+                        serper_fetch_full_content: document.getElementById('serper_fetch_full_content') ? document.getElementById('serper_fetch_full_content').checked : false
+                    };
+                    promises.push(fetch(BenchmarkUrls.saveSearchSettings, {
+                        method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
+                        body: JSON.stringify(searchData)
+                    }).then(r => r.json()));
+                }
+
+                // RAG
+                if (document.getElementById('rag_prompt_template')) {
+                     const ragData = { prompt_template: document.getElementById('rag_prompt_template').value };
+                     promises.push(fetch(BenchmarkUrls.saveRagSettings, {
+                        method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
+                        body: JSON.stringify(ragData)
+                    }).then(r => r.json()));
+                }
+
+                Promise.all(promises).then(results => {
+                    const allOk = results.every(r => r.status === 'ok');
+                    if (allOk) {
+                        btn.innerHTML = '<i class="bi bi-check-lg me-1"></i> Saved!';
+                        btn.classList.remove('btn-primary');
+                        btn.classList.add('btn-success');
+                        BenchmarkState.config.hasUnsavedChanges = false;
+                        BenchmarkUtils.saveInitialSettings();
+                        if(document.getElementById('unsaved-changes-alert')) document.getElementById('unsaved-changes-alert').style.display = 'none';
+
+                        setTimeout(() => {
+                            btn.innerHTML = originalText;
+                            btn.classList.remove('btn-success');
+                            btn.classList.add('btn-primary');
+                            btn.disabled = false;
+                        }, 1500);
+                        
+                        // Re-test connection if base URL changed
+                        if (llmData.llm_base_url !== BenchmarkState.config.lastSavedBaseUrl) {
+                            testConnection();
+                            BenchmarkState.config.lastSavedBaseUrl = llmData.llm_base_url;
+                        }
+
+                    } else {
+                        alert('Some settings failed to save.');
+                        btn.disabled = false;
+                        btn.innerHTML = originalText;
+                    }
+                }).catch(err => {
+                    console.error(err);
+                    alert('Network error saving settings.');
+                    btn.disabled = false;
+                    btn.innerHTML = originalText;
+                });
+            });
+        }
+
+        // Handle Modal Close
+        const settingsModal = document.getElementById('settingsModal');
+        if (settingsModal) {
+            settingsModal.addEventListener('hide.bs.modal', function(e) {
+                if (BenchmarkState.config.hasUnsavedChanges) {
+                    if (!confirm('You have unsaved changes. Are you sure you want to close without saving?')) {
+                        e.preventDefault();
+                    }
                 }
             });
         }
 
-        if (document.getElementById('restore-defaults-btn')) {
-            document.getElementById('restore-defaults-btn').addEventListener('click', function() {
-                BenchmarkUtils.restoreDefaults(BenchmarkUrls.getLlmEnvVars, (data) => {
-                    if (data.llm_base_url) document.getElementById('llm_base_url').value = data.llm_base_url;
-                    if (data.llm_api_key) document.getElementById('llm_api_key').value = data.llm_api_key;
-                    if (data.llm_model) document.getElementById('llm_model').value = data.llm_model;
-                    
-                    // Update lastSavedBaseUrl and test connection
-                    if (document.getElementById('llm_base_url')) {
-                        BenchmarkState.config.lastSavedBaseUrl = document.getElementById('llm_base_url').value;
-                        testConnection();
-                    }
-                });
-            });
-        }
 
-        if (includeRag) {
-            // RAG Settings
-            if (document.getElementById('save-rag-settings-btn')) {
-                document.getElementById('save-rag-settings-btn').addEventListener('click', function() {
-                    const data = {
-                        prompt_template: document.getElementById('rag_prompt_template').value
-                    };
-                    BenchmarkUtils.saveSettings(BenchmarkUrls.saveRagSettings, csrfToken, data, 'save-rag-settings-btn');
-                });
-            }
-
-            if (document.getElementById('restore-rag-defaults-btn')) {
-                document.getElementById('restore-rag-defaults-btn').addEventListener('click', function() {
-                    fetch(BenchmarkUrls.getDefaultRagPrompt)
-                        .then(res => res.json())
-                        .then(data => {
-                            if(data.default_prompt) {
-                                document.getElementById('rag_prompt_template').value = data.default_prompt;
-                            }
-                        })
-                        .catch(err => console.error(err));
-                });
-            }
-        }
-
-        if (includeSearch) {
-            // Search Settings
-            if (document.getElementById('save-search-settings-btn')) {
-                document.getElementById('save-search-settings-btn').addEventListener('click', function() {
-                    let searchProvider = 'serper'; // default
-                    const dropdownProvider = document.getElementById('search_provider');
-                    const checkedProvider = document.querySelector('input[name="search_provider"]:checked');
-                    
-                    if (dropdownProvider && dropdownProvider.tagName === 'SELECT') {
-                         searchProvider = dropdownProvider.value;
-                    } else if (checkedProvider) {
-                         searchProvider = checkedProvider.value;
-                    }
-
-                    const serperApiKey = document.getElementById('serper_api_key').value;
-                    const serperFetchFullContent = document.getElementById('serper_fetch_full_content') ? document.getElementById('serper_fetch_full_content').checked : false;
-                    
-                    const data = {
-                        search_provider: searchProvider,
-                        serper_api_key: serperApiKey,
-                        serper_fetch_full_content: serperFetchFullContent
-                    };
-                    BenchmarkUtils.saveSettings(BenchmarkUrls.saveSearchSettings, csrfToken, data, 'save-search-settings-btn');
-                });
-            }
-        }
     },
 
     /**
-     * Stop a running pipeline.
+     * Generate a UUID.
      * @param {string} url - The URL to the stop pipeline view.
      * @param {string} csrfToken - The CSRF token.
      * @param {string} pipelineId - The ID of the pipeline to stop.

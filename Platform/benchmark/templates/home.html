@@ -41,16 +41,29 @@
                     </a>
                 </div>
             </div>
+        </div>
+        <!-- Dataset Manager & Configuration -->
+        <div class="col-md-6">
+            <!-- Global Configuration Trigger -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-body d-flex justify-content-between align-items-center">
+                    <div>
+                        <h5 class="mb-0"><i class="bi bi-gear me-2"></i>Global Configuration</h5>
+                        <p class="text-muted small mb-0">Configure LLM, Search Provider, and RAG pipelines.</p>
+                    </div>
+                    <button class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#settingsModal">
+                        <i class="bi bi-sliders me-1"></i> Settings
+                    </button>
+                </div>
+            </div>
+            
             <!-- Dataset Manager -->
             {% include 'includes/dataset_manager.html' %}
         </div>
-        <!-- LLM and RAG Configuration -->
-        <div class="col-md-6">
-            {% include 'includes/llm_config.html' with show_retries=True card_expanded=True %}
-            {% include 'includes/search_config.html' %}
-            {% include 'includes/rag_config.html' %}
-        </div>
     </div>
 </div>
+
+{% include 'includes/settings_modal.html' with show_retries=True %}
+
 <script src="{% static 'js/benchmark/dashboard.js' %}"></script>
 {% endblock %}

@@ -2,6 +2,28 @@ from django.db import models
 from django.core.exceptions import ValidationError
 import os
 
+# --- Abstract Base Classes ---
+
+class SingletonModel(models.Model):
+    """
+    Abstract base class for singleton models.
+    Ensures only one instance exists.
+    """
+    class Meta:
+        abstract = True
+
+    def save(self, *args, **kwargs):
+        if not self.pk and self.__class__.objects.exists():
+            raise ValidationError(f"There can be only one {self.__class__.__name__} instance.")
+        return super(SingletonModel, self).save(*args, **kwargs)
+
+    @classmethod
+    def load(cls):
+        obj, created = cls.objects.get_or_create(pk=1)
+        return obj
+
+# --- Concrete Models ---
+
 class BenchmarkDataset(models.Model):
     """
     Represents a dataset of questions for benchmarking.
@@ -30,7 +52,22 @@ class BenchmarkDataset(models.Model):
                 os.remove(self.file.path)
         super(BenchmarkDataset, self).delete(*args, **kwargs)
 
-class LLMSettings(models.Model):
+class SearchSettings(SingletonModel):
+    """
+    A singleton model to store Search-specific settings.
+    """
+    PROVIDER_CHOICES = [
+        ('mcp', 'MCP Server'),
+        ('serper', 'Serper API'),
+    ]
+    search_provider = models.CharField(max_length=20, choices=PROVIDER_CHOICES, default='mcp', help_text="Select the search provider.")
+    serper_api_key = models.CharField(max_length=255, blank=True, help_text="API Key for Serper.dev")
+    serper_fetch_full_content = models.BooleanField(default=True, help_text="If enabled, fetches full page content for Serper results.")
+
+    def __str__(self):
+        return "Search Settings"
+
+class LLMSettings(SingletonModel):
     """
     A singleton model to store LLM settings for the benchmark tool.
     This allows users to persist their LLM configuration in the database.
@@ -41,158 +78,10 @@ class LLMSettings(models.Model):
     max_retries = models.PositiveIntegerField(default=3, help_text="Maximum number of retries allowed for the LLM.")
     allow_reasoning = models.BooleanField(default=False, help_text="Allow the LLM to output its chain of thought reasoning before the final answer.")
 
-    def save(self, *args, **kwargs):
-        if not self.pk and LLMSettings.objects.exists():
-            raise ValidationError("There can be only one LLMSettings instance.")
-        return super(LLMSettings, self).save(*args, **kwargs)
-
-    @classmethod
-    def load(cls):
-        """
-        Load the singleton instance of the settings, creating it if it doesn't exist.
-        """
-        obj, created = cls.objects.get_or_create(pk=1)
-        return obj
-
     def __str__(self):
         return "LLM Settings"
 
-class MultiTurnSessionGroup(models.Model):
-    """
-    Represents a group of benchmark sessions, typically from a single pipeline run.
-    """
-    name = models.CharField(max_length=255, default='Pipeline Run')
-    created_at = models.DateTimeField(auto_now_add=True)
-    settings_snapshot = models.JSONField(default=dict, blank=True, help_text="Snapshot of settings used for this run.")
-
-    class Meta:
-        ordering = ['-created_at']
-
-    def __str__(self):
-        return f"Session Group from {self.created_at.strftime('%Y-%m-%d %H:%M')}"
-
-class VanillaLLMMultiTurnSession(models.Model):
-    """
-    Represents a multi-turn conversation session for a Vanilla LLM.
-    """
-    group = models.ForeignKey(MultiTurnSessionGroup, related_name='vanilla_sessions', on_delete=models.CASCADE)
-    question = models.TextField()
-    ground_truths = models.JSONField(default=list)
-    created_at = models.DateTimeField(auto_now_add=True)
-    is_completed = models.BooleanField(default=False)
-    run_tag = models.CharField(max_length=255, blank=True, null=True, db_index=True)
-
-    def __str__(self):
-        return f"Vanilla LLM Session for: {self.question[:50]}..."
-
-class VanillaLLMMultiTurnTrial(models.Model):
-    """
-    Represents a single trial (turn) within a benchmark session for Vanilla LLM.
-    """
-    STATUS_CHOICES = [
-        ('processing', 'Processing'),
-        ('completed', 'Completed'),
-        ('error', 'Error'),
-    ]
-    session = models.ForeignKey(VanillaLLMMultiTurnSession, related_name='trials', on_delete=models.CASCADE)
-    trial_number = models.PositiveIntegerField()
-    answer = models.TextField(blank=True, null=True)
-    full_response = models.TextField(blank=True, null=True) # Full CoT
-    feedback = models.TextField(blank=True, null=True)
-    is_correct = models.BooleanField(null=True, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='processing')
-
-    class Meta:
-        unique_together = ('session', 'trial_number')
-        ordering = ['trial_number']
-
-    def __str__(self):
-        return f"Trial {self.trial_number} for Session {self.session.id}"
-
-class RAGMultiTurnSession(models.Model):
-    """
-    Represents a multi-turn conversation session for a RAG pipeline.
-    """
-    group = models.ForeignKey(MultiTurnSessionGroup, related_name='rag_sessions', on_delete=models.CASCADE)
-    question = models.TextField()
-    ground_truths = models.JSONField(default=list)
-    created_at = models.DateTimeField(auto_now_add=True)
-    is_completed = models.BooleanField(default=False)
-    run_tag = models.CharField(max_length=255, blank=True, null=True, db_index=True)
-    
-    REFORMULATION_CHOICES = [
-        ('no_reform', 'No Reformulation'),
-        ('reform', 'Reformulation'),
-    ]
-    reformulation_strategy = models.CharField(max_length=20, choices=REFORMULATION_CHOICES, default='no_reform')
-
-    def __str__(self):
-        return f"RAG Session for: {self.question[:50]}... ({self.reformulation_strategy})"
-
-class RAGMultiTurnTrial(models.Model):
-    """
-    Represents a single trial (turn) within a RAG session.
-    """
-    STATUS_CHOICES = [
-        ('processing', 'Processing'),
-        ('completed', 'Completed'),
-        ('error', 'Error'),
-    ]
-    session = models.ForeignKey(RAGMultiTurnSession, related_name='trials', on_delete=models.CASCADE)
-    trial_number = models.PositiveIntegerField()
-    answer = models.TextField(blank=True, null=True) # Parsed Answer
-    full_response = models.TextField(blank=True, null=True) # Full CoT
-    feedback = models.TextField(blank=True, null=True)
-    is_correct = models.BooleanField(null=True, blank=True) # Can be null if not yet evaluated
-    created_at = models.DateTimeField(auto_now_add=True)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='processing')
-    search_query = models.TextField(blank=True, null=True)
-    search_results = models.JSONField(default=list, blank=True, null=True)
-
-    class Meta:
-        unique_together = ('session', 'trial_number')
-        ordering = ['trial_number']
-
-    def __str__(self):
-        return f"Trial {self.trial_number} for RAG Session {self.session.id}"
-
-
-class VanillaLLMAdhocRun(models.Model):
-    """
-    Represents a single, complete run of the ad-hoc QA pipeline.
-    """
-    name = models.CharField(max_length=255, unique=True, help_text="A unique name for this benchmark run, e.g., 'gpt-4o-2025-12-02'")
-    created_at = models.DateTimeField(auto_now_add=True)
-    settings_snapshot = models.JSONField(default=dict, blank=True, help_text="Snapshot of settings used for this run.")
-    
-    # Aggregate statistics
-    total_questions = models.IntegerField(default=0)
-    correct_answers = models.IntegerField(default=0)
-    accuracy = models.FloatField(default=0.0)
-
-    class Meta:
-        ordering = ['-created_at']
-
-    def __str__(self):
-        return self.name
-
-class VanillaLLMAdhocResult(models.Model):
-    """
-    Stores the result of a single question-answer session within an VanillaLLMAdhocRun.
-    """
-    run = models.ForeignKey(VanillaLLMAdhocRun, related_name='results', on_delete=models.CASCADE)
-    question = models.TextField()
-    ground_truths = models.JSONField(default=list)
-    answer = models.TextField() # This stores the Parsed Final Answer
-    full_response = models.TextField(blank=True, null=True) # This stores the Full Chain of Thought
-    is_correct_rule = models.BooleanField(default=False)
-    is_correct_llm = models.BooleanField(default=False)
-
-    def __str__(self):
-        return f"Result for '{self.question[:50]}...' in run {self.run.name}"
-
-class RagSettings(models.Model):
+class RagSettings(SingletonModel):
     """
     A singleton model to store RAG-specific settings.
     """
@@ -221,26 +110,94 @@ Answer:""",
         help_text="Template for the RAG prompt. Use {question} and {search_results} placeholders."
     )
 
-    def save(self, *args, **kwargs):
-        if not self.pk and RagSettings.objects.exists():
-            raise ValidationError("There can be only one RagSettings instance.")
-        return super(RagSettings, self).save(*args, **kwargs)
-
-    @classmethod
-    def load(cls):
-        obj, created = cls.objects.get_or_create(pk=1)
-        return obj
-
     def __str__(self):
         return "RAG Settings"
 
-class RagAdhocRun(models.Model):
+class MultiTurnRun(models.Model):
     """
-    Represents a single, complete run of the RAG QA pipeline.
+    Represents a group of benchmark sessions, typically from a single pipeline run.
     """
-    name = models.CharField(max_length=255, unique=True)
+    name = models.CharField(max_length=255, default='Pipeline Run')
     created_at = models.DateTimeField(auto_now_add=True)
     settings_snapshot = models.JSONField(default=dict, blank=True, help_text="Snapshot of settings used for this run.")
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"MultiTurn Run from {self.created_at.strftime('%Y-%m-%d %H:%M')}"
+
+class MultiTurnSession(models.Model):
+    """
+    Represents a multi-turn conversation session.
+    Unified model for both Vanilla LLM and RAG.
+    """
+    PIPELINE_TYPE_CHOICES = [
+        ('vanilla', 'Vanilla LLM'),
+        ('rag', 'RAG'),
+    ]
+    REFORMULATION_CHOICES = [
+        ('no_reform', 'No Reformulation'),
+        ('reform', 'Reformulation'),
+    ]
+
+    run = models.ForeignKey(MultiTurnRun, related_name='sessions', on_delete=models.CASCADE)
+    question = models.TextField()
+    ground_truths = models.JSONField(default=list)
+    created_at = models.DateTimeField(auto_now_add=True)
+    is_completed = models.BooleanField(default=False)
+    run_tag = models.CharField(max_length=255, blank=True, null=True, db_index=True)
+    
+    pipeline_type = models.CharField(max_length=20, choices=PIPELINE_TYPE_CHOICES, default='vanilla')
+    reformulation_strategy = models.CharField(max_length=20, choices=REFORMULATION_CHOICES, default='no_reform', help_text="Only used if pipeline_type is 'rag'")
+
+    def __str__(self):
+        return f"Session ({self.pipeline_type}) for: {self.question[:50]}..."
+
+class MultiTurnTrial(models.Model):
+    """
+    Represents a single trial (turn) within a benchmark session.
+    Unified model for both Vanilla LLM and RAG.
+    """
+    STATUS_CHOICES = [
+        ('processing', 'Processing'),
+        ('completed', 'Completed'),
+        ('error', 'Error'),
+    ]
+    session = models.ForeignKey(MultiTurnSession, related_name='trials', on_delete=models.CASCADE)
+    trial_number = models.PositiveIntegerField()
+    answer = models.TextField(blank=True, null=True)
+    full_response = models.TextField(blank=True, null=True) # Full CoT
+    feedback = models.TextField(blank=True, null=True)
+    is_correct = models.BooleanField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='processing')
+    
+    # RAG specific fields (nullable)
+    search_query = models.TextField(blank=True, null=True)
+    search_results = models.JSONField(default=list, blank=True, null=True)
+
+    class Meta:
+        unique_together = ('session', 'trial_number')
+        ordering = ['trial_number']
+
+    def __str__(self):
+        return f"Trial {self.trial_number} for Session {self.session.id}"
+
+class AdhocRun(models.Model):
+    """
+    Represents a single, complete run of an ad-hoc QA pipeline.
+    Unified model for both Vanilla LLM and RAG.
+    """
+    RUN_TYPE_CHOICES = [
+        ('vanilla', 'Vanilla LLM'),
+        ('rag', 'RAG'),
+    ]
+    name = models.CharField(max_length=255, unique=True, help_text="A unique name for this benchmark run.")
+    created_at = models.DateTimeField(auto_now_add=True)
+    settings_snapshot = models.JSONField(default=dict, blank=True, help_text="Snapshot of settings used for this run.")
+    
+    run_type = models.CharField(max_length=20, choices=RUN_TYPE_CHOICES, default='vanilla')
 
     # Aggregate statistics
     total_questions = models.IntegerField(default=0)
@@ -251,46 +208,24 @@ class RagAdhocRun(models.Model):
         ordering = ['-created_at']
 
     def __str__(self):
-        return self.name
+        return f"{self.name} ({self.run_type})"
 
-class RagAdhocResult(models.Model):
+class AdhocResult(models.Model):
     """
-    Stores the result of a single question-answer session within a RagAdhocRun.
+    Stores the result of a single question-answer session within a AdhocRun.
+    Unified model for both Vanilla LLM and RAG.
     """
-    run = models.ForeignKey(RagAdhocRun, related_name='results', on_delete=models.CASCADE)
+    run = models.ForeignKey(AdhocRun, related_name='results', on_delete=models.CASCADE)
     question = models.TextField()
     ground_truths = models.JSONField(default=list)
     answer = models.TextField() # Parsed Answer
     full_response = models.TextField(blank=True, null=True) # Full CoT
     is_correct_rule = models.BooleanField(default=False)
     is_correct_llm = models.BooleanField(null=True, default=None) # Allow null for errors/uncertainty
+    
+    # RAG specific fields
     num_docs_used = models.IntegerField(default=0)
-    search_results = models.JSONField(default=list)
+    search_results = models.JSONField(default=list, blank=True, null=True)
 
     def __str__(self):
-        return f"RAG Result for '{self.question[:50]}...' in run {self.run.name}"
-
-class SearchSettings(models.Model):
-    """
-    A singleton model to store Search-specific settings.
-    """
-    PROVIDER_CHOICES = [
-        ('mcp', 'MCP Server'),
-        ('serper', 'Serper API'),
-    ]
-    search_provider = models.CharField(max_length=20, choices=PROVIDER_CHOICES, default='mcp', help_text="Select the search provider.")
-    serper_api_key = models.CharField(max_length=255, blank=True, help_text="API Key for Serper.dev")
-    serper_fetch_full_content = models.BooleanField(default=True, help_text="If enabled, fetches full page content for Serper results.")
-
-    def save(self, *args, **kwargs):
-        if not self.pk and SearchSettings.objects.exists():
-            raise ValidationError("There can be only one SearchSettings instance.")
-        return super(SearchSettings, self).save(*args, **kwargs)
-
-    @classmethod
-    def load(cls):
-        obj, created = cls.objects.get_or_create(pk=1)
-        return obj
-
-    def __str__(self):
-        return "Search Settings"
+        return f"Result for '{self.question[:50]}...' in run {self.run.name}"

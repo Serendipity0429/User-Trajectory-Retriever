@@ -21,15 +21,11 @@ from .models import (
     LLMSettings,
     RagSettings,
     SearchSettings,
-    VanillaLLMMultiTurnSession,
-    VanillaLLMMultiTurnTrial,
-    RAGMultiTurnSession,
-    RAGMultiTurnTrial,
-    MultiTurnSessionGroup,
-    VanillaLLMAdhocRun,
-    VanillaLLMAdhocResult,
-    RagAdhocRun,
-    RagAdhocResult,
+    MultiTurnRun,
+    MultiTurnSession,
+    MultiTurnTrial,
+    AdhocRun,
+    AdhocResult,
     BenchmarkDataset,
 )
 from .forms import BenchmarkDatasetForm
@@ -43,6 +39,7 @@ from .pipeline_utils import (
     BaseMultiTurnPipeline,
     VanillaLLMMultiTurnPipeline,
     RagMultiTurnPipeline,
+    serialize_events,
 )
 
 
@@ -223,14 +220,14 @@ def sync_datasets(request):
 @admin_required
 def vanilla_llm_adhoc(request):
     # GET request logic
-    runs = VanillaLLMAdhocRun.objects.all()
+    runs = AdhocRun.objects.filter(run_type='vanilla')
     selected_run = None
     run_results = []
     run_id = request.GET.get("run_id")
 
     if run_id:
         try:
-            selected_run = get_object_or_404(VanillaLLMAdhocRun, pk=run_id)
+            selected_run = get_object_or_404(AdhocRun, pk=run_id, run_type='vanilla')
             # Serialize the results to pass as JSON to the template
             run_results = list(
                 selected_run.results.values(
@@ -281,13 +278,12 @@ def vanilla_llm_adhoc(request):
 @admin_required
 def list_runs(request):
     try:
-        vanilla_runs = VanillaLLMMultiTurnSession.objects.filter(
+        # Assuming this lists multi-turn runs from both types
+        runs = MultiTurnSession.objects.filter(
             run_tag__isnull=False
-        ).values_list("run_tag", flat=True)
-        rag_runs = RAGMultiTurnSession.objects.filter(
-            run_tag__isnull=False
-        ).values_list("run_tag", flat=True)
-        runs = sorted(list(set(list(vanilla_runs) + list(rag_runs))), reverse=True)
+        ).values_list("run_tag", flat=True).distinct()
+        
+        runs = sorted(list(runs), reverse=True)
         return JsonResponse({"runs": runs})
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
@@ -296,9 +292,8 @@ def list_runs(request):
 @admin_required
 def load_run(request, run_tag):
     def stream_run_from_db(run_tag):
-        # This function seems to be for ad-hoc runs saved as multi-turn sessions.
-        # Defaulting to Vanilla LLM as the model type is not specified.
-        sessions = VanillaLLMMultiTurnSession.objects.filter(
+        # This function seems to be for ad-hoc runs saved as multi-turn sessions (imported).
+        sessions = MultiTurnSession.objects.filter(
             run_tag=run_tag
         ).prefetch_related("trials")
         for session in sessions:
@@ -357,17 +352,12 @@ def batch_delete_sessions(request):
                 {"status": "error", "message": "Invalid session ID format."}, status=400
             )
 
-        vanilla_sessions = VanillaLLMMultiTurnSession.objects.filter(id__in=session_ids)
-        rag_sessions = RAGMultiTurnSession.objects.filter(id__in=session_ids)
+        sessions = MultiTurnSession.objects.filter(id__in=session_ids)
 
-        deleted_vanilla_ids = list(vanilla_sessions.values_list("id", flat=True))
-        deleted_rag_ids = list(rag_sessions.values_list("id", flat=True))
+        deleted_ids = list(sessions.values_list("id", flat=True))
+        deleted_count = sessions.count()
 
-        deleted_count = len(deleted_vanilla_ids) + len(deleted_rag_ids)
-        deleted_ids = deleted_vanilla_ids + deleted_rag_ids
-
-        vanilla_sessions.delete()
-        rag_sessions.delete()
+        sessions.delete()
 
         return JsonResponse(
             {
@@ -425,7 +415,7 @@ def test_llm_connection(request):
         client = openai.OpenAI(base_url=base_url, api_key=api_key, timeout=timeout)
 
         # Test the connection by listing models
-        models = client.models.list()
+        models = client.models.list() # type: ignore
         
         model_list = [model.id for model in models.data]
 
@@ -468,25 +458,25 @@ def vanilla_llm_multi_turn(request):
             for line in f:
                 questions.append(json.loads(line))
     except FileNotFoundError:
-        # Handle case where file doesn't exist
         pass
 
     # Load sessions and group them
     groups = (
-        MultiTurnSessionGroup.objects.filter(vanilla_sessions__isnull=False)
+        MultiTurnRun.objects.filter(sessions__pipeline_type='vanilla')
         .exclude(name__startswith="Ad-hoc Session")
         .prefetch_related(
             models.Prefetch(
-                "vanilla_sessions",
-                queryset=VanillaLLMMultiTurnSession.objects.order_by("-created_at"),
+                "sessions",
+                queryset=MultiTurnSession.objects.filter(pipeline_type='vanilla').order_by("-created_at"),
             )
         )
         .order_by("-created_at")
         .distinct()
     )
 
-    individual_sessions = VanillaLLMMultiTurnSession.objects.filter(
-        group__name__startswith="Ad-hoc Session"
+    individual_sessions = MultiTurnSession.objects.filter(
+        run__name__startswith="Ad-hoc Session",
+        pipeline_type='vanilla'
     ).order_by("-created_at")
 
     datasets = BenchmarkDataset.objects.all().order_by("-created_at")
@@ -517,20 +507,21 @@ def rag_multi_turn(request):
 
     # Load sessions and group them
     groups = (
-        MultiTurnSessionGroup.objects.filter(rag_sessions__isnull=False)
+        MultiTurnRun.objects.filter(sessions__pipeline_type='rag')
         .exclude(name__startswith="Ad-hoc Session")
         .prefetch_related(
             models.Prefetch(
-                "rag_sessions",
-                queryset=RAGMultiTurnSession.objects.order_by("-created_at"),
+                "sessions",
+                queryset=MultiTurnSession.objects.filter(pipeline_type='rag').order_by("-created_at"),
             )
         )
         .order_by("-created_at")
         .distinct()
     )
 
-    individual_sessions = RAGMultiTurnSession.objects.filter(
-        group__name__startswith="Ad-hoc Session"
+    individual_sessions = MultiTurnSession.objects.filter(
+        run__name__startswith="Ad-hoc Session",
+        pipeline_type='rag'
     ).order_by("-created_at")
 
     datasets = BenchmarkDataset.objects.all().order_by("-created_at")
@@ -609,7 +600,7 @@ def save_search_settings(request):
 @admin_required
 def list_rag_adhoc_runs(request):
     try:
-        runs = RagAdhocRun.objects.values(
+        runs = AdhocRun.objects.filter(run_type='rag').values(
             "id", "name", "created_at", "accuracy"
         ).order_by("-created_at")
         return JsonResponse({"runs": list(runs)})
@@ -620,7 +611,7 @@ def list_rag_adhoc_runs(request):
 @admin_required
 def get_rag_adhoc_run(request, run_id):
     try:
-        run = get_object_or_404(RagAdhocRun, pk=run_id)
+        run = get_object_or_404(AdhocRun, pk=run_id, run_type='rag')
         results = list(
             run.results.values(
                 "question",
@@ -658,7 +649,7 @@ def get_rag_adhoc_run(request, run_id):
 @require_http_methods(["DELETE"])
 def delete_rag_adhoc_run(request, run_id):
     try:
-        run = get_object_or_404(RagAdhocRun, pk=run_id)
+        run = get_object_or_404(AdhocRun, pk=run_id, run_type='rag')
         run.delete()
         return JsonResponse({"status": "ok"})
     except Exception as e:
@@ -676,7 +667,7 @@ def batch_delete_rag_adhoc_runs(request):
                 {"status": "error", "message": "No run IDs provided."}, status=400
             )
 
-        runs = RagAdhocRun.objects.filter(id__in=run_ids)
+        runs = AdhocRun.objects.filter(id__in=run_ids, run_type='rag')
         deleted_count = runs.count()
         runs.delete()
 
@@ -698,7 +689,7 @@ def batch_delete_vanilla_llm_adhoc_runs(request):
                 {"status": "error", "message": "No run IDs provided."}, status=400
             )
 
-        runs = VanillaLLMAdhocRun.objects.filter(id__in=run_ids)
+        runs = AdhocRun.objects.filter(id__in=run_ids, run_type='vanilla')
         deleted_count = runs.count()
         runs.delete()
 
@@ -716,7 +707,7 @@ def create_session_group(request):
         name = data.get(
             "name", f"Pipeline Run - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
         )
-        group = MultiTurnSessionGroup.objects.create(name=name)
+        group = MultiTurnRun.objects.create(name=name)
         return JsonResponse({"group_id": group.id, "group_name": group.name})
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
@@ -758,38 +749,40 @@ def create_session(request):
             }
         # Ensure Group exists
         if group_id:
-            group = get_object_or_404(MultiTurnSessionGroup, pk=group_id)
+            group = get_object_or_404(MultiTurnRun, pk=group_id)
             # We assume existing group has its snapshot.
         else:
             # Create a new ad-hoc group for this single session
             group_name = (
                 f"Ad-hoc Session - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
             )
-            group = MultiTurnSessionGroup.objects.create(
+            group = MultiTurnRun.objects.create(
                 name=group_name, settings_snapshot=snapshot
             )
 
         session_data = {
             "question": question_text,
             "ground_truths": ground_truths,
-            "group": group,
+            "run": group, # Was 'group'
         }
 
         if "rag" in pipeline_type:
+            session_data['pipeline_type'] = 'rag'
             if "reform" in pipeline_type:
                 session_data["reformulation_strategy"] = "reform"
             else:
                 session_data["reformulation_strategy"] = "no_reform"
 
-            session = RAGMultiTurnSession.objects.create(**session_data)
+            session = MultiTurnSession.objects.create(**session_data)
 
-            trial = RAGMultiTurnTrial.objects.create(
+            trial = MultiTurnTrial.objects.create(
                 session=session, trial_number=1, status="processing"
             )
 
         else:
-            session = VanillaLLMMultiTurnSession.objects.create(**session_data)
-            trial = VanillaLLMMultiTurnTrial.objects.create(
+            session_data['pipeline_type'] = 'vanilla'
+            session = MultiTurnSession.objects.create(**session_data)
+            trial = MultiTurnTrial.objects.create(
                 session=session, trial_number=1, status="processing"
             )
 
@@ -801,27 +794,25 @@ def create_session(request):
 @admin_required
 def get_session(request, session_id):
     try:
-        session = VanillaLLMMultiTurnSession.objects.select_related("group").get(
+        session = MultiTurnSession.objects.select_related("run").get(
             pk=session_id
         )
+    except MultiTurnSession.DoesNotExist:
+        return JsonResponse({"error": "Session not found"}, status=404)
+    
+    if session.pipeline_type == 'vanilla':
         pipeline_type = "vanilla_llm_multi_turn"
-    except VanillaLLMMultiTurnSession.DoesNotExist:
-        try:
-            session = RAGMultiTurnSession.objects.select_related("group").get(
-                pk=session_id
-            )
-            pipeline_type = f"rag_multi_turn_{session.reformulation_strategy}"
-        except RAGMultiTurnSession.DoesNotExist:
-            return JsonResponse({"error": "Session not found"}, status=404)
+    else:
+        pipeline_type = f"rag_multi_turn_{session.reformulation_strategy}"
 
-    # Resolve settings snapshot from group
-    snapshot = session.group.settings_snapshot if session.group else {}
+    # Resolve settings snapshot from run
+    snapshot = session.run.settings_snapshot if session.run else {}
 
     max_retries = 3  # Default
     if snapshot and "llm_settings" in snapshot:
         max_retries = snapshot["llm_settings"].get("max_retries", 3)
 
-    if isinstance(session, RAGMultiTurnSession):
+    if session.pipeline_type == 'rag':
         trials = list(
             session.trials.values(
                 "id",
@@ -860,7 +851,7 @@ def get_session(request, session_id):
                 "is_completed": session.is_completed,
                 "created_at": session.created_at,
                 "max_retries": max_retries,
-                "group_id": session.group_id,
+                "group_id": session.run_id, # Run ID
                 "pipeline_type": pipeline_type,
                 "settings": snapshot,
             },
@@ -877,18 +868,11 @@ def retry_session(request, trial_id):
         feedback = data.get("feedback")
         is_correct = data.get("is_correct")
         try:
-            original_trial = VanillaLLMMultiTurnTrial.objects.select_related(
-                "session", "session__group"
+            original_trial = MultiTurnTrial.objects.select_related(
+                "session", "session__run"
             ).get(pk=trial_id)
-            TrialModel = VanillaLLMMultiTurnTrial
-        except VanillaLLMMultiTurnTrial.DoesNotExist:
-            try:
-                original_trial = RAGMultiTurnTrial.objects.select_related(
-                    "session", "session__group"
-                ).get(pk=trial_id)
-                TrialModel = RAGMultiTurnTrial
-            except RAGMultiTurnTrial.DoesNotExist:
-                return JsonResponse({"error": "Trial not found"}, status=404)
+        except MultiTurnTrial.DoesNotExist:
+             return JsonResponse({"error": "Trial not found"}, status=404)
 
         original_trial.feedback = feedback
 
@@ -898,8 +882,8 @@ def retry_session(request, trial_id):
 
         session = original_trial.session
 
-        # Resolve snapshot from group
-        snapshot = session.group.settings_snapshot if session.group else {}
+        # Resolve snapshot from run
+        snapshot = session.run.settings_snapshot if session.run else {}
 
         max_retries = 3
         if snapshot and "llm_settings" in snapshot:
@@ -917,7 +901,7 @@ def retry_session(request, trial_id):
                 {"status": "max_retries_reached", "session_id": session.id}
             )
 
-        new_trial = TrialModel.objects.create(
+        new_trial = MultiTurnTrial.objects.create(
             session=session,
             trial_number=original_trial.trial_number + 1,
             status="processing",
@@ -935,22 +919,17 @@ import traceback
 def run_trial(request, trial_id):
     try:
         try:
-            trial = VanillaLLMMultiTurnTrial.objects.select_related(
-                "session", "session__group"
+            trial = MultiTurnTrial.objects.select_related(
+                "session", "session__run"
             ).get(pk=trial_id)
 
-        except VanillaLLMMultiTurnTrial.DoesNotExist:
-            try:
-                trial = RAGMultiTurnTrial.objects.select_related(
-                    "session", "session__group"
-                ).get(pk=trial_id)
-            except RAGMultiTurnTrial.DoesNotExist:
-                return JsonResponse({"error": "Trial not found"}, status=404)
+        except MultiTurnTrial.DoesNotExist:
+             return JsonResponse({"error": "Trial not found"}, status=404)
 
         session = trial.session
 
-        # Resolve snapshot from group
-        snapshot = session.group.settings_snapshot if session.group else {}
+        # Resolve snapshot from run
+        snapshot = session.run.settings_snapshot if session.run else {}
 
         base_url = None
         api_key = None
@@ -971,7 +950,7 @@ def run_trial(request, trial_id):
             if not model:
                 model = db_settings.llm_model or config("LLM_MODEL", default="gpt-4o")
 
-        if isinstance(session, RAGMultiTurnSession):
+        if session.pipeline_type == 'rag':
             pipeline = RagMultiTurnPipeline(
                 base_url=base_url,
                 api_key=api_key,
@@ -1012,14 +991,10 @@ def run_trial(request, trial_id):
 def delete_session(request, session_id):
     try:
         try:
-            session = VanillaLLMMultiTurnSession.objects.get(pk=session_id)
+            session = MultiTurnSession.objects.get(pk=session_id)
             session.delete()
-        except VanillaLLMMultiTurnSession.DoesNotExist:
-            try:
-                session = RAGMultiTurnSession.objects.get(pk=session_id)
-                session.delete()
-            except RAGMultiTurnSession.DoesNotExist:
-                pass  # Session already deleted
+        except MultiTurnSession.DoesNotExist:
+             pass  # Session already deleted
 
         return JsonResponse({"status": "ok"})
     except Exception as e:
@@ -1030,7 +1005,7 @@ def delete_session(request, session_id):
 @require_http_methods(["DELETE"])
 def delete_session_group(request, group_id):
     try:
-        group = get_object_or_404(MultiTurnSessionGroup, pk=group_id)
+        group = get_object_or_404(MultiTurnRun, pk=group_id)
         group.delete()
         return JsonResponse({"status": "ok"})
     except Exception as e:
@@ -1069,7 +1044,7 @@ def run_vanilla_llm_multi_turn_pipeline(request):
             dataset_id=dataset_id,
         )
 
-        return StreamingHttpResponse(pipeline.run(), content_type="application/json")
+        return StreamingHttpResponse(serialize_events(pipeline.run()), content_type="application/json")
 
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
@@ -1107,15 +1082,8 @@ def run_vanilla_llm_adhoc_pipeline(request):
             dataset_id=dataset_id,
         )
 
-        def stream_generator():
-            try:
-                for result in pipeline.run():
-                    yield json.dumps(result) + "\n"
-            except Exception as e:
-                yield json.dumps({"error": str(e)}) + "\n"
-
         return StreamingHttpResponse(
-            stream_generator(), content_type="application/json"
+            serialize_events(pipeline.run()), content_type="application/json"
         )
 
     except Exception as e:
@@ -1153,15 +1121,8 @@ def run_rag_adhoc_pipeline(request):
             dataset_id=dataset_id,
         )
 
-        def stream_generator():
-            try:
-                for result in pipeline.run():
-                    yield json.dumps(result) + "\n"
-            except Exception as e:
-                yield json.dumps({"error": str(e)}) + "\n"
-
         return StreamingHttpResponse(
-            stream_generator(), content_type="application/json"
+            serialize_events(pipeline.run()), content_type="application/json"
         )
 
     except Exception as e:
@@ -1184,26 +1145,24 @@ def stop_rag_adhoc_pipeline(request):
 @admin_required
 def export_session(request, session_id):
     try:
-        session = VanillaLLMMultiTurnSession.objects.select_related("group").get(
+        session = MultiTurnSession.objects.select_related("run").get(
             pk=session_id
         )
+    except MultiTurnSession.DoesNotExist:
+        return HttpResponse("Session not found", status=404)
+    
+    if session.pipeline_type == 'vanilla':
         pipeline_type = "vanilla_llm_multi_turn"
-    except VanillaLLMMultiTurnSession.DoesNotExist:
-        try:
-            session = RAGMultiTurnSession.objects.select_related("group").get(
-                pk=session_id
-            )
-            pipeline_type = f"rag_multi_turn_{session.reformulation_strategy}"
-        except RAGMultiTurnSession.DoesNotExist:
-            return HttpResponse("Session not found", status=404)
+    else:
+        pipeline_type = f"rag_multi_turn_{session.reformulation_strategy}"
 
-    snapshot = session.group.settings_snapshot if session.group else {}
+    snapshot = session.run.settings_snapshot if session.run else {}
 
     max_retries = 3
     if snapshot and "llm_settings" in snapshot:
         max_retries = snapshot["llm_settings"].get("max_retries", 3)
 
-    if isinstance(session, RAGMultiTurnSession):
+    if session.pipeline_type == 'rag':
         trials = list(
             session.trials.values(
                 "trial_number",
@@ -1250,7 +1209,7 @@ def export_session(request, session_id):
             "Is Correct",
             "Trial Created At",
         ]
-        if isinstance(session, RAGMultiTurnSession):
+        if session.pipeline_type == 'rag':
             headers.extend(["Search Query", "Search Results"])
 
         writer.writerow(headers)
@@ -1268,7 +1227,7 @@ def export_session(request, session_id):
                 trial.get("is_correct"),
                 trial.get("created_at"),  # Already converted to string
             ]
-            if isinstance(session, RAGMultiTurnSession):
+            if session.pipeline_type == 'rag':
                 row.extend([trial.get("search_query"), trial.get("search_results")])
 
             writer.writerow(row)
@@ -1328,10 +1287,6 @@ def save_run(request):
 
         if isinstance(run_config, dict):
             # Optionally update global settings if requested, but mainly use for snapshot
-            # settings.llm_base_url = run_config.get('llm_base_url', settings.llm_base_url)
-            # settings.llm_model = run_config.get('llm_model', settings.llm_model)
-            # settings.llm_api_key = run_config.get('llm_api_key', settings.llm_api_key)
-            # settings.save()
             pass
 
         # Prepare snapshot from the config passed in the request
@@ -1348,7 +1303,7 @@ def save_run(request):
         )
 
         # Create a group for this imported run
-        group = MultiTurnSessionGroup.objects.create(
+        group = MultiTurnRun.objects.create(
             name=run_name, settings_snapshot=snapshot
         )
 
@@ -1356,15 +1311,16 @@ def save_run(request):
             if not result.get("question"):
                 continue
 
-            session = VanillaLLMMultiTurnSession.objects.create(
-                group=group,
+            session = MultiTurnSession.objects.create(
+                run=group, # Was group
                 question=result.get("question"),
                 ground_truths=result.get("ground_truths"),
                 run_tag=run_name,
                 is_completed=True,
+                pipeline_type='vanilla' # Defaulting to vanilla on import as per original logic logic
             )
 
-            VanillaLLMMultiTurnTrial.objects.create(
+            MultiTurnTrial.objects.create(
                 session=session,
                 trial_number=1,
                 answer=result.get("answer"),
@@ -1381,8 +1337,7 @@ def save_run(request):
 @require_http_methods(["DELETE"])
 def delete_run(request, run_tag):
     try:
-        VanillaLLMMultiTurnSession.objects.filter(run_tag=run_tag).delete()
-        RAGMultiTurnSession.objects.filter(run_tag=run_tag).delete()
+        MultiTurnSession.objects.filter(run_tag=run_tag).delete()
         return JsonResponse({"status": "ok", "filename": run_tag})
     except Exception as e:
         return JsonResponse({"status": "error", "message": str(e)}, status=500)
@@ -1390,8 +1345,9 @@ def delete_run(request, run_tag):
 
 @admin_required
 def load_vanilla_llm_multi_turn_run(request, group_id):
-    group = get_object_or_404(MultiTurnSessionGroup, pk=group_id)
-    sessions = group.vanilla_sessions.all().prefetch_related("trials")
+    group = get_object_or_404(MultiTurnRun, pk=group_id)
+    # Filter sessions by type
+    sessions = group.sessions.filter(pipeline_type='vanilla').prefetch_related("trials")
     results = []
     snapshot = group.settings_snapshot
     max_retries = 3
@@ -1418,8 +1374,9 @@ def load_vanilla_llm_multi_turn_run(request, group_id):
 
 @admin_required
 def load_rag_multi_turn_run(request, group_id):
-    group = get_object_or_404(MultiTurnSessionGroup, pk=group_id)
-    sessions = group.rag_sessions.all().prefetch_related("trials")
+    group = get_object_or_404(MultiTurnRun, pk=group_id)
+    # Filter sessions by type
+    sessions = group.sessions.filter(pipeline_type='rag').prefetch_related("trials")
     results = []
     snapshot = group.settings_snapshot
     max_retries = 3
@@ -1447,7 +1404,7 @@ def load_rag_multi_turn_run(request, group_id):
 @admin_required
 def list_vanilla_llm_adhoc_runs(request):
     try:
-        runs = VanillaLLMAdhocRun.objects.values(
+        runs = AdhocRun.objects.filter(run_type='vanilla').values(
             "id", "name", "created_at", "accuracy"
         ).order_by("-created_at")
         return JsonResponse({"runs": list(runs)})
@@ -1458,7 +1415,7 @@ def list_vanilla_llm_adhoc_runs(request):
 @admin_required
 def get_vanilla_llm_adhoc_run(request, run_id):
     try:
-        run = get_object_or_404(VanillaLLMAdhocRun, pk=run_id)
+        run = get_object_or_404(AdhocRun, pk=run_id, run_type='vanilla')
         results = list(run.results.values("question", "answer", "full_response", "ground_truths", "is_correct_rule", "is_correct_llm"))
         
         settings_data = {}
@@ -1499,7 +1456,7 @@ def web_search(request):
 @require_http_methods(["DELETE"])
 def delete_vanilla_llm_adhoc_run(request, run_id):
     try:
-        run = get_object_or_404(VanillaLLMAdhocRun, pk=run_id)
+        run = get_object_or_404(AdhocRun, pk=run_id, run_type='vanilla')
         run.delete()
         return JsonResponse({"status": "ok"})
     except Exception as e:
@@ -1548,7 +1505,7 @@ def run_rag_multi_turn_pipeline(request):
             dataset_id=dataset_id,
         )
 
-        return StreamingHttpResponse(pipeline.run(), content_type="application/json")
+        return StreamingHttpResponse(serialize_events(pipeline.run()), content_type="application/json")
 
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)

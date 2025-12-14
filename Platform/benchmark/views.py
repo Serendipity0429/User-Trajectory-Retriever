@@ -335,7 +335,8 @@ def get_default_settings(request):
             # Search
             "search_provider": SearchSettings._meta.get_field("search_provider").get_default(),
             "serper_api_key": config("SERPER_API_KEY", default=search_settings.serper_api_key),
-            "serper_fetch_full_content": SearchSettings._meta.get_field("serper_fetch_full_content").get_default(),
+            "search_limit": SearchSettings._meta.get_field("search_limit").get_default(),
+            "serper_fetch_full_content": SearchSettings._meta.get_field("fetch_full_content").get_default(),
         }
         return JsonResponse(config_data)
     except OperationalError:
@@ -613,8 +614,9 @@ def save_search_settings(request):
         settings = SearchSettings.load()
         settings.search_provider = data.get("search_provider", settings.search_provider)
         settings.serper_api_key = data.get("serper_api_key", settings.serper_api_key)
-        settings.serper_fetch_full_content = data.get(
-            "serper_fetch_full_content", settings.serper_fetch_full_content
+        settings.search_limit = int(data.get("search_limit", settings.search_limit))
+        settings.fetch_full_content = data.get(
+            "serper_fetch_full_content", settings.fetch_full_content
         )
         settings.save()
         return JsonResponse({"status": "ok"})
@@ -770,6 +772,7 @@ def create_session(request):
             snapshot["rag_settings"] = {"prompt_template": rag_settings.prompt_template}
             snapshot["search_settings"] = {
                 "search_provider": search_settings.search_provider,
+                "search_limit": search_settings.search_limit,
                 "serper_fetch_full_content": search_settings.serper_fetch_full_content,
             }
         # Ensure Group exists

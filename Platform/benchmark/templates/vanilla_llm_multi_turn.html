@@ -306,5 +306,6 @@
     </div>
     {% include 'includes/settings_modal.html' with show_retries=True %}
 {% endblock %}
+{% block benchmark_extra_js %}
 <script src="{% static 'js/benchmark/vanilla_llm_multi_turn.js' %}"></script>
-{% endblock benchmark_extra_js %}
+{% endblock%}

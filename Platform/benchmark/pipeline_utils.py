@@ -292,7 +292,8 @@ class RagAdhocPipeline(BaseAdhocPipeline):
             },
             'search_settings': {
                 'search_provider': self.search_settings.search_provider,
-                'serper_fetch_full_content': self.search_settings.serper_fetch_full_content
+                'search_limit': self.search_settings.search_limit,
+                'serper_fetch_full_content': self.search_settings.fetch_full_content
             }
         }
 
@@ -618,7 +619,8 @@ class RagMultiTurnPipeline(BaseMultiTurnPipeline):
             },
             'search_settings': {
                 'search_provider': search_settings.search_provider,
-                'serper_fetch_full_content': search_settings.serper_fetch_full_content
+                'search_limit': search_settings.search_limit,
+                'serper_fetch_full_content': search_settings.fetch_full_content
             }
         }
 

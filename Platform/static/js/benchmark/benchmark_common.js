@@ -269,6 +269,7 @@ const BenchmarkUtils = {
             rag_prompt_template: document.getElementById('rag_prompt_template') ? document.getElementById('rag_prompt_template').value : '',
             
             search_provider: document.getElementById('search_provider') ? document.getElementById('search_provider').value : '',
+            search_limit: document.getElementById('search_limit') ? document.getElementById('search_limit').value : '',
             serper_api_key: document.getElementById('serper_api_key') ? document.getElementById('serper_api_key').value : '',
             serper_fetch_full_content: document.getElementById('serper_fetch_full_content') ? document.getElementById('serper_fetch_full_content').checked : false,
         };
@@ -294,6 +295,7 @@ const BenchmarkUtils = {
             rag_prompt_template: document.getElementById('rag_prompt_template') ? document.getElementById('rag_prompt_template').value : '',
             
             search_provider: document.getElementById('search_provider') ? document.getElementById('search_provider').value : '',
+            search_limit: document.getElementById('search_limit') ? document.getElementById('search_limit').value : '',
             serper_api_key: document.getElementById('serper_api_key') ? document.getElementById('serper_api_key').value : '',
             serper_fetch_full_content: document.getElementById('serper_fetch_full_content') ? document.getElementById('serper_fetch_full_content').checked : false,
         };
@@ -345,6 +347,7 @@ const BenchmarkUtils = {
                         // Trigger change to update UI for serper_api_key container visibility
                         document.getElementById('search_provider').dispatchEvent(new Event('change'));
                     }
+                    if (document.getElementById('search_limit') && data.search_limit) document.getElementById('search_limit').value = data.search_limit;
                     if (document.getElementById('serper_api_key') && data.serper_api_key) document.getElementById('serper_api_key').value = data.serper_api_key;
                     if (document.getElementById('serper_fetch_full_content') && data.serper_fetch_full_content !== undefined) document.getElementById('serper_fetch_full_content').checked = data.serper_fetch_full_content;
 
@@ -411,6 +414,30 @@ const BenchmarkUtils = {
     },
 
     /**
+     * Validates the search limit input.
+     * @returns {boolean} True if valid, false otherwise.
+     */
+    validateSearchLimit: function() {
+        const searchLimitInput = document.getElementById('search_limit');
+        const feedbackDiv = document.getElementById('search-limit-feedback');
+        
+        if (!searchLimitInput || !feedbackDiv) return true;
+
+        const value = parseInt(searchLimitInput.value, 10);
+        
+        if (isNaN(value) || value < 1 || value > 10) {
+            searchLimitInput.classList.add('is-invalid');
+            feedbackDiv.textContent = 'Retrieved Doc Count must be between 1 and 10.';
+            feedbackDiv.style.display = 'block';
+            return false;
+        } else {
+            searchLimitInput.classList.remove('is-invalid');
+            feedbackDiv.style.display = 'none';
+            return true;
+        }
+    },
+
+    /**
      * Setup event handlers for configuration actions.
      */
     setupConfigurationActionHandlers: function(csrfToken, includeRag = false, includeSearch = false) {
@@ -432,13 +459,20 @@ const BenchmarkUtils = {
         testConnection(); 
         BenchmarkUtils.saveInitialSettings();
 
+        // Search Limit Validation
+        const searchLimitInput = document.getElementById('search_limit');
+        if (searchLimitInput) {
+            searchLimitInput.addEventListener('input', BenchmarkUtils.validateSearchLimit);
+            searchLimitInput.addEventListener('change', BenchmarkUtils.validateSearchLimit);
+        }
+
         // Check unsaved changes on input
         const checkChanges = () => BenchmarkUtils.checkUnsavedChanges();
         const settingsIds = [
             'llm_base_url', 'llm_model', 'llm_api_key', 'max_retries', 'allow_reasoning',
             'temperature', 'top_p', 'max_tokens',
             'rag_prompt_template',
-            'search_provider', 'serper_api_key', 'serper_fetch_full_content'
+            'search_provider', 'search_limit', 'serper_api_key', 'serper_fetch_full_content'
         ];
         settingsIds.forEach(id => {
             const el = document.getElementById(id);
@@ -461,6 +495,11 @@ const BenchmarkUtils = {
         // Global Save All Handler
         if (document.getElementById('save-all-settings-btn')) {
             document.getElementById('save-all-settings-btn').addEventListener('click', function() {
+                if (!BenchmarkUtils.validateSearchLimit()) {
+                    alert('Please correct the errors in the Search Settings tab.');
+                    return;
+                }
+
                 const btn = this;
                 const originalText = btn.innerHTML;
                 btn.disabled = true;
@@ -489,6 +528,7 @@ const BenchmarkUtils = {
                     let searchProvider = document.getElementById('search_provider').value;
                     const searchData = {
                         search_provider: searchProvider,
+                        search_limit: document.getElementById('search_limit') ? document.getElementById('search_limit').value : 5,
                         serper_api_key: document.getElementById('serper_api_key').value,
                         serper_fetch_full_content: document.getElementById('serper_fetch_full_content') ? document.getElementById('serper_fetch_full_content').checked : false
                     };
@@ -1589,6 +1629,15 @@ const BenchmarkUtils = {
                 addItem('Search Provider', provider === 'mcp' ? 'MCP Server' : (provider === 'serper' ? 'Serper API' : provider), 'bi-globe');
             }
             
+            // Search Limit
+            let searchLimit = ss.search_limit;
+            if ((searchLimit === undefined || searchLimit === '') && document.getElementById('search_limit')) {
+                searchLimit = document.getElementById('search_limit').value;
+            }
+            if (searchLimit) {
+                addItem('Top-K Limit', searchLimit, 'bi-list-ol');
+            }
+
             // Full content
             let fullContent = ss.serper_fetch_full_content;
              if (fullContent === undefined && document.getElementById('serper_fetch_full_content')) {

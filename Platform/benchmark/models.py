@@ -1,5 +1,6 @@
 from django.db import models
 from django.core.exceptions import ValidationError
+from django.core.validators import MinValueValidator, MaxValueValidator
 import os
 
 # --- Abstract Base Classes ---
@@ -60,8 +61,9 @@ class SearchSettings(SingletonModel):
         ('mcp', 'MCP Server'),
         ('serper', 'Serper API'),
     ]
-    search_provider = models.CharField(max_length=20, choices=PROVIDER_CHOICES, default='mcp', help_text="Select the search provider.")
+    search_provider = models.CharField(max_length=20, choices=PROVIDER_CHOICES, default='serper', help_text="Select the search provider.")
     serper_api_key = models.CharField(max_length=255, blank=True, help_text="API Key for Serper.dev")
+    search_limit = models.IntegerField(default=5, validators=[MinValueValidator(1), MaxValueValidator(10)], help_text="Number of search results to retrieve (Top-K).")
     fetch_full_content = models.BooleanField(default=True, help_text="If enabled, fetches full page content for search results (Serper & MCP).")
 
     def __str__(self):

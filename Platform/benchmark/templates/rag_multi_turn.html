@@ -305,9 +305,10 @@
             </div>
         </div>
     </div>
-</div>    {% include 'includes/settings_modal.html' with show_retries=True %}
+</div>    
+{% include 'includes/settings_modal.html' with show_retries=True %}
 {% endblock %}
+
 {% block benchmark_extra_js %}
 <script src="{% static 'js/benchmark/rag_multi_turn.js' %}"></script>
-
 {% endblock %}

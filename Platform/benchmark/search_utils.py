@@ -157,12 +157,16 @@ class MCPSearch(WebSearch):
         if self._initialized:
             return
         
-        project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        server_dir = os.path.join(project_root, 'Platform/benchmark/mcp/web-search-mcp')
-        script_path = os.path.join(server_dir, 'dist/index.js')
+        # Dynamically determine the path relative to this file
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        server_dir = os.path.join(current_dir, 'mcp', 'web-search-mcp')
+        script_path = os.path.join(server_dir, 'dist', 'index.js')
 
         if not os.path.exists(script_path):
             print_debug(f"Could not find MCP script at {script_path}")
+            print_debug('Please download the "web-search-mcp" from "https://github.com/mrkrsl/web-search-mcp" and place it in "Platform/benchmark/mcp/web-search-mcp".')
+            print_debug('Make sure to build it or download the "dist" folder.')
+            
             # Here we should probably handle this error more gracefully
             # For now, just log and the search will fail.
             self._client = None
@@ -242,10 +246,11 @@ class MCPSearch(WebSearch):
             return [{"error": "MCP client not initialized."}]
 
         fetch_full_content = getattr(self, 'fetch_full_content', True)
+        limit = getattr(self, 'search_limit', 5)
 
         search_args = {
             "query": query,
-            "limit": 5,
+            "limit": limit,
         }
         
         tool_name = "get-web-search-summaries"
@@ -379,9 +384,10 @@ class WebCrawler:
         return items
 
 class SerperSearch(WebSearch):
-    def __init__(self, api_key, fetch_full_content=True):
+    def __init__(self, api_key, fetch_full_content=True, search_limit=5):
         self.api_key = api_key
         self.fetch_full_content = fetch_full_content
+        self.search_limit = search_limit
         self.crawler = WebCrawler()
 
     def search(self, query: str) -> list:
@@ -391,50 +397,66 @@ class SerperSearch(WebSearch):
         import http.client
         import json
 
-        try:
-            conn = http.client.HTTPSConnection("google.serper.dev")
-            payload = json.dumps({
-                "q": query
-            })
-            headers = {
-                'X-API-KEY': self.api_key,
-                'Content-Type': 'application/json'
-            }
-            conn.request("POST", "/search", payload, headers)
-            res = conn.getresponse()
-            data = res.read()
-            response_data = json.loads(data.decode("utf-8"))
-            # print_debug(f"Serper API response: {response_data}")
-            
-            # Normalize results to match the expected format
-            results = []
-            items_to_fetch = []
-            
-            if 'organic' in response_data:
-                for item in response_data['organic']:
-                    snippet = item.get('snippet', '')
-                    url = item.get('link')
-                    
-                    result_item = {
-                        'title': item.get('title'),
-                        'url': url,
-                        'link': url, # Alias for frontend compatibility
-                        'snippet': snippet,
-                        'content': snippet # Default to snippet
-                    }
-                    results.append(result_item)
-                    
-                    if self.fetch_full_content and url:
-                        items_to_fetch.append(result_item)
+        all_results = []
+        items_to_fetch = []
+        page = 1
+        MAX_PAGES = 10 # Safety limit
 
-            # Parallel fetch
+        try:
+            while len(all_results) < self.search_limit and page <= MAX_PAGES:
+                conn = http.client.HTTPSConnection("google.serper.dev")
+                payload = json.dumps({
+                    "q": query,
+                    "page": page
+                })
+                headers = {
+                    'X-API-KEY': self.api_key,
+                    'Content-Type': 'application/json'
+                }
+                conn.request("POST", "/search", payload, headers)
+                res = conn.getresponse()
+                data = res.read()
+                response_data = json.loads(data.decode("utf-8"))
+                
+                new_results_found = False
+                if 'organic' in response_data:
+                    for item in response_data['organic']:
+                        # Stop if we have enough results
+                        if len(all_results) >= self.search_limit:
+                            break
+
+                        snippet = item.get('snippet', '')
+                        url = item.get('link')
+                        
+                        result_item = {
+                            'title': item.get('title'),
+                            'url': url,
+                            'link': url, # Alias for frontend compatibility
+                            'snippet': snippet,
+                            'content': snippet # Default to snippet
+                        }
+                        
+                        all_results.append(result_item)
+                        if self.fetch_full_content and url:
+                            items_to_fetch.append(result_item)
+                            
+                        new_results_found = True
+                
+                if not new_results_found:
+                    break
+                
+                page += 1
+
+            # Parallel fetch for all collected items
             if items_to_fetch:
                 self.crawler.batch_extract(items_to_fetch)
 
-            return results
+            return all_results
 
         except Exception as e:
             print_debug(f"Error calling Serper API: {e}")
+            if all_results:
+                return all_results
             return [{"error": f"Error calling Serper API: {str(e)}"}]
 
     def format_results(self, results: list) -> str:
@@ -454,11 +476,13 @@ class SerperSearch(WebSearch):
 def get_search_engine() -> WebSearch:
     from .models import SearchSettings
     settings = SearchSettings.load()
+    limit = getattr(settings, 'search_limit', 5)
     
     if settings.search_provider == 'serper':
         api_key = os.getenv('SERPER_API_KEY') or settings.serper_api_key
-        return SerperSearch(api_key=api_key, fetch_full_content=settings.fetch_full_content)
+        return SerperSearch(api_key=api_key, fetch_full_content=settings.fetch_full_content, search_limit=limit)
     else:
         mcp = MCPSearch()
         mcp.fetch_full_content = settings.fetch_full_content
+        mcp.search_limit = limit
         return mcp

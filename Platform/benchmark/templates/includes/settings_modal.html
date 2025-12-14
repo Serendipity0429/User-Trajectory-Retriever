@@ -163,6 +163,21 @@
                                     </select>
                                     <div class="form-text small text-muted mt-2"><i class="bi bi-info-circle me-1"></i> The search backend used for retrieving context in RAG pipelines.</div>
                                 </div>
+
+                                <div class="mb-3">
+                                    <label for="search_limit" class="form-label small text-muted fw-bold">Retrieved Doc Count (Top-K)</label>
+                                    <input type="number" class="form-control" id="search_limit" min="1" max="10" value="{{ search_settings.search_limit|default:5 }}">
+                                    <div id="search-limit-feedback" class="invalid-feedback" style="display: none;"></div>
+                                    <div class="form-text small text-muted">Number of search results to include in the context.</div>
+                                </div>
+
+                                <div class="form-check form-switch d-flex align-items-start mt-3 pt-3 border-top border-secondary">
+                                    <input class="form-check-input me-2" type="checkbox" role="switch" id="serper_fetch_full_content" {% if search_settings.fetch_full_content %}checked{% endif %}>
+                                    <div>
+                                        <label class="form-check-label fw-bold text-dark" for="serper_fetch_full_content">Fetch Full Page Content</label>
+                                        <div class="form-text small text-muted mb-0">Visits each result page to extract full text. Slower but provides richer context.</div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
@@ -176,14 +191,6 @@
                                     <button class="btn btn-outline-secondary bg-white text-muted" type="button" id="toggle-serper-key-visibility">
                                         <i class="bi bi-eye"></i>
                                     </button>
-                                </div>
-                                
-                                <div class="form-check form-switch d-flex align-items-start mt-3 pt-3 border-top border-white">
-                                    <input class="form-check-input me-2" type="checkbox" role="switch" id="serper_fetch_full_content" {% if search_settings.serper_fetch_full_content %}checked{% endif %}>
-                                    <div>
-                                        <label class="form-check-label fw-bold text-dark" for="serper_fetch_full_content">Fetch Full Page Content</label>
-                                        <div class="form-text small text-muted mb-0">Visits each result page to extract full text. Slower but provides richer context.</div>
-                                    </div>
                                 </div>
                             </div>
                         </div>

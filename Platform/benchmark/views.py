@@ -1371,6 +1371,8 @@ def delete_run(request, run_tag):
         return JsonResponse({"status": "error", "message": str(e)}, status=500)
 
 
+from difflib import SequenceMatcher
+
 @admin_required
 def load_vanilla_llm_multi_turn_run(request, group_id):
     group = get_object_or_404(MultiTurnRun, pk=group_id)
@@ -1381,24 +1383,27 @@ def load_vanilla_llm_multi_turn_run(request, group_id):
     max_retries = 3
     if snapshot and "llm_settings" in snapshot:
         max_retries = snapshot["llm_settings"].get("max_retries", 3)
+
     for session in sessions:
-        last_trial = session.trials.last()
+        trials = session.trials.all().order_by('trial_number')
+        last_trial = trials.last()
+        first_trial = trials.first()
+        
         if last_trial:
-            results.append(
-                {
-                    "question": session.question,
-                    "correct": last_trial.is_correct,
-                    "trials": session.trials.count(),
-                    "session_id": session.id,
-                    "final_answer": last_trial.answer,
-                    "ground_truths": session.ground_truths,
-                    "max_retries": max_retries,
-                }
-            )
+            results.append({
+                "question": session.question,
+                "correct": last_trial.is_correct,
+                "trials": session.trials.count(),
+                "session_id": session.id,
+                "final_answer": last_trial.answer,
+                "ground_truths": session.ground_truths,
+                "max_retries": max_retries,
+                "initial_correct": first_trial.is_correct if first_trial else None
+            })
+
     return JsonResponse(
         {"results": results, "group_name": group.name, "settings": snapshot}
     )
-
 
 @admin_required
 def load_rag_multi_turn_run(request, group_id):
@@ -1410,8 +1415,27 @@ def load_rag_multi_turn_run(request, group_id):
     max_retries = 3
     if snapshot and "llm_settings" in snapshot:
         max_retries = snapshot["llm_settings"].get("max_retries", 3)
+        
     for session in sessions:
-        last_trial = session.trials.last()
+        trials = session.trials.all().order_by('trial_number')
+        last_trial = trials.last()
+        first_trial = trials.first()
+        
+        # Calculate Query Shift
+        query_shift = 0.0
+        if trials.count() > 1:
+            total_shift = 0.0
+            count = 0
+            trial_list = list(trials)
+            for i in range(len(trial_list) - 1):
+                q1 = trial_list[i].search_query or ""
+                q2 = trial_list[i+1].search_query or ""
+                similarity = SequenceMatcher(None, q1, q2).ratio()
+                total_shift += (1.0 - similarity)
+                count += 1
+            if count > 0:
+                query_shift = total_shift / count
+
         if last_trial:
             results.append(
                 {
@@ -1422,6 +1446,8 @@ def load_rag_multi_turn_run(request, group_id):
                     "final_answer": last_trial.answer,
                     "ground_truths": session.ground_truths,
                     "max_retries": max_retries,
+                    "initial_correct": first_trial.is_correct if first_trial else None,
+                    "query_shift": query_shift
                 }
             )
     return JsonResponse(

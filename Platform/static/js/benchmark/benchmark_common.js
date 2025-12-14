@@ -2103,6 +2103,30 @@ const BenchmarkUtils = {
             const giveUp = results.filter(r => r.correct === false).length; // Simple approximation
             const giveUpRate = (giveUp / total) * 100;
             if(document.getElementById('stats-give-up-rate')) document.getElementById('stats-give-up-rate').textContent = `${giveUpRate.toFixed(2)}%`;
+
+            // Self-Correction Rate
+            // initial_correct is provided by the backend. 
+            // Denominator: Sessions where initial_correct is FALSE
+            // Numerator: Sessions where initial_correct is FALSE AND final correct is TRUE
+            const initialFailures = results.filter(r => r.initial_correct === false);
+            const selfCorrected = initialFailures.filter(r => r.correct === true);
+            const selfCorrectionRate = initialFailures.length > 0 ? (selfCorrected.length / initialFailures.length) * 100 : 0;
+            if(document.getElementById('stats-self-correction-rate')) {
+                document.getElementById('stats-self-correction-rate').textContent = `${selfCorrectionRate.toFixed(2)}%`;
+                document.getElementById('stats-self-correction-rate').title = `${selfCorrected.length} corrected out of ${initialFailures.length} initial failures`;
+            }
+
+            // Avg Query Shift (RAG only)
+            if(document.getElementById('stats-avg-query-shift')) {
+                const shiftSessions = results.filter(r => r.query_shift !== undefined && r.query_shift !== null);
+                if (shiftSessions.length > 0) {
+                     const totalShift = shiftSessions.reduce((sum, r) => sum + Number(r.query_shift), 0);
+                     const avgShift = totalShift / shiftSessions.length;
+                     document.getElementById('stats-avg-query-shift').textContent = avgShift.toFixed(3);
+                } else {
+                     document.getElementById('stats-avg-query-shift').textContent = "0.00";
+                }
+            }
         }
     },
 

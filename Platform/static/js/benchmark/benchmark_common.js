@@ -600,7 +600,34 @@ const BenchmarkUtils = {
     },
 
     /**
+     * Enable or disable configuration inputs.
+     * @param {boolean} disabled - Whether to disable the inputs.
+     */
+    toggleConfigurationInputs: function(disabled) {
+        const inputs = document.querySelectorAll('#settingsModal input, #settingsModal select, #settingsModal textarea, #dataset-selector');
+        inputs.forEach(input => {
+            input.disabled = disabled;
+        });
+        const saveBtn = document.getElementById('save-all-settings-btn');
+        if (saveBtn) saveBtn.disabled = disabled;
+    },
+
+    /**
      * Generate a UUID.
+     * @returns {string} The UUID.
+     */
+    generateUUID: function() {
+        if (crypto.randomUUID) {
+            return crypto.randomUUID();
+        }
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+            var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+            return v.toString(16);
+        });
+    },
+
+    /**
+     * Stop a pipeline.
      * @param {string} url - The URL to the stop pipeline view.
      * @param {string} csrfToken - The CSRF token.
      * @param {string} pipelineId - The ID of the pipeline to stop.
@@ -2729,6 +2756,11 @@ const BenchmarkUtils = {
                  fetch(loadRunUrl).then(res => res.json()).then(data => {
                      if (data.error) { alert(data.error); return; }
                      currentPipelineResults = data.results;
+                     
+                     // Show stats container first so updateStatsUI can find elements if they depend on visibility (though usually they don't)
+                     const statsContainer = document.getElementById('statistics-container');
+                     if (statsContainer) statsContainer.style.display = 'block';
+
                      BenchmarkUtils.MultiTurnUtils.updateStatsUI(data.results, data.group_name, (sid) => {
                          document.getElementById('session-container').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                          loadSession(sid);
@@ -2737,7 +2769,7 @@ const BenchmarkUtils = {
                      const settingsWhitelist = ['llm_model', 'llm_base_url', 'max_retries', 'allow_reasoning'];
                      if (pipelineType.includes('rag')) settingsWhitelist.push('rag_settings', 'search_settings');
                      BenchmarkUtils.renderRunConfiguration(data.settings, settingsWhitelist);
-                     document.getElementById('statistics-container').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                     if (statsContainer) statsContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                  });
             }
 

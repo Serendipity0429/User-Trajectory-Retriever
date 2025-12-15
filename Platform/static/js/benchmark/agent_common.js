@@ -461,13 +461,22 @@ window.AgentBenchmark = (function() {
 
         // 2. Action
         if (type === 'action' && data) {
-             // Normalize to array if it's a single tool_use object
+             // Normalize to array and adapt to common structure
              let actions = [];
-             if (Array.isArray(data)) {
-                 if (data.length > 0 && data[0].type === 'tool_use') actions = data;
-             } else if (data.type === 'tool_use') {
-                 actions = [data];
-             }
+             let rawList = Array.isArray(data) ? data : [data];
+             
+             actions = rawList.map(item => {
+                 if (item.type === 'tool_use') return item;
+                 // Handle simple object {name: "...", input: ...}
+                 if (item.name && (item.input || item.arguments)) {
+                     return { 
+                         type: 'tool_use', 
+                         name: item.name, 
+                         input: item.input || item.arguments 
+                     };
+                 }
+                 return null;
+             }).filter(item => item !== null);
 
              if (actions.length > 0) {
                  let html = '<div class="d-flex flex-column gap-3">';

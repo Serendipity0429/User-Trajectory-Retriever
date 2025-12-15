@@ -73,6 +73,13 @@ const BenchmarkUrls = {
         loadRun: (id) => `${API_PREFIX}/multi_turn/load_agent_run/${id}/`,
         runPipeline: `${API_PREFIX}/run_agentic_rag_pipeline/`,
         stopPipeline: `${API_PREFIX}/stop_agentic_rag_pipeline/`
+    },
+    
+    // Multi-turn: Browser Agent
+    browserAgent: {
+        loadRun: (id) => `${API_PREFIX}/multi_turn/load_agent_run/${id}/`, // Share loadRun for now as structure is same
+        runPipeline: `${API_PREFIX}/run_browser_agent_pipeline/`,
+        stopPipeline: `${API_PREFIX}/stop_browser_agent_pipeline/`
     }
 };
 
@@ -2763,7 +2770,8 @@ const BenchmarkUtils = {
             // --- Helper: Load Group/Run ---
             function loadRun(groupId) {
                  let loadRunUrl = BenchmarkUrls.vanillaLlmMultiTurn.loadRun(groupId);
-                 if (pipelineType.includes('agent')) loadRunUrl = BenchmarkUrls.agent.loadRun(groupId);
+                 if (pipelineType === 'browser_agent') loadRunUrl = BenchmarkUrls.browserAgent.loadRun(groupId);
+                 else if (pipelineType.includes('agent')) loadRunUrl = BenchmarkUrls.agent.loadRun(groupId);
                  else if (pipelineType.includes('rag')) loadRunUrl = BenchmarkUrls.ragMultiTurn.loadRun(groupId);
 
                  fetch(loadRunUrl).then(res => res.json()).then(data => {
@@ -2868,7 +2876,8 @@ const BenchmarkUtils = {
                 if (buildFormData) buildFormData(formData);
                 
                 let runUrl = BenchmarkUrls.vanillaLlmMultiTurn.runPipeline;
-                if (pipelineType.includes('agent')) runUrl = BenchmarkUrls.agent.runPipeline;
+                if (pipelineType === 'browser_agent') runUrl = BenchmarkUrls.browserAgent.runPipeline;
+                else if (pipelineType.includes('agent')) runUrl = BenchmarkUrls.agent.runPipeline;
                 else if (pipelineType.includes('rag')) runUrl = BenchmarkUrls.ragMultiTurn.runPipeline;
 
                 pipelineController = BenchmarkUtils.PipelineRunner.start({
@@ -2914,7 +2923,8 @@ const BenchmarkUtils = {
                      }
 
                      let stopUrl = BenchmarkUrls.vanillaLlmMultiTurn.stopPipeline;
-                     if (pipelineType.includes('agent')) stopUrl = BenchmarkUrls.agent.stopPipeline;
+                     if (pipelineType === 'browser_agent') stopUrl = BenchmarkUrls.browserAgent.stopPipeline;
+                     else if (pipelineType.includes('agent')) stopUrl = BenchmarkUrls.agent.stopPipeline;
                      else if (pipelineType.includes('rag')) stopUrl = BenchmarkUrls.ragMultiTurn.stopPipeline;
 
                     fetch(stopUrl, {

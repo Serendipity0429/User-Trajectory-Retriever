@@ -882,14 +882,15 @@ def create_session(request):
                 session=session, trial_number=1, status="processing"
             )
 
-        elif "agent" in pipeline_type:
-            session_data['pipeline_type'] = 'agent'
+        elif pipeline_type == "browser_agent":
+            session_data['pipeline_type'] = 'browser_agent'
             session = MultiTurnSession.objects.create(**session_data)
             trial = MultiTurnTrial.objects.create(
                 session=session, trial_number=1, status="processing"
             )
-        elif "browser_agent" in pipeline_type: # New pipeline type
-            session_data['pipeline_type'] = 'browser_agent'
+
+        elif pipeline_type == "agent":
+            session_data['pipeline_type'] = 'agent'
             session = MultiTurnSession.objects.create(**session_data)
             trial = MultiTurnTrial.objects.create(
                 session=session, trial_number=1, status="processing"

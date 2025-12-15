@@ -488,6 +488,39 @@ window.AgentBenchmark = (function() {
                              content: `<strong>Query:</strong> <span class="text-primary">${query}</span>`
                          };
                      },
+                     'navigate_to_url': (input) => {
+                         return {
+                             title: 'Navigate',
+                             content: `<div class="d-flex align-items-center"><i class="bi bi-globe me-2 text-primary"></i> <a href="${input.url}" target="_blank">${input.url}</a></div>`
+                         };
+                     },
+                     'click_element': (input) => {
+                         return {
+                             title: 'Click Element',
+                             content: `<strong>Selector:</strong> <span class="font-monospace text-primary bg-light px-1 rounded">${input.selector}</span>`
+                         };
+                     },
+                     'type_text': (input) => {
+                         return {
+                             title: 'Type Text',
+                             content: `
+                                <div><strong>Selector:</strong> <span class="font-monospace text-primary bg-light px-1 rounded">${input.selector}</span></div>
+                                <div class="mt-1"><strong>Text:</strong> <span class="text-success">"${input.text}"</span></div>
+                             `
+                         };
+                     },
+                     'scroll_page': (input) => {
+                         return {
+                             title: 'Scroll Page',
+                             content: `Direction: <strong>${input.direction || 'down'}</strong>, Amount: ${input.amount || 500}px`
+                         };
+                     },
+                     'get_dom_snapshot': (input) => {
+                         return {
+                             title: 'Get DOM Snapshot',
+                             content: '<em class="text-muted">Capturing current page structure...</em>'
+                         };
+                     },
                      'default': (name, input) => {
                          const argsContent = Object.entries(input)
                             .map(([key, value]) => `

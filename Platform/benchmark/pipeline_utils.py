@@ -3,6 +3,7 @@ import os
 import openai
 import logging
 import asyncio
+import time
 from datetime import datetime
 from task_manager.utils import check_answer_rule, check_answer_llm, redis_client
 from .search_utils import get_search_engine
@@ -14,6 +15,7 @@ from .models import (
 from .utils import print_debug, extract_final_answer, count_questions_in_file
 from .prompts import PROMPTS
 from .agent_utils import BenchmarkAgentFactory
+from .agent_browser_utils import BrowserAgentFactory
 from agentscope.message import Msg
 
 REDIS_PREFIX_ACTIVE = "pipeline_active"
@@ -21,6 +23,7 @@ REDIS_PREFIX_VANILLA_ADHOC = "vanilla_llm_adhoc_pipeline_active"
 REDIS_PREFIX_RAG_ADHOC = "rag_adhoc_pipeline_active"
 REDIS_PREFIX_MULTI_TURN = "multi_turn_pipeline_active"
 REDIS_PREFIX_VANILLA_MULTI_TURN = "vanilla_llm_multi_turn_pipeline_active"
+REDIS_PREFIX_BROWSER_AGENT = "browser_agent_pipeline_active"
 
 HARD_QUESTIONS_PATH = os.path.join(os.path.dirname(__file__), '..', 'data', 'hard_questions_refined.jsonl')
 
@@ -115,19 +118,29 @@ class BasePipeline:
         if max_tokens:
             kwargs['max_tokens'] = max_tokens
 
-        try:
-            response = self.client.chat.completions.create(**kwargs)
-            full_response = response.choices[0].message.content
-        except Exception as e:
-            # Let the caller handle or wrap exceptions
-            raise e
+        max_api_retries = 3
+        last_exception = None
 
-        if self.llm_settings.allow_reasoning:
-            answer = extract_final_answer(full_response)
-        else:
-            answer = full_response
-            
-        return answer, full_response
+        for attempt in range(max_api_retries):
+            try:
+                response = self.client.chat.completions.create(**kwargs)
+                full_response = response.choices[0].message.content
+                
+                if self.llm_settings.allow_reasoning:
+                    answer = extract_final_answer(full_response)
+                else:
+                    answer = full_response
+                    
+                return answer, full_response
+
+            except Exception as e:
+                last_exception = e
+                print_debug(f"LLM API call failed (attempt {attempt + 1}/{max_api_retries}): {e}")
+                if attempt < max_api_retries - 1:
+                    sleep_time = (2 ** attempt) * 1  # 1s, 2s, 4s...
+                    time.sleep(sleep_time)
+                else:
+                    raise last_exception
     
     def run(self):
         yield {'is_meta': True, 'type': 'info', 'message': 'Pipeline started'}
@@ -1237,6 +1250,7 @@ class BrowserAgentPipeline(BaseMultiTurnPipeline):
         )
         
     def _construct_messages(self, session, trial, completed_trials):
+        print_debug(f"Constructing messages for BrowserAgentPipeline, trial number: {trial.trial_number}")
         # The browser agent's initial prompt is self-contained.
         # History will be managed by the agentscope agent itself.
         messages = []
@@ -1287,30 +1301,32 @@ class BrowserAgentPipeline(BaseMultiTurnPipeline):
             except Exception as e:
                 print_debug(f"Redis update failed in BrowserAgentPipeline: {e}")
 
-        agent = BrowserAgentFactory.create_agent(agent_model, update_callback=on_memory_update)
-        
         async def run_agent_task():
-            import inspect
-            if history_msgs:
-                await agent.memory.add(history_msgs)
-            response = await agent(current_msg)
-            if inspect.isasyncgen(response):
-                final_res = None
-                async for x in response:
-                    final_res = x
-                response = final_res
-            trace = await agent.memory.get_memory()
-            return response, trace
+            agent = await BrowserAgentFactory.create_agent(agent_model, update_callback=on_memory_update)
+            try:
+                import inspect
+                if history_msgs:
+                    await agent.memory.add(history_msgs)
+                response = await agent(current_msg)
+                if inspect.isasyncgen(response):
+                    final_res = None
+                    async for x in response:
+                        final_res = x
+                    response = final_res
+                trace = await agent.memory.get_memory()
+                return response, trace
+            finally:
+                if hasattr(agent, 'mcp_client'):
+                    try:
+                        await agent.mcp_client.close()
+                    except Exception as e:
+                        print_debug(f"Error closing MCP client: {e}")
 
         try:
             response_msg, trace_msgs = asyncio.run(run_agent_task())
         except Exception as e:
             print_debug(f"Browser agent execution failed: {e}")
             raise e
-        finally:
-            # Ensure the browser client is closed after each session if not managed by a persistent process
-            from .browser_utils import BrowserClientManager
-            BrowserClientManager.close_client()
         
         raw_content = response_msg.content
         if isinstance(raw_content, list):

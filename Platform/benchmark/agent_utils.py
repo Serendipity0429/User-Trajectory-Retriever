@@ -8,6 +8,7 @@ from agentscope.formatter import OpenAIChatFormatter
 from agentscope.model import OpenAIChatModel
 from .search_utils import get_search_engine
 from .models import LLMSettings
+from .prompts import PROMPTS
 
 from asgiref.sync import sync_to_async
 
@@ -29,18 +30,19 @@ async def web_search_tool(query: str):
     """
     try:
         engine = await get_search_engine_safe()
-        # engine.search might be sync or async. 
-        # If engine.search is sync, we need to wrap it too? 
-        # Usually search engines (Serper) do network I/O.
-        # But get_search_engine() just returns the instance.
-        # Check search_utils.py to be sure.
-        # Assuming we need to run search in thread if it's sync.
         
         results = await sync_to_async(engine.search)(query)
-        # Return JSON for structured parsing by frontend and LLM
+        
+        if not results or (isinstance(results, list) and len(results) == 0):
+             return ToolResponse(content="No results found. Please try again with a different or more specific query.")
+        
+        # Check for error dict
+        if isinstance(results, list) and len(results) > 0 and isinstance(results[0], dict) and results[0].get('error'):
+            return ToolResponse(content=f"Search Error: {results[0].get('error')}")
+
         return ToolResponse(content=json.dumps(results))
     except Exception as e:
-        return ToolResponse(content=f"Error: {str(e)}")
+        return ToolResponse(content=f"Error executing search: {str(e)}")
 
 def answer_question(answer: str):
     """
@@ -80,35 +82,7 @@ class BenchmarkAgentFactory:
 
         return ReActAgent(
             name="Assistant",
-            sys_prompt="""You are an intelligent research agent tasked with answering user questions accurately.
-You have access to the following tools:
-1. `web_search_tool(query: str)`: Search the internet for information.
-2. `answer_question(answer: str)`: Submit the final answer.
-
-**Instructions:**
-1.  **Analyze the Request:** Understand the user's question.
-2.  **Information Retrieval:** Use `web_search_tool` to gather necessary information. You can use it multiple times if needed.
-3.  **Reasoning:** Think step-by-step about the information you have. Explain your logic.
-4.  **Refinement:** If the user provides feedback (e.g., "Incorrect"), analyze WHY it might be wrong. Did you miss a detail? Was the source outdated? Search again with a refined query.
-5.  **Final Answer:** When you are confident, use `answer_question` to submit the answer. The answer should be concise and directly address the question.
-
-**Format:**
-Always output your thought process as "Thought: [Your reasoning]" before taking any action.
-
-**WARNING:**
-You MUST use the `answer_question` tool to submit your final answer.
-Do NOT output the answer directly as text.
-If you find the answer, your next action MUST be `answer_question`.
-
-For example:
-Question: What is the capital of France?
-Correct Answer: (call answer_question tool with the answer) Paris
-
-Incorrect Answers:
-- \"The capital of France is Paris.\" (contains extra words)
-- \"Paris is the capital of France.\" (contains extra words)
-- \"Paris.\" (contains a period)
-""",
+            sys_prompt=PROMPTS["agent_react_system"],
             model=model,
             toolkit=toolkit,
             memory=memory,

@@ -472,14 +472,48 @@ window.AgentBenchmark = (function() {
              if (actions.length > 0) {
                  let html = '<div class="d-flex flex-column gap-3">';
                  
+                 // Helper for collapsible content
+                 const createCollapsible = (text, limit = 150) => {
+                     if (!text) return '';
+                     if (text.length <= limit) return `<div class="font-monospace text-dark bg-white px-2 py-1 rounded border w-100" style="font-size: 0.85rem; white-space: pre-wrap;">${text}</div>`;
+                     
+                     const id = `collapse-${Math.random().toString(36).substr(2, 9)}`;
+                     const preview = text.substring(0, limit).replace(/\n/g, ' ') + '...';
+                     return `
+                        <div class="w-100">
+                            <button class="btn btn-sm btn-light border text-secondary w-100 text-start d-flex align-items-center justify-content-between font-monospace" style="font-size: 0.85rem;" type="button" data-bs-toggle="collapse" data-bs-target="#${id}" aria-expanded="false">
+                                <span class="text-truncate" style="max-width: 90%;">${preview}</span>
+                                <i class="bi bi-chevron-expand small"></i>
+                            </button>
+                            <div class="collapse mt-1" id="${id}">
+                                <div class="card card-body bg-white border p-2 font-monospace small text-break" style="white-space: pre-wrap;">${text}</div>
+                            </div>
+                        </div>
+                     `;
+                 };
+
                  // Tool Rendering Strategy Map
                  const toolRenderers = {
                      'answer_question': (input) => {
                          const answerText = input.answer || 'No answer provided.';
+                         const content = (answerText.length > 300)
+                            ? (() => {
+                                const id = `ans-${Math.random().toString(36).substr(2, 9)}`;
+                                return `
+                                <div>
+                                    <p class="mb-0 lead text-dark text-truncate">${answerText.substring(0, 150)}...</p>
+                                    <button class="btn btn-sm btn-link p-0 mt-1 text-decoration-none" type="button" data-bs-toggle="collapse" data-bs-target="#${id}" aria-expanded="false"><i class="bi bi-caret-down-fill"></i> Show Full Answer</button>
+                                     <div class="collapse mt-2" id="${id}">
+                                        <div class="p-3 bg-light rounded text-break border shadow-sm" style="white-space: pre-wrap;">${answerText}</div>
+                                     </div>
+                                </div>`;
+                            })()
+                            : `<p class="mb-0 lead text-dark" style="font-size: 1rem;">${answerText}</p>`;
+                         
                          return {
                              title: 'Answer Question',
                              icon: 'bi-chat-right-text',
-                             content: `<div class="p-3 bg-white rounded border border-success-subtle"><strong class="text-success d-block mb-1">Proposed Answer:</strong><p class="mb-0 lead text-dark" style="font-size: 1rem;">${answerText}</p></div>`
+                             content: `<div class="p-3 bg-white rounded border border-success-subtle"><strong class="text-success d-block mb-1">Proposed Answer:</strong>${content}</div>`
                          };
                      },
                      'web_search_tool': (input) => {
@@ -537,11 +571,11 @@ window.AgentBenchmark = (function() {
                      'default': (name, input) => {
                          const argsContent = Object.entries(input)
                             .map(([key, value]) => {
-                                const valStr = typeof value === 'object' ? JSON.stringify(value, null, 2) : value;
+                                const valStr = typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value);
                                 return `
                                 <div class="d-flex flex-column flex-sm-row mb-1">
                                     <span class="fw-bold text-secondary me-2 mb-1 mb-sm-0" style="min-width: 100px;">${key}:</span> 
-                                    <div class="font-monospace text-dark bg-white px-2 py-1 rounded border w-100" style="font-size: 0.85rem; white-space: pre-wrap;">${valStr}</div>
+                                    <div class="w-100">${createCollapsible(valStr, 100)}</div>
                                 </div>`;
                             })
                             .join('');

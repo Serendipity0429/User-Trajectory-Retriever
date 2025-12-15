@@ -43,6 +43,7 @@ This project is a comprehensive platform for recording, replaying, and annotatin
 -   **Codebase Modernization:**
     -   **Dashboard App:** The admin dashboard has been moved to a dedicated `dashboard` app for better modularity.
     -   **Centralized Logic:** Consolidated common JavaScript logic and LLM response handling to reduce duplication.
+    -   **Browser Agent MCP Migration:** The browser agent has been refactored to use the Model Context Protocol (MCP) via `agentscope`, replacing the custom browser client with a standardized, more robust solution.
 -   **New Features:**
     -   **Batch Operations:** Added functionality for batch deleting benchmark runs.
     -   **Data Export:** Implemented CSV export for benchmark results to facilitate offline analysis.

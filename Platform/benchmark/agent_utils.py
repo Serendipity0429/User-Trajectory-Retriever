@@ -1,16 +1,18 @@
+import os
 import json
 import agentscope
-from agentscope.agent import ReActAgent, UserAgent
-from agentscope.tool import Toolkit, ToolResponse
-from agentscope.message import Msg
-from agentscope.memory import InMemoryMemory
-from agentscope.formatter import OpenAIChatFormatter
-from agentscope.model import OpenAIChatModel
 from .search_utils import get_search_engine
 from .models import LLMSettings
 from .prompts import PROMPTS
-
+from agentscope.agent import ReActAgent
+from agentscope.tool import Toolkit, ToolResponse
+from agentscope.memory import InMemoryMemory
+from agentscope.formatter import OpenAIChatFormatter
+from agentscope.model import OpenAIChatModel
+from agentscope.mcp import StdIOStatefulClient
+from .utils import print_debug
 from asgiref.sync import sync_to_async
+
 
 @sync_to_async
 def get_search_engine_safe():
@@ -30,7 +32,6 @@ async def web_search_tool(query: str):
     """
     try:
         engine = await get_search_engine_safe()
-        
         results = await sync_to_async(engine.search)(query)
         
         if not results or (isinstance(results, list) and len(results) == 0):
@@ -70,7 +71,7 @@ class StreamingMemory(InMemoryMemory):
             except Exception as e:
                 print(f"Error in StreamingMemory callback: {e}")
 
-class BenchmarkAgentFactory:
+class VanillaAgentFactory:
     @staticmethod
     def create_agent(model, verbose: bool = False, update_callback=None):
         # Create Toolkit and register tool
@@ -82,7 +83,7 @@ class BenchmarkAgentFactory:
 
         return ReActAgent(
             name="Assistant",
-            sys_prompt=PROMPTS["agent_react_system"],
+            sys_prompt=PROMPTS["vanilla_agent_react_system"],
             model=model,
             toolkit=toolkit,
             memory=memory,
@@ -98,6 +99,78 @@ class BenchmarkAgentFactory:
         agentscope.init(logging_level="INFO")
         
         # Create model instance directly
+        model = OpenAIChatModel(
+            model_name=llm_settings.llm_model,
+            api_key=llm_settings.llm_api_key,
+            client_kwargs={
+                "base_url": llm_settings.llm_base_url,
+            },
+            stream=True 
+        )
+        return model
+class BrowserAgentFactory:
+    @staticmethod
+    async def create_agent(model, verbose: bool = False, update_callback=None):
+        toolkit = Toolkit()
+        
+        # 1. Fetch available tools from MCP
+        try:
+            # Construct path to the local MCP server script
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            mcp_root = os.path.join(current_dir, 'mcp', 'chrome-devtools-mcp')
+            # build/src/index.js is the compiled entry point
+            mcp_script = os.path.join(mcp_root, 'build', 'src', 'index.js')
+            
+            if not os.path.exists(mcp_script):
+                 print_debug(f"MCP server script not found at {mcp_script}. Ensure it is built.")
+            else:
+                # Initialize StdIO Client
+                client = StdIOStatefulClient(
+                    name="chrome_devtools",
+                    command="node",
+                    args=[mcp_script],
+                    cwd=mcp_root # Set CWD to the repo root
+                )
+                
+                await client.connect()
+                await toolkit.register_mcp_client(client)
+                print_debug(f"Registered MCP tools from {client.name}")
+                
+        except Exception as e:
+            print_debug(f"Failed to fetch/register MCP tools: {e}")
+        
+        # 2. Register mandatory local tools
+        toolkit.register_tool_function(answer_question)
+
+        # DEBUG: Print all registered tools
+        print_debug(f"BrowserAgent Toolkit Tools: {list(toolkit.tools.keys())}")
+        
+        memory = InMemoryMemory()
+        if update_callback:
+            from .agent_utils import StreamingMemory
+            memory = StreamingMemory(update_callback=update_callback)
+
+        agent = ReActAgent(
+            name="BrowserAgent",
+            sys_prompt=PROMPTS["browser_agent_system"],
+            model=model,
+            toolkit=toolkit,
+            memory=memory,
+            formatter=OpenAIChatFormatter(),
+        )
+        
+        # Attach client to agent for cleanup
+        if 'client' in locals():
+            agent.mcp_client = client
+            
+        return agent
+
+    @staticmethod
+    def init_agentscope(llm_settings: LLMSettings):
+        """
+        Initialize AgentScope with the project's LLM settings.
+        """
+        agentscope.init(logging_level="INFO")
         model = OpenAIChatModel(
             model_name=llm_settings.llm_model,
             api_key=llm_settings.llm_api_key,

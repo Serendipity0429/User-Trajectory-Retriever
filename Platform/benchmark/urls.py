@@ -9,7 +9,7 @@ urlpatterns = [
     path("vanilla_llm_adhoc/", views.vanilla_llm_adhoc, name="vanilla_llm_adhoc"),
     path("rag_adhoc/", views.rag_adhoc, name="rag_adhoc"),
     path("rag_multi_turn/", views.rag_multi_turn, name="rag_multi_turn"),
-    path("agent_rag/", views.agent_rag, name="agent_rag"),
+    path("vanilla_agent/", views.vanilla_agent, name="vanilla_agent"),
     path("browser_agent/", views.browser_agent, name="browser_agent"), # New view
     path("api/list_runs/", views.list_runs, name="list_runs"),
     path("api/multi_turn/create_session_group/", views.create_session_group, name="create_session_group"),
@@ -40,9 +40,9 @@ urlpatterns = [
     path('api/run_rag_multi_turn_pipeline/', views.run_rag_multi_turn_pipeline, name='run_rag_multi_turn_pipeline'),
     path('api/stop_rag_multi_turn_pipeline/', views.stop_rag_multi_turn_pipeline, name='stop_rag_multi_turn_pipeline'),
 
-    # Agentic RAG Pipeline APIs
-    path('api/run_agentic_rag_pipeline/', views.run_agentic_rag_pipeline, name='run_agentic_rag_pipeline'),
-    path('api/stop_agentic_rag_pipeline/', views.stop_agentic_rag_pipeline, name='stop_agentic_rag_pipeline'),
+    # Vanilla Agent Pipeline APIs
+    path('api/run_vanilla_agent_pipeline/', views.run_vanilla_agent_pipeline, name='run_vanilla_agent_pipeline'),
+    path('api/stop_vanilla_agent_pipeline/', views.stop_vanilla_agent_pipeline, name='stop_vanilla_agent_pipeline'),
 
     # Browser Agent Pipeline APIs
     path('api/run_browser_agent_pipeline/', views.run_browser_agent_pipeline, name='run_browser_agent_pipeline'),

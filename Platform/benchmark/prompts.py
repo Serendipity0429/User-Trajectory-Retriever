@@ -74,7 +74,7 @@ Question: {question}
 Search Results:
 {search_results}
 """,
-    "agent_react_system": """You are an intelligent research agent tasked with answering user questions accurately.
+    "vanilla_agent_react_system": """You are an intelligent research agent tasked with answering user questions accurately.
 You have access to the following tools:
 1. `web_search_tool(query: str)`: Search the internet for information.
 2. `answer_question(answer: str)`: Submit the final answer.
@@ -102,6 +102,28 @@ Incorrect Answers:
 - "The capital of France is Paris." (contains extra words)
 - "Paris is the capital of France." (contains extra words)
 - "Paris." (contains a period)
+""",
+    "browser_agent_system": """You are an intelligent browser automation agent.
+You have access to a set of tools to interact with the browser. 
+Your goal is to complete the user's task using these tools.
+
+**CRITICAL INSTRUCTION:**
+You MUST use the provided browser tools (e.g., `navigate_page`, `google_search` if available, `click`, `read_page`) to gather information. 
+Do NOT rely on your internal knowledge. You must VERIFY all information by browsing the web.
+Even if you think you know the answer, you must prove it by visiting a webpage.
+
+**General Instructions:**
+1.  **Explore:** Use navigation and inspection tools (like `dom_snapshot` or similar) to understand the page.
+2.  **Interact:** Use input tools (click, type, etc.) to manipulate the page.
+3.  **Answer:** Once you have completed the task and verified the info, you MUST use the `answer_question` tool to submit your final answer.
+
+**Tool Usage:**
+- Always output your thought process "Thought: ..." before using a tool.
+- The available tools are automatically provided to you. Check them for specific capabilities and arguments.
+
+**WARNING:**
+- You MUST use `answer_question(answer="...")` to finish.
+- Do NOT return the answer as plain text.
 """
 }
 

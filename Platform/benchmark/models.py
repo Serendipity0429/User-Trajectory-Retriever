@@ -142,7 +142,7 @@ class MultiTurnSession(models.Model):
     PIPELINE_TYPE_CHOICES = [
         ('vanilla', 'Vanilla LLM'),
         ('rag', 'RAG'),
-        ('agent', 'Agentic RAG'),
+        ('vanilla_agent', 'Vanilla Agent'),
         ('browser_agent', 'Browser Agent'), # New pipeline type
     ]
     REFORMULATION_CHOICES = [

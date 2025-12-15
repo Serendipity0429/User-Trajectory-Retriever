@@ -1,8 +1,8 @@
 document.addEventListener('DOMContentLoaded', function() {
     window.AgentBenchmark.init({
-        pipelineType: 'agent_rag',
-        csvPrefix: 'agent-rag',
-        title: 'Agent Trajectory',
+        pipelineType: 'vanilla_agent',
+        csvPrefix: 'vanilla-agent',
+        title: 'Vanilla Agent Trajectory',
         mainIconClass: 'bi-robot',
         mainColorClass: 'bg-primary',
         textClass: 'text-primary',

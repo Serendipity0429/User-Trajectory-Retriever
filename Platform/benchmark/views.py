@@ -39,7 +39,7 @@ from .pipeline_utils import (
     BaseMultiTurnPipeline,
     VanillaLLMMultiTurnPipeline,
     RagMultiTurnPipeline,
-    AgenticRagPipeline,
+    VanillaAgentPipeline,
     BrowserAgentPipeline, # Ensure this is imported
     serialize_events,
 )
@@ -584,7 +584,7 @@ def rag_multi_turn(request):
 
 
 @admin_required
-def agent_rag(request):
+def vanilla_agent(request):
     # Load questions from the file
     questions = []
     try:
@@ -599,12 +599,12 @@ def agent_rag(request):
 
     # Load sessions and group them
     groups = (
-        MultiTurnRun.objects.filter(sessions__pipeline_type='agent')
+        MultiTurnRun.objects.filter(sessions__pipeline_type='vanilla_agent')
         .exclude(name__startswith="Ad-hoc Session")
         .prefetch_related(
             models.Prefetch(
                 "sessions",
-                queryset=MultiTurnSession.objects.filter(pipeline_type='agent').order_by("-created_at"),
+                queryset=MultiTurnSession.objects.filter(pipeline_type='vanilla_agent').order_by("-created_at"),
             )
         )
         .order_by("-created_at")
@@ -613,7 +613,7 @@ def agent_rag(request):
 
     individual_sessions = MultiTurnSession.objects.filter(
         run__name__startswith="Ad-hoc Session",
-        pipeline_type='agent'
+        pipeline_type='vanilla_agent'
     ).order_by("-created_at")
 
     datasets = BenchmarkDataset.objects.all().order_by("-created_at")
@@ -626,7 +626,7 @@ def agent_rag(request):
         "search_settings": get_search_settings_with_fallback(),
         "datasets": datasets,
     }
-    return render(request, "agent_rag.html", context)
+    return render(request, "vanilla_agent.html", context)
 
 
 @admin_required
@@ -889,8 +889,8 @@ def create_session(request):
                 session=session, trial_number=1, status="processing"
             )
 
-        elif pipeline_type == "agent":
-            session_data['pipeline_type'] = 'agent'
+        elif pipeline_type == "vanilla_agent":
+            session_data['pipeline_type'] = 'vanilla_agent'
             session = MultiTurnSession.objects.create(**session_data)
             trial = MultiTurnTrial.objects.create(
                 session=session, trial_number=1, status="processing"
@@ -919,8 +919,8 @@ def get_session(request, session_id):
     
     if session.pipeline_type == 'vanilla':
         pipeline_type = "vanilla_llm_multi_turn"
-    elif session.pipeline_type == 'agent':
-        pipeline_type = "agentic_rag"
+    elif session.pipeline_type == 'vanilla_agent':
+        pipeline_type = "vanilla_agent"
     elif session.pipeline_type == 'browser_agent': # New pipeline type
         pipeline_type = "browser_agent"
     else:
@@ -1080,8 +1080,8 @@ def run_trial(request, trial_id):
                 reformulation_strategy=session.reformulation_strategy,
             )
 
-        elif session.pipeline_type == 'agent':
-            pipeline = AgenticRagPipeline(
+        elif session.pipeline_type == 'vanilla_agent':
+            pipeline = VanillaAgentPipeline(
                 base_url=base_url,
                 api_key=api_key,
                 model=model,
@@ -1288,8 +1288,8 @@ def export_session(request, session_id):
     
     if session.pipeline_type == 'vanilla':
         pipeline_type = "vanilla_llm_multi_turn"
-    elif session.pipeline_type == 'agent':
-        pipeline_type = "agentic_rag"
+    elif session.pipeline_type == 'vanilla_agent':
+        pipeline_type = "vanilla_agent"
     elif session.pipeline_type == 'browser_agent':
         pipeline_type = "browser_agent"
     else:
@@ -1313,7 +1313,7 @@ def export_session(request, session_id):
                 "search_results",
             )
         )
-    elif session.pipeline_type == 'agent' or session.pipeline_type == 'browser_agent':
+    elif session.pipeline_type == 'vanilla_agent' or session.pipeline_type == 'browser_agent':
          trials = list(
             session.trials.values(
                 "trial_number", "answer", "feedback", "is_correct", "created_at", "full_response"
@@ -1574,8 +1574,8 @@ def load_rag_multi_turn_run(request, group_id):
 @admin_required
 def load_agent_multi_turn_run(request, group_id):
     group = get_object_or_404(MultiTurnRun, pk=group_id)
-    # Filter sessions by type 'agent' or 'browser_agent'
-    sessions = group.sessions.filter(pipeline_type__in=['agent', 'browser_agent']).prefetch_related("trials")
+    # Filter sessions by type 'vanilla_agent' or 'browser_agent'
+    sessions = group.sessions.filter(pipeline_type__in=['vanilla_agent', 'browser_agent']).prefetch_related("trials")
     results = []
     snapshot = group.settings_snapshot
     max_retries = 3 # Default or from settings
@@ -1829,7 +1829,7 @@ def stop_rag_multi_turn_pipeline(request):
 
 @admin_required
 @require_POST
-def run_agentic_rag_pipeline(request):
+def run_vanilla_agent_pipeline(request):
     try:
         db_settings = get_llm_settings_with_fallback()
         base_url = request.POST.get("llm_base_url") or db_settings.llm_base_url
@@ -1847,12 +1847,12 @@ def run_agentic_rag_pipeline(request):
 
         if pipeline_id:
             redis_client.set(
-                f"agentic_rag_pipeline_active:{pipeline_id}",
+                f"vanilla_agent_pipeline_active:{pipeline_id}",
                 "1",
                 ex=3600,
             )
 
-        pipeline = AgenticRagPipeline(
+        pipeline = VanillaAgentPipeline(
             base_url=base_url,
             api_key=api_key,
             model=model,
@@ -1869,12 +1869,12 @@ def run_agentic_rag_pipeline(request):
 
 @admin_required
 @require_POST
-def stop_agentic_rag_pipeline(request):
+def stop_vanilla_agent_pipeline(request):
     try:
         data = json.loads(request.body)
         pipeline_id = data.get("pipeline_id")
         if pipeline_id:
-            redis_client.delete(f"agentic_rag_pipeline_active:{pipeline_id}")
+            redis_client.delete(f"vanilla_agent_pipeline_active:{pipeline_id}")
         return JsonResponse({"status": "ok"})
     except Exception as e:
         return JsonResponse({"status": "error", "message": str(e)}, status=400)

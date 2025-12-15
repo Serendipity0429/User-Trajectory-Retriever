@@ -14,8 +14,8 @@ from .models import (
 )
 from .utils import print_debug, extract_final_answer, count_questions_in_file
 from .prompts import PROMPTS
-from .agent_utils import BenchmarkAgentFactory
-from .agent_browser_utils import BrowserAgentFactory
+from .agent_utils import VanillaAgentFactory
+from .agent_utils import BrowserAgentFactory
 from agentscope.message import Msg
 
 REDIS_PREFIX_ACTIVE = "pipeline_active"
@@ -766,7 +766,7 @@ def parse_react_content(content):
     # Filter out empty blocks
     return [b for b in blocks if b['content']]
 
-class AgenticRagPipeline(BaseMultiTurnPipeline):
+class VanillaAgentPipeline(BaseMultiTurnPipeline):
     def __init__(self, base_url, api_key, model, max_retries, pipeline_id=None, dataset_id=None):
         super().__init__(base_url, api_key, model, max_retries, pipeline_id, dataset_id)
         # Initialize AgentScope
@@ -778,11 +778,11 @@ class AgenticRagPipeline(BaseMultiTurnPipeline):
             llm_model=model,
             temperature=0.0 # Default for agent
         )
-        self.agent_model = BenchmarkAgentFactory.init_agentscope(self.temp_settings)
-        self.redis_prefix = f"agentic_rag_pipeline_active"
+        self.agent_model = VanillaAgentFactory.init_agentscope(self.temp_settings)
+        self.redis_prefix = f"vanilla_agent_pipeline_active"
 
     def __str__(self):
-        return "Agentic RAG Pipeline"
+        return "Vanilla Agent Pipeline"
 
     def get_settings_snapshot(self):
         rag_settings = RagSettings.load()
@@ -793,7 +793,7 @@ class AgenticRagPipeline(BaseMultiTurnPipeline):
                 'llm_model': self.llm_settings.llm_model,
                 'max_retries': self.llm_settings.max_retries,
             },
-            'pipeline_type': 'agent',
+            'pipeline_type': 'vanilla_agent',
             'agent_config': {
                 'model_name': self.agent_model.model_name if hasattr(self.agent_model, 'model_name') else 'unknown'
             }
@@ -805,7 +805,7 @@ class AgenticRagPipeline(BaseMultiTurnPipeline):
             ground_truths=ground_truths,
             run=group,
             run_tag=self.pipeline_id,
-            pipeline_type='agent'
+            pipeline_type='vanilla_agent'
         )
 
     def create_trial(self, session, trial_number):
@@ -817,7 +817,7 @@ class AgenticRagPipeline(BaseMultiTurnPipeline):
 
     def _process_single_session(self, group, question_text, ground_truths):
         """
-        Process a single question session, including retries, utilizing the Agentic run_single_turn logic.
+        Process a single question session, including retries, utilizing the Vanilla Agent run_single_turn logic.
         """
         try:
             session = self.create_session(self.llm_settings, question_text, ground_truths, group)
@@ -1079,7 +1079,7 @@ class AgenticRagPipeline(BaseMultiTurnPipeline):
         return trace_data, real_answer_found
     def run_single_turn(self, session, trial):
         # Re-init agentscope just in case (e.g. if run in a fresh worker)
-        agent_model = BenchmarkAgentFactory.init_agentscope(self.temp_settings)
+        agent_model = VanillaAgentFactory.init_agentscope(self.temp_settings)
         
         # Construct history for the agent
         prev_trials = session.trials.filter(trial_number__lt=trial.trial_number).order_by('trial_number')
@@ -1128,7 +1128,7 @@ class AgenticRagPipeline(BaseMultiTurnPipeline):
             except Exception as e:
                 print_debug(f"Redis update failed: {e}")
 
-        agent = BenchmarkAgentFactory.create_agent(agent_model, update_callback=on_memory_update)
+        agent = VanillaAgentFactory.create_agent(agent_model, update_callback=on_memory_update)
         
         # Run the agent
         async def run_agent_task():
@@ -1266,8 +1266,8 @@ class BrowserAgentPipeline(BaseMultiTurnPipeline):
         
         return messages
 
-    # Reusing the _serialize_trace from AgenticRagPipeline since it handles tool calls generically
-    _serialize_trace = AgenticRagPipeline._serialize_trace
+    # Reusing the _serialize_trace from VanillaAgentPipeline since it handles tool calls generically
+    _serialize_trace = VanillaAgentPipeline._serialize_trace
 
     def run_single_turn(self, session, trial):
         agent_model = BrowserAgentFactory.init_agentscope(self.temp_settings)

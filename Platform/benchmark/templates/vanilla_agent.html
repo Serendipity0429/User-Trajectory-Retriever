@@ -1,14 +1,14 @@
 {% extends "benchmark_base.html" %}
 {% load static %}
 
-{% block title %}Agentic RAG Baseline{% endblock %}
+{% block title %}Vanilla Agent Baseline{% endblock %}
 
 {% block content %}
 <div class="container-fluid mt-5 px-lg-4">
     <div class="pb-3 mb-4 border-bottom d-flex justify-content-between align-items-center">
         <div class="col-lg-8">
-            <h1 class="h2"><i class="bi bi-person-workspace me-2"></i>Agentic RAG Baseline</h1>
-            <p class="text-muted mb-0">Evaluate ReAct Agent performance using AgentScope.</p>
+            <h1 class="h2"><i class="bi bi-person-workspace me-2"></i>Vanilla Agent Baseline</h1>
+            <p class="text-muted mb-0">Evaluate Vanilla Agent performance using AgentScope.</p>
         </div>
         <div class="d-flex align-items-center">
             <button class="btn btn-outline-primary me-2" data-bs-toggle="modal" data-bs-target="#settingsModal">
@@ -96,7 +96,7 @@
                     <h5 class="mb-0"><i class="bi bi-robot me-2"></i>QA Pipeline</h5>
                 </div>
                 <div class="card-body">
-                    <p class="card-text">Run all questions through the Agent and get aggregate results.</p>
+                    <p class="card-text">Run all questions through the Vanilla Agent and get aggregate results.</p>
                     <div class="mb-3">
                         <label for="dataset-selector" class="form-label">Select Dataset</label>
                         <select class="form-select" id="dataset-selector">
@@ -262,5 +262,5 @@
 
 {% block benchmark_extra_js %}
 <script src="{% static 'js/benchmark/agent_common.js' %}"></script>
-<script src="{% static 'js/benchmark/agent_rag.js' %}"></script>
+<script src="{% static 'js/benchmark/vanilla_agent.js' %}"></script>
 {% endblock %}

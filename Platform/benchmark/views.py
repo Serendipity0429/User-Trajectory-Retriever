@@ -39,6 +39,7 @@ from .pipeline_utils import (
     BaseMultiTurnPipeline,
     VanillaLLMMultiTurnPipeline,
     RagMultiTurnPipeline,
+    AgenticRagPipeline,
     serialize_events,
 )
 
@@ -60,6 +61,23 @@ def get_search_settings_with_fallback():
         settings.serper_api_key = config("SERPER_API_KEY", default="")
     return settings
 
+
+@require_http_methods(["GET"])
+def get_trial_trace(request, trial_id):
+    """
+    Retrieve the real-time execution trace for a specific trial from Redis.
+    """
+    key = f"trial_trace:{trial_id}"
+    try:
+        trace_json = redis_client.get(key)
+        if trace_json:
+            # trace_json is already a JSON string
+            return JsonResponse({"trace": json.loads(trace_json)})
+        else:
+            return JsonResponse({"trace": []})
+    except Exception as e:
+        print_debug(f"Error retrieving trace: {e}")
+        return JsonResponse({"trace": []})
 
 @admin_required
 def home(request):
@@ -565,6 +583,52 @@ def rag_multi_turn(request):
 
 
 @admin_required
+def agent_rag(request):
+    # Load questions from the file
+    questions = []
+    try:
+        file_path = os.path.join(
+            os.path.dirname(__file__), "..", "data", "hard_questions_refined.jsonl"
+        )
+        with open(file_path, "r") as f:
+            for line in f:
+                questions.append(json.loads(line))
+    except FileNotFoundError:
+        pass
+
+    # Load sessions and group them
+    groups = (
+        MultiTurnRun.objects.filter(sessions__pipeline_type='agent')
+        .exclude(name__startswith="Ad-hoc Session")
+        .prefetch_related(
+            models.Prefetch(
+                "sessions",
+                queryset=MultiTurnSession.objects.filter(pipeline_type='agent').order_by("-created_at"),
+            )
+        )
+        .order_by("-created_at")
+        .distinct()
+    )
+
+    individual_sessions = MultiTurnSession.objects.filter(
+        run__name__startswith="Ad-hoc Session",
+        pipeline_type='agent'
+    ).order_by("-created_at")
+
+    datasets = BenchmarkDataset.objects.all().order_by("-created_at")
+
+    context = {
+        "questions": questions,
+        "groups": groups,
+        "individual_sessions": individual_sessions,
+        "llm_settings": get_llm_settings_with_fallback(),
+        "search_settings": get_search_settings_with_fallback(),
+        "datasets": datasets,
+    }
+    return render(request, "agent_rag.html", context)
+
+
+@admin_required
 def rag_adhoc(request):
     # Load questions from the file
     questions = []
@@ -766,15 +830,25 @@ def create_session(request):
             }
         }
 
-        if "rag" in pipeline_type:
+        if "rag" in pipeline_type and "agent" not in pipeline_type:
             rag_settings = RagSettings.load()
             search_settings = SearchSettings.load()
             snapshot["rag_settings"] = {"prompt_template": rag_settings.prompt_template}
             snapshot["search_settings"] = {
                 "search_provider": search_settings.search_provider,
                 "search_limit": search_settings.search_limit,
-                "serper_fetch_full_content": search_settings.serper_fetch_full_content,
+                "serper_fetch_full_content": search_settings.fetch_full_content,
             }
+        
+        if "agent" in pipeline_type:
+             # Snapshot for agent if needed, mostly LLM settings + search
+             search_settings = SearchSettings.load()
+             snapshot["search_settings"] = {
+                "search_provider": search_settings.search_provider,
+                "search_limit": search_settings.search_limit,
+                "serper_fetch_full_content": search_settings.fetch_full_content,
+             }
+
         # Ensure Group exists
         if group_id:
             group = get_object_or_404(MultiTurnRun, pk=group_id)
@@ -794,7 +868,7 @@ def create_session(request):
             "run": group, # Was 'group'
         }
 
-        if "rag" in pipeline_type:
+        if "rag" in pipeline_type and "agent" not in pipeline_type:
             session_data['pipeline_type'] = 'rag'
             if "reform" in pipeline_type:
                 session_data["reformulation_strategy"] = "reform"
@@ -803,6 +877,13 @@ def create_session(request):
 
             session = MultiTurnSession.objects.create(**session_data)
 
+            trial = MultiTurnTrial.objects.create(
+                session=session, trial_number=1, status="processing"
+            )
+
+        elif "agent" in pipeline_type:
+            session_data['pipeline_type'] = 'agent'
+            session = MultiTurnSession.objects.create(**session_data)
             trial = MultiTurnTrial.objects.create(
                 session=session, trial_number=1, status="processing"
             )
@@ -985,6 +1066,14 @@ def run_trial(request, trial_id):
                 model=model,
                 max_retries=1,
                 reformulation_strategy=session.reformulation_strategy,
+            )
+
+        elif session.pipeline_type == 'agent':
+            pipeline = AgenticRagPipeline(
+                base_url=base_url,
+                api_key=api_key,
+                model=model,
+                max_retries=1,
             )
 
         else:
@@ -1456,6 +1545,37 @@ def load_rag_multi_turn_run(request, group_id):
 
 
 @admin_required
+def load_agent_multi_turn_run(request, group_id):
+    group = get_object_or_404(MultiTurnRun, pk=group_id)
+    # Filter sessions by type 'agent'
+    sessions = group.sessions.filter(pipeline_type='agent').prefetch_related("trials")
+    results = []
+    snapshot = group.settings_snapshot
+    max_retries = 3 # Default or from settings
+
+    for session in sessions:
+        trials = session.trials.all().order_by('trial_number')
+        last_trial = trials.last()
+        first_trial = trials.first()
+        
+        if last_trial:
+            results.append({
+                "question": session.question,
+                "correct": last_trial.is_correct,
+                "trials": session.trials.count(),
+                "session_id": session.id,
+                "final_answer": last_trial.answer,
+                "ground_truths": session.ground_truths,
+                "max_retries": max_retries,
+                "initial_correct": first_trial.is_correct if first_trial else None
+            })
+
+    return JsonResponse(
+        {"results": results, "group_name": group.name, "settings": snapshot}
+    )
+
+
+@admin_required
 def list_vanilla_llm_adhoc_runs(request):
     try:
         runs = AdhocRun.objects.filter(run_type='vanilla').values(
@@ -1576,6 +1696,59 @@ def stop_rag_multi_turn_pipeline(request):
             redis_client.delete(
                 f"rag_multi_turn_{reformulation_strategy}_pipeline_active:{pipeline_id}"
             )
+        return JsonResponse({"status": "ok"})
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)}, status=400)
+
+
+@admin_required
+@require_POST
+def run_agentic_rag_pipeline(request):
+    try:
+        db_settings = get_llm_settings_with_fallback()
+        base_url = request.POST.get("llm_base_url") or db_settings.llm_base_url
+        api_key = request.POST.get("llm_api_key") or db_settings.llm_api_key
+        model = (
+            request.POST.get("llm_model") or db_settings.llm_model or "gpt-3.5-turbo"
+        )
+        max_retries = int(request.POST.get("max_retries", 3))
+        pipeline_id = request.POST.get("pipeline_id")
+        dataset_id = request.POST.get("dataset_id")
+        if not api_key:
+            return JsonResponse(
+                {"error": "An API Key is required to run the benchmark."}, status=400
+            )
+
+        if pipeline_id:
+            redis_client.set(
+                f"agentic_rag_pipeline_active:{pipeline_id}",
+                "1",
+                ex=3600,
+            )
+
+        pipeline = AgenticRagPipeline(
+            base_url=base_url,
+            api_key=api_key,
+            model=model,
+            max_retries=max_retries,
+            pipeline_id=pipeline_id,
+            dataset_id=dataset_id,
+        )
+
+        return StreamingHttpResponse(serialize_events(pipeline.run()), content_type="application/json")
+
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
+
+
+@admin_required
+@require_POST
+def stop_agentic_rag_pipeline(request):
+    try:
+        data = json.loads(request.body)
+        pipeline_id = data.get("pipeline_id")
+        if pipeline_id:
+            redis_client.delete(f"agentic_rag_pipeline_active:{pipeline_id}")
         return JsonResponse({"status": "ok"})
     except Exception as e:
         return JsonResponse({"status": "error", "message": str(e)}, status=400)

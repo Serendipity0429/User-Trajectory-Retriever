@@ -2,6 +2,7 @@ import json
 import os
 import openai
 import logging
+import asyncio
 from datetime import datetime
 from task_manager.utils import check_answer_rule, check_answer_llm, redis_client
 from .search_utils import get_search_engine
@@ -12,6 +13,8 @@ from .models import (
 )
 from .utils import print_debug, extract_final_answer, count_questions_in_file
 from .prompts import PROMPTS
+from .agent_utils import BenchmarkAgentFactory
+from agentscope.message import Msg
 
 REDIS_PREFIX_ACTIVE = "pipeline_active"
 REDIS_PREFIX_VANILLA_ADHOC = "vanilla_llm_adhoc_pipeline_active"
@@ -321,7 +324,7 @@ class RagAdhocPipeline(BaseAdhocPipeline):
         
         rule_result = check_answer_rule(question, ground_truths, answer)
         llm_result = check_answer_llm(question, ground_truths, answer, client=self.client, model=self.model)
-
+        
         AdhocResult.objects.create(
             run=run,
             question=question,
@@ -708,9 +711,482 @@ class RagMultiTurnPipeline(BaseMultiTurnPipeline):
                 messages.append({"role": "assistant", "content": past_trial.answer})
             messages.append({"role": "user", "content": "Your previous answer was incorrect."})
 
-        if allow_reasoning:
-            messages.append({"role": "user", "content": "Answer the question based on the context. Reference the provided source (like [1]) to avoid hallucination.\nFirst, explain your reasoning step-by-step.\nThen, on a new line, provide the final answer starting with 'Final Answer:'.\n\nFollow these rules for the final answer strictly:\n1. It must be an exact match to the correct answer.\n2. Do not include any punctuation.\n3. Do not include any extra words or sentences."})
-        else:
-            messages.append({"role": "user", "content": "Answer the question based on the context. Return ONLY the exact answer."})
+
         
         return messages
+
+def parse_react_content(content):
+    """
+    Parses a ReAct-style text content into blocks of Thought, Action, Observation.
+    """
+    if not isinstance(content, str):
+        return [{"type": "text", "content": content}]
+        
+    blocks = []
+    current_type = "text"
+    current_lines = []
+    
+    lines = content.split('\n')
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith("Thought:") or stripped.startswith("Reasoning:"):
+            if current_lines:
+                blocks.append({"type": current_type, "content": "\n".join(current_lines).strip()})
+            current_type = "thought"
+            current_lines = [stripped.split(":", 1)[1].strip() if ":" in stripped else stripped]
+        elif stripped.startswith("Action:") or stripped.startswith("Tool Call:"):
+            if current_lines:
+                blocks.append({"type": current_type, "content": "\n".join(current_lines).strip()})
+            current_type = "action"
+            current_lines = [stripped.split(":", 1)[1].strip() if ":" in stripped else stripped]
+        elif stripped.startswith("Observation:") or stripped.startswith("Execution Result:"):
+            if current_lines:
+                blocks.append({"type": current_type, "content": "\n".join(current_lines).strip()})
+            current_type = "observation"
+            current_lines = [stripped.split(":", 1)[1].strip() if ":" in stripped else stripped]
+        else:
+            current_lines.append(line)
+            
+    if current_lines:
+        blocks.append({"type": current_type, "content": "\n".join(current_lines).strip()})
+        
+    # Filter out empty blocks
+    return [b for b in blocks if b['content']]
+
+class AgenticRagPipeline(BaseMultiTurnPipeline):
+    def __init__(self, base_url, api_key, model, max_retries, pipeline_id=None, dataset_id=None):
+        super().__init__(base_url, api_key, model, max_retries, pipeline_id, dataset_id)
+        # Initialize AgentScope
+        # We need to create a temporary settings object to pass to the factory
+        # Since we might override settings in arguments
+        self.temp_settings = LLMSettings(
+            llm_base_url=base_url,
+            llm_api_key=api_key,
+            llm_model=model,
+            temperature=0.0 # Default for agent
+        )
+        self.agent_model = BenchmarkAgentFactory.init_agentscope(self.temp_settings)
+        self.redis_prefix = f"agentic_rag_pipeline_active"
+
+    def __str__(self):
+        return "Agentic RAG Pipeline"
+
+    def get_settings_snapshot(self):
+        rag_settings = RagSettings.load()
+        search_settings = SearchSettings.load()
+        return {
+            'llm_settings': {
+                'llm_base_url': self.llm_settings.llm_base_url,
+                'llm_model': self.llm_settings.llm_model,
+                'max_retries': self.llm_settings.max_retries,
+            },
+            'pipeline_type': 'agent',
+            'agent_config': {
+                'model_name': self.agent_model.model_name if hasattr(self.agent_model, 'model_name') else 'unknown'
+            }
+        }
+
+    def create_session(self, settings, question_text, ground_truths, group):
+        return MultiTurnSession.objects.create(
+            question=question_text,
+            ground_truths=ground_truths,
+            run=group,
+            run_tag=self.pipeline_id,
+            pipeline_type='agent'
+        )
+
+    def create_trial(self, session, trial_number):
+        return MultiTurnTrial.objects.create(
+            session=session,
+            trial_number=trial_number,
+            status='processing'
+        )
+
+    def _process_single_session(self, group, question_text, ground_truths):
+        """
+        Process a single question session, including retries, utilizing the Agentic run_single_turn logic.
+        """
+        try:
+            session = self.create_session(self.llm_settings, question_text, ground_truths, group)
+
+            yield {
+                'is_meta': True,
+                'type': 'session_created',
+                'session_id': session.id,
+                'question': question_text,
+                'group_id': group.id,
+                'group_name': group.name
+            }
+
+            is_session_completed = False
+            trial_number = 1
+            final_is_correct = False
+            final_answer = ""
+            
+            while trial_number <= self.max_retries and not is_session_completed:
+                if not self.check_active():
+                    break
+
+                trial = self.create_trial(session, trial_number)
+                
+                yield {
+                    'is_meta': True,
+                    'type': 'trial_started',
+                    'session_id': session.id,
+                    'trial_number': trial_number,
+                    'group_id': group.id
+                }
+
+                try:
+                    # Execute agent logic
+                    # run_single_turn returns (answer, is_correct, search_results)
+                    parsed_answer, is_correct, _ = self.run_single_turn(session, trial)
+                except Exception as e:
+                    trial.status = 'error'
+                    trial.save()
+                    raise e
+                
+                # run_single_turn already handles saving trial status, correctness, etc.
+                
+                yield {
+                    'is_meta': True,
+                    'type': 'trial_completed',
+                    'session_id': session.id,
+                    'trial_number': trial_number,
+                    'is_correct': is_correct,
+                    'answer': parsed_answer,
+                    'full_response': trial.full_response,
+                    'group_id': group.id
+                }
+
+                final_answer = parsed_answer
+                final_is_correct = is_correct
+
+                if is_correct:
+                    is_session_completed = True
+                else:
+                    trial_number += 1
+            
+            session.is_completed = True
+            session.save()
+
+            yield {
+                'question': question_text,
+                'correct': final_is_correct,
+                'trials': trial_number if final_is_correct else (trial_number - 1),
+                'session_id': session.id,
+                'final_answer': final_answer,
+                'ground_truths': ground_truths,
+                'max_retries': self.max_retries,
+                'group_name': group.name,
+                'group_id': group.id
+            }
+
+        except Exception as e:
+            yield {'error': str(e), 'question': question_text}
+
+    def _serialize_trace(self, trace_msgs):
+        trace_data = []
+        real_answer_found = None
+        should_stop = False
+        
+        for m in trace_msgs:
+            if should_stop:
+                break
+                
+            # Check for native tool calls
+            m_dict = m.to_dict() if hasattr(m, 'to_dict') else m.__dict__
+            
+            # Helper to extract text from content list/dict
+            def extract_text(c):
+                if isinstance(c, str): return c
+                if isinstance(c, list):
+                    try:
+                        texts = []
+                        for item in c:
+                            if isinstance(item, dict) and item.get('type') == 'text':
+                                texts.append(item.get('text', ''))
+                            elif isinstance(item, str):
+                                texts.append(item)
+                        return "".join(texts)
+                    except: return json.dumps(c, indent=2)
+                if isinstance(c, dict):
+                    if c.get('type') == 'text': return c.get('text', '')
+                    return json.dumps(c, indent=2)
+                return str(c)
+
+            # 1. Handle Tool Calls (Action)
+            if m_dict.get('tool_calls') or m_dict.get('function_call'):
+                 calls = m_dict.get('tool_calls') or m_dict.get('function_call')
+                 
+                 # Try to extract answer from tool call
+                 if isinstance(calls, list):
+                     for call in calls:
+                         if call.get('name') == 'answer_question' or call.get('function', {}).get('name') == 'answer_question':
+                             # Extract answer
+                             args = call.get('input') or call.get('function', {}).get('arguments')
+                             if isinstance(args, str):
+                                 try: args = json.loads(args)
+                                 except: pass
+                             if isinstance(args, dict) and 'answer' in args:
+                                 real_answer_found = args['answer']
+
+                 content_str = json.dumps(calls, indent=2)
+                 trace_data.append({
+                     "role": m.role,
+                     "name": m.name,
+                     "step_type": "action",
+                     "content": f"Tool Call: {content_str}",
+                     "timestamp": getattr(m, 'timestamp', None)
+                 })
+                 if m.content:
+                     trace_data.append({
+                         "role": m.role,
+                         "name": m.name,
+                         "step_type": "thought",
+                         "content": extract_text(m.content),
+                         "timestamp": getattr(m, 'timestamp', None)
+                     })
+                 continue
+
+            # 2. Handle Structured Content (e.g. Tool Results/Observations from agentscope)
+            content = m.content
+            if isinstance(content, list):
+                try:
+                    # Clean up nested JSON in tool results and SPLIT content
+                    import copy
+                    cleaned_content = copy.deepcopy(content)
+                    
+                    current_texts = []
+                    
+                    for item in cleaned_content:
+                        if isinstance(item, dict) and item.get('type') == 'text':
+                            current_texts.append(item.get('text', ''))
+                        
+                        elif isinstance(item, dict) and item.get('type') == 'tool_use':
+                            # Flush texts as thought
+                            if current_texts:
+                                trace_data.append({
+                                    "role": m.role,
+                                    "name": m.name,
+                                    "step_type": "thought",
+                                    "content": "\n".join(current_texts),
+                                    "timestamp": getattr(m, 'timestamp', None)
+                                })
+                                current_texts = []
+                            
+                            # Add action
+                            if item.get('name') == 'answer_question':
+                                 args = item.get('input')
+                                 if isinstance(args, dict) and 'answer' in args:
+                                     real_answer_found = args['answer']
+
+                            trace_data.append({
+                                "role": m.role,
+                                "name": m.name,
+                                "step_type": "action",
+                                "content": f"Tool Call: {json.dumps(item, indent=2)}",
+                                "timestamp": getattr(m, 'timestamp', None)
+                            })
+
+                        elif isinstance(item, dict) and item.get('type') == 'tool_result':
+                            # Flush texts
+                            if current_texts:
+                                trace_data.append({
+                                    "role": m.role,
+                                    "name": m.name,
+                                    "step_type": "text",
+                                    "content": "\n".join(current_texts),
+                                    "timestamp": getattr(m, 'timestamp', None)
+                                })
+                                current_texts = []
+
+                            # Process output JSON if needed
+                            output = item.get('output')
+                            if isinstance(output, str) and (output.strip().startswith('[') or output.strip().startswith('{')):
+                                try: item['output'] = json.loads(output)
+                                except: pass
+                            
+                            if item.get('name') == 'answer_question':
+                                should_stop = True
+                            
+                            trace_data.append({
+                                "role": m.role,
+                                "name": m.name,
+                                "step_type": "observation",
+                                "content": json.dumps(item, indent=2),
+                                "timestamp": getattr(m, 'timestamp', None)
+                            })
+                        else:
+                            # Fallback for unknown items in list
+                            if isinstance(item, str):
+                                current_texts.append(item)
+                            else:
+                                current_texts.append(json.dumps(item))
+
+                    # Flush remaining texts
+                    if current_texts:
+                        trace_data.append({
+                            "role": m.role,
+                            "name": m.name,
+                            "step_type": "thought" if m.role == "assistant" else "text",
+                            "content": "\n".join(current_texts),
+                            "timestamp": getattr(m, 'timestamp', None)
+                        })
+
+                    continue
+                except Exception as e:
+                    print_debug(f"Error parsing list content: {e}")
+                    pass
+                
+                content = extract_text(content)
+            elif isinstance(content, dict):
+                content = extract_text(content)
+            
+            # 3. Handle Text Content (Thoughts/Standard messages)
+            if isinstance(content, str):
+                blocks = parse_react_content(content)
+                for b in blocks:
+                    trace_data.append({
+                        "role": m.role,
+                        "name": m.name,
+                        "step_type": b['type'],
+                        "content": b['content'],
+                        "timestamp": getattr(m, 'timestamp', None)
+                    })
+            else:
+                 trace_data.append({
+                    "role": m.role,
+                    "name": m.name,
+                    "step_type": "text",
+                    "content": str(content),
+                    "timestamp": getattr(m, 'timestamp', None)
+                })
+        
+        return trace_data, real_answer_found
+    def run_single_turn(self, session, trial):
+        # Re-init agentscope just in case (e.g. if run in a fresh worker)
+        agent_model = BenchmarkAgentFactory.init_agentscope(self.temp_settings)
+        
+        # Construct history for the agent
+        prev_trials = session.trials.filter(trial_number__lt=trial.trial_number).order_by('trial_number')
+        
+        history_msgs = []
+        current_msg = None
+
+        if trial.trial_number > 1:
+            # Reconstruct full history including the original question
+            history_msgs.append(Msg(name="User", role="user", content=f"Question: {session.question}"))
+            
+            # Convert to list to handle indexing
+            trials_list = list(prev_trials)
+            
+            for i, pt in enumerate(trials_list):
+                if pt.answer:
+                     history_msgs.append(Msg(name="Assistant", role="assistant", content=pt.answer))
+                
+                # If NOT the last trial, add feedback to history
+                if i < len(trials_list) - 1:
+                     history_msgs.append(Msg(name="User", role="user", content=f"Incorrect. Feedback: {pt.feedback}"))
+            
+            # Last trial's feedback becomes the current prompt
+            last_pt = trials_list[-1]
+            current_msg = Msg(name="User", role="user", content=f"Your previous answer was incorrect. Feedback: {last_pt.feedback}. Please search again and provide the correct answer.")
+        else:
+            # First trial
+            current_msg = Msg(name="User", role="user", content=f"Question: {session.question}")
+
+        # Calculate history length to filter trace
+        initial_history_len = len(history_msgs)
+
+        # Define callback for streaming updates
+        def on_memory_update(msgs):
+            try:
+                # Filter out history messages from the trace visualization
+                # msgs contains [History..., Current_Prompt, Agent_Steps...]
+                # We want to show [Current_Prompt, Agent_Steps...]
+                # So slice from initial_history_len
+                relevant_msgs = msgs[initial_history_len:] if len(msgs) > initial_history_len else []
+                
+                # Use self._serialize_trace logic
+                trace_data, _ = self._serialize_trace(relevant_msgs)
+                key = f"trial_trace:{trial.id}"
+                redis_client.set(key, json.dumps(trace_data), ex=3600)
+            except Exception as e:
+                print_debug(f"Redis update failed: {e}")
+
+        agent = BenchmarkAgentFactory.create_agent(agent_model, update_callback=on_memory_update)
+        
+        # Run the agent
+        async def run_agent_task():
+            import inspect
+            
+            # Populate history first
+            if history_msgs:
+                await agent.memory.add(history_msgs)
+
+            response = await agent(current_msg)
+            
+            # Consume stream if applicable to ensure execution finishes
+            if inspect.isasyncgen(response):
+                final_res = None
+                async for x in response:
+                    final_res = x
+                response = final_res
+                
+            # Memory access is async in agentscope v1.0.9+
+            trace = await agent.memory.get_memory()
+            return response, trace
+
+        try:
+            response_msg, trace_msgs = asyncio.run(run_agent_task())
+        except Exception as e:
+            print_debug(f"Agent execution failed: {e}")
+            raise e
+        
+        # Handle potential list content from agentscope (fallback if tool not used)
+        raw_content = response_msg.content
+        if isinstance(raw_content, list):
+            try:
+                texts = []
+                for c in raw_content:
+                    if isinstance(c, dict) and c.get('type') == 'text':
+                        texts.append(c.get('text', ''))
+                    elif isinstance(c, str):
+                        texts.append(c)
+                answer = "".join(texts)
+            except:
+                answer = json.dumps(raw_content)
+        else:
+            answer = str(raw_content) if raw_content is not None else ""
+        
+        # Serialize trace (filtering history)
+        relevant_trace_msgs = trace_msgs[initial_history_len:] if len(trace_msgs) > initial_history_len else []
+        trace_data, real_answer_found = self._serialize_trace(relevant_trace_msgs)
+        
+        # Override answer if tool was used
+        if real_answer_found:
+            answer = real_answer_found
+        
+        full_response = json.dumps(trace_data)
+        
+        # If full_response is empty/invalid, just use answer (wrapped in a basic trace)
+        if not trace_data:
+             # Fallback
+             full_response = json.dumps([{
+                 "role": "assistant", 
+                 "name": "Agent Debug Fallback", 
+                 "content": answer
+             }])
+
+        # Check correctness
+        is_correct = check_answer_llm(session.question, session.ground_truths, answer, client=self.client, model=self.model)
+
+        trial.answer = answer
+        trial.full_response = full_response
+        trial.is_correct = is_correct
+        trial.feedback = "Correct" if is_correct else "Incorrect"
+        trial.status = 'completed'
+        trial.save()
+
+        return answer, is_correct, [] # No search results returned explicitly, they are in trace

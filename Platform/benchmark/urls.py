@@ -9,12 +9,14 @@ urlpatterns = [
     path("vanilla_llm_adhoc/", views.vanilla_llm_adhoc, name="vanilla_llm_adhoc"),
     path("rag_adhoc/", views.rag_adhoc, name="rag_adhoc"),
     path("rag_multi_turn/", views.rag_multi_turn, name="rag_multi_turn"),
+    path("agent_rag/", views.agent_rag, name="agent_rag"),
     path("api/list_runs/", views.list_runs, name="list_runs"),
     path("api/multi_turn/create_session_group/", views.create_session_group, name="create_session_group"),
     path("api/multi_turn/create_session/", views.create_session, name="create_session"),
     path("api/multi_turn/get_session/<int:session_id>/", views.get_session, name="get_session"),
     path("api/multi_turn/retry_session/<int:trial_id>/", views.retry_session, name="retry_session"),
     path("api/multi_turn/run_trial/<int:trial_id>/", views.run_trial, name="run_trial"),
+    path("api/multi_turn/get_trial_trace/<int:trial_id>/", views.get_trial_trace, name="get_trial_trace"),
     path("api/load_run/<str:run_tag>/", views.load_run, name="load_run"),
     path("api/get_default_settings/", views.get_default_settings, name="get_default_settings"),
     path("api/save_llm_settings/", views.save_llm_settings, name="save_llm_settings"),
@@ -27,6 +29,7 @@ urlpatterns = [
     path('api/multi_turn/delete_session_group/<int:group_id>/', views.delete_session_group, name='delete_session_group'),
     path('api/multi_turn/load_run/<int:group_id>/', views.load_vanilla_llm_multi_turn_run, name='load_vanilla_llm_multi_turn_run'),
     path('api/multi_turn/load_rag_run/<int:group_id>/', views.load_rag_multi_turn_run, name='load_rag_multi_turn_run'),
+    path('api/multi_turn/load_agent_run/<int:group_id>/', views.load_agent_multi_turn_run, name='load_agent_multi_turn_run'),
 
     # Vanilla LLM Multi-turn Pipeline APIs
     path('api/run_vanilla_llm_multi_turn_pipeline/', views.run_vanilla_llm_multi_turn_pipeline, name='run_vanilla_llm_multi_turn_pipeline'),
@@ -35,6 +38,10 @@ urlpatterns = [
     # RAG Multi-turn Pipeline APIs
     path('api/run_rag_multi_turn_pipeline/', views.run_rag_multi_turn_pipeline, name='run_rag_multi_turn_pipeline'),
     path('api/stop_rag_multi_turn_pipeline/', views.stop_rag_multi_turn_pipeline, name='stop_rag_multi_turn_pipeline'),
+
+    # Agentic RAG Pipeline APIs
+    path('api/run_agentic_rag_pipeline/', views.run_agentic_rag_pipeline, name='run_agentic_rag_pipeline'),
+    path('api/stop_agentic_rag_pipeline/', views.stop_agentic_rag_pipeline, name='stop_agentic_rag_pipeline'),
 
 
     # Vanilla LLM Ad-hoc pipeline URL

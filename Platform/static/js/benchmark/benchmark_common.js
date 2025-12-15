@@ -66,6 +66,13 @@ const BenchmarkUrls = {
         loadRun: (id) => `${API_PREFIX}/multi_turn/load_rag_run/${id}/`,
         runPipeline: `${API_PREFIX}/run_rag_multi_turn_pipeline/`,
         stopPipeline: `${API_PREFIX}/stop_rag_multi_turn_pipeline/`
+    },
+    
+    // Multi-turn: Agent
+    agent: {
+        loadRun: (id) => `${API_PREFIX}/multi_turn/load_agent_run/${id}/`,
+        runPipeline: `${API_PREFIX}/run_agentic_rag_pipeline/`,
+        stopPipeline: `${API_PREFIX}/stop_agentic_rag_pipeline/`
     }
 };
 
@@ -610,6 +617,9 @@ const BenchmarkUtils = {
         });
         const saveBtn = document.getElementById('save-all-settings-btn');
         if (saveBtn) saveBtn.disabled = disabled;
+        
+        const settingsBtn = document.querySelector('button[data-bs-target="#settingsModal"]');
+        if (settingsBtn) settingsBtn.disabled = disabled;
     },
 
     /**
@@ -2752,7 +2762,10 @@ const BenchmarkUtils = {
             
             // --- Helper: Load Group/Run ---
             function loadRun(groupId) {
-                 const loadRunUrl = (pipelineType.includes('rag') ? BenchmarkUrls.ragMultiTurn.loadRun(groupId) : BenchmarkUrls.vanillaLlmMultiTurn.loadRun(groupId));
+                 let loadRunUrl = BenchmarkUrls.vanillaLlmMultiTurn.loadRun(groupId);
+                 if (pipelineType.includes('agent')) loadRunUrl = BenchmarkUrls.agent.loadRun(groupId);
+                 else if (pipelineType.includes('rag')) loadRunUrl = BenchmarkUrls.ragMultiTurn.loadRun(groupId);
+
                  fetch(loadRunUrl).then(res => res.json()).then(data => {
                      if (data.error) { alert(data.error); return; }
                      currentPipelineResults = data.results;
@@ -2793,7 +2806,11 @@ const BenchmarkUtils = {
                 btn.disabled = true;
                 btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Starting...';
                 
-                const singleSessionPipelineType = document.getElementById('rag_mode_select') ? document.getElementById('rag_mode_select').value : pipelineType;
+                let singleSessionPipelineType = pipelineType;
+                // Only allow RAG mode override if we are on a RAG multi-turn page
+                if (document.getElementById('rag_mode_select') && pipelineType.startsWith('rag_multi_turn')) {
+                    singleSessionPipelineType = document.getElementById('rag_mode_select').value;
+                }
 
                 fetch(BenchmarkUrls.multiTurn.createSession, {
                     method: 'POST',
@@ -2850,8 +2867,12 @@ const BenchmarkUtils = {
                 
                 if (buildFormData) buildFormData(formData);
                 
+                let runUrl = BenchmarkUrls.vanillaLlmMultiTurn.runPipeline;
+                if (pipelineType.includes('agent')) runUrl = BenchmarkUrls.agent.runPipeline;
+                else if (pipelineType.includes('rag')) runUrl = BenchmarkUrls.ragMultiTurn.runPipeline;
+
                 pipelineController = BenchmarkUtils.PipelineRunner.start({
-                    url: (pipelineType.includes('rag') ? BenchmarkUrls.ragMultiTurn.runPipeline : BenchmarkUrls.vanillaLlmMultiTurn.runPipeline),
+                    url: runUrl,
                     formData: formData,
                     ui: ui,
                     totalItems: 0, // Dynamic total items
@@ -2892,7 +2913,10 @@ const BenchmarkUtils = {
                          strategyData.reformulation_strategy = s;
                      }
 
-                     const stopUrl = (pipelineType.includes('rag') ? BenchmarkUrls.ragMultiTurn.stopPipeline : BenchmarkUrls.vanillaLlmMultiTurn.stopPipeline);
+                     let stopUrl = BenchmarkUrls.vanillaLlmMultiTurn.stopPipeline;
+                     if (pipelineType.includes('agent')) stopUrl = BenchmarkUrls.agent.stopPipeline;
+                     else if (pipelineType.includes('rag')) stopUrl = BenchmarkUrls.ragMultiTurn.stopPipeline;
+
                     fetch(stopUrl, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },

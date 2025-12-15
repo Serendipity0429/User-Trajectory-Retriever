@@ -142,6 +142,7 @@ class MultiTurnSession(models.Model):
     PIPELINE_TYPE_CHOICES = [
         ('vanilla', 'Vanilla LLM'),
         ('rag', 'RAG'),
+        ('agent', 'Agentic RAG'),
     ]
     REFORMULATION_CHOICES = [
         ('no_reform', 'No Reformulation'),

@@ -1190,3 +1190,165 @@ class AgenticRagPipeline(BaseMultiTurnPipeline):
         trial.save()
 
         return answer, is_correct, [] # No search results returned explicitly, they are in trace
+
+
+class BrowserAgentPipeline(BaseMultiTurnPipeline):
+    def __init__(self, base_url, api_key, model, max_retries, pipeline_id=None, dataset_id=None):
+        super().__init__(base_url, api_key, model, max_retries, pipeline_id, dataset_id)
+        self.temp_settings = LLMSettings(
+            llm_base_url=base_url,
+            llm_api_key=api_key,
+            llm_model=model,
+            temperature=0.0 # Default for agent
+        )
+        self.agent_model = BrowserAgentFactory.init_agentscope(self.temp_settings)
+        self.redis_prefix = REDIS_PREFIX_BROWSER_AGENT
+
+    def __str__(self):
+        return "Browser Agent Pipeline"
+
+    def get_settings_snapshot(self):
+        return {
+            'llm_settings': {
+                'llm_base_url': self.llm_settings.llm_base_url,
+                'llm_model': self.llm_settings.llm_model,
+                'max_retries': self.llm_settings.max_retries,
+            },
+            'pipeline_type': 'browser_agent',
+            'agent_config': {
+                'model_name': self.agent_model.model_name if hasattr(self.agent_model, 'model_name') else 'unknown'
+            }
+        }
+
+    def create_session(self, settings, question_text, ground_truths, group):
+        return MultiTurnSession.objects.create(
+            question=question_text,
+            ground_truths=ground_truths,
+            run=group,
+            run_tag=self.pipeline_id,
+            pipeline_type='browser_agent' # New pipeline type
+        )
+
+    def create_trial(self, session, trial_number):
+        return MultiTurnTrial.objects.create(
+            session=session,
+            trial_number=trial_number,
+            status='processing'
+        )
+        
+    def _construct_messages(self, session, trial, completed_trials):
+        # The browser agent's initial prompt is self-contained.
+        # History will be managed by the agentscope agent itself.
+        messages = []
+        # If it's the first trial, the question is the primary message
+        if trial.trial_number == 1:
+            messages.append(Msg(name="User", role="user", content=f"Task: {session.question}"))
+        else:
+            # For subsequent trials (retries), we'll provide feedback
+            # This mimics the ReAct agent's feedback mechanism
+            last_trial = completed_trials[-1]
+            feedback_message = f"Your previous attempt was incorrect. Feedback: {last_trial.feedback}. Please re-evaluate the task and try again."
+            messages.append(Msg(name="User", role="user", content=feedback_message))
+        
+        return messages
+
+    # Reusing the _serialize_trace from AgenticRagPipeline since it handles tool calls generically
+    _serialize_trace = AgenticRagPipeline._serialize_trace
+
+    def run_single_turn(self, session, trial):
+        agent_model = BrowserAgentFactory.init_agentscope(self.temp_settings)
+        
+        prev_trials = session.trials.filter(trial_number__lt=trial.trial_number).order_by('trial_number')
+        
+        history_msgs = []
+        if trial.trial_number > 1:
+            # Reconstruct history for the browser agent for retries
+            history_msgs.append(Msg(name="User", role="user", content=f"Task: {session.question}"))
+            trials_list = list(prev_trials)
+            for i, pt in enumerate(trials_list):
+                if pt.answer:
+                    history_msgs.append(Msg(name="Assistant", role="assistant", content=pt.full_response)) # Full response contains the agent's thought process and actions
+                if i < len(trials_list) - 1:
+                    history_msgs.append(Msg(name="User", role="user", content=f"Incorrect. Feedback: {pt.feedback}"))
+            
+            last_pt = trials_list[-1]
+            current_msg = Msg(name="User", role="user", content=f"Your previous attempt was incorrect. Feedback: {last_pt.feedback}. Please re-evaluate the task and try again.")
+        else:
+            current_msg = Msg(name="User", role="user", content=f"Task: {session.question}")
+
+        initial_history_len = len(history_msgs)
+
+        def on_memory_update(msgs):
+            try:
+                relevant_msgs = msgs[initial_history_len:] if len(msgs) > initial_history_len else []
+                trace_data, _ = self._serialize_trace(relevant_msgs)
+                key = f"trial_trace:{trial.id}"
+                redis_client.set(key, json.dumps(trace_data), ex=3600)
+            except Exception as e:
+                print_debug(f"Redis update failed in BrowserAgentPipeline: {e}")
+
+        agent = BrowserAgentFactory.create_agent(agent_model, update_callback=on_memory_update)
+        
+        async def run_agent_task():
+            import inspect
+            if history_msgs:
+                await agent.memory.add(history_msgs)
+            response = await agent(current_msg)
+            if inspect.isasyncgen(response):
+                final_res = None
+                async for x in response:
+                    final_res = x
+                response = final_res
+            trace = await agent.memory.get_memory()
+            return response, trace
+
+        try:
+            response_msg, trace_msgs = asyncio.run(run_agent_task())
+        except Exception as e:
+            print_debug(f"Browser agent execution failed: {e}")
+            raise e
+        finally:
+            # Ensure the browser client is closed after each session if not managed by a persistent process
+            from .browser_utils import BrowserClientManager
+            BrowserClientManager.close_client()
+        
+        raw_content = response_msg.content
+        if isinstance(raw_content, list):
+            try:
+                texts = []
+                for c in raw_content:
+                    if isinstance(c, dict) and c.get('type') == 'text':
+                        texts.append(c.get('text', ''))
+                    elif isinstance(c, str):
+                        texts.append(c)
+                answer = "".join(texts)
+            except:
+                answer = json.dumps(raw_content)
+        else:
+            answer = str(raw_content) if raw_content is not None else ""
+        
+        relevant_trace_msgs = trace_msgs[initial_history_len:] if len(trace_msgs) > initial_history_len else []
+        trace_data, real_answer_found = self._serialize_trace(relevant_trace_msgs) # Corrected to relevant_msgs
+        
+        if real_answer_found:
+            answer = real_answer_found
+        
+        full_response = json.dumps(trace_data)
+        
+        if not trace_data:
+             full_response = json.dumps([{
+                 "role": "assistant", 
+                 "name": "Browser Agent Debug Fallback", 
+                 "content": answer
+             }])
+
+        is_correct = check_answer_llm(session.question, session.ground_truths, answer, client=self.client, model=self.model)
+
+        trial.answer = answer
+        trial.full_response = full_response
+        trial.is_correct = is_correct
+        trial.feedback = "Correct" if is_correct else "Incorrect"
+        trial.status = 'completed'
+        trial.save()
+
+        return answer, is_correct, [] # No search results explicitly

@@ -6,7 +6,7 @@
 {% block content %}
 <div class="container-fluid mt-5 px-lg-4">
     <div class="pb-3 mb-4 border-bottom d-flex justify-content-between align-items-center">
-        <div>
+        <div class="col-lg-8">
             <h1 class="h2"><i class="bi bi-person-workspace me-2"></i>Agentic RAG Baseline</h1>
             <p class="text-muted mb-0">Evaluate ReAct Agent performance using AgentScope.</p>
         </div>
@@ -261,5 +261,6 @@
 {% endblock %}
 
 {% block benchmark_extra_js %}
+<script src="{% static 'js/benchmark/agent_common.js' %}"></script>
 <script src="{% static 'js/benchmark/agent_rag.js' %}"></script>
 {% endblock %}

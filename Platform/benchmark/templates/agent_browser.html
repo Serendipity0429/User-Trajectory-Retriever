@@ -1,14 +1,14 @@
 {% extends "benchmark_base.html" %}
 {% load static %}
 
-{% block title %}Multi-Turn Web RAG Baseline{% endblock %}
+{% block title %}Browser Agent Baseline{% endblock %}
 
 {% block content %}
 <div class="container-fluid mt-5 px-lg-4">
     <div class="pb-3 mb-4 border-bottom d-flex justify-content-between align-items-center">
         <div class="col-lg-8">
-            <h1 class="h2"><i class="bi bi-globe me-2"></i>Multi-Turn Web RAG Baseline</h1>
-            <p class="text-muted mb-0">Evaluate RAG performance over multiple turns with optional query reformulation.</p>
+            <h1 class="h2"><i class="bi bi-browser-chrome me-2"></i>Browser Agent Baseline</h1>
+            <p class="text-muted mb-0">Evaluate Browser Agent performance using Chrome DevTools MCP.</p>
         </div>
         <div class="d-flex align-items-center">
             <button class="btn btn-outline-primary me-2" data-bs-toggle="modal" data-bs-target="#settingsModal">
@@ -62,54 +62,7 @@
                         </div>
                     </div>
                 </div>
-                <div class="col-lg-3 col-md-6 mb-4">
-                    <div class="card text-center text-dark bg-light summary-card h-100">
-                        <div class="card-body">
-                            <h5 class="card-title" id="stats-avg-trials-all">0.00</h5>
-                            <p class="card-text text-muted small">Avg. Trials (All)</p>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-lg-3 col-md-6 mb-4">
-                    <div class="card text-center text-dark bg-light summary-card h-100">
-                        <div class="card-body">
-                            <h5 class="card-title" id="stats-avg-trials-success">0.00</h5>
-                            <p class="card-text text-muted small">Avg. Trials (Success)</p>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-lg-3 col-md-6 mb-4">
-                    <div class="card text-center text-dark bg-light summary-card h-100">
-                        <div class="card-body">
-                            <h5 class="card-title" id="stats-first-try-success">0.00%</h5>
-                            <p class="card-text text-muted small">1st Try Success</p>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-lg-3 col-md-6 mb-4">
-                    <div class="card text-center text-dark bg-light summary-card h-100">
-                        <div class="card-body">
-                            <h5 class="card-title" id="stats-give-up-rate">0.00%</h5>
-                            <p class="card-text text-muted small">Give-up Rate</p>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-lg-3 col-md-6 mb-4">
-                    <div class="card text-center text-dark bg-light summary-card h-100">
-                        <div class="card-body">
-                            <h5 class="card-title" id="stats-self-correction-rate">0.00%</h5>
-                            <p class="card-text text-muted small">Self-Correction Rate</p>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-lg-3 col-md-6 mb-4">
-                    <div class="card text-center text-dark bg-light summary-card h-100">
-                        <div class="card-body">
-                            <h5 class="card-title" id="stats-avg-query-shift">0.00</h5>
-                            <p class="card-text text-muted small">Avg. Query Shift (Dist)</p>
-                        </div>
-                    </div>
-                </div>
+                <!-- Additional stats can be added here if needed -->
             </div>    
             <div class="card shadow-sm">
                 <div class="card-body p-3">
@@ -118,11 +71,10 @@
                             <thead class="table-light text-uppercase small fw-bold text-muted">
                                 <tr>
                                     <th class="px-4 py-3" style="width: 5%;">#</th>
-                                    <th class="px-4 py-3" style="width: 25%;">Question</th>
-                                    <th class="px-4 py-3" style="width: 25%;">Final Answer</th>
+                                    <th class="px-4 py-3" style="width: 35%;">Question</th>
+                                    <th class="px-4 py-3" style="width: 30%;">Final Answer</th>
                                     <th class="px-4 py-3" style="width: 20%;">Ground Truths</th>
                                     <th class="px-4 py-3 text-center" style="width: 10%;">Result</th>
-                                    <th class="px-4 py-3 text-center" style="width: 10%;">Trials</th>
                                 </tr>
                             </thead>                           
                              <tbody id="stats-details-tbody">
@@ -144,7 +96,7 @@
                     <h5 class="mb-0"><i class="bi bi-robot me-2"></i>QA Pipeline</h5>
                 </div>
                 <div class="card-body">
-                    <p class="card-text">Run all questions through the LLM and get aggregate results.</p>
+                    <p class="card-text">Run all questions through the Browser Agent and get aggregate results.</p>
                     <div class="mb-3">
                         <label for="dataset-selector" class="form-label">Select Dataset</label>
                         <select class="form-select" id="dataset-selector">
@@ -155,7 +107,7 @@
                         </select>
                     </div>
                     <div class="d-grid gap-2">
-                        <button id="run-pipeline-btn" class="btn btn-success">Run QA Pipeline</button>
+                        <button id="run-pipeline-btn" class="btn btn-success">Run Pipeline</button>
                         <button id="stop-pipeline-btn" class="btn btn-danger" style="display: none;">Stop Pipeline</button>
                     </div>
                     <div id="pipeline-progress" class="mt-3" style="display: none;">
@@ -292,7 +244,9 @@
                         <div id="session-ground-truths"></div>
                     </div>
                     <hr>
-                    <div id="trials-container"></div>
+                    <!-- Here we will display the agent trace -->
+                    <div id="trials-container">
+                    </div>
                 </div>
             </div>
             <div id="no-session-selected" class="text-center mt-5">
@@ -303,28 +257,10 @@
     </div>
 </div>
 
-<!-- Search Results List Modal -->
-<div class="modal fade" id="searchResultsListModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-scrollable">
-        <div class="modal-content">
-            <div class="modal-header">
-                        <h5 class="modal-title" id="searchResultsListModalLabel">Search Results</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <div id="modal-search-results-container" class="list-group list-group-flush">
-                    <!-- Results will be injected here -->
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-            </div>
-        </div>
-    </div>
-</div>    
 {% include 'includes/settings_modal.html' with show_retries=True %}
 {% endblock %}
 
 {% block benchmark_extra_js %}
-<script src="{% static 'js/benchmark/rag_multi_turn.js' %}"></script>
+<script src="{% static 'js/benchmark/agent_common.js' %}"></script>
+<script src="{% static 'js/benchmark/agent_browser.js' %}"></script>
 {% endblock %}

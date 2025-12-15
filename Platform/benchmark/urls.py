@@ -10,6 +10,7 @@ urlpatterns = [
     path("rag_adhoc/", views.rag_adhoc, name="rag_adhoc"),
     path("rag_multi_turn/", views.rag_multi_turn, name="rag_multi_turn"),
     path("agent_rag/", views.agent_rag, name="agent_rag"),
+    path("browser_agent/", views.browser_agent, name="browser_agent"), # New view
     path("api/list_runs/", views.list_runs, name="list_runs"),
     path("api/multi_turn/create_session_group/", views.create_session_group, name="create_session_group"),
     path("api/multi_turn/create_session/", views.create_session, name="create_session"),
@@ -42,6 +43,11 @@ urlpatterns = [
     # Agentic RAG Pipeline APIs
     path('api/run_agentic_rag_pipeline/', views.run_agentic_rag_pipeline, name='run_agentic_rag_pipeline'),
     path('api/stop_agentic_rag_pipeline/', views.stop_agentic_rag_pipeline, name='stop_agentic_rag_pipeline'),
+
+    # Browser Agent Pipeline APIs
+    path('api/run_browser_agent_pipeline/', views.run_browser_agent_pipeline, name='run_browser_agent_pipeline'),
+    path('api/stop_browser_agent_pipeline/', views.stop_browser_agent_pipeline, name='stop_browser_agent_pipeline'),
+
 
 
     # Vanilla LLM Ad-hoc pipeline URL

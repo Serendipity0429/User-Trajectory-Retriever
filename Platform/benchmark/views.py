@@ -40,6 +40,7 @@ from .pipeline_utils import (
     VanillaLLMMultiTurnPipeline,
     RagMultiTurnPipeline,
     AgenticRagPipeline,
+    BrowserAgentPipeline, # Ensure this is imported
     serialize_events,
 )
 
@@ -840,7 +841,7 @@ def create_session(request):
                 "serper_fetch_full_content": search_settings.fetch_full_content,
             }
         
-        if "agent" in pipeline_type:
+        if "agent" in pipeline_type or "browser_agent" in pipeline_type: # Updated for browser agent
              # Snapshot for agent if needed, mostly LLM settings + search
              search_settings = SearchSettings.load()
              snapshot["search_settings"] = {
@@ -887,6 +888,12 @@ def create_session(request):
             trial = MultiTurnTrial.objects.create(
                 session=session, trial_number=1, status="processing"
             )
+        elif "browser_agent" in pipeline_type: # New pipeline type
+            session_data['pipeline_type'] = 'browser_agent'
+            session = MultiTurnSession.objects.create(**session_data)
+            trial = MultiTurnTrial.objects.create(
+                session=session, trial_number=1, status="processing"
+            )
 
         else:
             session_data['pipeline_type'] = 'vanilla'
@@ -911,6 +918,10 @@ def get_session(request, session_id):
     
     if session.pipeline_type == 'vanilla':
         pipeline_type = "vanilla_llm_multi_turn"
+    elif session.pipeline_type == 'agent':
+        pipeline_type = "agentic_rag"
+    elif session.pipeline_type == 'browser_agent': # New pipeline type
+        pipeline_type = "browser_agent"
     else:
         pipeline_type = f"rag_multi_turn_{session.reformulation_strategy}"
 
@@ -1075,7 +1086,13 @@ def run_trial(request, trial_id):
                 model=model,
                 max_retries=1,
             )
-
+        elif session.pipeline_type == 'browser_agent':
+            pipeline = BrowserAgentPipeline(
+                base_url=base_url,
+                api_key=api_key,
+                model=model,
+                max_retries=1,
+            )
         else:
             pipeline = VanillaLLMMultiTurnPipeline(
                 base_url=base_url, api_key=api_key, model=model, max_retries=1
@@ -1270,6 +1287,10 @@ def export_session(request, session_id):
     
     if session.pipeline_type == 'vanilla':
         pipeline_type = "vanilla_llm_multi_turn"
+    elif session.pipeline_type == 'agent':
+        pipeline_type = "agentic_rag"
+    elif session.pipeline_type == 'browser_agent':
+        pipeline_type = "browser_agent"
     else:
         pipeline_type = f"rag_multi_turn_{session.reformulation_strategy}"
 
@@ -1291,7 +1312,12 @@ def export_session(request, session_id):
                 "search_results",
             )
         )
-
+    elif session.pipeline_type == 'agent' or session.pipeline_type == 'browser_agent':
+         trials = list(
+            session.trials.values(
+                "trial_number", "answer", "feedback", "is_correct", "created_at", "full_response"
+            )
+        )
     else:
         trials = list(
             session.trials.values(
@@ -1547,8 +1573,8 @@ def load_rag_multi_turn_run(request, group_id):
 @admin_required
 def load_agent_multi_turn_run(request, group_id):
     group = get_object_or_404(MultiTurnRun, pk=group_id)
-    # Filter sessions by type 'agent'
-    sessions = group.sessions.filter(pipeline_type='agent').prefetch_related("trials")
+    # Filter sessions by type 'agent' or 'browser_agent'
+    sessions = group.sessions.filter(pipeline_type__in=['agent', 'browser_agent']).prefetch_related("trials")
     results = []
     snapshot = group.settings_snapshot
     max_retries = 3 # Default or from settings
@@ -1567,7 +1593,8 @@ def load_agent_multi_turn_run(request, group_id):
                 "final_answer": last_trial.answer,
                 "ground_truths": session.ground_truths,
                 "max_retries": max_retries,
-                "initial_correct": first_trial.is_correct if first_trial else None
+                "initial_correct": first_trial.is_correct if first_trial else None,
+                "pipeline_type": session.pipeline_type # Add pipeline_type to results
             })
 
     return JsonResponse(
@@ -1610,6 +1637,104 @@ def get_vanilla_llm_adhoc_run(request, run_id):
         return JsonResponse(run_data)
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
+
+
+@admin_required
+def browser_agent(request):
+    # Load questions from the file
+    questions = []
+    try:
+        file_path = os.path.join(
+            os.path.dirname(__file__), "..", "data", "hard_questions_refined.jsonl"
+        )
+        with open(file_path, "r") as f:
+            for line in f:
+                questions.append(json.loads(line))
+    except FileNotFoundError:
+        pass
+
+    # Load sessions and group them
+    groups = (
+        MultiTurnRun.objects.filter(sessions__pipeline_type='browser_agent')
+        .exclude(name__startswith="Ad-hoc Session")
+        .prefetch_related(
+            models.Prefetch(
+                "sessions",
+                queryset=MultiTurnSession.objects.filter(pipeline_type='browser_agent').order_by("-created_at"),
+            )
+        )
+        .order_by("-created_at")
+        .distinct()
+    )
+
+    individual_sessions = MultiTurnSession.objects.filter(
+        run__name__startswith="Ad-hoc Session",
+        pipeline_type='browser_agent'
+    ).order_by("-created_at")
+
+    datasets = BenchmarkDataset.objects.all().order_by("-created_at")
+
+    context = {
+        "questions": questions,
+        "groups": groups,
+        "individual_sessions": individual_sessions,
+        "llm_settings": get_llm_settings_with_fallback(),
+        "datasets": datasets,
+    }
+    return render(request, "agent_browser.html", context)
+
+
+@admin_required
+@require_POST
+def run_browser_agent_pipeline(request):
+    try:
+        db_settings = get_llm_settings_with_fallback()
+        base_url = request.POST.get("llm_base_url") or db_settings.llm_base_url
+        api_key = request.POST.get("llm_api_key") or db_settings.llm_api_key
+        model = (
+            request.POST.get("llm_model") or db_settings.llm_model or "gpt-3.5-turbo"
+        )
+        max_retries = int(request.POST.get("max_retries", 3))
+        pipeline_id = request.POST.get("pipeline_id")
+        dataset_id = request.POST.get("dataset_id")
+        if not api_key:
+            return JsonResponse(
+                {"error": "An API Key is required to run the benchmark."}, status=400
+            )
+
+        if pipeline_id:
+            redis_client.set(
+                f"browser_agent_pipeline_active:{pipeline_id}",
+                "1",
+                ex=3600,
+            )
+
+        pipeline = BrowserAgentPipeline(
+            base_url=base_url,
+            api_key=api_key,
+            model=model,
+            max_retries=max_retries,
+            pipeline_id=pipeline_id,
+            dataset_id=dataset_id,
+        )
+
+        return StreamingHttpResponse(serialize_events(pipeline.run()), content_type="application/json")
+
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
+
+
+@admin_required
+@require_POST
+def stop_browser_agent_pipeline(request):
+    try:
+        data = json.loads(request.body)
+        pipeline_id = data.get("pipeline_id")
+        if pipeline_id:
+            redis_client.delete(f"browser_agent_pipeline_active:{pipeline_id}")
+        return JsonResponse({"status": "ok"})
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)}, status=400)
 
 
 @require_POST

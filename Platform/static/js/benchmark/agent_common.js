@@ -4,8 +4,8 @@ window.AgentBenchmark = (function() {
 
     function init(config) {
         globalConfig = {
-            pipelineType: 'agent_rag', // default
-            csvPrefix: 'agent-data',
+            pipelineType: 'vanilla_agent', // default
+            csvPrefix: 'vanilla-agent-data',
             title: 'Agent Trajectory',
             mainIconClass: 'bi-robot',
             mainColorClass: 'bg-primary',
@@ -470,7 +470,7 @@ window.AgentBenchmark = (function() {
              }
 
              if (actions.length > 0) {
-                 let html = '<div class="d-flex flex-column gap-2">';
+                 let html = '<div class="d-flex flex-column gap-3">';
                  
                  // Tool Rendering Strategy Map
                  const toolRenderers = {
@@ -478,60 +478,77 @@ window.AgentBenchmark = (function() {
                          const answerText = input.answer || 'No answer provided.';
                          return {
                              title: 'Answer Question',
-                             content: `<p class="mb-0">${answerText}</p>`
+                             icon: 'bi-chat-right-text',
+                             content: `<div class="p-3 bg-white rounded border border-success-subtle"><strong class="text-success d-block mb-1">Proposed Answer:</strong><p class="mb-0 lead text-dark" style="font-size: 1rem;">${answerText}</p></div>`
                          };
                      },
                      'web_search_tool': (input) => {
                          const query = input.query || 'No query provided.';
                          return {
                              title: 'Web Search',
-                             content: `<strong>Query:</strong> <span class="text-primary">${query}</span>`
+                             icon: 'bi-search',
+                             content: `
+                                <div class="input-group">
+                                    <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-primary"></i></span>
+                                    <input type="text" class="form-control bg-white border-start-0 text-primary fw-bold" value="${query}" readonly>
+                                </div>`
                          };
                      },
                      'navigate_to_url': (input) => {
                          return {
-                             title: 'Navigate',
-                             content: `<div class="d-flex align-items-center"><i class="bi bi-globe me-2 text-primary"></i> <a href="${input.url}" target="_blank">${input.url}</a></div>`
+                             title: 'Navigate to URL',
+                             icon: 'bi-browser-chrome',
+                             content: `<div class="d-flex align-items-center p-2 bg-white rounded border"><i class="bi bi-globe me-2 text-info"></i> <a href="${input.url}" target="_blank" class="text-break text-decoration-none fw-medium">${input.url}</a></div>`
                          };
                      },
                      'click_element': (input) => {
                          return {
                              title: 'Click Element',
-                             content: `<strong>Selector:</strong> <span class="font-monospace text-primary bg-light px-1 rounded">${input.selector}</span>`
+                             icon: 'bi-mouse',
+                             content: `<div class="d-flex align-items-center"><span class="badge bg-secondary me-2">Selector</span><code class="text-primary bg-white px-2 py-1 rounded border">${input.selector}</code></div>`
                          };
                      },
                      'type_text': (input) => {
                          return {
                              title: 'Type Text',
+                             icon: 'bi-keyboard',
                              content: `
-                                <div><strong>Selector:</strong> <span class="font-monospace text-primary bg-light px-1 rounded">${input.selector}</span></div>
-                                <div class="mt-1"><strong>Text:</strong> <span class="text-success">"${input.text}"</span></div>
+                                <div class="mb-2"><span class="badge bg-secondary me-2">Selector</span><code class="text-primary bg-white px-2 py-1 rounded border">${input.selector}</code></div>
+                                <div class="p-2 bg-white rounded border border-light-subtle text-success"><i class="bi bi-pencil-square me-2 text-muted"></i>"${input.text}"</div>
                              `
                          };
                      },
                      'scroll_page': (input) => {
+                        const direction = input.direction || 'down';
+                        const icon = direction === 'down' ? 'bi-arrow-down-circle' : 'bi-arrow-up-circle';
                          return {
                              title: 'Scroll Page',
-                             content: `Direction: <strong>${input.direction || 'down'}</strong>, Amount: ${input.amount || 500}px`
+                             icon: 'bi-arrows-vertical',
+                             content: `<div class="d-flex align-items-center"><i class="bi ${icon} me-2 fs-5 text-secondary"></i> Scroll <strong>${direction}</strong> by <span class="badge bg-light text-dark border ms-2">${input.amount || 500}px</span></div>`
                          };
                      },
                      'get_dom_snapshot': (input) => {
                          return {
-                             title: 'Get DOM Snapshot',
-                             content: '<em class="text-muted">Capturing current page structure...</em>'
+                             title: 'Capture DOM Snapshot',
+                             icon: 'bi-camera',
+                             content: '<div class="text-muted small"><i class="bi bi-info-circle me-1"></i>Capturing the current page accessibility tree structure.</div>'
                          };
                      },
                      'default': (name, input) => {
                          const argsContent = Object.entries(input)
-                            .map(([key, value]) => `
-                                <div class="d-flex text-break">
-                                    <strong class="me-2" style="min-width: 80px;">${key}:</strong> 
-                                    <span class="text-primary">${typeof value === 'object' ? JSON.stringify(value, null, 2) : value}</span>
-                                </div>`)
+                            .map(([key, value]) => {
+                                const valStr = typeof value === 'object' ? JSON.stringify(value, null, 2) : value;
+                                return `
+                                <div class="d-flex flex-column flex-sm-row mb-1">
+                                    <span class="fw-bold text-secondary me-2 mb-1 mb-sm-0" style="min-width: 100px;">${key}:</span> 
+                                    <div class="font-monospace text-dark bg-white px-2 py-1 rounded border w-100" style="font-size: 0.85rem; white-space: pre-wrap;">${valStr}</div>
+                                </div>`;
+                            })
                             .join('');
                          return {
                              title: name,
-                             content: `<div class="p-2 bg-light rounded" style="font-size: 0.95rem; white-space: pre-wrap;">${argsContent || '<em class="text-muted">No parameters</em>'}</div>`
+                             icon: 'bi-tools',
+                             content: `<div class="p-2 rounded" style="background-color: rgba(0,0,0,0.02);">${argsContent || '<em class="text-muted">No parameters</em>'}</div>`
                          };
                      }
                  };
@@ -545,13 +562,18 @@ window.AgentBenchmark = (function() {
                      const renderResult = renderer(toolInput);
 
                      html += `
-                        <div class="card border-0 bg-white shadow-sm">
-                            <div class="card-header bg-warning bg-opacity-10 border-0 py-2">
-                                <span class="badge bg-warning text-dark me-2">Call</span>
-                                <span class="fw-bold font-monospace text-dark">${renderResult.title}</span>
-                            </div>
-                            <div class="card-body py-2 bg-light small text-muted">
-                                ${renderResult.content}
+                        <div class="card border-0 shadow-sm tool-call-card" style="border-left: 4px solid #ffc107 !important;">
+                            <div class="card-body py-3">
+                                <div class="d-flex align-items-center mb-2">
+                                    <div class="bg-warning bg-opacity-25 text-dark rounded-circle p-2 me-2 d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
+                                        <i class="bi ${renderResult.icon || 'bi-gear'}"></i>
+                                    </div>
+                                    <h6 class="mb-0 fw-bold text-dark">${renderResult.title}</h6>
+                                    <span class="badge bg-light text-secondary border ms-auto font-monospace small">${toolName}</span>
+                                </div>
+                                <div class="ps-5 pt-1">
+                                    ${renderResult.content}
+                                </div>
                             </div>
                         </div>
                      `;

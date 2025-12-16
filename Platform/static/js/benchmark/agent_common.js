@@ -1,5 +1,6 @@
 window.AgentBenchmark = (function() {
     const activePolls = {};
+    const trialState = {};
     let globalConfig = {};
 
     function init(config) {
@@ -38,11 +39,17 @@ window.AgentBenchmark = (function() {
     function startPolling(trialId) {
         if (activePolls[trialId]) return;
 
+        // Initialize state
+        if (!trialState[trialId]) {
+            trialState[trialId] = { renderedCount: 0 };
+        }
+
         const intervalId = setInterval(() => {
             const container = document.getElementById(`live-trace-${trialId}`);
             if (!container) {
                 clearInterval(intervalId);
                 delete activePolls[trialId];
+                delete trialState[trialId];
                 return;
             }
 
@@ -50,15 +57,34 @@ window.AgentBenchmark = (function() {
                 .then(res => res.json())
                 .then(data => {
                     const traceData = data.trace;
-                    if (traceData && traceData.length > 0) {
-                        let html = renderTraceTimeline(traceData);
-                        html += `
-                            <div class="d-flex align-items-center justify-content-center py-3 text-muted animate__animated animate__fadeIn">
-                                <span class="spinner-border spinner-border-sm me-2"></span>
-                                <small>${globalConfig.runningText}</small>
-                            </div>
-                        `;
-                        container.innerHTML = html;
+                    if (traceData && Array.isArray(traceData) && traceData.length > 0) {
+                        let timelineContainer = container.querySelector('.timeline-container');
+                        
+                        // Initial Setup if container is in "loading" state or missing structure
+                        if (!timelineContainer) {
+                            container.innerHTML = `
+                                <div class="timeline-container d-flex flex-column gap-3"></div>
+                                <div class="loading-spinner d-flex align-items-center justify-content-center py-3 text-muted animate__animated animate__fadeIn">
+                                    <span class="spinner-border spinner-border-sm me-2"></span>
+                                    <small>${globalConfig.runningText}</small>
+                                </div>
+                            `;
+                            timelineContainer = container.querySelector('.timeline-container');
+                            trialState[trialId].renderedCount = 0;
+                        }
+
+                        // Incremental Update
+                        const currentCount = trialState[trialId].renderedCount;
+                        if (traceData.length > currentCount) {
+                            const newSteps = traceData.slice(currentCount);
+                            let newStepsHtml = '';
+                            newSteps.forEach((step, idx) => {
+                                newStepsHtml += renderStep(step, currentCount + idx);
+                            });
+                            
+                            timelineContainer.insertAdjacentHTML('beforeend', newStepsHtml);
+                            trialState[trialId].renderedCount = traceData.length;
+                        }
                     }
                 })
                 .catch(err => console.error("Polling error:", err));

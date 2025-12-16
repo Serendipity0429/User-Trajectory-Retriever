@@ -610,3 +610,17 @@ class ThrottledFunctionManager {
 }
 
 const throttleManager = new ThrottledFunctionManager();
+
+function getElementHierarchyHTML(element, depth = 10) {
+    if (!element || !element.tagName || depth <= 0) return ['<html>'];
+    const hierarchy = [];
+    let current = element;
+    while (current && depth > 0) {
+        const tag_name = current.tagName.toLowerCase();
+        const attributes = Array.from(current.attributes).map(attr => ` ${attr.name}="${attr.value}"`).join('');
+        hierarchy.push(`<${tag_name}${attributes}>`);
+        current = current.parentElement;
+        depth--;
+    }
+    return hierarchy;
+}

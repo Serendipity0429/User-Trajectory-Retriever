@@ -103,6 +103,7 @@
         "page.js",
         "mouseMove.js",
         "message.js",
+        "ui_annotation.js",
         "general.js",
         "content.js"
       ],

@@ -6,7 +6,7 @@ const defaultConfig = {
     localServerAddress: 'http://127.0.0.1:8000',
     remoteServerAddress: 'http://101.6.41.59:32904',
     isPassiveMode: true,
-    cancelTrialThreshold: 999, // TODO: temporarily banned cancellation feature, restore this in the formal study
+    cancelTrialThreshold: 10, // Number of cancellations allowed before submission
     messageBoxSize: 'medium',
     messageBoxPosition: 'top-right',
     popupScale: 1,

@@ -17,6 +17,7 @@ from .prompts import PROMPTS
 from .agent_utils import VanillaAgentFactory
 from .agent_utils import BrowserAgentFactory
 from agentscope.message import Msg
+from asgiref.sync import sync_to_async
 
 REDIS_PREFIX_ACTIVE = "pipeline_active"
 REDIS_PREFIX_VANILLA_ADHOC = "vanilla_llm_adhoc_pipeline_active"
@@ -32,6 +33,13 @@ def serialize_events(generator):
     Helper function to serialize events from the pipeline generator.
     """
     for event in generator:
+        yield json.dumps(event) + "\n"
+
+async def serialize_events_async(generator):
+    """
+    Helper function to serialize events from an async pipeline generator.
+    """
+    async for event in generator:
         yield json.dumps(event) + "\n"
 
 class BasePipeline:
@@ -142,8 +150,32 @@ class BasePipeline:
                 else:
                     raise last_exception
     
-    def run(self):
-        yield {'is_meta': True, 'type': 'info', 'message': 'Pipeline started'}
+    async def run(self):
+        run_object = await sync_to_async(self.create_run_object)()
+        yield {'is_meta': True, 'type': 'run_created', 'run_id': run_object.id, 'name': run_object.name}
+        
+        total_questions = 0
+        questions_iterator = None
+        
+        try:
+            total_questions = await sync_to_async(self.get_total_questions)()
+            questions_iterator = await sync_to_async(self.load_questions)()
+        except Exception as e:
+            yield {'error': str(e)}
+            await sync_to_async(self.stop_token)()
+            return
+
+        yield {'is_meta': True, 'type': 'total_count', 'count': total_questions}
+
+        # Iterating over sync generator in async method?
+        # load_questions returns a generator.
+        # We can iterate it synchronously if it doesn't do I/O during iteration (it reads file line by line).
+        # Actually load_questions reads file.
+        # Ideally we convert it to list or iterate in thread.
+        # For now, let's assume we can iterate it (blocking slightly).
+        
+        # But wait, BaseMultiTurnPipeline.run logic is different.
+        # It calls _process_single_session.
         pass
         
     def get_settings_snapshot(self):
@@ -1214,8 +1246,17 @@ class BrowserAgentPipeline(BaseMultiTurnPipeline):
             llm_model=model,
             temperature=0.0 # Default for agent
         )
-        self.agent_model = BrowserAgentFactory.init_agentscope(self.temp_settings)
+        self.agent_model = None # Initialized by async factory
+        self.agent_toolkit = None # Initialized by async factory
+        self.mcp_client = None # Initialized by async factory
         self.redis_prefix = REDIS_PREFIX_BROWSER_AGENT
+
+    @classmethod
+    async def create(cls, base_url, api_key, model, max_retries, pipeline_id=None, dataset_id=None):
+        instance = await sync_to_async(cls)(base_url, api_key, model, max_retries, pipeline_id, dataset_id)
+        # Skip MCP initialization during creation to avoid loop binding issues
+        instance.agent_model, instance.agent_toolkit, instance.mcp_client = await BrowserAgentFactory.init_agentscope(instance.temp_settings, skip_mcp=True)
+        return instance
 
     def __str__(self):
         return "Browser Agent Pipeline"
@@ -1269,19 +1310,155 @@ class BrowserAgentPipeline(BaseMultiTurnPipeline):
     # Reusing the _serialize_trace from VanillaAgentPipeline since it handles tool calls generically
     _serialize_trace = VanillaAgentPipeline._serialize_trace
 
-    def run_single_turn(self, session, trial):
-        agent_model = BrowserAgentFactory.init_agentscope(self.temp_settings)
+    async def _process_single_session_async(self, group, question_text, ground_truths):
+        try:
+            session = await sync_to_async(self.create_session)(self.llm_settings, question_text, ground_truths, group)
+
+            yield {
+                'is_meta': True,
+                'type': 'session_created',
+                'session_id': session.id,
+                'question': question_text,
+                'group_id': group.id,
+                'group_name': group.name
+            }
+
+            is_session_completed = False
+            trial_number = 1
+            final_is_correct = False
+            final_answer = ""
+            
+            while trial_number <= self.max_retries and not is_session_completed:
+                if not await sync_to_async(self.check_active)():
+                    break
+
+                trial = await sync_to_async(self.create_trial)(session, trial_number)
+                
+                yield {
+                    'is_meta': True,
+                    'type': 'trial_started',
+                    'session_id': session.id,
+                    'trial_number': trial_number,
+                    'group_id': group.id
+                }
+
+                try:
+                    parsed_answer, is_correct, _ = await self.run_single_turn_async(session, trial)
+                except Exception as e:
+                    def update_error():
+                        trial.status = 'error'
+                        trial.save()
+                    await sync_to_async(update_error)()
+                    raise e
+                
+                yield {
+                    'is_meta': True,
+                    'type': 'trial_completed',
+                    'session_id': session.id,
+                    'trial_number': trial_number,
+                    'is_correct': is_correct,
+                    'answer': parsed_answer,
+                    'full_response': trial.full_response,
+                    'group_id': group.id
+                }
+
+                final_answer = parsed_answer
+                final_is_correct = is_correct
+
+                if is_correct:
+                    is_session_completed = True
+                else:
+                    trial_number += 1
+            
+            session.is_completed = True
+            await sync_to_async(session.save)()
+
+            yield {
+                'question': question_text,
+                'correct': final_is_correct,
+                'trials': trial_number if final_is_correct else (trial_number - 1),
+                'session_id': session.id,
+                'final_answer': final_answer,
+                'ground_truths': ground_truths,
+                'max_retries': self.max_retries,
+                'group_name': group.name,
+                'group_id': group.id
+            }
+
+        except Exception as e:
+            yield {'error': str(e), 'question': question_text}
+
+    async def cleanup(self):
+        if self.mcp_client:
+            try:
+                # Attempt to close/disconnect MCP client to avoid TaskGroup errors
+                if hasattr(self.mcp_client, 'disconnect'):
+                    await self.mcp_client.disconnect()
+                elif hasattr(self.mcp_client, 'close'):
+                    await self.mcp_client.close()
+            except Exception as e:
+                print_debug(f"Error cleaning up MCP client: {e}")
+            finally:
+                self.mcp_client = None
+
+    async def run(self):
+        def create_run_obj():
+            name = f"{str(self)}- {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}" 
+            snapshot = self.get_settings_snapshot()
+            return MultiTurnRun.objects.create(name=name, settings_snapshot=snapshot)
+
+        group = await sync_to_async(create_run_obj)()
         
-        prev_trials = session.trials.filter(trial_number__lt=trial.trial_number).order_by('trial_number')
+        total_questions = 0
+        questions_iterator = None
+        
+        try:
+            total_questions = await sync_to_async(self.get_total_questions)()
+            questions_iterator = await sync_to_async(self.load_questions)()
+        except Exception as e:
+            yield {'error': str(e)}
+            await sync_to_async(self.stop_token)()
+            return
+
+        yield {'is_meta': True, 'type': 'total_count', 'count': total_questions}
+        
+        try:
+            all_questions = await sync_to_async(list)(questions_iterator)
+
+            for data in all_questions:
+                if not await sync_to_async(self.check_active)():
+                    break
+
+                question_text = data['question']
+                ground_truths = data.get('ground_truths', [])
+                
+                async for event in self._process_single_session_async(group, question_text, ground_truths):
+                    yield event
+        finally:
+            await self.cleanup()
+            await sync_to_async(self.stop_token)()
+
+    async def run_single_turn_async(self, session, trial, auto_cleanup=False):
+        # Lazy init for MCP client (handle loop changes or delayed init)
+        if not self.mcp_client:
+             self.mcp_client = await BrowserAgentFactory.connect_mcp(self.agent_toolkit)
+
+        # The agent_model, toolkit and mcp_client are already initialized in __init__
+        
+        # Async DB access for history
+        def get_history():
+            prev_trials = session.trials.filter(trial_number__lt=trial.trial_number).order_by('trial_number')
+            return list(prev_trials)
+            
+        trials_list = await sync_to_async(get_history)()
         
         history_msgs = []
         if trial.trial_number > 1:
             # Reconstruct history for the browser agent for retries
             history_msgs.append(Msg(name="User", role="user", content=f"Task: {session.question}"))
-            trials_list = list(prev_trials)
             for i, pt in enumerate(trials_list):
                 if pt.answer:
-                    history_msgs.append(Msg(name="Assistant", role="assistant", content=pt.full_response)) # Full response contains the agent's thought process and actions
+                    history_msgs.append(Msg(name="Assistant", role="assistant", content=pt.full_response))
                 if i < len(trials_list) - 1:
                     history_msgs.append(Msg(name="User", role="user", content=f"Incorrect. Feedback: {pt.feedback}"))
             
@@ -1302,7 +1479,7 @@ class BrowserAgentPipeline(BaseMultiTurnPipeline):
                 print_debug(f"Redis update failed in BrowserAgentPipeline: {e}")
 
         async def run_agent_task():
-            agent = await BrowserAgentFactory.create_agent(agent_model, update_callback=on_memory_update)
+            agent = await BrowserAgentFactory.create_agent(self.agent_model, self.agent_toolkit, self.mcp_client, update_callback=on_memory_update)
             try:
                 import inspect
                 if history_msgs:
@@ -1315,18 +1492,19 @@ class BrowserAgentPipeline(BaseMultiTurnPipeline):
                     response = final_res
                 trace = await agent.memory.get_memory()
                 return response, trace
-            finally:
-                if hasattr(agent, 'mcp_client'):
-                    try:
-                        await agent.mcp_client.close()
-                    except Exception as e:
-                        print_debug(f"Error closing MCP client: {e}")
+            except Exception as e:
+                print_debug(f"Error in run_agent_task: {e}")
+                raise e
 
         try:
-            response_msg, trace_msgs = asyncio.run(run_agent_task())
+            # Direct await instead of asyncio.run
+            response_msg, trace_msgs = await run_agent_task()
         except Exception as e:
             print_debug(f"Browser agent execution failed: {e}")
             raise e
+        finally:
+            if auto_cleanup:
+                await self.cleanup()
         
         raw_content = response_msg.content
         if isinstance(raw_content, list):
@@ -1344,7 +1522,7 @@ class BrowserAgentPipeline(BaseMultiTurnPipeline):
             answer = str(raw_content) if raw_content is not None else ""
         
         relevant_trace_msgs = trace_msgs[initial_history_len:] if len(trace_msgs) > initial_history_len else []
-        trace_data, real_answer_found = self._serialize_trace(relevant_trace_msgs) # Corrected to relevant_msgs
+        trace_data, real_answer_found = self._serialize_trace(relevant_trace_msgs)
         
         if real_answer_found:
             answer = real_answer_found
@@ -1358,13 +1536,21 @@ class BrowserAgentPipeline(BaseMultiTurnPipeline):
                  "content": answer
              }])
 
-        is_correct = check_answer_llm(session.question, session.ground_truths, answer, client=self.client, model=self.model)
+        # Async DB access for saving result
+        def save_result():
+            is_correct = check_answer_llm(session.question, session.ground_truths, answer, client=self.client, model=self.model)
+            trial.answer = answer
+            trial.full_response = full_response
+            trial.is_correct = is_correct
+            trial.feedback = "Correct" if is_correct else "Incorrect"
+            trial.status = 'completed'
+            trial.save()
+            return answer, is_correct
 
-        trial.answer = answer
-        trial.full_response = full_response
-        trial.is_correct = is_correct
-        trial.feedback = "Correct" if is_correct else "Incorrect"
-        trial.status = 'completed'
-        trial.save()
+        answer, is_correct = await sync_to_async(save_result)()
 
-        return answer, is_correct, [] # No search results explicitly
+        return answer, is_correct, []
+
+    def run_single_turn(self, session, trial):
+        # Auto-cleanup when running via sync wrapper (one-off execution)
+        return asyncio.run(self.run_single_turn_async(session, trial, auto_cleanup=True))

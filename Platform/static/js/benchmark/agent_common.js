@@ -62,7 +62,7 @@ window.AgentBenchmark = (function() {
                     }
                 })
                 .catch(err => console.error("Polling error:", err));
-        }, 1000); // Poll every 1s
+        }, 2000); // Poll every 2s
         
         activePolls[trialId] = intervalId;
     }
@@ -293,6 +293,26 @@ window.AgentBenchmark = (function() {
 
     function formatContent(content, type) {
         let data = null;
+
+        // Helper for collapsible content
+        const createCollapsible = (text, limit = 150, classes = "") => {
+             if (!text) return '';
+             if (text.length <= limit) return `<div class="${classes}" style="white-space: pre-wrap;">${text}</div>`;
+             
+             const id = `collapse-${Math.random().toString(36).substr(2, 9)}`;
+             const preview = text.substring(0, limit).replace(/\n/g, ' ') + '...';
+             return `
+                <div class="${classes}">
+                    <button class="btn btn-sm btn-light border text-secondary w-100 text-start d-flex align-items-center justify-content-between font-monospace" style="font-size: 0.85rem;" type="button" data-bs-toggle="collapse" data-bs-target="#${id}" aria-expanded="false">
+                        <span class="text-truncate" style="max-width: 90%;">${preview}</span>
+                        <i class="bi bi-chevron-expand small"></i>
+                    </button>
+                    <div class="collapse mt-1" id="${id}">
+                        <div class="p-2 bg-light border rounded text-break font-monospace small" style="white-space: pre-wrap;">${text}</div>
+                    </div>
+                </div>
+             `;
+        };
         
         // Helper to try parsing JSON
         const tryParse = (str) => {
@@ -326,6 +346,12 @@ window.AgentBenchmark = (function() {
 
         } else if (typeof content === 'object' && content !== null) {
             data = content;
+        }
+
+        // If data is an array of {"type": "text", "text": "..."} objects, extract the text.
+        if (Array.isArray(data) && data.every(item => item && item.type === 'text' && typeof item.text === 'string')) {
+            content = data.map(item => item.text).join('\n');
+            data = null; // Reset data to ensure it's treated as plain text below
         }
 
         // 1. Observation
@@ -365,7 +391,7 @@ window.AgentBenchmark = (function() {
                             const uniqueGroupId = `search-results-${Math.random().toString(36).substr(2, 9)}`;
                             
                             html += '<div class="card border-0 bg-white shadow-sm">';
-                            html += `<div class="card-header bg-success bg-opacity-10 border-0 py-2"><span class="badge bg-success text-dark me-2">Search Result</span><span class="fw-bold font-monospace text-dark">${output.length} results from ${toolName}</span></div>`;
+                            html += `<div class="card-header bg-success bg-opacity-10 border-0 py-2"><span class="badge bg-success text-light me-2">Search Result</span><span class="fw-bold font-monospace text-dark">${output.length} results from ${toolName}</span></div>`;
                             html += '<div class="list-group list-group-flush rounded w-100" style="overflow: hidden; max-width: 100%; word-break: break-word;">';
                             
                             const renderItem = (res) => {
@@ -427,7 +453,7 @@ window.AgentBenchmark = (function() {
                         } else {
                             html += `
                                 <div class="card border-0 bg-white shadow-sm">
-                                    <div class="card-header bg-success bg-opacity-10 border-0 py-2"><span class="badge bg-success text-dark me-2">Result</span><span class="fw-bold font-monospace text-dark">${toolName}</span></div>
+                                    <div class="card-header bg-success bg-opacity-10 border-0 py-2"><span class="badge bg-success text-light me-2">Result</span><span class="fw-bold font-monospace text-dark">${toolName}</span></div>
                                     <div class="card-body py-2 bg-light font-monospace small text-muted">
                                         ${typeof output === 'string' ? output : JSON.stringify(output, null, 2)}
                                     </div>
@@ -437,18 +463,19 @@ window.AgentBenchmark = (function() {
                     } else if (toolName === 'answer_question') {
                         html += `
                             <div class="card border-0 bg-white shadow-sm">
-                                <div class="card-header bg-success bg-opacity-10 border-0 py-2"><span class="badge bg-success text-dark me-2">Answer Tool</span><span class="fw-bold font-monospace text-dark">Answer submitted</span></div>
+                                <div class="card-header bg-success bg-opacity-10 border-0 py-2"><span class="badge bg-success text-light me-2">Answer Tool</span><span class="fw-bold font-monospace text-dark">Answer submitted</span></div>
                                 <div class="card-body py-2 bg-light font-monospace small text-muted">
                                     <i class="bi bi-check-circle me-1 text-success"></i> Successfully submitted final answer.
                                 </div>
                             </div>
                         `;
                     } else {
+                        const outputStr = typeof output === 'string' ? output : JSON.stringify(output, null, 2);
                         html += `
                             <div class="card border-0 bg-white shadow-sm">
-                                <div class="card-header bg-success bg-opacity-10 border-0 py-2"><span class="badge bg-success text-dark me-2">Result</span><span class="fw-bold font-monospace text-dark">${toolName}</span></div>
+                                <div class="card-header bg-success bg-opacity-10 border-0 py-2"><span class="badge bg-success text-light me-2">Result</span><span class="fw-bold font-monospace text-dark">${toolName}</span></div>
                                 <div class="card-body py-2 bg-light font-monospace small text-muted">
-                                    ${typeof output === 'string' ? output : JSON.stringify(output, null, 2)}
+                                    ${createCollapsible(outputStr, 200)}
                                 </div>
                             </div>
                         `;
@@ -481,117 +508,40 @@ window.AgentBenchmark = (function() {
              if (actions.length > 0) {
                  let html = '<div class="d-flex flex-column gap-3">';
                  
-                 // Helper for collapsible content
-                 const createCollapsible = (text, limit = 150) => {
-                     if (!text) return '';
-                     if (text.length <= limit) return `<div class="font-monospace text-dark bg-white px-2 py-1 rounded border w-100" style="font-size: 0.85rem; white-space: pre-wrap;">${text}</div>`;
-                     
-                     const id = `collapse-${Math.random().toString(36).substr(2, 9)}`;
-                     const preview = text.substring(0, limit).replace(/\n/g, ' ') + '...';
-                     return `
-                        <div class="w-100">
-                            <button class="btn btn-sm btn-light border text-secondary w-100 text-start d-flex align-items-center justify-content-between font-monospace" style="font-size: 0.85rem;" type="button" data-bs-toggle="collapse" data-bs-target="#${id}" aria-expanded="false">
-                                <span class="text-truncate" style="max-width: 90%;">${preview}</span>
-                                <i class="bi bi-chevron-expand small"></i>
-                            </button>
-                            <div class="collapse mt-1" id="${id}">
-                                <div class="card card-body bg-white border p-2 font-monospace small text-break" style="white-space: pre-wrap;">${text}</div>
-                            </div>
-                        </div>
-                     `;
-                 };
-
                  // Tool Rendering Strategy Map
                  const toolRenderers = {
                      'answer_question': (input) => {
                          const answerText = input.answer || 'No answer provided.';
-                         const content = (answerText.length > 300)
-                            ? (() => {
-                                const id = `ans-${Math.random().toString(36).substr(2, 9)}`;
-                                return `
-                                <div>
-                                    <p class="mb-0 lead text-dark text-truncate">${answerText.substring(0, 150)}...</p>
-                                    <button class="btn btn-sm btn-link p-0 mt-1 text-decoration-none" type="button" data-bs-toggle="collapse" data-bs-target="#${id}" aria-expanded="false"><i class="bi bi-caret-down-fill"></i> Show Full Answer</button>
-                                     <div class="collapse mt-2" id="${id}">
-                                        <div class="p-3 bg-light rounded text-break border shadow-sm" style="white-space: pre-wrap;">${answerText}</div>
-                                     </div>
-                                </div>`;
-                            })()
-                            : `<p class="mb-0 lead text-dark" style="font-size: 1rem;">${answerText}</p>`;
-                         
+                         // Simple card for answer_question
                          return {
-                             title: 'Answer Question',
-                             icon: 'bi-chat-right-text',
-                             content: `<div class="p-3 bg-white rounded border border-success-subtle"><strong class="text-success d-block mb-1">Proposed Answer:</strong>${content}</div>`
-                         };
-                     },
-                     'web_search_tool': (input) => {
-                         const query = input.query || 'No query provided.';
-                         return {
-                             title: 'Web Search',
-                             icon: 'bi-search',
-                             content: `
-                                <div class="input-group">
-                                    <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-primary"></i></span>
-                                    <input type="text" class="form-control bg-white border-start-0 text-primary fw-bold" value="${query}" readonly>
-                                </div>`
-                         };
-                     },
-                     'navigate_to_url': (input) => {
-                         return {
-                             title: 'Navigate to URL',
-                             icon: 'bi-browser-chrome',
-                             content: `<div class="d-flex align-items-center p-2 bg-white rounded border"><i class="bi bi-globe me-2 text-info"></i> <a href="${input.url}" target="_blank" class="text-break text-decoration-none fw-medium">${input.url}</a></div>`
-                         };
-                     },
-                     'click_element': (input) => {
-                         return {
-                             title: 'Click Element',
-                             icon: 'bi-mouse',
-                             content: `<div class="d-flex align-items-center"><span class="badge bg-secondary me-2">Selector</span><code class="text-primary bg-white px-2 py-1 rounded border">${input.selector}</code></div>`
-                         };
-                     },
-                     'type_text': (input) => {
-                         return {
-                             title: 'Type Text',
-                             icon: 'bi-keyboard',
-                             content: `
-                                <div class="mb-2"><span class="badge bg-secondary me-2">Selector</span><code class="text-primary bg-white px-2 py-1 rounded border">${input.selector}</code></div>
-                                <div class="p-2 bg-white rounded border border-light-subtle text-success"><i class="bi bi-pencil-square me-2 text-muted"></i>"${input.text}"</div>
+                             html: `
+                                <div class="card border-0 shadow-sm tool-call-card mb-2">
+                                    <div class="card-header bg-warning bg-opacity-25 border-bottom fw-bold text-dark">
+                                        answer_question
+                                    </div>
+                                    <div class="card-body">
+                                        <div style="white-space: pre-wrap;">${answerText}</div>
+                                    </div>
+                                </div>
                              `
                          };
                      },
-                     'scroll_page': (input) => {
-                        const direction = input.direction || 'down';
-                        const icon = direction === 'down' ? 'bi-arrow-down-circle' : 'bi-arrow-up-circle';
-                         return {
-                             title: 'Scroll Page',
-                             icon: 'bi-arrows-vertical',
-                             content: `<div class="d-flex align-items-center"><i class="bi ${icon} me-2 fs-5 text-secondary"></i> Scroll <strong>${direction}</strong> by <span class="badge bg-light text-dark border ms-2">${input.amount || 500}px</span></div>`
-                         };
-                     },
-                     'get_dom_snapshot': (input) => {
-                         return {
-                             title: 'Capture DOM Snapshot',
-                             icon: 'bi-camera',
-                             content: '<div class="text-muted small"><i class="bi bi-info-circle me-1"></i>Capturing the current page accessibility tree structure.</div>'
-                         };
-                     },
                      'default': (name, input) => {
-                         const argsContent = Object.entries(input)
-                            .map(([key, value]) => {
-                                const valStr = typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value);
-                                return `
-                                <div class="d-flex flex-column flex-sm-row mb-1">
-                                    <span class="fw-bold text-secondary me-2 mb-1 mb-sm-0" style="min-width: 100px;">${key}:</span> 
-                                    <div class="w-100">${createCollapsible(valStr, 100)}</div>
-                                </div>`;
-                            })
-                            .join('');
+                         // Default generic renderer for all other tools
+                         const inputStr = JSON.stringify(input, null, 2);
+                         const collapsibleContent = createCollapsible(inputStr, 300, "font-monospace small text-muted");
+                         
                          return {
-                             title: name,
-                             icon: 'bi-tools',
-                             content: `<div class="p-2 rounded" style="background-color: rgba(0,0,0,0.02);">${argsContent || '<em class="text-muted">No parameters</em>'}</div>`
+                             html: `
+                                <div class="card border-0 shadow-sm tool-call-card mb-2">
+                                    <div class="card-header bg-warning bg-opacity-25 border-bottom fw-bold text-dark font-monospace">
+                                        ${name}
+                                    </div>
+                                    <div class="card-body">
+                                        ${collapsibleContent}
+                                    </div>
+                                </div>
+                             `
                          };
                      }
                  };
@@ -600,26 +550,12 @@ window.AgentBenchmark = (function() {
                      const toolName = action.name;
                      const toolInput = action.input || {};
                      
-                     // Select renderer or fallback to default
-                     const renderer = toolRenderers[toolName] || ((input) => toolRenderers['default'](toolName, input));
-                     const renderResult = renderer(toolInput);
-
-                     html += `
-                        <div class="card border-0 shadow-sm tool-call-card" style="border-left: 4px solid #ffc107 !important;">
-                            <div class="card-body py-3">
-                                <div class="d-flex align-items-center mb-2">
-                                    <div class="bg-warning bg-opacity-25 text-dark rounded-circle p-2 me-2 d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
-                                        <i class="bi ${renderResult.icon || 'bi-gear'}"></i>
-                                    </div>
-                                    <h6 class="mb-0 fw-bold text-dark">${renderResult.title}</h6>
-                                    <span class="badge bg-light text-secondary border ms-auto font-monospace small">${toolName}</span>
-                                </div>
-                                <div class="ps-5 pt-1">
-                                    ${renderResult.content}
-                                </div>
-                            </div>
-                        </div>
-                     `;
+                     // Select renderer
+                     if (toolName === 'answer_question') {
+                         html += toolRenderers['answer_question'](toolInput).html;
+                     } else {
+                         html += toolRenderers['default'](toolName, toolInput).html;
+                     }
                  });
                  html += '</div>';
                  return html;
@@ -633,9 +569,15 @@ window.AgentBenchmark = (function() {
                                  .replace(/(Observation:)/g, '<span class="fw-bold text-success">$1</span>');
         
         if (type === 'action' || type === 'observation' || type === 'thought') {
-            return `<div class="bg-dark bg-opacity-10 p-2 rounded" style="font-family: monospace; white-space: pre-wrap; font-size: 0.85rem; overflow-x: auto;">${safeContent}</div>`;
+            const bgColorClass = type === 'thought' ? 'bg-light' : 'bg-dark bg-opacity-10'; // Use bg-light for thought
+            return `<div class="${bgColorClass} p-2 rounded" style="font-family: monospace; white-space: pre-wrap; font-size: 0.85rem; overflow-x: auto;">${safeContent}</div>`;
         }
         
+        // Use collapsible for generic large content
+        if (safeContent.length > 300) {
+             return createCollapsible(safeContent, 300);
+        }
+
         return `<div style="white-space: pre-wrap;">${safeContent}</div>`;
     }
 

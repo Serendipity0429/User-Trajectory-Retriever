@@ -2762,7 +2762,7 @@ const BenchmarkUtils = {
                      if (data.error) alert(`Error in trial #${trialId}: ${data.error}`);
                      if (sessionId) loadSession(sessionId);
                  }).catch(() => {
-                     alert('Network error in trial.');
+                     console.error('Network error in trial.');
                      if (sessionId) loadSession(sessionId);
                  });
             }

@@ -88,6 +88,7 @@ class VanillaAgentFactory:
             toolkit=toolkit,
             memory=memory,
             formatter=OpenAIChatFormatter(),
+            max_iters=30,
         )
 
     @staticmethod
@@ -110,44 +111,12 @@ class VanillaAgentFactory:
         return model
 class BrowserAgentFactory:
     @staticmethod
-    async def create_agent(model, verbose: bool = False, update_callback=None):
-        toolkit = Toolkit()
-        
-        # 1. Fetch available tools from MCP
-        try:
-            # Construct path to the local MCP server script
-            current_dir = os.path.dirname(os.path.abspath(__file__))
-            mcp_root = os.path.join(current_dir, 'mcp', 'chrome-devtools-mcp')
-            # build/src/index.js is the compiled entry point
-            mcp_script = os.path.join(mcp_root, 'build', 'src', 'index.js')
-            
-            if not os.path.exists(mcp_script):
-                 print_debug(f"MCP server script not found at {mcp_script}. Ensure it is built.")
-            else:
-                # Initialize StdIO Client
-                client = StdIOStatefulClient(
-                    name="chrome_devtools",
-                    command="node",
-                    args=[mcp_script],
-                    cwd=mcp_root # Set CWD to the repo root
-                )
-                
-                await client.connect()
-                await toolkit.register_mcp_client(client)
-                print_debug(f"Registered MCP tools from {client.name}")
-                
-        except Exception as e:
-            print_debug(f"Failed to fetch/register MCP tools: {e}")
-        
-        # 2. Register mandatory local tools
-        toolkit.register_tool_function(answer_question)
-
+    async def create_agent(model, toolkit: Toolkit, mcp_client: StdIOStatefulClient, verbose: bool = False, update_callback=None):
         # DEBUG: Print all registered tools
         print_debug(f"BrowserAgent Toolkit Tools: {list(toolkit.tools.keys())}")
         
         memory = InMemoryMemory()
         if update_callback:
-            from .agent_utils import StreamingMemory
             memory = StreamingMemory(update_callback=update_callback)
 
         agent = ReActAgent(
@@ -157,16 +126,17 @@ class BrowserAgentFactory:
             toolkit=toolkit,
             memory=memory,
             formatter=OpenAIChatFormatter(),
+            max_iters=30,
         )
         
         # Attach client to agent for cleanup
-        if 'client' in locals():
-            agent.mcp_client = client
+        if mcp_client:
+            agent.mcp_client = mcp_client
             
         return agent
 
     @staticmethod
-    def init_agentscope(llm_settings: LLMSettings):
+    async def init_agentscope(llm_settings: LLMSettings, skip_mcp: bool = False):
         """
         Initialize AgentScope with the project's LLM settings.
         """
@@ -179,4 +149,41 @@ class BrowserAgentFactory:
             },
             stream=True 
         )
-        return model
+        
+        toolkit = Toolkit()
+        toolkit.register_tool_function(answer_question)
+
+        mcp_client = None
+        if not skip_mcp:
+             mcp_client = await BrowserAgentFactory.connect_mcp(toolkit)
+        
+        return model, toolkit, mcp_client
+
+    @staticmethod
+    async def connect_mcp(toolkit: Toolkit):
+        mcp_client = None
+        try:
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            mcp_root = os.path.join(current_dir, 'mcp', 'chrome-devtools-mcp')
+            mcp_script = os.path.join(mcp_root, 'build', 'src', 'index.js')
+            mcp_args = [
+                mcp_script,
+                "--isolated",
+            ]
+            
+            if not os.path.exists(mcp_script):
+                 print_debug(f"MCP server script not found at {mcp_script}. Ensure it is built.")
+            else:
+                mcp_client = StdIOStatefulClient(
+                    name="chrome_devtools",
+                    command="node",
+                    args=mcp_args,
+                    cwd=mcp_root
+                )
+                await mcp_client.connect()
+                await toolkit.register_mcp_client(mcp_client)
+                print_debug(f"Registered MCP tools from {mcp_client.name}")
+                
+        except Exception as e:
+            print_debug(f"Failed to fetch/register MCP tools: {e}")
+        return mcp_client   

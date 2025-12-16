@@ -1,5 +1,6 @@
 from django.db import models
 from django.views.decorators.http import require_POST, require_http_methods
+from asgiref.sync import async_to_sync
 import re
 import csv
 from django.shortcuts import render, get_object_or_404
@@ -42,7 +43,9 @@ from .pipeline_utils import (
     VanillaAgentPipeline,
     BrowserAgentPipeline, # Ensure this is imported
     serialize_events,
+    serialize_events_async,
 )
+from .pipeline_manager import PipelineManager
 
 
 def get_llm_settings_with_fallback():
@@ -1071,35 +1074,43 @@ def run_trial(request, trial_id):
             if not model:
                 model = db_settings.llm_model or config("LLM_MODEL", default="gpt-4o")
 
-        if session.pipeline_type == 'rag':
-            pipeline = RagMultiTurnPipeline(
-                base_url=base_url,
-                api_key=api_key,
-                model=model,
-                max_retries=1,
-                reformulation_strategy=session.reformulation_strategy,
+        if session.pipeline_type == 'browser_agent':
+            factory_kwargs = {
+                "base_url": base_url,
+                "api_key": api_key,
+                "model": model,
+                "max_retries": 1,
+                "pipeline_id": session.run_tag,
+            }
+            answer, is_correct, search_results, error_msg = PipelineManager.get_instance().run_trial(
+                session.id, trial.id, factory_kwargs
             )
+            if error_msg:
+                raise Exception(error_msg)
 
-        elif session.pipeline_type == 'vanilla_agent':
-            pipeline = VanillaAgentPipeline(
-                base_url=base_url,
-                api_key=api_key,
-                model=model,
-                max_retries=1,
-            )
-        elif session.pipeline_type == 'browser_agent':
-            pipeline = BrowserAgentPipeline(
-                base_url=base_url,
-                api_key=api_key,
-                model=model,
-                max_retries=1,
-            )
         else:
-            pipeline = VanillaLLMMultiTurnPipeline(
-                base_url=base_url, api_key=api_key, model=model, max_retries=1
-            )
+            if session.pipeline_type == 'rag':
+                pipeline = RagMultiTurnPipeline(
+                    base_url=base_url,
+                    api_key=api_key,
+                    model=model,
+                    max_retries=1,
+                    reformulation_strategy=session.reformulation_strategy,
+                )
 
-        answer, is_correct, search_results = pipeline.run_single_turn(session, trial)
+            elif session.pipeline_type == 'vanilla_agent':
+                pipeline = VanillaAgentPipeline(
+                    base_url=base_url,
+                    api_key=api_key,
+                    model=model,
+                    max_retries=1,
+                )
+            else:
+                pipeline = VanillaLLMMultiTurnPipeline(
+                    base_url=base_url, api_key=api_key, model=model, max_retries=1
+                )
+
+            answer, is_correct, search_results = pipeline.run_single_turn(session, trial)
 
         if is_correct:
             session.is_completed = True
@@ -1130,6 +1141,9 @@ def delete_session(request, session_id):
             session.delete()
         except MultiTurnSession.DoesNotExist:
              pass  # Session already deleted
+
+        # Ensure any persistent browser session is closed
+        PipelineManager.get_instance().close_session(session_id)
 
         return JsonResponse({"status": "ok"})
     except Exception as e:
@@ -1687,7 +1701,7 @@ def browser_agent(request):
 
 @admin_required
 @require_POST
-def run_browser_agent_pipeline(request):
+async def run_browser_agent_pipeline(request):
     try:
         db_settings = get_llm_settings_with_fallback()
         base_url = request.POST.get("llm_base_url") or db_settings.llm_base_url
@@ -1710,7 +1724,7 @@ def run_browser_agent_pipeline(request):
                 ex=3600,
             )
 
-        pipeline = BrowserAgentPipeline(
+        pipeline = await BrowserAgentPipeline.create(
             base_url=base_url,
             api_key=api_key,
             model=model,
@@ -1719,7 +1733,7 @@ def run_browser_agent_pipeline(request):
             dataset_id=dataset_id,
         )
 
-        return StreamingHttpResponse(serialize_events(pipeline.run()), content_type="application/json")
+        return StreamingHttpResponse(serialize_events_async(pipeline.run()), content_type="application/json")
 
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)

@@ -66,22 +66,57 @@ def get_search_settings_with_fallback():
     return settings
 
 
-@require_http_methods(["GET"])
 def get_trial_trace(request, trial_id):
     """
-    Retrieve the real-time execution trace for a specific trial from Redis.
+    Retrieve the real-time execution trace.
+    Optimized: Checks Redis for completion status first to avoid DB I/O loop.
     """
-    key = f"trial_trace:{trial_id}"
+    trace_key = f"trial_trace:{trial_id}"
+    status_key = f"trial_status:{trial_id}"
+    
     try:
-        trace_json = redis_client.get(key)
-        if trace_json:
-            # trace_json is already a JSON string
-            return JsonResponse({"trace": json.loads(trace_json)})
+        cursor = int(request.GET.get('cursor', 0))
+        
+        # 1. Try Fetching Cached Status from Redis (Fastest)
+        cached_status = redis_client.get(status_key)
+        
+        if cached_status:
+            trial_data = json.loads(cached_status)
         else:
-            return JsonResponse({"trace": []})
+            # 2. Fallback: Fetch Status/Results from DB (Slower, but necessary if not in Redis)
+            try:
+                trial = MultiTurnTrial.objects.get(pk=trial_id)
+                trial_data = {
+                    "id": trial.id,
+                    "status": trial.status,
+                    "answer": trial.answer,
+                    "feedback": trial.feedback,
+                    "is_correct": trial.is_correct,
+                    "full_response": trial.full_response if trial.status != 'processing' else None
+                }
+            except MultiTurnTrial.DoesNotExist:
+                trial_data = {"status": "error", "error": "Trial not found"}
+
+        # 3. Fetch Trace from Redis
+        trace_json = redis_client.get(trace_key)
+        
+        response_data = {"trial": trial_data, "trace": [], "total_steps": 0}
+
+        if trace_json:
+            full_trace = json.loads(trace_json)
+            response_data["total_steps"] = len(full_trace)
+            
+            if cursor > 0:
+                if cursor < len(full_trace):
+                    response_data["trace"] = full_trace[cursor:]
+            else:
+                response_data["trace"] = full_trace
+        
+        return JsonResponse(response_data)
+
     except Exception as e:
         print_debug(f"Error retrieving trace: {e}")
-        return JsonResponse({"trace": []})
+        return JsonResponse({"trace": [], "total_steps": 0, "error": str(e)})
 
 @admin_required
 def home(request):
@@ -1088,27 +1123,28 @@ def run_trial(request, trial_id):
             if error_msg:
                 raise Exception(error_msg)
 
-        else:
-            if session.pipeline_type == 'rag':
-                pipeline = RagMultiTurnPipeline(
-                    base_url=base_url,
-                    api_key=api_key,
-                    model=model,
-                    max_retries=1,
-                    reformulation_strategy=session.reformulation_strategy,
-                )
+        elif session.pipeline_type == 'rag':
+            pipeline = RagMultiTurnPipeline(
+                base_url=base_url,
+                api_key=api_key,
+                model=model,
+                max_retries=1,
+                reformulation_strategy=session.reformulation_strategy,
+            )
+            answer, is_correct, search_results = pipeline.run_single_turn(session, trial)
 
-            elif session.pipeline_type == 'vanilla_agent':
-                pipeline = VanillaAgentPipeline(
-                    base_url=base_url,
-                    api_key=api_key,
-                    model=model,
-                    max_retries=1,
-                )
-            else:
-                pipeline = VanillaLLMMultiTurnPipeline(
-                    base_url=base_url, api_key=api_key, model=model, max_retries=1
-                )
+        elif session.pipeline_type == 'vanilla_agent':
+            pipeline = VanillaAgentPipeline(
+                base_url=base_url,
+                api_key=api_key,
+                model=model,
+                max_retries=1,
+            )
+            answer, is_correct, search_results = pipeline.run_single_turn(session, trial)
+        else:
+            pipeline = VanillaLLMMultiTurnPipeline(
+                base_url=base_url, api_key=api_key, model=model, max_retries=1
+            )
 
             answer, is_correct, search_results = pipeline.run_single_turn(session, trial)
 
@@ -1129,7 +1165,44 @@ def run_trial(request, trial_id):
 
     except Exception as e:
         traceback.print_exc()
+        try:
+            # Attempt to mark trial as error if possible
+            if 'trial' in locals() and trial.status == 'processing':
+                trial.status = 'error'
+                trial.save()
+        except:
+            pass # Ignore errors during error handling
         return JsonResponse({"error": str(e), "trial_id": trial_id}, status=500)
+
+
+@admin_required
+@require_POST
+def stop_session(request):
+    try:
+        data = json.loads(request.body)
+        session_id = data.get("session_id")
+        if not session_id:
+             return JsonResponse({"status": "error", "message": "Session ID required"}, status=400)
+             
+        session = get_object_or_404(MultiTurnSession, pk=session_id)
+        
+        # Find processing trials
+        processing_trials = session.trials.filter(status='processing')
+        
+        # Clear Redis cache for these trials
+        for trial in processing_trials:
+            redis_client.delete(f"trial_status:{trial.id}")
+            redis_client.delete(f"trial_trace:{trial.id}")
+        
+        # Mark processing trials as error (stopped)
+        processing_trials.update(status='error', feedback='Session stopped by user.')
+        
+        # Close pipeline resources
+        PipelineManager.get_instance().close_session(session_id)
+        
+        return JsonResponse({"status": "ok"})
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)}, status=500)
 
 
 @admin_required
@@ -1683,7 +1756,7 @@ def browser_agent(request):
     )
 
     individual_sessions = MultiTurnSession.objects.filter(
-        run__name__startswith="Ad-hoc Session",
+        models.Q(run__name__startswith="Ad-hoc Session") | models.Q(run__isnull=True),
         pipeline_type='browser_agent'
     ).order_by("-created_at")
 

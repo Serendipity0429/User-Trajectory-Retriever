@@ -25,6 +25,7 @@ urlpatterns = [
     path("api/save_run/", views.save_run, name="save_run"),
     path("api/delete_run/<str:run_tag>/", views.delete_run, name="delete_run"),
     path("api/multi_turn/delete_session/<int:session_id>/", views.delete_session, name="delete_session"),
+    path("api/multi_turn/stop_session/", views.stop_session, name="stop_session"),
     path('api/multi_turn/export_session/<int:session_id>/', views.export_session, name='export_session'),
     path('api/multi_turn/batch_delete_sessions/', views.batch_delete_sessions, name='batch_delete_sessions'),
     path('api/multi_turn/delete_session_group/<int:group_id>/', views.delete_session_group, name='delete_session_group'),

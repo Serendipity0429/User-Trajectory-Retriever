@@ -41,26 +41,31 @@ window.AgentBenchmark = (function() {
 
         // Initialize state
         if (!trialState[trialId]) {
-            trialState[trialId] = { renderedCount: 0 };
+            trialState[trialId] = { renderedCount: 0, backoffDelay: 2000 };
         }
 
-        const intervalId = setInterval(() => {
+        const poll = () => {
             const container = document.getElementById(`live-trace-${trialId}`);
             if (!container) {
-                clearInterval(intervalId);
                 delete activePolls[trialId];
                 delete trialState[trialId];
                 return;
             }
 
-            fetch(`/benchmark/api/multi_turn/get_trial_trace/${trialId}/`)
+            const currentCount = trialState[trialId].renderedCount;
+            
+            // Use cursor to fetch only new data
+            fetch(`/benchmark/api/multi_turn/get_trial_trace/${trialId}/?cursor=${currentCount}`)
                 .then(res => res.json())
                 .then(data => {
-                    const traceData = data.trace;
-                    if (traceData && Array.isArray(traceData) && traceData.length > 0) {
+                    const newSteps = data.trace || [];
+                    const trialInfo = data.trial; // Enhanced info from backend
+
+                    // 1. Render new steps
+                    if (newSteps.length > 0) {
+                        trialState[trialId].backoffDelay = 2000; // Reset backoff
+
                         let timelineContainer = container.querySelector('.timeline-container');
-                        
-                        // Initial Setup if container is in "loading" state or missing structure
                         if (!timelineContainer) {
                             container.innerHTML = `
                                 <div class="timeline-container d-flex flex-column gap-3"></div>
@@ -70,27 +75,87 @@ window.AgentBenchmark = (function() {
                                 </div>
                             `;
                             timelineContainer = container.querySelector('.timeline-container');
-                            trialState[trialId].renderedCount = 0;
                         }
 
-                        // Incremental Update
-                        const currentCount = trialState[trialId].renderedCount;
-                        if (traceData.length > currentCount) {
-                            const newSteps = traceData.slice(currentCount);
-                            let newStepsHtml = '';
-                            newSteps.forEach((step, idx) => {
-                                newStepsHtml += renderStep(step, currentCount + idx);
-                            });
-                            
-                            timelineContainer.insertAdjacentHTML('beforeend', newStepsHtml);
-                            trialState[trialId].renderedCount = traceData.length;
+                        let newStepsHtml = '';
+                        newSteps.forEach((step, idx) => {
+                            newStepsHtml += renderStep(step, currentCount + idx);
+                        });
+                        
+                        timelineContainer.insertAdjacentHTML('beforeend', newStepsHtml);
+                        trialState[trialId].renderedCount += newSteps.length;
+                    } else {
+                        trialState[trialId].backoffDelay = Math.min(trialState[trialId].backoffDelay * 1.5, 10000);
+                    }
+
+                    // 2. Check for Completion
+                    if (trialInfo && (trialInfo.status === 'completed' || trialInfo.status === 'error')) {
+                        // Stop polling
+                        clearTimeout(activePolls[trialId]);
+                        delete activePolls[trialId];
+                        delete trialState[trialId];
+
+                        // Remove spinner
+                        const spinner = container.querySelector('.loading-spinner');
+                        if (spinner) spinner.remove();
+
+                        // Update Trial UI
+                        const trialDiv = document.getElementById(`trial-${trialId}`);
+                        if (trialDiv) {
+                            // Update Status Badge
+                            const headerStatusDiv = trialDiv.querySelector('.card-header > div:last-child');
+                            if (headerStatusDiv) {
+                                let statusBadge = '';
+                                if (trialInfo.status === 'error') {
+                                    statusBadge = '<span class="badge bg-danger rounded-pill shadow-sm"><i class="bi bi-exclamation-triangle me-1"></i>Error</span>';
+                                } else if (trialInfo.is_correct === true) {
+                                    statusBadge = '<span class="badge bg-success rounded-pill shadow-sm"><i class="bi bi-check-lg me-1"></i>Correct</span>';
+                                } else if (trialInfo.is_correct === false) {
+                                    statusBadge = '<span class="badge bg-danger rounded-pill shadow-sm"><i class="bi bi-x-lg me-1"></i>Incorrect</span>';
+                                }
+                                headerStatusDiv.innerHTML = statusBadge;
+                            }
+
+                            // Update Answer
+                            const answerDiv = trialDiv.querySelector('.card-body .border-top .p-3');
+                            if (answerDiv) {
+                                answerDiv.innerHTML = trialInfo.answer || '<em class="text-muted">No answer produced.</em>';
+                            }
+
+                            // Update Feedback
+                            if (trialInfo.feedback) {
+                                const footerDiv = trialDiv.querySelector('.card-body .border-top');
+                                if (footerDiv && !footerDiv.querySelector('.alert')) {
+                                    footerDiv.insertAdjacentHTML('beforeend', renderFeedback(trialInfo));
+                                }
+                            }
+                        }
+
+
+
+                        return; // Exit poll loop
+                    }
+
+                })
+                .catch(err => {
+                    console.error("Polling error:", err);
+                    trialState[trialId].backoffDelay = 10000;
+                })
+                .finally(() => {
+                    // Schedule next poll if still active
+                    if (activePolls[trialId]) { // Check if not deleted by completion logic
+                         if (document.getElementById(`live-trace-${trialId}`)) {
+                            activePolls[trialId] = setTimeout(poll, trialState[trialId].backoffDelay);
+                        } else {
+                            delete activePolls[trialId];
+                            delete trialState[trialId];
                         }
                     }
-                })
-                .catch(err => console.error("Polling error:", err));
-        }, 2000); // Poll every 2s
-        
-        activePolls[trialId] = intervalId;
+                });
+        };
+
+        // Start the loop
+        activePolls[trialId] = setTimeout(poll, 2000);
     }
 
     function renderAgentTrace(trial, isCompleted, trialCount, maxRetries) {
@@ -396,7 +461,7 @@ window.AgentBenchmark = (function() {
                     <div class="p-2 bg-light border rounded">
                         <div class="d-flex align-items-center mb-1">
                             <i class="bi bi-window-sidebar me-2 text-primary"></i>
-                            <span class="fw-bold text-truncate" style="max-width: 300px;">${data.title || 'Untitled Page'}</span>
+                            <span class="fw-bold" style="max-width: 300px;">${data.title || 'Untitled Page'}</span>
                         </div>
                         <a href="${data.url}" target="_blank" class="small text-muted d-block text-truncate mb-2">${data.url}</a>
                         <span class="badge bg-secondary">Content Length: ${data.body_content_length || 'N/A'}</span>

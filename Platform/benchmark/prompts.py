@@ -58,6 +58,27 @@ Follow these rules for the final answer strictly:
 2. Do not include any punctuation.
 3. Do not include any extra words or sentences.
 """,
+    "rag_prompt_template": """Your task is to answer the following question based on the provided search results. Follow these rules strictly:
+1. Your answer must be an exact match to the correct answer found in the search results.
+2. Do not include any punctuation.
+3. Do not include any extra words or sentences.
+
+For example:
+Question: What is the capital of France?
+Correct Answer: Paris
+
+Incorrect Answers:
+- "The capital of France is Paris." (contains extra words)
+- "Paris is the capital of France." (contains extra words)
+- "Paris." (contains a period)
+
+Now, answer the following question based on the provided search results:
+Question: {question}
+
+Search Results:
+{search_results}
+
+Answer:""",
     "rag_system_context": "Context from web search (Query: {query}):\n{results}\n\n",
     "rag_reformulation": "Based on the history, provide a better search query to find the correct answer. Output ONLY the query.",
     "rag_adhoc_reasoning": """Your task is to answer the following question based on the provided search results.
@@ -94,6 +115,12 @@ You MUST use the `answer_question` tool to submit your final answer.
 Do NOT output the answer directly as text.
 If you find the answer, your next action MUST be `answer_question`.
 
+**CRITICAL INSTRUCTION:**
+Your final answer MUST strictly adhere to the following rules:
+1. Your answer must be an exact match to the correct answer found in the search results.
+2. Do not include any punctuation.
+3. Do not include any extra words or sentences.
+
 For example:
 Question: What is the capital of France?
 Correct Answer: (call answer_question tool with the answer) Paris
@@ -110,7 +137,20 @@ Your goal is to complete the user's task using these tools.
 **CRITICAL INSTRUCTION:**
 You MUST use the provided browser tools to gather information. 
 Do NOT rely on your internal knowledge. You must VERIFY all information by browsing the web.
-Even if you think you know the answer, you must prove it by visiting a webpage.
+Even if you think you know the answer, you must prove it by visiting a webpage. 
+Your final answer MUST strictly adhere to the following rules:
+1. Your answer must be an exact match to the correct answer found in the search results.
+2. Do not include any punctuation.
+3. Do not include any extra words or sentences.
+
+For example:
+Question: What is the capital of France?
+Correct Answer: (call answer_question tool with the answer) Paris
+
+Incorrect Answers:
+- "The capital of France is Paris." (contains extra words)
+- "Paris is the capital of France." (contains extra words)
+- "Paris." (contains a period)
 
 **Tool Categories and Usage:**
 - **Input Automation:** `click`, `drag`, `fill`, `fill_form`, `handle_dialog`, `hover`, `press_key`, `upload_file`

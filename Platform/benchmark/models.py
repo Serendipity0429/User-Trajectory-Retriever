@@ -2,7 +2,7 @@ from django.db import models
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator, MaxValueValidator
 import os
-
+from benchmark.prompts import PROMPTS
 # --- Abstract Base Classes ---
 
 class SingletonModel(models.Model):
@@ -93,27 +93,7 @@ class RagSettings(SingletonModel):
     A singleton model to store RAG-specific settings.
     """
     prompt_template = models.TextField(
-        default="""Your task is to answer the following question based on the provided search results. Follow these rules strictly:
-1. Your answer must be an exact match to the correct answer found in the search results.
-2. Do not include any punctuation.
-3. Do not include any extra words or sentences.
-
-For example:
-Question: What is the capital of France?
-Correct Answer: Paris
-
-Incorrect Answers:
-- "The capital of France is Paris." (contains extra words)
-- "Paris is the capital of France." (contains extra words)
-- "Paris." (contains a period)
-
-Now, answer the following question based on the provided search results:
-Question: {question}
-
-Search Results:
-{search_results}
-
-Answer:""",
+        default=PROMPTS["rag_prompt_template"],
         help_text="Template for the RAG prompt. Use {question} and {search_results} placeholders."
     )
 

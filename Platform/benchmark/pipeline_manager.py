@@ -65,7 +65,11 @@ class PipelineManager:
             answer, is_correct, search_results = await pipeline.run_single_turn_async(session, trial)
             return answer, is_correct, search_results, None
         except Exception as e:
-             return None, False, [], str(e)
+            def update_error():
+                trial.status = 'error'
+                trial.save()
+            await sync_to_async(update_error)()
+            return None, False, [], str(e)
 
     def close_session(self, session_id):
         """

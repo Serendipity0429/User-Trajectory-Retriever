@@ -51,6 +51,7 @@ const BenchmarkUrls = {
         runTrial: (id) => `${API_PREFIX}/multi_turn/run_trial/${id}/`,
         retrySession: (id) => `${API_PREFIX}/multi_turn/retry_session/${id}/`,
         deleteSession: (id) => `${API_PREFIX}/multi_turn/delete_session/${id}/`,
+        stopSession: `${API_PREFIX}/multi_turn/stop_session/`,
         exportSession: (id) => `${API_PREFIX}/multi_turn/export_session/${id}/`,
     },
 
@@ -910,6 +911,119 @@ const BenchmarkUtils = {
             return tr;
         },
         
+        // Helper to render ground truths list with expansion
+        renderGroundTruthsList: function(groundTruthsArray, displayLimit = 3) {
+            const ul = document.createElement('ul');
+            ul.className = 'list-unstyled mb-0';
+
+            const visibleItems = groundTruthsArray.slice(0, displayLimit);
+            const hiddenItems = groundTruthsArray.slice(displayLimit);
+
+            const createItem = (text) => {
+                const li = document.createElement('li');
+                li.className = 'text-secondary small ground-truth-item';
+                li.appendChild(this.createIcon('bi bi-dot me-1 text-muted'));
+                li.appendChild(document.createTextNode(text));
+                return li;
+            };
+
+            visibleItems.forEach(gt => ul.appendChild(createItem(gt)));
+
+            if (hiddenItems.length > 0) {
+                const hiddenContainer = document.createElement('div');
+                hiddenContainer.style.display = 'none';
+                hiddenItems.forEach(gt => hiddenContainer.appendChild(createItem(gt)));
+                ul.appendChild(hiddenContainer);
+
+                const liBtn = document.createElement('li');
+                liBtn.className = 'show-more-item';
+                
+                const showMoreBtn = document.createElement('button');
+                showMoreBtn.className = 'btn btn-link btn-sm p-0 text-decoration-none small toggle-answers-link';
+                showMoreBtn.textContent = `... Show ${hiddenItems.length} more`;
+                showMoreBtn.type = 'button';
+                
+                const showLessBtn = document.createElement('button');
+                showLessBtn.className = 'btn btn-link btn-sm p-0 text-decoration-none small toggle-answers-link';
+                showLessBtn.textContent = 'Show less';
+                showLessBtn.type = 'button';
+                showLessBtn.style.display = 'none';
+
+                showMoreBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    hiddenContainer.style.display = 'block';
+                    showMoreBtn.style.display = 'none';
+                    showLessBtn.style.display = 'inline-block';
+                };
+
+                showLessBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    hiddenContainer.style.display = 'none';
+                    showMoreBtn.style.display = 'inline-block';
+                    showLessBtn.style.display = 'none';
+                };
+
+                liBtn.appendChild(showMoreBtn);
+                liBtn.appendChild(showLessBtn);
+                ul.appendChild(liBtn);
+            }
+            return ul;
+        },
+
+        // Helper to render ground truths as badges with expansion
+        renderGroundTruthsBadges: function(groundTruthsArray, displayLimit = 3) {
+            const container = document.createElement('div');
+            
+            const createBadge = (text) => {
+                const el = document.createElement('span');
+                el.className = 'badge bg-secondary me-1';
+                el.textContent = text;
+                return el;
+            };
+
+            const visibleItems = groundTruthsArray.slice(0, displayLimit);
+            const hiddenItems = groundTruthsArray.slice(displayLimit);
+
+            visibleItems.forEach(gt => container.appendChild(createBadge(gt)));
+
+            if (hiddenItems.length > 0) {
+                const hiddenContainer = document.createElement('div');
+                hiddenContainer.style.display = 'none';
+                hiddenContainer.className = 'mt-1';
+                hiddenItems.forEach(gt => hiddenContainer.appendChild(createBadge(gt)));
+                container.appendChild(hiddenContainer);
+
+                const showMoreBtn = document.createElement('button');
+                showMoreBtn.className = 'btn btn-link btn-sm p-0';
+                showMoreBtn.textContent = `Show ${hiddenItems.length} more`;
+                showMoreBtn.type = 'button';
+                
+                const showLessBtn = document.createElement('button');
+                showLessBtn.className = 'btn btn-link btn-sm p-0 ms-2';
+                showLessBtn.textContent = 'Show less';
+                showLessBtn.type = 'button';
+                showLessBtn.style.display = 'none';
+
+                showMoreBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    hiddenContainer.style.display = 'block';
+                    showMoreBtn.style.display = 'none';
+                    showLessBtn.style.display = 'inline-block';
+                };
+
+                showLessBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    hiddenContainer.style.display = 'none';
+                    showMoreBtn.style.display = 'inline-block';
+                    showLessBtn.style.display = 'none';
+                };
+
+                container.appendChild(showMoreBtn);
+                container.appendChild(showLessBtn);
+            }
+            return container;
+        },
+
         // This will be the new centralized render function
         renderResultRow: function(data, resultsBody, index, type = 'vanilla_adhoc', isRetry = false) {
             const rowId = `result-${Date.now()}-${Math.random()}`;
@@ -922,16 +1036,10 @@ const BenchmarkUtils = {
                 td.colSpan = (type === 'rag_adhoc') ? 8 : 7;
                 td.textContent = `Error: ${data.error}`;
                 tr.appendChild(td);
-                if (!isRetry) {
-                    // This 'failedItems' needs to be managed externally or passed in
-                    // For now, it will remain in adhoc files.
-                    // failedItems.push({ ...data, rowId }); 
-                }
             } else {
                 const ruleCorrect = data.hasOwnProperty('is_correct_rule') ? data.is_correct_rule : data.rule_result;
                 const llmCorrect = data.hasOwnProperty('is_correct_llm') ? data.is_correct_llm : data.llm_result;
                 
-                // Use LLM result for styling if available, otherwise fallback to rule or neutral
                 let rowClass = 'table-light';
                 let textClass = 'text-dark';
 
@@ -942,21 +1050,16 @@ const BenchmarkUtils = {
                     rowClass = 'table-danger-light';
                     textClass = 'text-danger-dark';
                 } else if (ruleCorrect === true) {
-                     // Fallback to rule if LLM is null (optional, or just leave neutral)
-                     // But user emphasized LLM judge. If LLM is null, maybe just keep neutral/warning.
-                     // Let's stick to strict LLM judge as requested, but maybe show warning if null.
                      rowClass = 'table-warning-light'; 
                 }
 
                 tr.className = rowClass;
                 const textColorClass = textClass;
 
-                // Cell 1: Index or empty
+                // Cell 1: Index
                 const td1 = document.createElement('td');
                 td1.className = 'px-4 fw-bold text-muted small';
-                if (index) { // Only add index if provided (e.g., for pipeline runs)
-                    td1.textContent = index;
-                }
+                if (index) td1.textContent = index;
                 tr.appendChild(td1);
 
                 // Cell 2: Question
@@ -966,19 +1069,15 @@ const BenchmarkUtils = {
                 td2.appendChild(divQuestion);
                 tr.appendChild(td2);
 
-                // Cell 3: Answer (with Toggle for Reasoning)
+                // Cell 3: Answer
                 const td3 = document.createElement('td');
                 td3.className = 'px-4';
-                
-                // Main parsed answer
                 const divAnswer = this.createTextElement('div', `compact-cell ${textColorClass}`, data.answer);
                 td3.appendChild(divAnswer);
 
-                // If full_response is present and different from answer, show toggle
                 if (data.full_response && data.full_response !== data.answer) {
                     const reasoningContainer = document.createElement('div');
                     reasoningContainer.className = 'mt-1';
-
                     const viewReasoningBtn = document.createElement('button');
                     viewReasoningBtn.className = 'btn btn-link btn-sm p-0 text-decoration-none small view-reasoning-btn';
                     viewReasoningBtn.dataset.reasoning = data.full_response;
@@ -986,41 +1085,15 @@ const BenchmarkUtils = {
                     viewReasoningBtn.innerHTML = '<i class="bi bi-card-text"></i> View Reasoning';
                     viewReasoningBtn.style.fontSize = '0.9rem';
                     viewReasoningBtn.classList.add(textColorClass);
-
                     reasoningContainer.appendChild(viewReasoningBtn);
                     td3.appendChild(reasoningContainer);
                 }
-                
                 tr.appendChild(td3);
 
                 // Cell 4: Ground Truths
                 const td4 = document.createElement('td');
                 const groundTruthsArray = data.ground_truths || [];
-                const remainingCount = groundTruthsArray.length - 3;
-                const ul = document.createElement('ul');
-                ul.className = 'list-unstyled mb-0';
-                ul.dataset.expanded = 'false';
-                ul.dataset.remaining = remainingCount.toString();
-
-                groundTruthsArray.forEach((gt, gtIndex) => {
-                    const li = document.createElement('li');
-                    li.className = 'text-secondary small ground-truth-item';
-                    if (gtIndex >= 3) {
-                        li.style.display = 'none';
-                    }
-                    li.appendChild(this.createIcon('bi bi-dot me-1 text-muted'));
-                    li.appendChild(document.createTextNode(gt));
-                    ul.appendChild(li);
-                });
-
-                if (groundTruthsArray.length > 3) {
-                    const liShowMore = document.createElement('li');
-                    liShowMore.className = 'show-more-item';
-                    const a = this.createLink('#', 'toggle-answers-link small text-decoration-none', `... Show ${remainingCount} more`);
-                    liShowMore.appendChild(a);
-                    ul.appendChild(liShowMore);
-                }
-                td4.appendChild(ul);
+                td4.appendChild(this.renderGroundTruthsList(groundTruthsArray));
                 tr.appendChild(td4);
 
                 // Cell for Search Results (RAG Adhoc specific)
@@ -1240,89 +1313,19 @@ const BenchmarkUtils = {
                 row.onclick = () => loadSessionCallback(result.session_id);
             }
 
-            let resultBadge;
-            if (result.correct === true) {
-                resultBadge = document.createElement('span');
-                resultBadge.className = 'badge bg-success';
-                resultBadge.textContent = 'Correct';
-            } else if (result.correct === false) {
-                resultBadge = document.createElement('span');
-                resultBadge.className = 'badge bg-danger';
-                resultBadge.textContent = 'Incorrect';
-            } else {
-                resultBadge = document.createElement('span');
-                resultBadge.className = 'badge bg-warning text-dark';
-                resultBadge.textContent = 'Error';
-            }
-            
-            const GROUNDTRUTH_DISPLAY_LIMIT = 3; 
-            const ulGroundTruths = document.createElement('ul');
-            ulGroundTruths.className = 'list-unstyled mb-0';
-
-            const initialGroundTruths = result.ground_truths.slice(0, GROUNDTRUTH_DISPLAY_LIMIT);
-            initialGroundTruths.forEach(gt => {
-                const li = document.createElement('li');
-                li.className = 'text-secondary small';
-                const icon = document.createElement('i');
-                icon.className = 'bi bi-dot me-1 text-muted';
-                li.appendChild(icon);
-                li.appendChild(document.createTextNode(gt));
-                ulGroundTruths.appendChild(li);
-            });
-
-            const fullGroundTruthsDiv = document.createElement('div');
-            fullGroundTruthsDiv.style.display = 'none';
-            result.ground_truths.slice(GROUNDTRUTH_DISPLAY_LIMIT).forEach(gt => {
-                const li = document.createElement('li');
-                li.className = 'text-secondary small';
-                const icon = document.createElement('i');
-                icon.className = 'bi bi-dot me-1 text-muted';
-                li.appendChild(icon);
-                li.appendChild(document.createTextNode(gt));
-                fullGroundTruthsDiv.appendChild(li);
-            });
-            ulGroundTruths.appendChild(fullGroundTruthsDiv);
-
-            let showMoreButton;
-            let showLessButton;
-
-            if (result.ground_truths.length > GROUNDTRUTH_DISPLAY_LIMIT) {
-                showMoreButton = document.createElement('button');
-                showMoreButton.className = 'btn btn-link btn-sm p-0 mt-1 show-more-groundtruths';
-                showMoreButton.type = 'button';
-                showMoreButton.textContent = `Show ${result.ground_truths.length - GROUNDTRUTH_DISPLAY_LIMIT} more`;
-                
-                showLessButton = document.createElement('button');
-                showLessButton.className = 'btn btn-link btn-sm p-0 mt-1 show-less-groundtruths';
-                showLessButton.type = 'button';
-                showLessButton.style.display = 'none';
-                showLessButton.textContent = 'Show less';
-
-                showMoreButton.onclick = (e) => {
-                    e.stopPropagation();
-                    fullGroundTruthsDiv.style.display = 'block';
-                    showMoreButton.style.display = 'none';
-                    showLessButton.style.display = 'inline';
-                };
-
-                showLessButton.onclick = (e) => {
-                    e.stopPropagation();
-                    fullGroundTruthsDiv.style.display = 'none';
-                    showMoreButton.style.display = 'inline';
-                    showLessButton.style.display = 'none';
-                };
-            }
-            
+            // Cell 1: Index
             const td1 = document.createElement('td');
             td1.className = 'px-4 fw-bold text-muted small';
             td1.textContent = index + 1;
             row.appendChild(td1);
 
+            // Cell 2: Question
             const td2 = document.createElement('td');
             td2.className = 'px-4';
             td2.textContent = result.question;
             row.appendChild(td2);
 
+            // Cell 3: Answer
             const td3 = document.createElement('td');
             td3.className = 'px-4';
             const em = document.createElement('em');
@@ -1330,20 +1333,29 @@ const BenchmarkUtils = {
             td3.appendChild(em);
             row.appendChild(td3);
 
+            // Cell 4: Ground Truths
             const td4 = document.createElement('td');
             td4.className = 'px-4';
-            td4.appendChild(ulGroundTruths);
-            if (showMoreButton) {
-                td4.appendChild(showMoreButton);
-                td4.appendChild(showLessButton);
-            }
+            td4.appendChild(this.renderGroundTruthsList(result.ground_truths));
             row.appendChild(td4);
 
+            // Cell 5: Status Badge
             const td5 = document.createElement('td');
             td5.className = 'px-4 text-center';
-            td5.appendChild(resultBadge);
+            if (result.correct === true) {
+                td5.appendChild(this.createBadge(null, true));
+            } else if (result.correct === false) {
+                td5.appendChild(this.createBadge(null, false));
+            } else {
+                 // Error/Unknown state
+                 const span = document.createElement('span');
+                 span.className = 'badge bg-warning text-dark';
+                 span.textContent = 'Error';
+                 td5.appendChild(span);
+            }
             row.appendChild(td5);
 
+            // Cell 6: Trials
             const td6 = document.createElement('td');
             td6.className = 'px-4 text-center';
             td6.textContent = result.trials;
@@ -1927,62 +1939,7 @@ const BenchmarkUtils = {
 
             const gtContainer = document.getElementById('session-ground-truths');
             gtContainer.innerHTML = '';
-
-            const GROUNDTRUTH_DISPLAY_LIMIT = 3; 
-
-            if (session.ground_truths.length > GROUNDTRUTH_DISPLAY_LIMIT) {
-                const initialGroundTruths = session.ground_truths.slice(0, GROUNDTRUTH_DISPLAY_LIMIT);
-                initialGroundTruths.forEach(gt => {
-                    const el = document.createElement('span');
-                    el.className = 'badge bg-secondary me-1';
-                    el.textContent = gt;
-                    gtContainer.appendChild(el);
-                });
-
-                const showMoreBtn = document.createElement('button');
-                showMoreBtn.className = 'btn btn-link btn-sm p-0';
-                showMoreBtn.textContent = `Show ${session.ground_truths.length - GROUNDTRUTH_DISPLAY_LIMIT} more`;
-                showMoreBtn.setAttribute('type', 'button');
-                gtContainer.appendChild(showMoreBtn);
-
-                const fullGroundTruthsDiv = document.createElement('div');
-                fullGroundTruthsDiv.style.display = 'none'; // Initially hidden
-                session.ground_truths.slice(GROUNDTRUTH_DISPLAY_LIMIT).forEach(gt => {
-                    const el = document.createElement('span');
-                    el.className = 'badge bg-secondary me-1';
-                    el.textContent = gt;
-                    fullGroundTruthsDiv.appendChild(el);
-                });
-                gtContainer.appendChild(fullGroundTruthsDiv);
-
-                const showLessBtn = document.createElement('button');
-                showLessBtn.className = 'btn btn-link btn-sm p-0 ms-2';
-                showLessBtn.textContent = `Show less`;
-                showLessBtn.setAttribute('type', 'button');
-                showLessBtn.style.display = 'none'; // Initially hidden
-                gtContainer.appendChild(showLessBtn);
-
-
-                showMoreBtn.addEventListener('click', () => {
-                    fullGroundTruthsDiv.style.display = 'block';
-                    showMoreBtn.style.display = 'none';
-                    showLessBtn.style.display = 'inline';
-                });
-
-                showLessBtn.addEventListener('click', () => {
-                    fullGroundTruthsDiv.style.display = 'none';
-                    showMoreBtn.style.display = 'inline';
-                    showLessBtn.style.display = 'none';
-                });
-
-            } else {
-                session.ground_truths.forEach(gt => {
-                    const el = document.createElement('span');
-                    el.className = 'badge bg-secondary me-1';
-                    el.textContent = gt;
-                    gtContainer.appendChild(el);
-                });
-            }
+            gtContainer.appendChild(BenchmarkUtils.BenchmarkRenderer.renderGroundTruthsBadges(session.ground_truths));
 
             const trialsContainer = document.getElementById('trials-container');
             trialsContainer.innerHTML = '';
@@ -2692,11 +2649,27 @@ const BenchmarkUtils = {
             if (!csrfToken) console.error("CSRF Token is missing or empty!");
             BenchmarkUtils.setupConfigurationHandlers();
             BenchmarkUtils.setupConfigurationActionHandlers(csrfToken, true, true);
-            // questions data removed - parsing only on demand
             
             let activeSessionId = null;
             let currentPipelineResults = [];
             let pipelineController = null;
+
+            // Session Control Variables
+            let sessionAbortController = null;
+            const startSessionBtn = document.getElementById('start-session-btn');
+            const stopSessionBtn = document.getElementById('stop-session-btn');
+            let sessionRetryTimeout = null;
+
+            function resetSessionUI() {
+                if (startSessionBtn) startSessionBtn.style.display = 'block';
+                if (stopSessionBtn) stopSessionBtn.style.display = 'none';
+                BenchmarkUtils.toggleConfigurationInputs(false);
+                sessionAbortController = null;
+                if (sessionRetryTimeout) {
+                    clearTimeout(sessionRetryTimeout);
+                    sessionRetryTimeout = null;
+                }
+            }
 
             // --- Batch Delete ---
             BenchmarkUtils.setupBatchSelection(
@@ -2726,6 +2699,9 @@ const BenchmarkUtils = {
             // --- Helper: Load Session ---
             function loadSession(sessionId, initialTrialId = null) {
                 activeSessionId = sessionId;
+                // If we are currently running a session and loading a DIFFERENT session, do not abort unless logic dictates.
+                // But typically loadSession is called to refresh current session.
+                
                 fetch(BenchmarkUrls.multiTurn.getSession(sessionId))
                     .then(res => res.json())
                     .then(data => {
@@ -2745,25 +2721,52 @@ const BenchmarkUtils = {
                         if (data.session.group_id) delBtn.style.display = 'none';
                         else delBtn.style.display = 'inline-block';
 
-                        if (initialTrialId) executeTrial(initialTrialId, sessionId);
-                        
-                        const lastTrial = data.trials[data.trials.length - 1];
-                         if (lastTrial && lastTrial.status === 'completed' && lastTrial.is_correct === false && !data.session.is_completed) {
-                             if (data.trials.length < data.session.max_retries) {
-                                 setTimeout(() => window.retryTrial(lastTrial.id), 1500);
-                             }
-                         }
+                        if (initialTrialId) {
+                            executeTrial(initialTrialId, sessionId);
+                        } else {
+                            // Only check for retry if we are NOT starting a new trial explicitly
+                            const lastTrial = data.trials[data.trials.length - 1];
+                            if (lastTrial && lastTrial.status === 'completed' && lastTrial.is_correct === false && !data.session.is_completed) {
+                                if (data.trials.length < data.session.max_retries) {
+                                    // Check if we should auto-retry (if session is running)
+                                    if (sessionAbortController && !sessionAbortController.signal.aborted) {
+                                         sessionRetryTimeout = setTimeout(() => {
+                                             if (sessionAbortController && !sessionAbortController.signal.aborted) {
+                                                 window.retryTrial(lastTrial.id); 
+                                             }
+                                         }, 1500);
+                                    }
+                                } else {
+                                    // Max retries reached, session done
+                                    if (sessionAbortController) resetSessionUI();
+                                }
+                            } else if (data.session.is_completed) {
+                                // Session completed
+                                if (sessionAbortController) resetSessionUI();
+                            }
+                        }
                     });
             }
 
             // --- Helper: Execute Trial ---
             function executeTrial(trialId, sessionId) {
-                 fetch(BenchmarkUrls.multiTurn.runTrial(trialId)).then(res => res.json()).then(data => {
-                     if (data.error) alert(`Error in trial #${trialId}: ${data.error}`);
+                 const signal = sessionAbortController ? sessionAbortController.signal : null;
+                 
+                 fetch(BenchmarkUrls.multiTurn.runTrial(trialId), { signal: signal })
+                 .then(res => res.json()).then(data => {
+                     if (data.error) {
+                         alert(`Error in trial #${trialId}: ${data.error}`);
+                         if (sessionAbortController) resetSessionUI();
+                     }
                      if (sessionId) loadSession(sessionId);
-                 }).catch(() => {
-                     console.error('Network error in trial.');
-                     if (sessionId) loadSession(sessionId);
+                 }).catch((err) => {
+                     if (err.name === 'AbortError') {
+                         console.log("Trial execution aborted by user.");
+                     } else {
+                         console.error('Network error in trial.', err);
+                         if (sessionId) loadSession(sessionId);
+                     }
+                     if (sessionAbortController) resetSessionUI();
                  });
             }
             
@@ -2778,7 +2781,7 @@ const BenchmarkUtils = {
                      if (data.error) { alert(data.error); return; }
                      currentPipelineResults = data.results;
                      
-                     // Show stats container first so updateStatsUI can find elements if they depend on visibility (though usually they don't)
+                     // Show stats container first so updateStatsUI can find elements if they depend on visibility
                      const statsContainer = document.getElementById('statistics-container');
                      if (statsContainer) statsContainer.style.display = 'block';
 
@@ -2795,47 +2798,88 @@ const BenchmarkUtils = {
             }
 
             // --- Single Session Start ---
-            document.getElementById('start-session-btn').addEventListener('click', function() {
-                const questionSelect = document.getElementById('question-select');
-                if (!questionSelect.value) { alert('Select a question.'); return; }
-                
-                let qData = null;
-                try {
-                     const questionsDataEl = document.getElementById(questionsDataId);
-                     if (questionsDataEl) {
-                         const questions = JSON.parse(questionsDataEl.textContent);
-                         qData = questions[questionSelect.value];
-                     }
-                } catch (e) { console.error("Error parsing questions data", e); }
-                
-                if (!qData) { alert('Could not load question data.'); return; }
-                
-                const btn = this;
-                btn.disabled = true;
-                btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Starting...';
-                
-                let singleSessionPipelineType = pipelineType;
-                // Only allow RAG mode override if we are on a RAG multi-turn page
-                if (document.getElementById('rag_mode_select') && pipelineType.startsWith('rag_multi_turn')) {
-                    singleSessionPipelineType = document.getElementById('rag_mode_select').value;
-                }
-
-                fetch(BenchmarkUrls.multiTurn.createSession, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
-                    body: JSON.stringify({
-                        question: qData.question,
-                        ground_truths: qData.answer,
-                        pipeline_type: singleSessionPipelineType
-                    })
-                }).then(res => res.json()).then(data => {
-                    if (data.error) alert(data.error);
-                    else {
-                        BenchmarkUtils.MultiTurnUtils.addNewSessionToList('session-list', data.session_id, qData, null);
-                        loadSession(data.session_id, data.trial_id);
+            if (startSessionBtn) {
+                startSessionBtn.addEventListener('click', function() {
+                    const questionSelect = document.getElementById('question-select');
+                    if (!questionSelect.value) { alert('Select a question.'); return; }
+                    
+                    let qData = null;
+                    try {
+                         const questionsDataEl = document.getElementById(questionsDataId);
+                         if (questionsDataEl) {
+                             const questions = JSON.parse(questionsDataEl.textContent);
+                             qData = questions[questionSelect.value];
+                         }
+                    } catch (e) { console.error("Error parsing questions data", e); }
+                    
+                    if (!qData) { alert('Could not load question data.'); return; }
+                    
+                    // UI Lock
+                    startSessionBtn.style.display = 'none';
+                    if (stopSessionBtn) stopSessionBtn.style.display = 'inline-block'; // Or block
+                    BenchmarkUtils.toggleConfigurationInputs(true);
+                    
+                    sessionAbortController = new AbortController();
+                    const signal = sessionAbortController.signal;
+                    
+                    let singleSessionPipelineType = pipelineType;
+                    // Only allow RAG mode override if we are on a RAG multi-turn page
+                    if (document.getElementById('rag_mode_select') && pipelineType.startsWith('rag_multi_turn')) {
+                        singleSessionPipelineType = document.getElementById('rag_mode_select').value;
                     }
-                }).finally(() => { btn.disabled = false; btn.innerHTML = 'Start'; });
-            });
+
+                    fetch(BenchmarkUrls.multiTurn.createSession, {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
+                        body: JSON.stringify({
+                            question: qData.question,
+                            ground_truths: qData.answer,
+                            pipeline_type: singleSessionPipelineType
+                        }),
+                        signal: signal
+                    }).then(res => res.json()).then(data => {
+                        if (data.error) {
+                            alert(data.error);
+                            resetSessionUI();
+                        } else {
+                            BenchmarkUtils.MultiTurnUtils.addNewSessionToList('session-list', data.session_id, qData, null);
+                            loadSession(data.session_id, data.trial_id);
+                        }
+                    }).catch(err => {
+                        if (err.name !== 'AbortError') {
+                            alert('Error starting session.');
+                            console.error(err);
+                        }
+                        resetSessionUI();
+                    });
+                });
+            }
+            
+            // --- Single Session Stop ---
+            if (stopSessionBtn) {
+                stopSessionBtn.addEventListener('click', function() {
+                    if (sessionAbortController) {
+                        sessionAbortController.abort();
+                    }
+                    if (activeSessionId) {
+                         const currentSessionId = activeSessionId; // Capture ID
+                         fetch(BenchmarkUrls.multiTurn.stopSession, {
+                             method: 'POST',
+                             headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+                             body: JSON.stringify({ session_id: currentSessionId })
+                         })
+                         .then(res => res.json())
+                         .then(data => {
+                             if (data.status === 'ok') {
+                                 // Reload session to update UI (remove spinner, show error)
+                                 loadSession(currentSessionId);
+                             }
+                         })
+                         .catch(console.error);
+                    }
+                    resetSessionUI();
+                });
+            }
 
             // --- Pipeline Run ---
             document.getElementById('run-pipeline-btn').addEventListener('click', function() {
@@ -2962,7 +3006,7 @@ const BenchmarkUtils = {
                 // Handle Session Click
                 const target = e.target.closest('.session-details');
                 if (target) { 
-                    e.preventDefault(); 
+                    e.preventDefault();
                     loadSession(target.dataset.sessionId); 
                     return;
                 }
@@ -2985,15 +3029,29 @@ const BenchmarkUtils = {
             window.retryTrial = function(trialId) {
                 const trial = window.sessionTrials ? window.sessionTrials.find(t => t.id === trialId) : null;
                 const feedback = trial ? trial.feedback : "";
+                
+                const signal = sessionAbortController ? sessionAbortController.signal : null;
+
                 fetch(BenchmarkUrls.multiTurn.retrySession(trialId), {
                     method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
-                    body: JSON.stringify({ feedback: feedback, is_correct: false })
+                    body: JSON.stringify({ feedback: feedback, is_correct: false }),
+                    signal: signal
                 }).then(res => res.json()).then(data => {
-                    if (data.error) alert(data.error);
-                    else {
+                    if (data.error) {
+                        alert(data.error);
+                        if (sessionAbortController) resetSessionUI();
+                    } else {
                         loadSession(activeSessionId);
                         if (data.status === 'retrying') executeTrial(data.new_trial_id, activeSessionId);
+                        if (data.status === 'max_retries_reached' || data.status === 'completed') {
+                             if (sessionAbortController) resetSessionUI();
+                        }
                     }
+                }).catch(err => {
+                    if (err.name !== 'AbortError') {
+                        console.error(err);
+                    }
+                     if (sessionAbortController) resetSessionUI();
                 });
             };
             

@@ -1,7 +1,7 @@
 import asyncio
 import threading
 from asgiref.sync import sync_to_async
-from .pipeline_utils import BrowserAgentPipeline
+from .pipelines.agent import BrowserAgentPipeline
 from .models import MultiTurnSession, MultiTurnTrial
 
 class PipelineManager:
@@ -39,15 +39,11 @@ class PipelineManager:
     async def _run_trial_async(self, session_id, trial_id, factory_kwargs):
         # 1. Get or Create Pipeline
         if session_id not in self.pipelines:
-            # Pass pipeline_id as session_id's run_tag or similar if needed, 
-            # but factory_kwargs should have what create needs.
-            # We assume factory_kwargs aligns with BrowserAgentPipeline.create arguments.
-            
-            # BrowserAgentPipeline.create(base_url, api_key, model, max_retries, pipeline_id, dataset_id)
-            # We need to ensure arguments match.
-            
-            pipeline = await BrowserAgentPipeline.create(**factory_kwargs)
-            self.pipelines[session_id] = pipeline
+            try:
+                pipeline = await BrowserAgentPipeline.create(**factory_kwargs)
+                self.pipelines[session_id] = pipeline
+            except Exception as e:
+                return None, False, [], f"Pipeline Initialization Error: {str(e)}"
         
         pipeline = self.pipelines[session_id]
         

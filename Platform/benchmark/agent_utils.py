@@ -136,9 +136,10 @@ class BrowserAgentFactory:
         return agent
 
     @staticmethod
-    async def init_agentscope(llm_settings: LLMSettings, skip_mcp: bool = False):
+    def init_agentscope(llm_settings: LLMSettings):
         """
         Initialize AgentScope with the project's LLM settings.
+        Returns model and toolkit. MCP connection is handled externally.
         """
         agentscope.init(logging_level="INFO")
         model = OpenAIChatModel(
@@ -153,37 +154,4 @@ class BrowserAgentFactory:
         toolkit = Toolkit()
         toolkit.register_tool_function(answer_question)
 
-        mcp_client = None
-        if not skip_mcp:
-             mcp_client = await BrowserAgentFactory.connect_mcp(toolkit)
-        
-        return model, toolkit, mcp_client
-
-    @staticmethod
-    async def connect_mcp(toolkit: Toolkit):
-        mcp_client = None
-        try:
-            current_dir = os.path.dirname(os.path.abspath(__file__))
-            mcp_root = os.path.join(current_dir, 'mcp', 'chrome-devtools-mcp')
-            mcp_script = os.path.join(mcp_root, 'build', 'src', 'index.js')
-            mcp_args = [
-                mcp_script,
-                "--isolated",
-            ]
-            
-            if not os.path.exists(mcp_script):
-                 print_debug(f"MCP server script not found at {mcp_script}. Ensure it is built.")
-            else:
-                mcp_client = StdIOStatefulClient(
-                    name="chrome_devtools",
-                    command="node",
-                    args=mcp_args,
-                    cwd=mcp_root
-                )
-                await mcp_client.connect()
-                await toolkit.register_mcp_client(mcp_client)
-                print_debug(f"Registered MCP tools from {mcp_client.name}")
-                
-        except Exception as e:
-            print_debug(f"Failed to fetch/register MCP tools: {e}")
-        return mcp_client   
+        return model, toolkit   

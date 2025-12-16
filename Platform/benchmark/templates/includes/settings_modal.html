@@ -198,18 +198,6 @@
 
                     <!-- RAG Settings -->
                     <div class="tab-pane" id="rag-settings" role="tabpanel" aria-labelledby="rag-tab">
-                        <div class="card border-0 shadow-sm mb-4">
-                            <div class="card-body bg-light rounded-3">
-                                <h6 class="text-primary fw-bold mb-3"><i class="bi bi-diagram-3 me-2"></i>Pipeline Strategy</h6>
-                                <div class="mb-3">
-                                    <label for="rag_mode_select" class="form-label small text-muted fw-bold">RAG Mode</label>
-                                    <select id="rag_mode_select" class="form-select">
-                                        <option value="rag_multi_turn_no_reform" selected>No Query Reformulation (Direct Search)</option>
-                                        <option value="rag_multi_turn_reform">With Query Reformulation (LLM Refined)</option>
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
 
                         <div class="card border-0 shadow-sm mb-4">
                             <div class="card-body bg-light rounded-3">
@@ -217,7 +205,7 @@
                                     <h6 class="text-primary fw-bold mb-0"><i class="bi bi-code-square me-2"></i>System Prompt Template</h6>
                                 </div>
                                 <div class="mb-2">
-                                    <textarea class="form-control border-secondary" id="rag_prompt_template" rows="10" style="font-family: 'Menlo', 'Monaco', 'Courier New', monospace; font-size: 0.85rem; background-color: #f8f9fa;">{{ rag_settings.prompt_template|safe }}</textarea>
+                                    <textarea class="form-control border-secondary" id="rag_prompt_template" rows="5" style="font-family: 'Menlo', 'Monaco', 'Courier New', monospace; font-size: 0.85rem; background-color: #e9ecef;" disabled readonly>The RAG prompt template is currently hardcoded to ensure benchmark consistency. You can view the template in 'prompts.py'.</textarea>
                                 </div>
                                 <div class="form-text small text-muted">
                                     <i class="bi bi-exclamation-circle me-1"></i> Required placeholders: <code>{question}</code>, <code>{search_results}</code>.

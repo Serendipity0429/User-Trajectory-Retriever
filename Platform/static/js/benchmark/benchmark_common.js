@@ -8,9 +8,7 @@ const BenchmarkUrls = {
     testLlmConnection: `${API_PREFIX}/test_llm_connection/`,
     
     // RAG & Search Settings
-    saveRagSettings: `${API_PREFIX}/save_rag_settings/`,
     saveSearchSettings: `${API_PREFIX}/save_search_settings/`,
-    getDefaultRagPrompt: `${API_PREFIX}/rag_adhoc/get_default_prompt/`,
     webSearch: `${API_PREFIX}/web_search/`,
 
     // Datasets
@@ -553,14 +551,6 @@ const BenchmarkUtils = {
                     }).then(r => r.json()));
                 }
 
-                // RAG
-                if (document.getElementById('rag_prompt_template')) {
-                     const ragData = { prompt_template: document.getElementById('rag_prompt_template').value };
-                     promises.push(fetch(BenchmarkUrls.saveRagSettings, {
-                        method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
-                        body: JSON.stringify(ragData)
-                    }).then(r => r.json()));
-                }
 
                 Promise.all(promises).then(results => {
                     const allOk = results.every(r => r.status === 'ok');
@@ -2958,13 +2948,6 @@ const BenchmarkUtils = {
                 if (pipelineController) pipelineController.abort();
                 if (pipelineController && pipelineController.pipelineId) {
                     let strategyData = { pipeline_id: pipelineController.pipelineId };
-                     const pipelineTypeInput = document.getElementById('rag_mode_select');
-                     if (pipelineTypeInput && pipelineType.includes('rag')) {
-                         let s = 'no_reform';
-                         if (pipelineTypeInput.value.includes('reform')) s = 'reform';
-                         if (pipelineTypeInput.value.includes('no_reform')) s = 'no_reform';
-                         strategyData.reformulation_strategy = s;
-                     }
 
                      let stopUrl = BenchmarkUrls.vanillaLlmMultiTurn.stopPipeline;
                      if (pipelineType === 'browser_agent') stopUrl = BenchmarkUrls.browserAgent.stopPipeline;

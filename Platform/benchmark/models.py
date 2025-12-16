@@ -3,6 +3,8 @@ from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator, MaxValueValidator
 import os
 from benchmark.prompts import PROMPTS
+from decouple import config
+
 # --- Abstract Base Classes ---
 
 class SingletonModel(models.Model):
@@ -69,6 +71,13 @@ class SearchSettings(SingletonModel):
     def __str__(self):
         return "Search Settings"
 
+    @classmethod
+    def get_effective_settings(cls):
+        settings = cls.load()
+        if not settings.serper_api_key:
+            settings.serper_api_key = config("SERPER_API_KEY", default="")
+        return settings
+
 class LLMSettings(SingletonModel):
     """
     A singleton model to store LLM settings for the benchmark tool.
@@ -88,17 +97,16 @@ class LLMSettings(SingletonModel):
     def __str__(self):
         return "LLM Settings"
 
-class RagSettings(SingletonModel):
-    """
-    A singleton model to store RAG-specific settings.
-    """
-    prompt_template = models.TextField(
-        default=PROMPTS["rag_prompt_template"],
-        help_text="Template for the RAG prompt. Use {question} and {search_results} placeholders."
-    )
-
-    def __str__(self):
-        return "RAG Settings"
+    @classmethod
+    def get_effective_settings(cls):
+        settings = cls.load()
+        if not settings.llm_api_key:
+            settings.llm_api_key = config("LLM_API_KEY", default="")
+        if not settings.llm_model:
+            settings.llm_model = config("LLM_MODEL", default="")
+        if not settings.llm_base_url:
+            settings.llm_base_url = config("LLM_BASE_URL", default="")
+        return settings
 
 class MultiTurnRun(models.Model):
     """
@@ -125,10 +133,6 @@ class MultiTurnSession(models.Model):
         ('vanilla_agent', 'Vanilla Agent'),
         ('browser_agent', 'Browser Agent'), # New pipeline type
     ]
-    REFORMULATION_CHOICES = [
-        ('no_reform', 'No Reformulation'),
-        ('reform', 'Reformulation'),
-    ]
 
     run = models.ForeignKey(MultiTurnRun, related_name='sessions', on_delete=models.CASCADE)
     question = models.TextField()
@@ -138,7 +142,6 @@ class MultiTurnSession(models.Model):
     run_tag = models.CharField(max_length=255, blank=True, null=True, db_index=True)
     
     pipeline_type = models.CharField(max_length=20, choices=PIPELINE_TYPE_CHOICES, default='vanilla')
-    reformulation_strategy = models.CharField(max_length=20, choices=REFORMULATION_CHOICES, default='no_reform', help_text="Only used if pipeline_type is 'rag'")
 
     def __str__(self):
         return f"Session ({self.pipeline_type}) for: {self.question[:50]}..."

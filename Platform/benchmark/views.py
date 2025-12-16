@@ -20,7 +20,6 @@ from .search_utils import get_search_engine
 from .utils import count_questions_in_file
 from .models import (
     LLMSettings,
-    RagSettings,
     SearchSettings,
     MultiTurnRun,
     MultiTurnSession,
@@ -33,37 +32,28 @@ from .forms import BenchmarkDatasetForm
 
 from datetime import datetime
 
-# Import from the new utils module
-from .pipeline_utils import (
-    VanillaLLMAdhocPipeline,
-    RagAdhocPipeline,
+# Import from the new pipelines module
+from .pipelines.base import (
     BaseMultiTurnPipeline,
-    VanillaLLMMultiTurnPipeline,
-    RagMultiTurnPipeline,
-    VanillaAgentPipeline,
-    BrowserAgentPipeline, # Ensure this is imported
     serialize_events,
     serialize_events_async,
 )
+from .pipelines.vanilla import (
+    VanillaLLMAdhocPipeline,
+    VanillaLLMMultiTurnPipeline,
+)
+from .pipelines.rag import (
+    RagAdhocPipeline,
+    RagMultiTurnPipeline,
+)
+from .pipelines.agent import (
+    VanillaAgentPipeline,
+    BrowserAgentPipeline,
+)
 from .pipeline_manager import PipelineManager
+from benchmark.prompts import PROMPTS
 
-
-def get_llm_settings_with_fallback():
-    settings = LLMSettings.load()
-    if not settings.llm_api_key:
-        settings.llm_api_key = config("LLM_API_KEY", default="")
-    if not settings.llm_model:
-        settings.llm_model = config("LLM_MODEL", default="")
-    if not settings.llm_base_url:
-        settings.llm_base_url = config("LLM_BASE_URL", default="")
-    return settings
-
-
-def get_search_settings_with_fallback():
-    settings = SearchSettings.load()
-    if not settings.serper_api_key:
-        settings.serper_api_key = config("SERPER_API_KEY", default="")
-    return settings
+# Helper functions removed - use Model.get_effective_settings() instead.
 
 
 def get_trial_trace(request, trial_id):
@@ -120,14 +110,12 @@ def get_trial_trace(request, trial_id):
 
 @admin_required
 def home(request):
-    settings = get_llm_settings_with_fallback()
-    rag_settings = RagSettings.load()
-    search_settings = get_search_settings_with_fallback()
+    settings = LLMSettings.get_effective_settings()
+    search_settings = SearchSettings.get_effective_settings()
     datasets = BenchmarkDataset.objects.all().order_by("-created_at")
 
     context = {
         "llm_settings": settings,
-        "rag_settings": rag_settings,
         "search_settings": search_settings,
         "datasets": datasets,
     }
@@ -299,7 +287,7 @@ def vanilla_llm_adhoc(request):
         except (ValueError, TypeError):
             pass  # Ignore invalid run_id
 
-    settings_obj = get_llm_settings_with_fallback()
+    settings_obj = LLMSettings.get_effective_settings()
 
     # Load questions from the file
     questions = []
@@ -332,62 +320,26 @@ def vanilla_llm_adhoc(request):
     return render(request, "vanilla_llm_adhoc.html", context)
 
 
-@admin_required
-def list_runs(request):
-    try:
-        # Assuming this lists multi-turn runs from both types
-        runs = MultiTurnSession.objects.filter(
-            run_tag__isnull=False
-        ).values_list("run_tag", flat=True).distinct()
-        
-        runs = sorted(list(runs), reverse=True)
-        return JsonResponse({"runs": runs})
-    except Exception as e:
-        return JsonResponse({"error": str(e)}, status=500)
 
 
-@admin_required
-def load_run(request, run_tag):
-    def stream_run_from_db(run_tag):
-        # This function seems to be for ad-hoc runs saved as multi-turn sessions (imported).
-        sessions = MultiTurnSession.objects.filter(
-            run_tag=run_tag
-        ).prefetch_related("trials")
-        for session in sessions:
-            trial = session.trials.first()
-            if trial:
-                result_data = {
-                    "question": session.question,
-                    "answer": trial.answer,
-                    "ground_truths": session.ground_truths,
-                    "rule_result": trial.is_correct,
-                    "llm_result": trial.is_correct,
-                }
-                yield json.dumps(result_data) + "\n"
 
-    return StreamingHttpResponse(
-        stream_run_from_db(run_tag), content_type="application/json"
-    )
+
 
 
 @admin_required
 def get_default_settings(request):
     try:
         # LLM Defaults
-        llm_settings = get_llm_settings_with_fallback()
+        llm_settings = LLMSettings.get_effective_settings()
         
-        # RAG & Search Defaults
-        rag_settings = RagSettings.load()
-        search_settings = SearchSettings.load()
+        # Search Defaults
+        search_settings = SearchSettings.get_effective_settings()
 
         config_data = {
             # LLM
             "llm_base_url": config("LLM_BASE_URL", default=llm_settings.llm_base_url),
             "llm_api_key": config("LLM_API_KEY", default=llm_settings.llm_api_key),
             "llm_model": config("LLM_MODEL", default=llm_settings.llm_model),
-            
-            # RAG
-            "rag_prompt_template": RagSettings._meta.get_field("prompt_template").get_default(),
             
             # Search
             "search_provider": SearchSettings._meta.get_field("search_provider").get_default(),
@@ -568,7 +520,7 @@ def vanilla_llm_multi_turn(request):
         "questions": questions,
         "groups": groups,
         "individual_sessions": individual_sessions,
-        "llm_settings": get_llm_settings_with_fallback(),
+        "llm_settings": LLMSettings.get_effective_settings(),
         "datasets": datasets,
     }
     return render(request, "vanilla_llm_multi_turn.html", context)
@@ -613,9 +565,8 @@ def rag_multi_turn(request):
         "questions": questions,
         "groups": groups,
         "individual_sessions": individual_sessions,
-        "llm_settings": get_llm_settings_with_fallback(),
-        "rag_settings": RagSettings.load(),
-        "search_settings": get_search_settings_with_fallback(),
+        "llm_settings": LLMSettings.get_effective_settings(),
+        "search_settings": SearchSettings.get_effective_settings(),
         "datasets": datasets,
     }
     return render(request, "rag_multi_turn.html", context)
@@ -660,8 +611,8 @@ def vanilla_agent(request):
         "questions": questions,
         "groups": groups,
         "individual_sessions": individual_sessions,
-        "llm_settings": get_llm_settings_with_fallback(),
-        "search_settings": get_search_settings_with_fallback(),
+        "llm_settings": LLMSettings.get_effective_settings(),
+        "search_settings": SearchSettings.get_effective_settings(),
         "datasets": datasets,
     }
     return render(request, "vanilla_agent.html", context)
@@ -687,26 +638,14 @@ def rag_adhoc(request):
     context = {
         "questions": questions,
         "total_questions": len(questions),
-        "llm_settings": get_llm_settings_with_fallback(),
-        "rag_settings": RagSettings.load(),
-        "search_settings": get_search_settings_with_fallback(),
+        "llm_settings": LLMSettings.get_effective_settings(),
+        "search_settings": SearchSettings.get_effective_settings(),
         "datasets": datasets,
     }
 
     return render(request, "rag_adhoc.html", context)
 
 
-@admin_required
-@require_POST
-def save_rag_settings(request):
-    try:
-        data = json.loads(request.body)
-        settings = RagSettings.load()
-        settings.prompt_template = data.get("prompt_template", settings.prompt_template)
-        settings.save()
-        return JsonResponse({"status": "ok"})
-    except Exception as e:
-        return JsonResponse({"status": "error", "message": str(e)}, status=400)
 
 
 @admin_required
@@ -860,7 +799,7 @@ def create_session(request):
             )
 
         # Determine settings for snapshot
-        llm_settings = LLMSettings.load()
+        llm_settings = LLMSettings.get_effective_settings()
         snapshot = {
             "llm_settings": {
                 "llm_base_url": llm_settings.llm_base_url,
@@ -870,9 +809,8 @@ def create_session(request):
         }
 
         if "rag" in pipeline_type and "agent" not in pipeline_type:
-            rag_settings = RagSettings.load()
-            search_settings = SearchSettings.load()
-            snapshot["rag_settings"] = {"prompt_template": rag_settings.prompt_template}
+            # rag_settings removed as prompt is hardcoded
+            search_settings = SearchSettings.get_effective_settings()
             snapshot["search_settings"] = {
                 "search_provider": search_settings.search_provider,
                 "search_limit": search_settings.search_limit,
@@ -881,7 +819,7 @@ def create_session(request):
         
         if "agent" in pipeline_type or "browser_agent" in pipeline_type: # Updated for browser agent
              # Snapshot for agent if needed, mostly LLM settings + search
-             search_settings = SearchSettings.load()
+             search_settings = SearchSettings.get_effective_settings()
              snapshot["search_settings"] = {
                 "search_provider": search_settings.search_provider,
                 "search_limit": search_settings.search_limit,
@@ -909,11 +847,7 @@ def create_session(request):
 
         if "rag" in pipeline_type and "agent" not in pipeline_type:
             session_data['pipeline_type'] = 'rag'
-            if "reform" in pipeline_type:
-                session_data["reformulation_strategy"] = "reform"
-            else:
-                session_data["reformulation_strategy"] = "no_reform"
-
+            
             session = MultiTurnSession.objects.create(**session_data)
 
             trial = MultiTurnTrial.objects.create(
@@ -962,7 +896,7 @@ def get_session(request, session_id):
     elif session.pipeline_type == 'browser_agent': # New pipeline type
         pipeline_type = "browser_agent"
     else:
-        pipeline_type = f"rag_multi_turn_{session.reformulation_strategy}"
+        pipeline_type = "rag_multi_turn"
 
     # Resolve settings snapshot from run
     snapshot = session.run.settings_snapshot if session.run else {}
@@ -1081,27 +1015,21 @@ def run_trial(request, trial_id):
             trial = MultiTurnTrial.objects.select_related(
                 "session", "session__run"
             ).get(pk=trial_id)
-
         except MultiTurnTrial.DoesNotExist:
              return JsonResponse({"error": "Trial not found"}, status=404)
 
         session = trial.session
-
-        # Resolve snapshot from run
         snapshot = session.run.settings_snapshot if session.run else {}
 
-        base_url = None
-        api_key = None
-        model = None
-        if snapshot and "llm_settings" in snapshot:
-            llm_s = snapshot["llm_settings"]
-            base_url = llm_s.get("llm_base_url")
-            api_key = config("LLM_API_KEY", default=None)
-            model = llm_s.get("llm_model")
+        # Resolve LLM Settings
+        llm_s = snapshot.get("llm_settings", {})
+        base_url = llm_s.get("llm_base_url")
+        model = llm_s.get("llm_model")
+        api_key = config("LLM_API_KEY", default=None) # Start with Env var
 
-        # Fallback for API Key if not in snapshot (likely)
+        # Fallback to DB defaults if missing
         if not api_key or not model:
-            db_settings = LLMSettings.load()
+            db_settings = LLMSettings.get_effective_settings()
             if not api_key:
                 api_key = config("LLM_API_KEY", default=db_settings.llm_api_key)
             if not base_url:
@@ -1109,12 +1037,21 @@ def run_trial(request, trial_id):
             if not model:
                 model = db_settings.llm_model or config("LLM_MODEL", default="gpt-4o")
 
+        # Define Pipeline Mapping
+        # factory_func: (kwargs) -> pipeline instance or result
+        # 'use_manager': bool, indicating if it goes through PipelineManager (async/browser)
+        
+        common_kwargs = {
+            "base_url": base_url, 
+            "api_key": api_key, 
+            "model": model, 
+            "max_retries": 1
+        }
+
         if session.pipeline_type == 'browser_agent':
+             # Browser Agent uses PipelineManager
             factory_kwargs = {
-                "base_url": base_url,
-                "api_key": api_key,
-                "model": model,
-                "max_retries": 1,
+                **common_kwargs,
                 "pipeline_id": session.run_tag,
             }
             answer, is_correct, search_results, error_msg = PipelineManager.get_instance().run_trial(
@@ -1122,30 +1059,18 @@ def run_trial(request, trial_id):
             )
             if error_msg:
                 raise Exception(error_msg)
-
-        elif session.pipeline_type == 'rag':
-            pipeline = RagMultiTurnPipeline(
-                base_url=base_url,
-                api_key=api_key,
-                model=model,
-                max_retries=1,
-                reformulation_strategy=session.reformulation_strategy,
-            )
-            answer, is_correct, search_results = pipeline.run_single_turn(session, trial)
-
-        elif session.pipeline_type == 'vanilla_agent':
-            pipeline = VanillaAgentPipeline(
-                base_url=base_url,
-                api_key=api_key,
-                model=model,
-                max_retries=1,
-            )
-            answer, is_correct, search_results = pipeline.run_single_turn(session, trial)
+        
         else:
-            pipeline = VanillaLLMMultiTurnPipeline(
-                base_url=base_url, api_key=api_key, model=model, max_retries=1
-            )
-
+            # Synchronous Pipelines
+            if session.pipeline_type == 'rag':
+                pipeline = RagMultiTurnPipeline(
+                    **common_kwargs
+                )
+            elif session.pipeline_type == 'vanilla_agent':
+                pipeline = VanillaAgentPipeline(**common_kwargs)
+            else: # Default: Vanilla LLM
+                pipeline = VanillaLLMMultiTurnPipeline(**common_kwargs)
+            
             answer, is_correct, search_results = pipeline.run_single_turn(session, trial)
 
         if is_correct:
@@ -1234,134 +1159,201 @@ def delete_session_group(request, group_id):
         return JsonResponse({"status": "error", "message": str(e)}, status=500)
 
 
-@admin_required
-@require_POST
-def run_vanilla_llm_multi_turn_pipeline(request):
+def _get_common_llm_settings(request):
+    """
+    Helper to extract LLM settings from request or DB defaults.
+    """
+    db_settings = LLMSettings.get_effective_settings()
+    base_url = request.POST.get("llm_base_url") or db_settings.llm_base_url
+    api_key = request.POST.get("llm_api_key") or db_settings.llm_api_key
+    model = request.POST.get("llm_model") or db_settings.llm_model or "gpt-3.5-turbo"
+    max_retries = int(request.POST.get("max_retries", 3))
+    return base_url, api_key, model, max_retries
+
+
+def _run_pipeline_generic(request, pipeline_class, redis_prefix_template, **kwargs):
+    """
+    Generic handler for running synchronous pipelines.
+    
+    Args:
+        request: The Django request object.
+        pipeline_class: The class of the pipeline to instantiate.
+        redis_prefix_template: A format string for the Redis key prefix. 
+                               Should contain placeholders for format() if needed.
+        **kwargs: Additional arguments to pass to the pipeline constructor 
+                  (e.g., rag_prompt_template, reformulation_strategy).
+    """
     try:
-        db_settings = get_llm_settings_with_fallback()
-        base_url = request.POST.get("llm_base_url") or db_settings.llm_base_url
-        api_key = request.POST.get("llm_api_key") or db_settings.llm_api_key
-        model = (
-            request.POST.get("llm_model") or db_settings.llm_model or "gpt-3.5-turbo"
-        )
-        max_retries = int(request.POST.get("max_retries", 3))
+        base_url, api_key, model, max_retries = _get_common_llm_settings(request)
+        
         pipeline_id = request.POST.get("pipeline_id")
         dataset_id = request.POST.get("dataset_id")
+
         if not api_key:
             return JsonResponse(
                 {"error": "An API Key is required to run the benchmark."}, status=400
             )
 
+        # Construct Redis key
+        # Handle dynamic keys like 'rag_multi_turn_{reformulation_strategy}_pipeline_active'
+        redis_key = None
         if pipeline_id:
-            redis_client.set(
-                f"vanilla_llm_multi_turn_pipeline_active:{pipeline_id}", "1", ex=3600
-            )
+            try:
+                # Attempt to format with kwargs (e.g. reformulation_strategy)
+                prefix = redis_prefix_template.format(**kwargs)
+            except KeyError:
+                # Fallback if format fails or no placeholders
+                prefix = redis_prefix_template
+                
+            redis_key = f"{prefix}:{pipeline_id}"
+            redis_client.set(redis_key, "1", ex=3600)
 
-        pipeline = VanillaLLMMultiTurnPipeline(
-            base_url=base_url,
-            api_key=api_key,
-            model=model,
-            max_retries=max_retries,
-            pipeline_id=pipeline_id,
-            dataset_id=dataset_id,
+        # Prepare Constructor Arguments
+        # Start with common args
+        constructor_args = {
+            "base_url": base_url,
+            "api_key": api_key,
+            "model": model,
+            "pipeline_id": pipeline_id,
+            "dataset_id": dataset_id,
+        }
+        
+        # Add max_retries if the class expects it (BaseMultiTurnPipeline and subclasses)
+        # We check simply if it's in the signature or just pass it if it accepts **kwargs
+        # But safest is to check if it's a multi-turn/agent pipeline.
+        # Adhoc pipelines don't usually take max_retries in constructor in current impl?
+        # Let's check the classes.
+        # VanillaLLMMultiTurnPipeline: (..., max_retries, ...)
+        # VanillaLLMAdhocPipeline: (..., dataset_id=None) - NO max_retries
+        # RagAdhocPipeline: (..., rag_prompt_template, ...) - NO max_retries
+        # RagMultiTurnPipeline: (..., max_retries, reformulation_strategy, ...)
+        # VanillaAgentPipeline: (..., max_retries, ...)
+        
+        if issubclass(pipeline_class, (BaseMultiTurnPipeline, VanillaAgentPipeline)):
+             constructor_args["max_retries"] = max_retries
+             
+        # Add specific kwargs
+        constructor_args.update(kwargs)
+
+        pipeline = pipeline_class(**constructor_args)
+
+        return StreamingHttpResponse(
+            serialize_events(pipeline.run()), content_type="application/json"
         )
 
-        return StreamingHttpResponse(serialize_events(pipeline.run()), content_type="application/json")
-
     except Exception as e:
+        traceback.print_exc()
         return JsonResponse({"error": str(e)}, status=500)
+
+
+def _stop_pipeline_generic(request, redis_prefix_template):
+    """
+    Generic handler for stopping pipelines.
+    """
+    try:
+        data = json.loads(request.body)
+        pipeline_id = data.get("pipeline_id")
+        
+        # Extract dynamic parts if needed (like reformulation_strategy) from data
+        # Only needed for RagMultiTurn really
+        kwargs = {}
+            
+        if pipeline_id:
+            prefix = redis_prefix_template.format(**kwargs)
+            redis_client.delete(f"{prefix}:{pipeline_id}")
+            
+        return JsonResponse({"status": "ok"})
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)}, status=400)
+
+
+@admin_required
+@require_POST
+def run_vanilla_llm_multi_turn_pipeline(request):
+    return _run_pipeline_generic(
+        request, 
+        VanillaLLMMultiTurnPipeline, 
+        "vanilla_llm_multi_turn_pipeline_active"
+    )
 
 
 @admin_required
 @require_POST
 def stop_vanilla_llm_multi_turn_pipeline(request):
-    try:
-        data = json.loads(request.body)
-        pipeline_id = data.get("pipeline_id")
-        if pipeline_id:
-            redis_client.delete(f"vanilla_llm_multi_turn_pipeline_active:{pipeline_id}")
-        return JsonResponse({"status": "ok"})
-    except Exception as e:
-        return JsonResponse({"status": "error", "message": str(e)}, status=400)
+    return _stop_pipeline_generic(request, "vanilla_llm_multi_turn_pipeline_active")
 
 
 @admin_required
 @require_POST
 def run_vanilla_llm_adhoc_pipeline(request):
-    try:
-        pipeline_id = request.POST.get("pipeline_id")
-        dataset_id = request.POST.get("dataset_id")
-        if pipeline_id:
-            redis_client.set(
-                f"vanilla_llm_adhoc_pipeline_active:{pipeline_id}", "1", ex=3600
-            )
-
-        pipeline = VanillaLLMAdhocPipeline(
-            base_url=request.POST.get("llm_base_url"),
-            api_key=request.POST.get("llm_api_key"),
-            model=request.POST.get("llm_model"),
-            pipeline_id=pipeline_id,
-            dataset_id=dataset_id,
-        )
-
-        return StreamingHttpResponse(
-            serialize_events(pipeline.run()), content_type="application/json"
-        )
-
-    except Exception as e:
-        return JsonResponse({"error": str(e)}, status=500)
+    return _run_pipeline_generic(
+        request, 
+        VanillaLLMAdhocPipeline, 
+        "vanilla_llm_adhoc_pipeline_active"
+    )
 
 
 @admin_required
 @require_POST
 def stop_vanilla_llm_adhoc_pipeline(request):
-    try:
-        data = json.loads(request.body)
-        pipeline_id = data.get("pipeline_id")
-        if pipeline_id:
-            redis_client.delete(f"vanilla_llm_adhoc_pipeline_active:{pipeline_id}")
-        return JsonResponse({"status": "ok"})
-    except Exception as e:
-        return JsonResponse({"status": "error", "message": str(e)}, status=400)
+    return _stop_pipeline_generic(request, "vanilla_llm_adhoc_pipeline_active")
 
 
 @admin_required
 @require_POST
 def run_rag_adhoc_pipeline(request):
-    try:
-        pipeline_id = request.POST.get("pipeline_id")
-        dataset_id = request.POST.get("dataset_id")
-        if pipeline_id:
-            redis_client.set(f"rag_adhoc_pipeline_active:{pipeline_id}", "1", ex=3600)
-
-        pipeline = RagAdhocPipeline(
-            base_url=request.POST.get("llm_base_url"),
-            api_key=request.POST.get("llm_api_key"),
-            model=request.POST.get("llm_model"),
-            rag_prompt_template=request.POST.get("rag_prompt_template"),
-            pipeline_id=pipeline_id,
-            dataset_id=dataset_id,
-        )
-
-        return StreamingHttpResponse(
-            serialize_events(pipeline.run()), content_type="application/json"
-        )
-
-    except Exception as e:
-        return JsonResponse({"error": str(e)}, status=500)
+    return _run_pipeline_generic(
+        request, 
+        RagAdhocPipeline, 
+        "rag_adhoc_pipeline_active"
+    )
 
 
 @admin_required
 @require_POST
 def stop_rag_adhoc_pipeline(request):
-    try:
-        data = json.loads(request.body)
-        pipeline_id = data.get("pipeline_id")
-        if pipeline_id:
-            redis_client.delete(f"rag_adhoc_pipeline_active:{pipeline_id}")
-        return JsonResponse({"status": "ok"})
-    except Exception as e:
-        return JsonResponse({"status": "error", "message": str(e)}, status=400)
+    return _stop_pipeline_generic(request, "rag_adhoc_pipeline_active")
+
+
+@admin_required
+@require_POST
+def run_rag_multi_turn_pipeline(request):
+    return _run_pipeline_generic(
+        request, 
+        RagMultiTurnPipeline, 
+        "rag_multi_turn_pipeline_active",
+    )
+
+
+@admin_required
+@require_POST
+def stop_rag_multi_turn_pipeline(request):
+    return _stop_pipeline_generic(
+        request, 
+        "rag_multi_turn_pipeline_active"
+    )
+
+
+@admin_required
+@require_POST
+def run_vanilla_agent_pipeline(request):
+    return _run_pipeline_generic(
+        request, 
+        VanillaAgentPipeline, 
+        "vanilla_agent_pipeline_active"
+    )
+
+
+@admin_required
+@require_POST
+def stop_vanilla_agent_pipeline(request):
+    return _stop_pipeline_generic(request, "vanilla_agent_pipeline_active")
+
+
+@admin_required
+@require_POST
+def stop_browser_agent_pipeline(request):
+    return _stop_pipeline_generic(request, "browser_agent_pipeline_active")
 
 
 @admin_required
@@ -1380,7 +1372,7 @@ def export_session(request, session_id):
     elif session.pipeline_type == 'browser_agent':
         pipeline_type = "browser_agent"
     else:
-        pipeline_type = f"rag_multi_turn_{session.reformulation_strategy}"
+        pipeline_type = "rag_multi_turn"
 
     snapshot = session.run.settings_snapshot if session.run else {}
 
@@ -1488,90 +1480,7 @@ def export_session(request, session_id):
         return response
 
 
-@admin_required
-@require_POST
-def save_run(request):
-    try:
-        body = json.loads(request.body)
-        run_name = body.get("name")
-        run_data = body.get("data")
-        run_config = body.get("config")
-        if not run_name:
-            return JsonResponse(
-                {
-                    "status": "error",
-                    "message": "Invalid data format: 'name' is missing.",
-                },
-                status=400,
-            )
 
-        if not isinstance(run_data, list):
-            return JsonResponse(
-                {
-                    "status": "error",
-                    "message": "Invalid data format: 'data' is not a list.",
-                },
-                status=400,
-            )
-
-        settings = get_llm_settings_with_fallback()
-
-        if isinstance(run_config, dict):
-            # Optionally update global settings if requested, but mainly use for snapshot
-            pass
-
-        # Prepare snapshot from the config passed in the request
-        snapshot = (
-            {
-                "llm_settings": {
-                    "llm_base_url": run_config.get("llm_base_url", ""),
-                    "llm_model": run_config.get("llm_model", ""),
-                    "max_retries": 3,  # Default or extract if available
-                }
-            }
-            if run_config
-            else {}
-        )
-
-        # Create a group for this imported run
-        group = MultiTurnRun.objects.create(
-            name=run_name, settings_snapshot=snapshot
-        )
-
-        for result in run_data:
-            if not result.get("question"):
-                continue
-
-            session = MultiTurnSession.objects.create(
-                run=group, # Was group
-                question=result.get("question"),
-                ground_truths=result.get("ground_truths"),
-                run_tag=run_name,
-                is_completed=True,
-                pipeline_type='vanilla' # Defaulting to vanilla on import as per original logic logic
-            )
-
-            MultiTurnTrial.objects.create(
-                session=session,
-                trial_number=1,
-                answer=result.get("answer"),
-                is_correct=result.get("rule_result"),
-            )
-
-        return JsonResponse({"status": "ok", "filename": run_name})
-
-    except Exception as e:
-        return JsonResponse({"status": "error", "message": str(e)}, status=400)
-
-
-@admin_required
-@require_http_methods(["DELETE"])
-def delete_run(request, run_tag):
-    try:
-        MultiTurnSession.objects.filter(run_tag=run_tag).delete()
-        return JsonResponse({"status": "ok", "filename": run_tag})
-    except Exception as e:
-        return JsonResponse({"status": "error", "message": str(e)}, status=500)
 
 
 from difflib import SequenceMatcher
@@ -1766,44 +1675,63 @@ def browser_agent(request):
         "questions": questions,
         "groups": groups,
         "individual_sessions": individual_sessions,
-        "llm_settings": get_llm_settings_with_fallback(),
+        "llm_settings": LLMSettings.get_effective_settings(),
         "datasets": datasets,
     }
     return render(request, "agent_browser.html", context)
 
 
-@admin_required
-@require_POST
-async def run_browser_agent_pipeline(request):
+async def _run_pipeline_generic_async(request, pipeline_class, redis_prefix_template, **kwargs):
+    """
+    Generic handler for running asynchronous pipelines (like Browser Agent).
+    """
     try:
-        db_settings = get_llm_settings_with_fallback()
+        # Since _get_common_llm_settings is synchronous and accesses DB, wrap it
+        # However, it accesses DB. Better to do basic extraction or use sync_to_async
+        # For simplicity, we can extract from request manually here or make _get_common_llm_settings safe.
+        # But _get_common_llm_settings calls LLMSettings.get_effective_settings() which hits DB.
+        
+        # Async-safe settings retrieval
+        @async_to_sync
+        async def get_settings_async():
+            return LLMSettings.get_effective_settings()
+        
+        # Since we are in an async view, we can't call sync DB methods directly.
+        # But `request.POST` is already available.
+        # Let's just use sync_to_async wrapper for the DB part.
+        
+        db_settings = await sync_to_async(LLMSettings.get_effective_settings)()
+        
         base_url = request.POST.get("llm_base_url") or db_settings.llm_base_url
         api_key = request.POST.get("llm_api_key") or db_settings.llm_api_key
-        model = (
-            request.POST.get("llm_model") or db_settings.llm_model or "gpt-3.5-turbo"
-        )
+        model = request.POST.get("llm_model") or db_settings.llm_model or "gpt-3.5-turbo"
         max_retries = int(request.POST.get("max_retries", 3))
+
         pipeline_id = request.POST.get("pipeline_id")
         dataset_id = request.POST.get("dataset_id")
+        
         if not api_key:
-            return JsonResponse(
+             return JsonResponse(
                 {"error": "An API Key is required to run the benchmark."}, status=400
             )
 
         if pipeline_id:
-            redis_client.set(
-                f"browser_agent_pipeline_active:{pipeline_id}",
-                "1",
-                ex=3600,
-            )
+             redis_key = f"{redis_prefix_template}:{pipeline_id}"
+             # Async redis usage if we had async redis client, but redis_client is sync.
+             # We can run it in thread or just use it if it's fast enough (it usually is)
+             # but strictly speaking strict async should use async redis.
+             # We'll use sync_to_async for safety.
+             await sync_to_async(redis_client.set)(redis_key, "1", ex=3600)
 
-        pipeline = await BrowserAgentPipeline.create(
+        # Factory creation is async for BrowserAgent
+        pipeline = await pipeline_class.create(
             base_url=base_url,
             api_key=api_key,
             model=model,
             max_retries=max_retries,
             pipeline_id=pipeline_id,
             dataset_id=dataset_id,
+            **kwargs
         )
 
         return StreamingHttpResponse(serialize_events_async(pipeline.run()), content_type="application/json")
@@ -1814,15 +1742,12 @@ async def run_browser_agent_pipeline(request):
 
 @admin_required
 @require_POST
-def stop_browser_agent_pipeline(request):
-    try:
-        data = json.loads(request.body)
-        pipeline_id = data.get("pipeline_id")
-        if pipeline_id:
-            redis_client.delete(f"browser_agent_pipeline_active:{pipeline_id}")
-        return JsonResponse({"status": "ok"})
-    except Exception as e:
-        return JsonResponse({"status": "error", "message": str(e)}, status=400)
+async def run_browser_agent_pipeline(request):
+    return await _run_pipeline_generic_async(
+        request, 
+        BrowserAgentPipeline, 
+        "browser_agent_pipeline_active"
+    )
 
 
 @require_POST
@@ -1850,118 +1775,3 @@ def delete_vanilla_llm_adhoc_run(request, run_id):
         return JsonResponse({"status": "error", "message": str(e)}, status=500)
 
 
-@admin_required
-def get_default_rag_prompt(request):
-    default_prompt = RagSettings._meta.get_field("prompt_template").get_default()
-    return JsonResponse({"default_prompt": default_prompt})
-
-
-@admin_required
-@require_POST
-def run_rag_multi_turn_pipeline(request):
-    try:
-        db_settings = get_llm_settings_with_fallback()
-        base_url = request.POST.get("llm_base_url") or db_settings.llm_base_url
-        api_key = request.POST.get("llm_api_key") or db_settings.llm_api_key
-        model = (
-            request.POST.get("llm_model") or db_settings.llm_model or "gpt-3.5-turbo"
-        )
-        max_retries = int(request.POST.get("max_retries", 3))
-        pipeline_id = request.POST.get("pipeline_id")
-        dataset_id = request.POST.get("dataset_id")
-        reformulation_strategy = request.POST.get("reformulation_strategy", "no_reform")
-        if not api_key:
-            return JsonResponse(
-                {"error": "An API Key is required to run the benchmark."}, status=400
-            )
-
-        if pipeline_id:
-            redis_client.set(
-                f"rag_multi_turn_{reformulation_strategy}_pipeline_active:{pipeline_id}",
-                "1",
-                ex=3600,
-            )
-
-        pipeline = RagMultiTurnPipeline(
-            base_url=base_url,
-            api_key=api_key,
-            model=model,
-            max_retries=max_retries,
-            reformulation_strategy=reformulation_strategy,
-            pipeline_id=pipeline_id,
-            dataset_id=dataset_id,
-        )
-
-        return StreamingHttpResponse(serialize_events(pipeline.run()), content_type="application/json")
-
-    except Exception as e:
-        return JsonResponse({"error": str(e)}, status=500)
-
-
-@admin_required
-@require_POST
-def stop_rag_multi_turn_pipeline(request):
-    try:
-        data = json.loads(request.body)
-        pipeline_id = data.get("pipeline_id")
-        reformulation_strategy = data.get("reformulation_strategy", "no_reform")
-        if pipeline_id:
-            redis_client.delete(
-                f"rag_multi_turn_{reformulation_strategy}_pipeline_active:{pipeline_id}"
-            )
-        return JsonResponse({"status": "ok"})
-    except Exception as e:
-        return JsonResponse({"status": "error", "message": str(e)}, status=400)
-
-
-@admin_required
-@require_POST
-def run_vanilla_agent_pipeline(request):
-    try:
-        db_settings = get_llm_settings_with_fallback()
-        base_url = request.POST.get("llm_base_url") or db_settings.llm_base_url
-        api_key = request.POST.get("llm_api_key") or db_settings.llm_api_key
-        model = (
-            request.POST.get("llm_model") or db_settings.llm_model or "gpt-3.5-turbo"
-        )
-        max_retries = int(request.POST.get("max_retries", 3))
-        pipeline_id = request.POST.get("pipeline_id")
-        dataset_id = request.POST.get("dataset_id")
-        if not api_key:
-            return JsonResponse(
-                {"error": "An API Key is required to run the benchmark."}, status=400
-            )
-
-        if pipeline_id:
-            redis_client.set(
-                f"vanilla_agent_pipeline_active:{pipeline_id}",
-                "1",
-                ex=3600,
-            )
-
-        pipeline = VanillaAgentPipeline(
-            base_url=base_url,
-            api_key=api_key,
-            model=model,
-            max_retries=max_retries,
-            pipeline_id=pipeline_id,
-            dataset_id=dataset_id,
-        )
-
-        return StreamingHttpResponse(serialize_events(pipeline.run()), content_type="application/json")
-
-    except Exception as e:
-        return JsonResponse({"error": str(e)}, status=500)
-
-
-@admin_required
-@require_POST
-def stop_vanilla_agent_pipeline(request):
-    try:
-        data = json.loads(request.body)
-        pipeline_id = data.get("pipeline_id")
-        if pipeline_id:
-            redis_client.delete(f"vanilla_agent_pipeline_active:{pipeline_id}")
-        return JsonResponse({"status": "ok"})
-    except Exception as e:
-        return JsonResponse({"status": "error", "message": str(e)}, status=400)

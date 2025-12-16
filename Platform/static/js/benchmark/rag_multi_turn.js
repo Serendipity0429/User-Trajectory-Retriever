@@ -1,17 +1,7 @@
 document.addEventListener('DOMContentLoaded', function() {
     BenchmarkUtils.MultiTurnPage.init({
         pipelineType: 'rag_multi_turn',
-        csvPrefix: 'rag-multiturn',
-        buildFormData: function(formData) {
-             const pipelineTypeInput = document.getElementById('rag_mode_select');
-             if (pipelineTypeInput) {
-                 const val = pipelineTypeInput.value;
-                 let reformStrategy = 'no_reform';
-                 if (val.includes('reform')) reformStrategy = 'reform';
-                 if (val.includes('no_reform')) reformStrategy = 'no_reform';
-                 formData.append('reformulation_strategy', reformStrategy);
-             }
-        }
+        csvPrefix: 'rag-multiturn'
     });
 
     // --- Search Results Modal Listener ---

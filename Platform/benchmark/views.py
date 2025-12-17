@@ -1181,7 +1181,6 @@ def _run_pipeline_generic(request, pipeline_class, redis_prefix_template, **kwar
         redis_prefix_template: A format string for the Redis key prefix. 
                                Should contain placeholders for format() if needed.
         **kwargs: Additional arguments to pass to the pipeline constructor 
-                  (e.g., rag_prompt_template, reformulation_strategy).
     """
     try:
         base_url, api_key, model, max_retries = _get_common_llm_settings(request)
@@ -1195,11 +1194,10 @@ def _run_pipeline_generic(request, pipeline_class, redis_prefix_template, **kwar
             )
 
         # Construct Redis key
-        # Handle dynamic keys like 'rag_multi_turn_{reformulation_strategy}_pipeline_active'
         redis_key = None
         if pipeline_id:
             try:
-                # Attempt to format with kwargs (e.g. reformulation_strategy)
+                # Attempt to format with kwargs
                 prefix = redis_prefix_template.format(**kwargs)
             except KeyError:
                 # Fallback if format fails or no placeholders
@@ -1226,7 +1224,7 @@ def _run_pipeline_generic(request, pipeline_class, redis_prefix_template, **kwar
         # VanillaLLMMultiTurnPipeline: (..., max_retries, ...)
         # VanillaLLMAdhocPipeline: (..., dataset_id=None) - NO max_retries
         # RagAdhocPipeline: (..., rag_prompt_template, ...) - NO max_retries
-        # RagMultiTurnPipeline: (..., max_retries, reformulation_strategy, ...)
+        # RagMultiTurnPipeline: (..., max_retries,  ...)
         # VanillaAgentPipeline: (..., max_retries, ...)
         
         if issubclass(pipeline_class, (BaseMultiTurnPipeline, VanillaAgentPipeline)):
@@ -1254,7 +1252,7 @@ def _stop_pipeline_generic(request, redis_prefix_template):
         data = json.loads(request.body)
         pipeline_id = data.get("pipeline_id")
         
-        # Extract dynamic parts if needed (like reformulation_strategy) from data
+        # Extract dynamic parts if needed from data
         # Only needed for RagMultiTurn really
         kwargs = {}
             

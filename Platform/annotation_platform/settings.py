@@ -275,3 +275,6 @@ LOGGING = {
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = os.path.join(BASE_DIR, "media")
+
+# Compression setting for rrweb_record
+ENABLE_RRWEB_COMPRESSION = True

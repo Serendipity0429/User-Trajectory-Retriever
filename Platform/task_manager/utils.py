@@ -150,6 +150,25 @@ def append_json_data(existing_json_str, new_json_str):
     return existing_json_str
 
 
+def safe_int(val):
+    """
+    Safely convert a value to an integer within the standard 32-bit signed integer range.
+    Returns None if conversion fails. Clamps values that exceed limits.
+    """
+    try:
+        val = int(val)
+        # Standard 32-bit signed integer range
+        MAX_INT = 2147483647
+        MIN_INT = -2147483648
+        if val > MAX_INT:
+            return MAX_INT
+        if val < MIN_INT:
+            return MIN_INT
+        return val
+    except (ValueError, TypeError):
+        return None
+
+
 def store_data(request, message, user):
     user_id = user.id
     lock_key = f"data_store_lock:{user_id}"
@@ -191,11 +210,17 @@ def store_data(request, message, user):
             webpage = Webpage()
             webpage.user = user
             webpage.belong_task = task
-            webpage.url = message["url"]
-            webpage.title = message.get("title")
-            webpage.referrer = message.get("referrer")
-            webpage.width = message.get("width")
-            webpage.height = message.get("height")
+            # Truncate fields to fit database constraints
+            webpage.url = message["url"][:4096]
+            webpage.title = (
+                message.get("title")[:1024] if message.get("title") else None
+            )
+            webpage.referrer = (
+                message.get("referrer")[:4096] if message.get("referrer") else None
+            )
+
+            webpage.width = safe_int(message.get("width"))
+            webpage.height = safe_int(message.get("height"))
 
             webpage.start_timestamp = (
                 timezone.make_aware(datetime.fromtimestamp(start_ts / 1000))
@@ -225,7 +250,54 @@ def store_data(request, message, user):
         # Common logic for both CREATE and MERGE
         raw_rrweb = message.get("rrweb_record", "[]")
         new_rrweb_record = raw_rrweb.replace("</script>", "<\\/script>")
-        webpage.rrweb_record = append_json_data(webpage.rrweb_record, new_rrweb_record)
+
+        # Optimize rrweb_record storage with compression
+        existing_rrweb = []
+        try:
+            if isinstance(webpage.rrweb_record, str):
+                if webpage.rrweb_record and webpage.rrweb_record not in ("[]", "{}"):
+                    existing_rrweb = json.loads(webpage.rrweb_record)
+            elif isinstance(webpage.rrweb_record, dict) and webpage.rrweb_record.get(
+                "compressed"
+            ):
+                compressed_data = webpage.rrweb_record["data"]
+                decompressed_str = zlib.decompress(
+                    base64.b64decode(compressed_data)
+                ).decode("utf-8")
+                existing_rrweb = json.loads(decompressed_str)
+            elif isinstance(webpage.rrweb_record, list):
+                existing_rrweb = webpage.rrweb_record
+        except Exception as e:
+            logger.error(f"Error parsing existing rrweb_record: {e}")
+            existing_rrweb = []
+
+        new_rrweb_list = []
+        try:
+            if new_rrweb_record and new_rrweb_record not in ("[]", "{}"):
+                new_rrweb_list = json.loads(new_rrweb_record)
+        except Exception as e:
+            logger.error(f"Error parsing new rrweb_record: {e}")
+
+        if new_rrweb_list:
+            existing_rrweb.extend(new_rrweb_list)
+
+        # Compress and save based on setting
+        should_compress = getattr(settings, "ENABLE_RRWEB_COMPRESSION", True)
+        
+        try:
+            if should_compress:
+                final_json_str = json.dumps(existing_rrweb)
+                compressed_str = base64.b64encode(
+                    zlib.compress(final_json_str.encode("utf-8"))
+                ).decode("utf-8")
+                webpage.rrweb_record = {"compressed": True, "data": compressed_str}
+            else:
+                webpage.rrweb_record = json.dumps(existing_rrweb)
+        except Exception as e:
+            logger.error(f"Error saving rrweb_record (compress={should_compress}): {e}")
+            # Fallback to uncompressed if compression fails
+            webpage.rrweb_record = json.dumps(existing_rrweb)
+
         webpage.event_list = append_json_data(
             webpage.event_list, message.get("event_list", "[]")
         )
@@ -240,7 +312,9 @@ def store_data(request, message, user):
                     datetime.fromtimestamp(message["end_timestamp"] / 1000)
                 )
 
-            webpage.dwell_time = message.get("dwell_time", webpage.dwell_time)
+            webpage.dwell_time = safe_int(
+                message.get("dwell_time", webpage.dwell_time)
+            )
             webpage.page_switch_record = message.get(
                 "page_switch_record", webpage.page_switch_record
             )

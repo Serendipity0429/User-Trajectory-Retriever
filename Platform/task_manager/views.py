@@ -1643,7 +1643,23 @@ def get_rrweb_record(request, webpage_id):
         # The rrweb_record might be stored as a JSON string within the JSONField.
         # We need to parse it to ensure JsonResponse sends a proper JSON array.
         record_data = webpage.rrweb_record
-        if isinstance(record_data, str):
+
+        if isinstance(record_data, dict) and record_data.get("compressed"):
+            try:
+                compressed_data = record_data["data"]
+                decompressed_str = zlib.decompress(
+                    base64.b64decode(compressed_data)
+                ).decode("utf-8")
+                record_data = json.loads(decompressed_str)
+            except Exception as e:
+                logger.error(
+                    f"Error decompressing rrweb record for webpage {webpage_id}: {e}"
+                )
+                return JsonResponse(
+                    {"status": "error", "message": "Failed to decompress data."},
+                    status=500,
+                )
+        elif isinstance(record_data, str):
             record_data = json.loads(record_data)
 
         return JsonResponse(record_data, safe=False)

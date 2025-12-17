@@ -22,7 +22,8 @@
     "notifications",
     "scripting",
     "alarms",
-    "contextMenus"
+    "contextMenus",
+    "webNavigation"
   ],
   "host_permissions": [
     "http://*/*",

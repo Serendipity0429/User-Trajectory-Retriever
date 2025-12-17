@@ -257,42 +257,7 @@ async function initialize() {
         // // Wait a bit for the page to stabilize (frameworks hydration, etc.)
         await new Promise(resolve => setTimeout(resolve, 500) );
 
-        // Monkey-patch history API for SPA navigation tracking
-        (function (history) {
-            const { pushState, replaceState } = history;
 
-            history.pushState = function (...args) {
-                pushState.apply(history, args);
-                setTimeout(async () => {
-                    if (_content_vars.url_now !== window.location.href) {
-                        _content_vars.referrer_now = _content_vars.url_now;
-                        _content_vars.url_now = window.location.href;
-                        viewState.flush();
-                        await updateTaskStatus();
-                        if (getTaskStatus()) {
-                            setupTaskUI();
-                        }
-                        printDebug("content", "URL changed (pushState), re-initializing UI.");
-                    }
-                }, 0);
-            };
-
-            history.replaceState = function (...args) {
-                replaceState.apply(history, args);
-                setTimeout(async () => {
-                    if (_content_vars.url_now !== window.location.href) {
-                        _content_vars.referrer_now = _content_vars.url_now;
-                        _content_vars.url_now = window.location.href;
-                        viewState.flush();
-                        await updateTaskStatus();
-                        if (getTaskStatus()) {
-                            setupTaskUI();
-                        }
-                        printDebug("content", "URL changed (replaceState), re-initializing UI.");
-                    }
-                }, 0);
-            };
-        })(window.history);
 
         unblockInteractions();
         viewState.initialize();
@@ -334,19 +299,7 @@ if (document.readyState == 'interactive' || document.readyState == 'complete') {
 }
 
 
-window.addEventListener('popstate', async () => {
-    await initializeConfig(); // Ensure config is loaded
-    if (_content_vars.url_now !== window.location.href) {
-        _content_vars.referrer_now = _content_vars.url_now;
-        _content_vars.url_now = window.location.href;
-        viewState.flush();
-        await updateTaskStatus();
-        if (getTaskStatus()) {
-            setupTaskUI();
-        }
-        printDebug("content", "URL changed (popstate), re-initializing UI.");
-    }
-});
+
 
 chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
     // Handle messages from the background script
@@ -392,6 +345,23 @@ chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
             countEl.textContent = message.count;
         }
         sendResponse({success: true});
+        return true;
+    }
+
+    if (message.command === 'web_navigation_updated') {
+        if (_content_vars.url_now !== message.url) {
+            _content_vars.referrer_now = _content_vars.url_now;
+            _content_vars.url_now = message.url;
+            viewState.flush();
+            (async () => {
+                await updateTaskStatus();
+                if (getTaskStatus()) {
+                    setupTaskUI();
+                }
+            })();
+            printDebug("content", "URL changed (web_navigation_updated), re-initializing UI.");
+        }
+        sendResponse({ success: true });
         return true;
     }
 

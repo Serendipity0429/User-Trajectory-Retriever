@@ -6,24 +6,30 @@
 
     await initializeConfig();
 
-    const taskStatusResponse = await new Promise((resolve) => {
-        chrome.runtime.sendMessage({ type: "msg_from_popup", command: "get_active_task" }, (response) => {
-            if (chrome.runtime.lastError) {
-                console.error("Error getting task status in general.js:", chrome.runtime.lastError.message);
-                resolve(null);
-                return;
-            }
-            resolve(response);
+    let is_task_active = false;
+
+    const checkTaskStatus = async () => {
+        const taskStatusResponse = await new Promise((resolve) => {
+            chrome.runtime.sendMessage({ type: "msg_from_popup", command: "get_active_task" }, (response) => {
+                if (chrome.runtime.lastError) {
+                    console.error("Error getting task status in general.js:", chrome.runtime.lastError.message);
+                    resolve(null);
+                    return;
+                }
+                resolve(response);
+            });
         });
+        is_task_active = taskStatusResponse ? taskStatusResponse.is_task_active : false;
+        printDebug("general", `Task status updated: ${is_task_active}`);
+    };
+
+    await checkTaskStatus();
+
+    chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+        if (message.command === 'refresh_task_status') {
+            checkTaskStatus();
+        }
     });
-
-    const is_task_active = taskStatusResponse ? taskStatusResponse.is_task_active : false;
-
-    if (!is_task_active) {
-        // NOTICE: Since general.js is loaded before content.js, this return will cause content.js to not load as well.
-        printDebug("general", "No active task, script is disabled");
-        return;
-    }
 
     const event_tracker = {
 
@@ -145,6 +151,7 @@
         },
 
         handleEvent(event, type) {
+            if (!is_task_active) return;
             if (annotation_module.is_annotating) return;
 
             const target = event.target;

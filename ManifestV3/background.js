@@ -41,8 +41,6 @@ async function setCurrentTask(task_id) {
     return await _set_session({ [TASK_STORAGE_KEY]: task_id });
 }
 
-// SECURITY: Avoid storing passwords in local storage.
-// The 'password' field has been removed.
 async function getUserInfo() {
     const { username, access_token, refresh_token, logged_in } = await _get_session(['username', 'access_token', 'refresh_token', 'logged_in']);
     printDebug("background", `User Info - Username: ${username}, Access Token: ${access_token ? 'Set' : 'Not Set'}, Refresh Token: ${refresh_token ? 'Set' : 'Not Set'}, Logged In: ${logged_in}`);
@@ -177,6 +175,7 @@ async function checkActiveTask() {
 
         if (is_task_started || is_task_finished) {
             printDebug("background", `Task state changed. Old: ${old_task_id}, New: ${new_task_id}`);
+            broadcastToTabs({ command: 'refresh_task_status' });
             if (!await hasPendingAnnotation()) {
                 await closeAllIrrelevantTabs();
             }
@@ -838,6 +837,23 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
                 printDebug("background", `Detected URL change that might affect task status: ${path}. Forcing task check.`);
                 await checkActiveTask();
             }
+        }
+    }
+});
+
+chrome.webNavigation.onHistoryStateUpdated.addListener(async (details) => {
+    // Only process for the top-level frame
+    if (details.frameId === 0) {
+        await initializeConfig();
+        const config = getConfig();
+        if (!_is_server_page(details.url)) { // Exclude server pages
+            printDebug("background", `webNavigation.onHistoryStateUpdated detected for tab ${details.tabId}. URL: ${details.url}`);
+            chrome.tabs.sendMessage(details.tabId, { command: 'web_navigation_updated', url: details.url }, (response) => {
+                if (chrome.runtime.lastError) {
+                    // Suppress errors for tabs that don't have the content script injected yet
+                    // console.warn(`Error sending web_navigation_updated to tab ${details.tabId}:`, chrome.runtime.lastError.message);
+                }
+            });
         }
     }
 });

@@ -922,13 +922,24 @@ async function testConnection(serverType) {
                     type: "update_message_box_style",
                     style: style
                 }, function(response) {
-                    if (chrome.runtime.lastError || !response?.success) {
+                    const lastError = chrome.runtime.lastError;
+
+                    if (lastError) {
+                        const errorMsg = lastError.message;
+                        // Ignore errors indicating the content script is not present
+                        if (errorMsg.includes("Receiving end does not exist") || 
+                            errorMsg.includes("Could not establish connection")) {
+                            return;
+                        }
+                    }
+
+                    if (lastError || !response?.success) {
                         if (retries > 0) {
                             setTimeout(() => {
                                 sendMessageToContentScript(style, retries - 1);
                             }, 100);
                         } else {
-                            console.error("Failed to send message to content script after multiple retries:", chrome.runtime.lastError.message);
+                            console.error("Failed to send message to content script after multiple retries:", lastError ? lastError.message : "Unknown error");
                         }
                     }
                 });

@@ -141,14 +141,8 @@ def clean_project() -> None:
     run_manage_py_command("flush", "--no-input")
 
     print_success("--- Cleaning complete ---")
-
-
-def setup_development_data() -> None:
-    """
-    Loads initial data and creates test users for a development environment.
-    """
-    print_header("Setting up development data")
-
+    
+def load_datasets() -> None:
     # Load dataset.
     run_manage_py_command(
         "load_nq_dataset",
@@ -159,6 +153,15 @@ def setup_development_data() -> None:
     run_manage_py_command(
         "load_nq_dataset", "./data/tutorial_questions.jsonl", "tutorial"
     )
+
+
+def setup_development_data() -> None:
+    """
+    Loads initial data and creates test users for a development environment.
+    """
+    print_header("Setting up development data")
+    
+    load_datasets()
 
     # Create test users.
     print_info("Creating test users...")
@@ -210,8 +213,11 @@ def main() -> None:
     run_manage_py_command("migrate")
     print_success("--- Migrations complete ---")
 
-    if args.clean and IS_DEBUG:
-        setup_development_data()
+    if args.clean:
+        if IS_DEBUG:
+            setup_development_data()
+        else:
+            load_datasets()
 
     # Start the appropriate server.
     if IS_DEBUG:

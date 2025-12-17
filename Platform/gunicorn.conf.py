@@ -13,10 +13,10 @@ bind = os.getenv("GUNICORN_BIND_ADDRESS", "0.0.0.0:8000")
 
 # The number of worker processes.
 # A common recommendation is 2 * cpu_cores + 1
-workers = multiprocessing.cpu_count() * 2
+workers = multiprocessing.cpu_count()
 
 # The type of worker to use.
-worker_class = "sync"
+worker_class = "gevent"
 
 # Log to stdout and stderr
 accesslog = "-"

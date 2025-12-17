@@ -5,7 +5,6 @@
  */
 class Message {
     constructor() {
-        this.send_flag = false;
         this.command = "";
         this.start_timestamp = 0;
         this.end_timestamp = 0;

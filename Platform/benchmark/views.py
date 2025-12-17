@@ -1,6 +1,6 @@
 from django.db import models
 from django.views.decorators.http import require_POST, require_http_methods
-from asgiref.sync import async_to_sync
+from asgiref.sync import async_to_sync, sync_to_async
 import re
 import csv
 from django.shortcuts import render, get_object_or_404

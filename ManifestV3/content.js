@@ -365,6 +365,24 @@ chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
         return true;
     }
 
+    if (message.command === 'refresh_task_status') {
+        printDebug("content", "Received refresh_task_status message.");
+        (async () => {
+            try {
+                await updateTaskStatus();
+                if (getTaskStatus()) {
+                    setupTaskUI();
+                } else {
+                    removeExistingBoxes();
+                }
+            } catch (e) {
+                console.error("Error handling refresh_task_status:", e);
+            }
+        })();
+        sendResponse({success: true});
+        return true;
+    }
+
     
 
     // Handle messages from the popup
@@ -420,10 +438,71 @@ function applyMessageBoxStyle(style) {
 // --- Interaction Blocking Logic ---
 function blockInteractions() {
     if (document.getElementById('utrt-interaction-blocker')) return;
+    
     const blocker = document.createElement('div');
     blocker.id = 'utrt-interaction-blocker';
     blocker.classList.add('rr-block', 'rr-ignore');
-    blocker.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:2147483647;background:transparent;cursor:wait;';
+    
+    // Create style for the spinner and overlay
+    const style = document.createElement('style');
+    style.textContent = `
+        #utrt-interaction-blocker {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 2147483647;
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(2px);
+            cursor: wait;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            color: #2c3e50;
+            transition: opacity 0.3s ease;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .utrt-spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #e0e0e0;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            animation: utrt-spin 1s cubic-bezier(0.68, -0.55, 0.27, 1.55) infinite; /* Bouncy spin */
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        @keyframes utrt-spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .utrt-message {
+            font-size: 18px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            text-align: center;
+            padding: 0 20px;
+            animation: utrt-pulse 2s infinite ease-in-out;
+        }
+        @keyframes utrt-pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+    `;
+    
+    blocker.appendChild(style);
+
+    const spinner = document.createElement('div');
+    spinner.className = 'utrt-spinner';
+    blocker.appendChild(spinner);
+
+    const message = document.createElement('div');
+    message.className = 'utrt-message';
+    message.textContent = 'Initializing Recorder... Please Wait';
+    blocker.appendChild(message);
     
     if (document.body) document.body.appendChild(blocker);
     else if (document.documentElement) document.documentElement.appendChild(blocker);

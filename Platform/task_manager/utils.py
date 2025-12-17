@@ -339,6 +339,7 @@ def check_is_redirected_page(webpage):
     return (
         webpage.dwell_time < 500
         or (webpage.mouse_moves == "[]" and webpage.event_list == "[]")
+        or webpage.rrweb_record == "[]"
     )
 
 

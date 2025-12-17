@@ -208,9 +208,7 @@ class Webpage(models.Model):
     dwell_time = models.IntegerField(null=True)
     width = models.IntegerField(null=True)
     height = models.IntegerField(null=True)
-    page_switch_record = models.JSONField(
-        null=True
-    )  # page switch record in JSON format
+    page_switch_record = models.JSONField(null=True)  # page switch record in JSON format
     mouse_moves = models.JSONField()  # mouse move data in JSON format
     event_list = models.JSONField()  # list of events in JSON format
     rrweb_record = models.JSONField()  # rrweb record in JSON forma

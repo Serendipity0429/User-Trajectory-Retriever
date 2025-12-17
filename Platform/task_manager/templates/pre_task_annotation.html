@@ -197,7 +197,7 @@
                             <p>If you have an idea of the answer, or a possible range for it, please specify it below.</p>
                             <div class="d-flex align-items-stretch">
                                 <div class="flex-grow-1 me-3">
-                                    <input type="text" class="form-control h-100" id="initial_guess" name="initial_guess" placeholder="Your initial guess or range">
+                                    <input type="text" class="form-control h-100" id="initial_guess" name="initial_guess" placeholder="e.g.,around 40 days, in 2017, Bill Gates, etc.">
                                 </div>
                                 <div>
                                     <input type="checkbox" class="btn-check" name="initial_guess_unknown" id="initial_guess_unknown" autocomplete="off">
@@ -205,6 +205,13 @@
                                 </div>
                             </div>
                             <div class="invalid-feedback">Please provide an initial guess or check "I don't know".</div>
+                            
+                            <!-- Hidden reason field -->
+                            <div id="initial_guess_reason_container" class="mt-2" style="display: none;">
+                                <label for="initial_guess_reason" class="form-label text-muted">Why do you have no guess?</label>
+                                <input type="text" class="form-control" id="initial_guess_reason" name="initial_guess_reason" placeholder="e.g., Never heard of this term, Ambiguous question...">
+                                <div class="invalid-feedback">Please provide a reason for having no guess.</div>
+                            </div>
                         </div>                        <!-- Expected Source of Answer -->
                         <div class="mb-4 p-3 border rounded">
                             <h5><strong>8. Expected Source of Answer</strong></h5>
@@ -261,9 +268,12 @@
         // Initial Guess Logic
         $('#initial_guess_unknown').change(function() {
             if ($(this).is(':checked')) {
-                $('#initial_guess').val('').prop('disabled', true);
+                $('#initial_guess').val('').prop('disabled', true).removeClass('is-invalid');
+                $('#initial_guess_reason_container').slideDown();
             } else {
                 $('#initial_guess').prop('disabled', false);
+                $('#initial_guess_reason_container').slideUp();
+                $('#initial_guess_reason').val('').removeClass('is-invalid');
             }
         });
 
@@ -333,10 +343,20 @@
             // Validation for initial guess
             const initialGuess = $('#initial_guess');
             const initialGuessUnknown = $('#initial_guess_unknown');
-            if (!initialGuessUnknown.is(':checked') && initialGuess.val().trim() === '') {
-                initialGuess.addClass('is-invalid');
-                setFocus(initialGuess);
-                isValid = false;
+            const initialGuessReason = $('#initial_guess_reason');
+            
+            if (!initialGuessUnknown.is(':checked')) {
+                if (initialGuess.val().trim() === '') {
+                    initialGuess.addClass('is-invalid');
+                    setFocus(initialGuess);
+                    isValid = false;
+                }
+            } else {
+                if (initialGuessReason.val().trim() === '') {
+                    initialGuessReason.addClass('is-invalid');
+                    setFocus(initialGuessReason);
+                    isValid = false;
+                }
             }
 
             // Validation for expected source

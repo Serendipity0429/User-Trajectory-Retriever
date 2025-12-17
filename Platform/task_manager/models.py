@@ -66,6 +66,7 @@ class PreTaskAnnotation(models.Model):
 
     initial_guess = models.TextField(null=True, blank=True)
     initial_guess_unknown = models.BooleanField(default=False)
+    initial_guess_reason = models.TextField(null=True, blank=True)
     expected_source = models.JSONField(null=True, blank=True)
     expected_source_other = models.TextField(null=True, blank=True)
     submission_timestamp = models.DateTimeField(auto_now_add=True, null=True)

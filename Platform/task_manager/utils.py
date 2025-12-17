@@ -492,13 +492,69 @@ def check_answer(entry, user_answer, llm=True):
 def close_window():
     # This script sends a message to our `close_helper.js` content script,
     # which then securely communicates with the background script to close the tab.
-    return HttpResponse(
-        """
-        <html><body><script>
+    html_content = """
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <title>Closing...</title>
+        <style>
+            body {
+                margin: 0;
+                padding: 0;
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100vw;
+                height: 100vh;
+                background: rgba(255, 255, 255, 0.9);
+                backdrop-filter: blur(2px);
+                cursor: wait;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+                color: #2c3e50;
+            }
+            .utrt-spinner {
+                width: 50px;
+                height: 50px;
+                border: 4px solid #e0e0e0;
+                border-top: 4px solid #3498db;
+                border-radius: 50%;
+                animation: utrt-spin 1s cubic-bezier(0.68, -0.55, 0.27, 1.55) infinite;
+                margin-bottom: 20px;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            }
+            @keyframes utrt-spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+            }
+            .utrt-message {
+                font-size: 18px;
+                font-weight: 600;
+                letter-spacing: 0.5px;
+                text-align: center;
+                padding: 0 20px;
+                animation: utrt-pulse 2s infinite ease-in-out;
+            }
+            @keyframes utrt-pulse {
+                0%, 100% { opacity: 1; }
+                50% { opacity: 0.7; }
+            }
+        </style>
+    </head>
+    <body>
+        <div class="utrt-spinner"></div>
+        <div class="utrt-message">Please wait, this page will close automatically.</div>
+        <script>
             window.postMessage({ type: "UTR_CLOSE_WINDOW_REQUEST" }, "*");
-        </script>Please wait, this page will close automatically.</body></html>
+        </script>
+    </body>
+    </html>
     """
-    )
+    return HttpResponse(html_content)
 
 
 def render_status_page(request, title, message, alert_type="info"):

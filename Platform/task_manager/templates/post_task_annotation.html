@@ -328,6 +328,14 @@
                 isValid = false;
             }
 
+            // Validation for unhelpful paths 'other'
+            const unhelpfulPathsOther = $('input[name="unhelpful_paths_other"]');
+            if ($('input[name="unhelpful_paths"][value="other"]').is(':checked') && unhelpfulPathsOther.val().trim() === '') {
+                unhelpfulPathsOther.addClass('is-invalid');
+                setFocus(unhelpfulPathsOther);
+                isValid = false;
+            }
+
             // Validation for strategic shift
             const strategyShift = $('input[name="strategy_shift"]:checked');
             const strategyShiftOther = $('input[name="strategy_shift_other"]');
@@ -376,6 +384,11 @@
             $('input[name="aha_moment_other"]').removeClass('is-invalid');
         });
         $('input[name="aha_moment_other"]').on('input', () => $('input[name="aha_moment_other"]').removeClass('is-invalid'));
+        $('input[name="unhelpful_paths"][value="other"]').change(() => {
+            $('input[name="unhelpful_paths"]').closest('.w-100').removeClass('is-invalid');
+            $('input[name="unhelpful_paths_other"]').removeClass('is-invalid');
+        });
+        $('input[name="unhelpful_paths_other"]').on('input', () => $('input[name="unhelpful_paths_other"]').removeClass('is-invalid'));
         $('input[name="strategy_shift"]').change(() => {
             $('input[name="strategy_shift"]').closest('.w-100').removeClass('is-invalid');
             $('input[name="strategy_shift_other"]').removeClass('is-invalid');

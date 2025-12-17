@@ -4,9 +4,9 @@
 const defaultConfig = {
     serverType: 'remote', // 'local' or 'remote'
     localServerAddress: 'http://127.0.0.1:8000',
-    remoteServerAddress: 'http://101.6.41.59:32904',
+    remoteServerAddress: 'http://101.6.43.73:32904/', // Temporary
     isPassiveMode: true,
-    cancelTrialThreshold: 10, // Number of cancellations allowed before submission
+    cancelTrialThreshold: 5, // Number of cancellations allowed before submission
     messageBoxSize: 'medium',
     messageBoxPosition: 'top-right',
     popupScale: 1,
@@ -28,8 +28,8 @@ function initializeConfig() {
 
     initializationPromise = (async () => {
         // NOTICE: manually switch the development mode
-        // const IS_DEV = false; // For production use, set to false
-        const IS_DEV = true; // For development purposes, set to true
+        const IS_DEV = false; // For production use, set to false
+        // const IS_DEV = true; // For development purposes, set to true
 
         const _get_local_config = (keys) => new Promise(resolve => chrome.storage.local.get(keys, resolve));
         const _set_local_config = (kv_pairs) => new Promise(resolve => chrome.storage.local.set(kv_pairs, resolve));

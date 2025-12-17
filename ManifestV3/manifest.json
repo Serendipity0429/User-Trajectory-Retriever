@@ -1,6 +1,6 @@
 {
   "name": "Alpha-UTRT: THUIR User Trajectory Retriever Toolkit",
-  "version": "3.1",
+  "version": "4.0",
   "manifest_version": 3,
   "description": "This extension records user interactions for academic research, allowing for replay and analysis of web trajectories.",
   "icons": {

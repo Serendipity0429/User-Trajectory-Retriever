@@ -778,6 +778,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     // Not the last tab, just close it.
                     await chrome.tabs.remove(sender.tab.id);
                 }
+                await checkActiveTask();
                 sendResponse({ success: true });
                 break;
 
@@ -815,8 +816,7 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
 
 chrome.tabs.onRemoved.addListener(async (tabId, removeInfo) => {
     await initializeConfig();
-    printDebug("background", `Tab ${tabId} was closed. Forcing a check for active task status.`);
-    throttledCheckActiveTaskID();
+    printDebug("background", `Tab ${tabId} was closed.`);
 });
 
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {

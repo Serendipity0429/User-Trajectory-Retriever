@@ -122,6 +122,7 @@ def clean_project() -> None:
         WORK_DIR / "msg_system" / "migrations",
         WORK_DIR / "media" / "attachments",
         WORK_DIR / "media" / "evidence_images",
+        WORK_DIR / "media" / "benchmark_datasets",
         WORK_DIR / "staticfiles",
     ]
 

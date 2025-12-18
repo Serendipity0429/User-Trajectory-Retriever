@@ -1,6 +1,7 @@
 /**
  * @fileoverview Manages the UI for the annotation modal.
  * Separated from general.js for better maintainability.
+ * Only enabled in active annotation mode
  */
 
 const ANNOTATION_MODAL_STYLE = `

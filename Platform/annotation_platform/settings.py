@@ -31,6 +31,7 @@ ADMIN_USERNAME = config("ADMIN_USERNAME", default="admin")
 # It exposes sensitive information, such as detailed error pages and configuration details.
 # Always set DEBUG = False in a production environment.)
 DEBUG = config("DJANGO_DEBUG", default=True, cast=bool)
+IP_TO_LAUNCH = config("IP_TO_LAUNCH", default="http://127.0.0.1:8000/")
 
 # As requested, host permissions are not being strictly configured for this stage.
 # However, for production, you should replace '*' with your actual domain names.
@@ -216,7 +217,7 @@ else:
     CORS_ALLOWED_ORIGINS = [
         "http://localhost:8080",
         "http://127.0.0.1:8000",
-        "http://101.6.41.59:32904",
+        IP_TO_LAUNCH.rstrip("/"),
     ]
     CORS_ALLOWED_ORIGIN_REGEXES = [
         r"^chrome-extension://.*$",
@@ -225,7 +226,7 @@ else:
 CSRF_TRUSTED_ORIGINS = [
     "http://localhost:8080",
     "http://127.0.0.1:8000",
-    "http://101.6.41.59:32904",
+    IP_TO_LAUNCH.rstrip("/"),
     "chrome-extension://bbjnmhakmlafhniehkjmpcgfalppcjmf",
 ]
 CSRF_TRUSTED_ORIGINS_REGEXES = [
@@ -241,8 +242,6 @@ CORS_ALLOW_METHODS = (
     "PUT",
     "VIEW",
 )
-
-IP_TO_LAUNCH = config("IP_TO_LAUNCH", default="http://127.0.0.1:8000/")
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (

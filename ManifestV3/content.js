@@ -242,14 +242,31 @@ async function initialize() {
     try {
         await initializeConfig(); // Ensure config is loaded before proceeding
 
-        const login_response = await new Promise((resolve, reject) => {
-            chrome.runtime.sendMessage({ type: MSG_TYPE_POPUP, command: "check_logging_status" }, (response) => {
-                if (chrome.runtime.lastError) {
-                    return reject(chrome.runtime.lastError);
+        let attempts = 0;
+        const maxAttempts = 3;
+        let login_response = null;
+
+        while (attempts < maxAttempts) {
+            try {
+                login_response = await new Promise((resolve, reject) => {
+                    chrome.runtime.sendMessage({ type: MSG_TYPE_POPUP, command: "check_logging_status" }, (response) => {
+                        if (chrome.runtime.lastError) {
+                            return reject(chrome.runtime.lastError);
+                        }
+                        resolve(response);
+                    });
+                });
+                // If we get here, the connection worked
+                break; 
+            } catch (e) {
+                attempts++;
+                if (attempts >= maxAttempts) {
+                    throw e; // Re-throw after max retries
                 }
-                resolve(response);
-            });
-        });
+                // Wait before retrying (backoff: 500ms, 1000ms, etc.)
+                await new Promise(r => setTimeout(r, 500 * attempts));
+            }
+        }
 
         if (!login_response || !login_response.log_status) {
             printDebug("content", "User is not logged in. Exiting content script.");
@@ -257,7 +274,18 @@ async function initialize() {
             return;
         }
 
-        await updateTaskStatus();
+        // Retry for updateTaskStatus as well
+        attempts = 0;
+        while (attempts < maxAttempts) {
+            try {
+                await updateTaskStatus();
+                break;
+            } catch (e) {
+                attempts++;
+                if (attempts >= maxAttempts) throw e;
+                await new Promise(r => setTimeout(r, 500 * attempts));
+            }
+        }
 
         if (!getTaskStatus()) {
             printDebug("content", "No active task. Exiting content script.");

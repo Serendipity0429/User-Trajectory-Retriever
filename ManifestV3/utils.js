@@ -23,6 +23,33 @@ const processQueue = (error, token = null) => {
     failedQueue = [];
 };
 
+/**
+ * Retries an async operation with exponential backoff.
+ * @param {Function} operation - The async function to retry.
+ * @param {number} [retries] - Number of retries. Defaults to config.max_retries.
+ * @param {number} [baseDelay] - Base delay in ms. Defaults to 500ms.
+ * @returns {Promise<any>} - The result of the operation.
+ */
+async function withRetry(operation, retries = null, baseDelay = 500) {
+    const config = getConfig();
+    const maxRetries = retries !== null ? retries : (config?.max_retries || 3);
+    let attempt = 0;
+
+    while (true) {
+        try {
+            return await operation();
+        } catch (error) {
+            if (attempt >= maxRetries) {
+                throw error;
+            }
+            attempt++;
+            const delay = baseDelay * attempt;
+            printDebug("utils", `Retry attempt ${attempt}/${maxRetries} failed. Retrying in ${delay}ms...`, error);
+            await new Promise(resolve => setTimeout(resolve, delay));
+        }
+    }
+}
+
 async function refreshToken() {
     if (isRefreshing) {
         return new Promise((resolve, reject) => {
@@ -32,120 +59,106 @@ async function refreshToken() {
 
     isRefreshing = true;
     const config = getConfig();
-    const MAX_RETRIES = config.max_retries || 3;
-    let attempt = 0;
 
-    while (attempt < MAX_RETRIES) {
+    const refreshOperation = async () => {
         const { refresh_token } = await _get_session('refresh_token');
         if (!refresh_token) {
-            printDebug("utils", "Refresh token not found. Forcing logout.");
-            await _remove_session(['access_token', 'refresh_token', 'username', 'logged_in']);
-            chrome.runtime.sendMessage({ command: "alter_logging_status", log_status: false });
-            chrome.action.setBadgeText({ text: '' });
-            
-            isRefreshing = false;
-            processQueue(new Error("No refresh token available"), null);
-            return null;
+            throw new Error("No refresh token available");
         }
 
-        try {
-            const response = await fetch(config.urls.token_refresh, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                body: new URLSearchParams({ 'refresh': refresh_token }),
-            });
+        const response = await fetch(config.urls.token_refresh, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: new URLSearchParams({ 'refresh': refresh_token }),
+        });
 
-            if (response.ok) {
-                const data = await response.json();
-                const new_access_token = data.access;
-                await _set_session({ 'access_token': new_access_token });
-                printDebug("utils", "Token refreshed successfully.");
-                processQueue(null, new_access_token);
-                isRefreshing = false;
-                return new_access_token;
-            } else {
-                throw new Error(`Failed to refresh token. Status: ${response.status}`);
-            }
-        } catch (error) {
-            console.error(`Error during token refresh (attempt ${attempt + 1}):`, error);
-            attempt++;
-            if (attempt >= MAX_RETRIES) {
-                console.error("Max retries reached. Forcing logout.");
-                await _remove_session(['access_token', 'refresh_token', 'username', 'logged_in']);
-                chrome.runtime.sendMessage({ command: "alter_logging_status", log_status: false });
-                chrome.action.setBadgeText({ text: '' });
-                processQueue(new Error("Refresh token is invalid"), null);
-                isRefreshing = false;
-                return null;
-            }
-            await new Promise(resolve => setTimeout(resolve, 500)); // Wait before retrying
+        if (response.ok) {
+            const data = await response.json();
+            return data.access;
+        } else {
+            throw new Error(`Failed to refresh token. Status: ${response.status}`);
         }
+    };
+
+    try {
+        const new_access_token = await withRetry(refreshOperation);
+        await _set_session({ 'access_token': new_access_token });
+        printDebug("utils", "Token refreshed successfully.");
+        processQueue(null, new_access_token);
+        isRefreshing = false;
+        return new_access_token;
+    } catch (error) {
+        printDebug("utils", "Token refresh failed after retries:", error);
+        await _remove_session(['access_token', 'refresh_token', 'username', 'logged_in']);
+        chrome.runtime.sendMessage({ command: "alter_logging_status", log_status: false });
+        chrome.action.setBadgeText({ text: '' });
+        processQueue(error, null);
+        isRefreshing = false;
+        return null;
     }
 }
 
 async function _request(method, url, data = {}, content_type = 'form', response_type = 'json', request_timeout = null, with_credentials = false)
 {
     const config = getConfig();
-    const MAX_RETRIES = config.max_retries || 3;
     const TIMEOUT = request_timeout || config.request_timeout || 3000;
-    let attempt = 0;
-    while (attempt < MAX_RETRIES) {
+
+    const requestOperation = async () => {
+        const { access_token, extension_session_token } = await _get_session(['access_token', 'extension_session_token']);
+        let headers = {
+            'Accept': 'application/json'
+        };
+        let body;
+        let request_url = url;
+
+        if (method.toUpperCase() === 'POST') {
+            // If data is empty, send an empty body
+            if (!data || Object.keys(data).length === 0) {
+                body = null;
+            } else {
+                switch (content_type) {
+                    case 'json':
+                        headers["Content-Type"] = "application/json";
+                        body = JSON.stringify(data);
+                        break;
+                    case 'text':
+                        headers["Content-Type"] = "text/plain";
+                        body = typeof data === "string" ? data : String(data);
+                        break;
+                    case 'form':
+                    default:
+                        headers["Content-Type"] = "application/x-www-form-urlencoded";
+                        body = new URLSearchParams(data);
+                        break;
+                }
+            }
+        }
+
+        if (access_token && url !== config.urls.token_login) {
+            headers["Authorization"] = `Bearer ${access_token}`;
+            if (extension_session_token) {
+                headers["X-Extension-Session-Token"] = extension_session_token;
+            }
+        }
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), TIMEOUT);
+
+        const fetchOptions = {
+            method: method.toUpperCase(),
+            headers,
+            body,
+            signal: controller.signal,
+        };
+
+        if (with_credentials) {
+            fetchOptions.credentials = 'include';
+        }
+
         try {
-            const { access_token, extension_session_token } = await _get_session(['access_token', 'extension_session_token']);
-            let headers = {
-                'Accept': 'application/json'
-            };
-            let body;
-            let request_url = url;
-
-            if (method.toUpperCase() === 'POST') {
-                // If data is empty, send an empty body
-                if (!data || Object.keys(data).length === 0) {
-                    body = null;
-                } else {
-                    switch (content_type) {
-                        case 'json':
-                            headers["Content-Type"] = "application/json";
-                            body = JSON.stringify(data);
-                            break;
-                        case 'text':
-                            headers["Content-Type"] = "text/plain";
-                            body = typeof data === "string" ? data : String(data);
-                            break;
-                        case 'form':
-                        default:
-                            headers["Content-Type"] = "application/x-www-form-urlencoded";
-                            body = new URLSearchParams(data);
-                            break;
-                    }
-                }
-            }
-
-            if (access_token && url !== config.urls.token_login) {
-                headers["Authorization"] = `Bearer ${access_token}`;
-                if (extension_session_token) {
-                    headers["X-Extension-Session-Token"] = extension_session_token;
-                }
-            }
-
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), TIMEOUT);
-
-            const fetchOptions = {
-                method: method.toUpperCase(),
-                headers,
-                body,
-                signal: controller.signal,
-            };
-
-            if (with_credentials) {
-                fetchOptions.credentials = 'include';
-            }
-
             let response = await fetch(request_url, fetchOptions);
-
             clearTimeout(timeoutId);
 
             // Refresh token if unauthorized
@@ -176,7 +189,6 @@ async function _request(method, url, data = {}, content_type = 'form', response_
                         }
                         return json_response;
                     } catch (e) {
-                        // If parsing fails or an error was thrown, re-throw it.
                         throw e;
                     }
                 default:
@@ -186,16 +198,18 @@ async function _request(method, url, data = {}, content_type = 'form', response_
                     return response;
             }
         } catch (error) {
-            attempt++;
-            if (error.name === 'AbortError') {
+             if (error.name === 'AbortError') {
                 printDebug("utils", `Request timed out after ${TIMEOUT}ms: ${url}`);
             }
-            if (attempt >= MAX_RETRIES) {
-                printDebug("utils", `API request failed after ${MAX_RETRIES} attempts: ${url}`, error);
-                throw error;
-            }
-            await new Promise(resolve => setTimeout(resolve, 500 * attempt));
+            throw error;
         }
+    };
+
+    try {
+        return await withRetry(requestOperation);
+    } catch (error) {
+        printDebug("utils", `API request failed after retries: ${url}`, error);
+        throw error;
     }
 }
 

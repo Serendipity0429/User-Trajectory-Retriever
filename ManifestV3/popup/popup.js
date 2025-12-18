@@ -934,36 +934,41 @@ async function testConnection(serverType) {
 
     cancelSettingsBtn.addEventListener('click', handleCloseControlPanel);
 
-    function sendMessageToContentScript(style, retries = 3) {
-        chrome.tabs.query({ active: true, currentWindow: true }, function(tabs) {
+    async function sendMessageToContentScript(style) {
+        const operation = async () => {
+            const tabs = await new Promise(resolve => chrome.tabs.query({ active: true, currentWindow: true }, resolve));
             if (tabs[0] && tabs[0].id) {
-                chrome.tabs.sendMessage(tabs[0].id, {
-                    type: "update_message_box_style",
-                    style: style
-                }, function(response) {
-                    const lastError = chrome.runtime.lastError;
+                return new Promise((resolve, reject) => {
+                    chrome.tabs.sendMessage(tabs[0].id, {
+                        type: "update_message_box_style",
+                        style: style
+                    }, function(response) {
+                        const lastError = chrome.runtime.lastError;
 
-                    if (lastError) {
-                        const errorMsg = lastError.message;
-                        // Ignore errors indicating the content script is not present
-                        if (errorMsg.includes("Receiving end does not exist") || 
-                            errorMsg.includes("Could not establish connection")) {
-                            return;
+                        if (lastError) {
+                            const errorMsg = lastError.message;
+                            // Ignore errors indicating the content script is not present
+                            if (errorMsg.includes("Receiving end does not exist") || 
+                                errorMsg.includes("Could not establish connection")) {
+                                return resolve(); // Resolve successfully to stop retrying
+                            }
+                            return reject(lastError);
                         }
-                    }
 
-                    if (lastError || !response?.success) {
-                        if (retries > 0) {
-                            setTimeout(() => {
-                                sendMessageToContentScript(style, retries - 1);
-                            }, 100);
-                        } else {
-                            console.error("Failed to send message to content script after multiple retries:", lastError ? lastError.message : "Unknown error");
+                        if (!response?.success) {
+                            return reject(new Error("Response not successful"));
                         }
-                    }
+                        resolve(response);
+                    });
                 });
             }
-        });
+        };
+
+        try {
+            await withRetry(operation, 3, 100);
+        } catch (error) {
+            console.error("Failed to send message to content script after multiple retries:", error ? error.message : "Unknown error");
+        }
     }
 
     const sizeBtns = document.querySelectorAll('.size-btn');

@@ -51,12 +51,13 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "corsheaders",
+    "captcha",
     "task_manager",
     "user_system.apps.UserSystemConfig",
     "discussion",
-    "msg_system",
-    "captcha",
-    "benchmark",
+    'msg_system',
+    'core',
+    'benchmark',
     "dashboard",
 ]
 
@@ -275,6 +276,9 @@ LOGGING = {
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = os.path.join(BASE_DIR, "media")
+
+# Django 6.0 transitional setting for URLField
+FORMS_URLFIELD_ASSUME_HTTPS = True
 
 # Compression setting for rrweb_record
 ENABLE_RRWEB_COMPRESSION = True

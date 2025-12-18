@@ -9,29 +9,23 @@ from datetime import datetime
 from django.utils import timezone
 import re
 from dateutil.parser import parse as parse_date, ParserError
-import redis
 from django.shortcuts import render
 import random
 
 from .models import Task, Webpage, TaskDataset, TaskDatasetEntry
 
-try:
-    import simplejson as json
-except ImportError:
-    import json
 import time
-import base64
-import zlib
 import uuid
+import json
+import zlib
+import base64
 from django.urls import reverse
 from .models import TaskTrial
 from django.core.exceptions import ObjectDoesNotExist
+from core.utils import redis_client, print_debug, print_json_debug, decompress_json_data
 
-# Redis client instance
-redis_client = redis.StrictRedis(
-    host=settings.REDIS_HOST, port=settings.REDIS_PORT, db=settings.REDIS_DB
-)
-
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 def get_annotation_state(user_id):
     """Helper to get annotation state from Redis, initializing if not present."""
@@ -61,40 +55,6 @@ def set_annotation_state(user_id, state):
     """Helper to save annotation state back to Redis."""
     state_key = f"annotation_state:{user_id}"
     redis_client.set(state_key, json.dumps(state))
-
-
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-
-
-def print_debug(*args, **kwargs):
-    if settings.DEBUG:
-        message = " ".join(map(str, args)) + " ".join(
-            f"{k}={v}" for k, v in kwargs.items()
-        )
-        logger.info(message)
-
-
-def print_json_debug(message):
-    truncator = 50
-    # only print the first 50 characters for each key
-    message = {
-        k: (
-            v[:truncator] + "..."
-            if hasattr(v, "__getitem__") and len(v) > truncator
-            else v
-        )
-        for k, v in message.items()
-    }
-    print_debug(json.dumps(message, indent=4))
-
-
-def decompress_json_data(compressed_data):
-    compressed_bytes = base64.b64decode(compressed_data)
-    decompressed_bytes = zlib.decompress(compressed_bytes).decode("utf-8")
-    decompressed_json = json.loads(decompressed_bytes)
-    return decompressed_json
-
 
 def start_annotating(request, name):
     user_id = request.user.id
@@ -169,10 +129,27 @@ def safe_int(val):
         return None
 
 
+def acquire_lock(lock_key, timeout=30, wait_time=0.1):
+    """
+    Attempts to acquire a Redis lock.
+    Returns True if acquired, False if timed out.
+    """
+    expires = time.time() + timeout
+    while time.time() < expires:
+        if redis_client.set(lock_key, 1, nx=True, ex=timeout):
+            return True
+        time.sleep(wait_time)
+    return False
+
+
 def store_data(request, message, user):
     user_id = user.id
     lock_key = f"data_store_lock:{user_id}"
-    redis_client.set(lock_key, 1, ex=30)  # Lock with a 30-second timeout
+
+    # Attempt to acquire lock
+    if not acquire_lock(lock_key):
+        logger.warning(f"Could not acquire data store lock for user {user.username}. Dropping packet.")
+        return
 
     try:
         state = get_annotation_state(user_id)

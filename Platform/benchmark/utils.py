@@ -36,14 +36,16 @@ def handle_async_api_error(view_func):
     return _wrapped_view
 
 
-def print_debug(*args, **kwargs):
-    if settings.DEBUG:
-        message = " ".join(map(str, args)) + " ".join(
-            f"{k}={v}" for k, v in kwargs.items()
-        )
-        logger.info(message)
+from core.utils import print_debug
+
+
+
+
 
 def count_questions_in_file(file_path):
+
+
+
     count = 0
     try:
         with open(file_path, 'r', encoding='utf-8') as f:

@@ -598,31 +598,39 @@ def task_home(request):
 def annotation_home(request):
 
     user = request.user
+    from django.db.models import Prefetch
 
-    unannotated_tasks = sorted(
-        Task.objects.filter(user=user, active=True), key=lambda task: -task.id
+    # Prefetch webpages for tasks to avoid N+1 problem
+    # We only want webpages that match the criteria: user=user, is_redirected=False, during_annotation=False
+    # Note: user=user is redundant if belong_task.user is already user, but good for safety.
+    webpages_queryset = Webpage.objects.filter(
+        user=user, is_redirected=False, during_annotation=False
+    ).order_by("start_timestamp")
+
+    # Fetch all tasks for the user, prefetching the filtered webpages
+    all_tasks = (
+        Task.objects.filter(user=user)
+        .prefetch_related(
+            Prefetch("webpage_set", queryset=webpages_queryset, to_attr="prefetched_webpages")
+        )
+        .order_by("-id")
     )
-    annotated_tasks = sorted(
-        Task.objects.filter(user=user, active=False), key=lambda task: -task.id
-    )
+
+    unannotated_tasks = []
+    annotated_tasks = []
+
+    for task in all_tasks:
+        if task.active:
+            unannotated_tasks.append(task)
+        else:
+            annotated_tasks.append(task)
 
     def get_webpages(tasks):
         tasks_to_webpages = []
         for task in tasks:
-            tasks_to_webpages.append(
-                (
-                    task,
-                    sorted(
-                        Webpage.objects.filter(
-                            user=user,
-                            belong_task=task,
-                            is_redirected=False,
-                            during_annotation=False,
-                        ),
-                        key=lambda item: item.start_timestamp,
-                    ),
-                )
-            )
+            # Use the prefetched webpages
+            webpages = getattr(task, "prefetched_webpages", [])
+            tasks_to_webpages.append((task, webpages))
         return tasks_to_webpages
 
     # Split unannotated

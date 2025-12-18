@@ -12,15 +12,9 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def print_debug(*args, **kwargs):
-    if settings.DEBUG:
-        message = " ".join(map(str, args)) + " ".join(
-            f"{k}={v}" for k, v in kwargs.items()
-        )
-        logger.info(message)
+from core.utils import print_debug
 
-
-def get_user_from_request(req):
+def get_tokens_for_user(user):
     user = User.objects.get(username=req.session["username"])
     return user
 

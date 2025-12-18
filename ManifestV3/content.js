@@ -98,10 +98,24 @@ function addPulseAnimation() {
     document.head.appendChild(style);
 }
 
+function escapeHTML(str) {
+    if (!str) return '';
+    return str.replace(/[&<>'"]/g, 
+        tag => ({
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            "'": '&#39;',
+            '"': '&quot;'
+        }[tag]));
+}
+
 async function displayQuestionBox(question) {
     if (!question) return;
 
     addPulseAnimation();
+
+    const safeQuestion = escapeHTML(question);
 
     const innerHTML = `
         <h5 style="font-size: 1.2em; margin-bottom: 0.5em; margin-top: 0; display: flex; justify-content: space-between; align-items: flex-start;">
@@ -111,7 +125,7 @@ async function displayQuestionBox(question) {
                 <span class="recording-indicator-dot"></span>
             </span>
         </h5>
-        <p style="font-size: 1.1em; font-weight: 500; margin-bottom: 0; margin-top:0; color:#021e4d"><strong>${question}</strong></p>
+        <p style="font-size: 1.1em; font-weight: 500; margin-bottom: 0; margin-top:0; color:#021e4d"><strong>${safeQuestion}</strong></p>
         <p style="font-size: 0.9em; font-style: italic; margin-top: 10px; color: #555;">Use the right-click menu to mark evidence.</p>
         <div id="evidence-count-container" style="margin-top: 10px; font-size: 0.9em; color: #58595a;">
             Evidence Collected: <span id="evidence-count">0</span>

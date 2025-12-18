@@ -11,10 +11,10 @@ import os
 import json
 from user_system.decorators import admin_required
 from django.db import OperationalError
-from user_system.utils import print_debug
+from core.utils import print_debug, print_json_debug, redis_client
 
 import httpx
-from task_manager.utils import check_answer_rule, check_answer_llm, redis_client
+from task_manager.utils import check_answer_rule, check_answer_llm
 from .search_utils import get_search_engine
 from .utils import count_questions_in_file, handle_api_error, handle_async_api_error, print_debug
 from .models import (
@@ -51,6 +51,7 @@ from .pipelines.agent import (
     BrowserAgentPipeline,
 )
 from .pipeline_manager import PipelineManager
+from .services import TrialService
 from benchmark.prompts import PROMPTS
 
 PIPELINE_CLASS_MAP = {
@@ -66,54 +67,16 @@ PIPELINE_CLASS_MAP = {
 def get_trial_trace(request, trial_id):
     """
     Retrieve the real-time execution trace.
-    Optimized: Checks Redis for completion status first to avoid DB I/O loop.
+    Delegates logic to TrialService.
     """
-    trace_key = f"trial_trace:{trial_id}"
-    status_key = f"trial_status:{trial_id}"
-    
     try:
         cursor = int(request.GET.get('cursor', 0))
-        
-        # 1. Try Fetching Cached Status from Redis (Fastest)
-        cached_status = redis_client.get(status_key)
-        
-        if cached_status:
-            trial_data = json.loads(cached_status)
-        else:
-            # 2. Fallback: Fetch Status/Results from DB (Slower, but necessary if not in Redis)
-            try:
-                trial = MultiTurnTrial.objects.get(pk=trial_id)
-                trial_data = {
-                    "id": trial.id,
-                    "status": trial.status,
-                    "answer": trial.answer,
-                    "feedback": trial.feedback,
-                    "is_correct": trial.is_correct,
-                    "full_response": trial.full_response if trial.status != 'processing' else None
-                }
-            except MultiTurnTrial.DoesNotExist:
-                trial_data = {"status": "error", "error": "Trial not found"}
-
-        # 3. Fetch Trace from Redis
-        trace_json = redis_client.get(trace_key)
-        
-        response_data = {"trial": trial_data, "trace": [], "total_steps": 0}
-
-        if trace_json:
-            full_trace = json.loads(trace_json)
-            response_data["total_steps"] = len(full_trace)
-            
-            if cursor > 0:
-                if cursor < len(full_trace):
-                    response_data["trace"] = full_trace[cursor:]
-            else:
-                response_data["trace"] = full_trace
-        
+        response_data = TrialService.get_trace_data(trial_id, cursor)
         return JsonResponse(response_data)
-
     except Exception as e:
-        print_debug(f"Error retrieving trace: {e}")
-        return JsonResponse({"trace": [], "total_steps": 0, "error": str(e)})
+        print_debug(f"View Error in get_trial_trace: {e}")
+        return JsonResponse({"status": "error", "error": str(e)}, status=500)
+
 
 @admin_required
 def home(request):

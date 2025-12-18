@@ -12,7 +12,8 @@ from .forms import (
     ResetPasswordForm,
 )
 from .models import User, ResetPasswordRequest, InformedConsent
-from .utils import authenticate, print_debug
+from core.utils import print_debug
+from user_system.utils import authenticate
 from django.utils.timezone import now
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.urls import reverse

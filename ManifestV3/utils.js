@@ -30,7 +30,7 @@ const processQueue = (error, token = null) => {
  * @param {number} [baseDelay] - Base delay in ms. Defaults to 500ms.
  * @returns {Promise<any>} - The result of the operation.
  */
-async function withRetry(operation, retries = null, baseDelay = 500) {
+async function withRetry(operation, retries = null, baseDelay = 200) {
     const config = getConfig();
     const maxRetries = retries !== null ? retries : (config?.max_retries || 3);
     let attempt = 0;

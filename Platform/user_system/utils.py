@@ -11,14 +11,6 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-
-from core.utils import print_debug
-
-def get_tokens_for_user(user):
-    user = User.objects.get(username=req.session["username"])
-    return user
-
-
 def authenticate(username, password):
     """
     :param username: username

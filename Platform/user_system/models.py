@@ -27,9 +27,6 @@ class User(AbstractUser):
         related_name="users",
     )
 
-    # No need for custom manager, USERNAME_FIELD, or REQUIRED_FIELDS as AbstractUser provides sensible defaults.
-    # 'username' is the default USERNAME_FIELD.
-    # 'email' is in REQUIRED_FIELDS by default.
 
 
 def get_password_reset_token_expiry_date():

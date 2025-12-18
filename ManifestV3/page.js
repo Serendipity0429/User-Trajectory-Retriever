@@ -217,14 +217,15 @@ class ViewState {
                 // inlineImages: true, // NOTICE: enable image inlining to capture images as base64
                 // dsheet: true, // NOTICE: enable stylesheet inlining to capture custom styles
                 // collectFonts: true, // NOTICE: enable font collection to capture custom fonts
-                recordCanvas: true, // NOTICE: enable canvas recording, which is under experimental stage
-                sampling: {
-                    canvas: 15,
-                },
-                dataURLOptions: {
-                    type: 'image/webp',
-                    quality: 0.8,
-                },
+                // recordCanvas: true, // NOTICE: enable canvas recording, which is under experimental stage
+                // recordCanvas may cause https://github.com/rrweb-io/rrweb/issues/436
+                // sampling: {
+                //     canvas: 15,
+                // },
+                // dataURLOptions: {
+                //     type: 'image/webp',
+                //     quality: 0.8,
+                // },
             });
         } 
         printDebug("page", "rrweb recording started.");
@@ -294,6 +295,15 @@ class ViewState {
         if (window._utrt_routine_interval) {
             clearInterval(window._utrt_routine_interval);
             window._utrt_routine_interval = null;
+        }
+
+        if (this._stop_rrweb_record_fn) {
+            try {
+                this._stop_rrweb_record_fn();
+            } catch (e) {
+                console.error("Error stopping rrweb recording:", e);
+            }
+            this._stop_rrweb_record_fn = null;
         }
 
         this.sendMessage(false);

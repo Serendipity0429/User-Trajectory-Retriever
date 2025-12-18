@@ -88,10 +88,10 @@ class Profile(models.Model):
     )
     EDUCATION_CHOICES = (
         ("", ""),
-        ("high_school", "High School"),
-        ("bachelor", "Bachelor's Degree"),
-        ("master", "Master's Degree"),
         ("phd", "PhD"),
+        ("master", "Master's Degree"),
+        ("bachelor", "Bachelor's Degree"),
+        ("high_school", "High School"),
         ("other", "Other"),
     )
     ENGLISH_PROFICIENCY_CHOICES = (
@@ -104,19 +104,19 @@ class Profile(models.Model):
     )
     WEB_SEARCH_PROFICIENCY_CHOICES = (
         ("", ""),
-        ("not_proficient", "Poor"),
-        ("slightly_proficient", "Intermediate"),
-        ("moderately_proficient", "Advanced"),
-        ("very_proficient", "Very proficient"),
         ("expert", "Expert"),
+        ("very_proficient", "Very proficient"),
+        ("moderately_proficient", "Advanced"),
+        ("slightly_proficient", "Intermediate"),
+        ("not_proficient", "Poor"),
     )
     WEB_AGENT_FAMILIARITY_CHOICES = (
         ("", ""),
-        ("not_familiar", "Not familiar at all"),
-        ("slightly_familiar", "Slightly familiar"),
-        ("moderately_familiar", "Moderately familiar"),
-        ("very_familiar", "Very familiar"),
         ("expert", "Expert"),
+        ("very_familiar", "Very familiar"),
+        ("moderately_familiar", "Moderately familiar"),
+        ("slightly_familiar", "Slightly familiar"),
+        ("not_familiar", "Not familiar at all"),
     )
     WEB_AGENT_FREQUENCY_CHOICES = (
         ("", ""),

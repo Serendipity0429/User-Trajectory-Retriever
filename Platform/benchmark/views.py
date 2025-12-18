@@ -27,6 +27,7 @@ from .models import (
     AdhocRun,
     AdhocResult,
     BenchmarkDataset,
+    AgentSettings,
 )
 from .forms import BenchmarkDatasetForm
 
@@ -112,11 +113,13 @@ def get_trial_trace(request, trial_id):
 def home(request):
     settings = LLMSettings.get_effective_settings()
     search_settings = SearchSettings.get_effective_settings()
+    agent_settings = AgentSettings.get_effective_settings()
     datasets = BenchmarkDataset.objects.all().order_by("-created_at")
 
     context = {
         "llm_settings": settings,
         "search_settings": search_settings,
+        "agent_settings": agent_settings,
         "datasets": datasets,
     }
     return render(request, "home.html", context)
@@ -335,6 +338,9 @@ def get_default_settings(request):
         # Search Defaults
         search_settings = SearchSettings.get_effective_settings()
 
+        # Agent Defaults
+        agent_settings = AgentSettings.get_effective_settings()
+
         config_data = {
             # LLM
             "llm_base_url": config("LLM_BASE_URL", default=llm_settings.llm_base_url),
@@ -346,6 +352,9 @@ def get_default_settings(request):
             "serper_api_key": config("SERPER_API_KEY", default=search_settings.serper_api_key),
             "search_limit": SearchSettings._meta.get_field("search_limit").get_default(),
             "serper_fetch_full_content": SearchSettings._meta.get_field("fetch_full_content").get_default(),
+
+            # Agent
+            "agent_memory_type": agent_settings.memory_type,
         }
         return JsonResponse(config_data)
     except OperationalError:
@@ -613,6 +622,7 @@ def vanilla_agent(request):
         "individual_sessions": individual_sessions,
         "llm_settings": LLMSettings.get_effective_settings(),
         "search_settings": SearchSettings.get_effective_settings(),
+        "agent_settings": AgentSettings.get_effective_settings(),
         "datasets": datasets,
     }
     return render(request, "vanilla_agent.html", context)
@@ -660,6 +670,19 @@ def save_search_settings(request):
         settings.fetch_full_content = data.get(
             "serper_fetch_full_content", settings.fetch_full_content
         )
+        settings.save()
+        return JsonResponse({"status": "ok"})
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)}, status=400)
+
+
+@admin_required
+@require_POST
+def save_agent_settings(request):
+    try:
+        data = json.loads(request.body)
+        settings = AgentSettings.load()
+        settings.memory_type = data.get("memory_type", settings.memory_type)
         settings.save()
         return JsonResponse({"status": "ok"})
     except Exception as e:
@@ -1674,6 +1697,7 @@ def browser_agent(request):
         "groups": groups,
         "individual_sessions": individual_sessions,
         "llm_settings": LLMSettings.get_effective_settings(),
+        "agent_settings": AgentSettings.get_effective_settings(),
         "datasets": datasets,
     }
     return render(request, "agent_browser.html", context)

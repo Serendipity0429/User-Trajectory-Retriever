@@ -2,11 +2,10 @@ from django.db import models
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator, MaxValueValidator
 import os
-from benchmark.prompts import PROMPTS
+
 from decouple import config
 
 # --- Abstract Base Classes ---
-
 class SingletonModel(models.Model):
     """
     Abstract base class for singleton models.
@@ -26,7 +25,6 @@ class SingletonModel(models.Model):
         return obj
 
 # --- Concrete Models ---
-
 class BenchmarkDataset(models.Model):
     """
     Represents a dataset of questions for benchmarking.
@@ -87,7 +85,7 @@ class LLMSettings(SingletonModel):
     llm_model = models.CharField(max_length=100, blank=True, help_text="e.g., gpt-4o")
     llm_api_key = models.CharField(max_length=255, blank=True, help_text="Your API Key")
     max_retries = models.PositiveIntegerField(default=3, help_text="Maximum number of retries allowed for the LLM.")
-    allow_reasoning = models.BooleanField(default=False, help_text="Allow the LLM to output its chain of thought reasoning before the final answer.")
+    allow_reasoning = models.BooleanField(default=True, help_text="Allow the LLM to output its chain of thought reasoning before the final answer.")
     
     # Advanced Parameters
     temperature = models.FloatField(default=0.0, help_text="Sampling temperature (0.0 to 2.0).")
@@ -107,6 +105,25 @@ class LLMSettings(SingletonModel):
         if not settings.llm_base_url:
             settings.llm_base_url = config("LLM_BASE_URL", default="")
         return settings
+
+class AgentSettings(SingletonModel):
+    """
+    A singleton model to store Agent-specific settings.
+    """
+    MEMORY_TYPE_CHOICES = [
+        ('naive', 'Naive Memory'),
+        ('mem0', 'Mem0 Memory'),
+        ('reme', 'ReMe Memory'),
+    ]
+    
+    memory_type = models.CharField(max_length=50, choices=MEMORY_TYPE_CHOICES, default='no_memory', help_text="Select the long-term memory mechanism.")
+    
+    def __str__(self):
+        return "Agent Settings"
+
+    @classmethod
+    def get_effective_settings(cls):
+        return cls.load()
 
 class MultiTurnRun(models.Model):
     """

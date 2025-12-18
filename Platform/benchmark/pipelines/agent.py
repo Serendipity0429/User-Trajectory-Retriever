@@ -5,7 +5,7 @@ from concurrent import futures
 from datetime import datetime
 from asgiref.sync import sync_to_async
 from agentscope.message import Msg
-from ..models import LLMSettings, SearchSettings, MultiTurnRun, MultiTurnSession, MultiTurnTrial
+from ..models import LLMSettings, SearchSettings, MultiTurnRun, MultiTurnSession, MultiTurnTrial, AgentSettings
 from ..utils import print_debug
 from ..agent_utils import VanillaAgentFactory, BrowserAgentFactory
 from ..mcp_manager import MCPManager
@@ -32,6 +32,7 @@ class VanillaAgentPipeline(BaseAgentPipeline):
 
     def get_settings_snapshot(self):
         search_settings = SearchSettings.get_effective_settings()
+        agent_settings = AgentSettings.get_effective_settings()
         return {
             'llm_settings': {
                 'llm_base_url': self.llm_settings.llm_base_url,
@@ -40,7 +41,8 @@ class VanillaAgentPipeline(BaseAgentPipeline):
             },
             'pipeline_type': 'vanilla_agent',
             'agent_config': {
-                'model_name': self.agent_model.model_name if hasattr(self.agent_model, 'model_name') else 'unknown'
+                'model_name': self.agent_model.model_name if hasattr(self.agent_model, 'model_name') else 'unknown',
+                'memory_type': agent_settings.memory_type
             }
         }
 
@@ -59,6 +61,91 @@ class VanillaAgentPipeline(BaseAgentPipeline):
             trial_number=trial_number,
             status='processing'
         )
+
+    async def _run_single_turn_async(self, session, trial):
+        completed_trials = await sync_to_async(list)(
+            session.trials.filter(trial_number__lt=trial.trial_number, status='completed').order_by('trial_number')
+        )
+        
+        history_msgs = []
+        if trial.trial_number > 1:
+            history_msgs.append(Msg(name="User", role="user", content=f"Task: {session.question}"))
+            for pt in completed_trials:
+                if pt.answer:
+                    history_msgs.append(Msg(name="Assistant", role="assistant", content=pt.full_response))
+                history_msgs.append(Msg(name="User", role="user", content=f"Incorrect. Feedback: {pt.feedback}"))
+            
+            last_pt = completed_trials[-1]
+            current_msg = Msg(name="User", role="user", content=f"Your previous attempt was incorrect. Feedback: {last_pt.feedback}. Please re-evaluate the task and try again.")
+        else:
+            current_msg = Msg(name="User", role="user", content=f"Task: {session.question}")
+
+        initial_history_len = len(history_msgs)
+
+        def on_memory_update(msgs):
+            try:
+                relevant_msgs = msgs[initial_history_len:] if len(msgs) > initial_history_len else []
+                trace_data, _ = self._serialize_trace(relevant_msgs)
+                key = f"trial_trace:{trial.id}"
+                
+                try:
+                    loop = asyncio.get_running_loop()
+                    loop.create_task(asyncio.to_thread(redis_client.set, key, json.dumps(trace_data), ex=3600))
+                except RuntimeError:
+                     threading.Thread(target=redis_client.set, args=(key, json.dumps(trace_data)), kwargs={'ex': 3600}).start()
+            except Exception as e:
+                print_debug(f"Redis update failed: {e}")
+
+        # Create Agent
+        agent = await sync_to_async(VanillaAgentFactory.create_agent)(self.agent_model, update_callback=on_memory_update)
+        
+        # Inject History
+        if history_msgs:
+            await agent.memory.add(history_msgs)
+
+        # Run Agent
+        response_msg = await agent(current_msg)
+        
+        # Process Response
+        trace_msgs = await agent.memory.get_memory()
+        
+        raw_content = response_msg.content
+        if isinstance(raw_content, list):
+            try:
+                texts = []
+                for c in raw_content:
+                    if isinstance(c, dict) and c.get('type') == 'text':
+                        texts.append(c.get('text', ''))
+                    elif isinstance(c, str):
+                        texts.append(c)
+                answer = "".join(texts)
+            except:
+                answer = json.dumps(raw_content)
+        else:
+            answer = str(raw_content) if raw_content is not None else ""
+
+        relevant_trace_msgs = trace_msgs[initial_history_len:] if len(trace_msgs) > initial_history_len else []
+        trace_data, real_answer_found = self._serialize_trace(relevant_trace_msgs)
+        
+        if real_answer_found:
+            answer = real_answer_found
+            
+        full_response = json.dumps(trace_data)
+        
+        if not trace_data:
+             full_response = json.dumps([{
+                 "role": "assistant", 
+                 "name": "Vanilla Agent Debug", 
+                 "content": answer
+             }])
+
+        # Save Result
+        answer, is_correct = await sync_to_async(self.save_trial_result)(session, trial, answer, full_response)
+        
+        return answer, is_correct, []
+
+    def run_single_turn(self, session, trial):
+        return asyncio.run(self._run_single_turn_async(session, trial))
 
     def _process_single_session(self, group, question_text, ground_truths):
         """
@@ -175,6 +262,7 @@ class BrowserAgentPipeline(BaseAgentPipeline):
         return "Browser Agent Pipeline"
 
     def get_settings_snapshot(self):
+        agent_settings = AgentSettings.get_effective_settings()
         return {
             'llm_settings': {
                 'llm_base_url': self.llm_settings.llm_base_url,
@@ -183,7 +271,8 @@ class BrowserAgentPipeline(BaseAgentPipeline):
             },
             'pipeline_type': 'browser_agent',
             'agent_config': {
-                'model_name': self.agent_model.model_name if hasattr(self.agent_model, 'model_name') else 'unknown'
+                'model_name': self.agent_model.model_name if hasattr(self.agent_model, 'model_name') else 'unknown',
+                'memory_type': agent_settings.memory_type
             }
         }
 

@@ -9,6 +9,7 @@ const BenchmarkUrls = {
     
     // RAG & Search Settings
     saveSearchSettings: `${API_PREFIX}/save_search_settings/`,
+    saveAgentSettings: `${API_PREFIX}/save_agent_settings/`,
     webSearch: `${API_PREFIX}/web_search/`,
 
     // Datasets
@@ -285,6 +286,8 @@ const BenchmarkUtils = {
             search_limit: document.getElementById('search_limit') ? document.getElementById('search_limit').value : '',
             serper_api_key: document.getElementById('serper_api_key') ? document.getElementById('serper_api_key').value : '',
             serper_fetch_full_content: document.getElementById('serper_fetch_full_content') ? document.getElementById('serper_fetch_full_content').checked : false,
+            
+            agent_memory_type: document.getElementById('agent_memory_type') ? document.getElementById('agent_memory_type').value : '',
         };
         BenchmarkState.config.hasUnsavedChanges = false;
         if(document.getElementById('unsaved-changes-alert')) document.getElementById('unsaved-changes-alert').style.display = 'none';
@@ -311,6 +314,8 @@ const BenchmarkUtils = {
             search_limit: document.getElementById('search_limit') ? document.getElementById('search_limit').value : '',
             serper_api_key: document.getElementById('serper_api_key') ? document.getElementById('serper_api_key').value : '',
             serper_fetch_full_content: document.getElementById('serper_fetch_full_content') ? document.getElementById('serper_fetch_full_content').checked : false,
+            
+            agent_memory_type: document.getElementById('agent_memory_type') ? document.getElementById('agent_memory_type').value : '',
         };
 
         let hasChanges = false;
@@ -363,6 +368,9 @@ const BenchmarkUtils = {
                     if (document.getElementById('search_limit') && data.search_limit) document.getElementById('search_limit').value = data.search_limit;
                     if (document.getElementById('serper_api_key') && data.serper_api_key) document.getElementById('serper_api_key').value = data.serper_api_key;
                     if (document.getElementById('serper_fetch_full_content') && data.serper_fetch_full_content !== undefined) document.getElementById('serper_fetch_full_content').checked = data.serper_fetch_full_content;
+
+                    // Apply Agent Settings
+                    if (document.getElementById('agent_memory_type') && data.agent_memory_type) document.getElementById('agent_memory_type').value = data.agent_memory_type;
 
                     // Update lastSavedBaseUrl and test connection
                     if (document.getElementById('llm_base_url')) {
@@ -485,7 +493,8 @@ const BenchmarkUtils = {
             'llm_base_url', 'llm_model', 'llm_api_key', 'max_retries', 'allow_reasoning',
             'temperature', 'top_p', 'max_tokens',
             'rag_prompt_template',
-            'search_provider', 'search_limit', 'serper_api_key', 'serper_fetch_full_content'
+            'search_provider', 'search_limit', 'serper_api_key', 'serper_fetch_full_content',
+            'agent_memory_type'
         ];
         settingsIds.forEach(id => {
             const el = document.getElementById(id);
@@ -548,6 +557,17 @@ const BenchmarkUtils = {
                     promises.push(fetch(BenchmarkUrls.saveSearchSettings, {
                         method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
                         body: JSON.stringify(searchData)
+                    }).then(r => r.json()));
+                }
+
+                // Agent
+                if (document.getElementById('agent_memory_type')) {
+                    const agentData = {
+                        memory_type: document.getElementById('agent_memory_type').value
+                    };
+                    promises.push(fetch(BenchmarkUrls.saveAgentSettings, {
+                        method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
+                        body: JSON.stringify(agentData)
                     }).then(r => r.json()));
                 }
 
@@ -1694,6 +1714,24 @@ const BenchmarkUtils = {
                 addItem('Full Content', fullContent ? 'Enabled' : 'Disabled', 'bi-file-text');
             }
         }
+        
+        if (shouldShow('agent_config')) {
+            const ac = snapshot.agent_config || {};
+            // If pulling from DOM
+            let memory = ac.memory_type;
+             if (!memory && document.getElementById('agent_memory_type')) {
+                 memory = document.getElementById('agent_memory_type').value;
+             }
+             if (memory) {
+                 const memoryMap = {
+                     'no_memory': 'No LTM',
+                     'local_memory': 'Local File',
+                     'dict_memory': 'Dict Memory',
+                     'vector_memory': 'Vector (Mem0)'
+                 };
+                 addItem('Agent Memory', memoryMap[memory] || memory, 'bi-memory');
+             }
+        }
 
         if (configDetails.children.length > 0) {
             configCard.style.display = 'block';
@@ -2702,6 +2740,9 @@ const BenchmarkUtils = {
                          if (pipelineType.includes('rag')) {
                             settingsWhitelist.push('rag_settings', 'search_settings');
                         }
+                        if (pipelineType.includes('agent')) {
+                            settingsWhitelist.push('agent_config');
+                        }
                         BenchmarkUtils.renderRunConfiguration(data.session.settings_snapshot, settingsWhitelist);
                         
                         document.getElementById('session-container').style.display = 'block';
@@ -2782,6 +2823,7 @@ const BenchmarkUtils = {
                      
                      const settingsWhitelist = ['llm_model', 'llm_base_url', 'max_retries', 'allow_reasoning'];
                      if (pipelineType.includes('rag')) settingsWhitelist.push('rag_settings', 'search_settings');
+                     if (pipelineType.includes('agent')) settingsWhitelist.push('agent_config');
                      BenchmarkUtils.renderRunConfiguration(data.settings, settingsWhitelist);
                      if (statsContainer) statsContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                  });

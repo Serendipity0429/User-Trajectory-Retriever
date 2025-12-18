@@ -51,6 +51,9 @@
                         <li class="nav-item" role="presentation">
                             <button class="nav-link" id="rag-tab" data-bs-toggle="tab" data-bs-target="#rag-settings" type="button" role="tab" aria-controls="rag-settings" aria-selected="false"><i class="bi bi-layers me-2"></i>RAG Pipeline</button>
                         </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="agent-tab" data-bs-toggle="tab" data-bs-target="#agent-settings" type="button" role="tab" aria-controls="agent-settings" aria-selected="false"><i class="bi bi-robot me-2"></i>Agent</button>
+                        </li>
                     </ul>
                 </div>
                 
@@ -209,6 +212,25 @@
                                 </div>
                                 <div class="form-text small text-muted">
                                     <i class="bi bi-exclamation-circle me-1"></i> Required placeholders: <code>{question}</code>, <code>{search_results}</code>.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Agent Settings -->
+                    <div class="tab-pane" id="agent-settings" role="tabpanel" aria-labelledby="agent-tab">
+                        <div class="card border-0 shadow-sm mb-4">
+                            <div class="card-body bg-light rounded-3">
+                                <h6 class="text-primary fw-bold mb-3"><i class="bi bi-memory me-2"></i>Memory Configuration</h6>
+                                <div class="mb-3">
+                                    <label for="agent_memory_type" class="form-label small text-muted fw-bold">Long-Term Memory</label>
+                                    <select class="form-select" id="agent_memory_type">
+                                        <option value="no_memory" {% if agent_settings.memory_type == 'no_memory' %}selected{% endif %}>No Long-Term Memory (Default)</option>
+                                        <option value="local_memory" {% if agent_settings.memory_type == 'local_memory' %}selected{% endif %}>Local File Memory</option>
+                                        <option value="dict_memory" {% if agent_settings.memory_type == 'dict_memory' %}selected{% endif %}>Dict Memory</option>
+                                        <option value="vector_memory" {% if agent_settings.memory_type == 'vector_memory' %}selected{% endif %}>Vector Memory (Mem0)</option>
+                                    </select>
+                                    <div class="form-text small text-muted mt-2"><i class="bi bi-info-circle me-1"></i> Choose the memory mechanism for the agent.</div>
                                 </div>
                             </div>
                         </div>

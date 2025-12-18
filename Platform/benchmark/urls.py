@@ -27,6 +27,7 @@ urlpatterns = [
     path("api/save_llm_settings/", views.save_llm_settings, name="save_llm_settings"),
     path("api/test_llm_connection/", views.test_llm_connection, name="test_llm_connection"),
     path('api/save_search_settings/', views.save_search_settings, name='save_search_settings'),
+    path('api/save_agent_settings/', views.save_agent_settings, name='save_agent_settings'),
 
     # ==========================================
     # 4. API - Datasets

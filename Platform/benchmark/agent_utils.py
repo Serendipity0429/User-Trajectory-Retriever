@@ -2,11 +2,21 @@ import os
 import json
 import agentscope
 from .search_utils import get_search_engine
-from .models import LLMSettings
+from .models import LLMSettings, AgentSettings
 from .prompts import PROMPTS
 from agentscope.agent import ReActAgent
 from agentscope.tool import Toolkit, ToolResponse
 from agentscope.memory import InMemoryMemory
+try:
+    from agentscope.memory import Mem0LongTermMemory
+except ImportError:
+    Mem0LongTermMemory = None
+
+try:
+    from agentscope.memory import ReMePersonalLongTermMemory
+except ImportError:
+    ReMePersonalLongTermMemory = None
+
 from agentscope.formatter import OpenAIChatFormatter
 from agentscope.model import OpenAIChatModel
 from agentscope.mcp import StdIOStatefulClient
@@ -79,7 +89,31 @@ class VanillaAgentFactory:
         toolkit.register_tool_function(web_search_tool)
         toolkit.register_tool_function(answer_question)
         
-        memory = StreamingMemory(update_callback=update_callback) if update_callback else InMemoryMemory()
+        agent_settings = AgentSettings.get_effective_settings()
+        memory_type = agent_settings.memory_type
+        
+        print_debug(f"Initializing VanillaAgent with memory_type: {memory_type}")
+        
+        memory = None
+        if memory_type == 'mem0' and Mem0LongTermMemory:
+             try:
+                # Attempt to use Mem0 if available
+                # We wrapper it for streaming if possible, or just use it
+                # For now, basic instantiation. Note: this might lose streaming UI updates if not wrapped.
+                # Assuming Mem0 doesn't support our update_callback out of box.
+                memory = Mem0LongTermMemory(user_id="vanilla_agent_user")
+             except Exception as e:
+                print_debug(f"Failed to init Mem0: {e}")
+                memory = StreamingMemory(update_callback=update_callback)
+        elif memory_type == 'reme' and ReMePersonalLongTermMemory:
+             try:
+                memory = ReMePersonalLongTermMemory(user_id="vanilla_agent_user")
+             except Exception as e:
+                print_debug(f"Failed to init ReMe: {e}")
+                memory = StreamingMemory(update_callback=update_callback)
+        else:
+            # no_memory or default
+            memory = StreamingMemory(update_callback=update_callback) if update_callback else InMemoryMemory()
 
         return ReActAgent(
             name="Assistant",
@@ -115,9 +149,26 @@ class BrowserAgentFactory:
         # DEBUG: Print all registered tools
         print_debug(f"BrowserAgent Toolkit Tools: {list(toolkit.tools.keys())}")
         
-        memory = InMemoryMemory()
-        if update_callback:
-            memory = StreamingMemory(update_callback=update_callback)
+        agent_settings = await sync_to_async(AgentSettings.get_effective_settings)()
+        memory_type = agent_settings.memory_type
+        
+        print_debug(f"Initializing BrowserAgent with memory_type: {memory_type}")
+
+        memory = None
+        if memory_type == 'mem0' and Mem0LongTermMemory:
+             try:
+                memory = Mem0LongTermMemory(user_id="browser_agent_user")
+             except Exception as e:
+                print_debug(f"Failed to init Mem0: {e}")
+                memory = StreamingMemory(update_callback=update_callback)
+        elif memory_type == 'reme' and ReMePersonalLongTermMemory:
+             try:
+                memory = ReMePersonalLongTermMemory(user_id="browser_agent_user")
+             except Exception as e:
+                print_debug(f"Failed to init ReMe: {e}")
+                memory = StreamingMemory(update_callback=update_callback)
+        else:
+             memory = StreamingMemory(update_callback=update_callback) if update_callback else InMemoryMemory()
 
         agent = ReActAgent(
             name="BrowserAgent",
@@ -154,4 +205,4 @@ class BrowserAgentFactory:
         toolkit = Toolkit()
         toolkit.register_tool_function(answer_question)
 
-        return model, toolkit   
+        return model, toolkit

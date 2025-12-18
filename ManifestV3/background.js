@@ -6,6 +6,7 @@ importScripts('./utils.js', './config.js');
 
 // --- Constants ---
 const TASK_STORAGE_KEY = 'current_task_id';
+const TRIAL_NUM_STORAGE_KEY = 'current_trial_num';
 const TASK_INFO_KEY = 'current_task_info';
 
 const ALARM_CLEAR_STORAGE = 'clear_local_storage';
@@ -39,6 +40,15 @@ async function setCurrentTask(task_id) {
         await _remove_session(TASK_INFO_KEY);
     }
     return await _set_session({ [TASK_STORAGE_KEY]: task_id });
+}
+
+async function getCurrentTrialNum() {
+    const result = await _get_session(TRIAL_NUM_STORAGE_KEY);
+    return result[TRIAL_NUM_STORAGE_KEY] || 0;
+}
+
+async function setCurrentTrialNum(trial_num) {
+    return await _set_session({ [TRIAL_NUM_STORAGE_KEY]: trial_num });
 }
 
 async function getUserInfo() {
@@ -122,11 +132,13 @@ async function checkActiveTask() {
     const { logged_in } = await _get_session('logged_in');
     if (!logged_in) {
         await setCurrentTask(-1);
+        await setCurrentTrialNum(0);
         return -1;
     }
 
     try {
         const old_task_id = await getCurrentTask();
+        const old_trial_num = await getCurrentTrialNum();
         const config = getConfig();
         const extension_version = chrome.runtime.getManifest().version;
 
@@ -145,6 +157,7 @@ async function checkActiveTask() {
             });
             await _set_session({ 'update_required': true, 'update_info': response });
             await setCurrentTask(-1);
+            await setCurrentTrialNum(0);
             chrome.action.setBadgeText({ text: 'upd' });
             chrome.action.setBadgeBackgroundColor({ color: '#eb1313ff' });
             return -1;
@@ -155,9 +168,11 @@ async function checkActiveTask() {
 
         const data = response.task_id;
         const new_task_id = (data !== null && data !== undefined && !isNaN(data)) ? parseInt(data, 10) : -1;
+        const new_trial_num = response.trial_num || 0;
 
         const is_task_started = old_task_id === -1 && new_task_id > -1;
         const is_task_finished = old_task_id > -1 && new_task_id === -1;
+        const is_new_trial = old_task_id === new_task_id && old_task_id > -1 && old_trial_num !== new_trial_num;
 
         if (new_task_id > -1) {
             chrome.action.setBadgeText({ text: 'on' });
@@ -169,23 +184,25 @@ async function checkActiveTask() {
             chrome.action.setBadgeBackgroundColor({ color: '#660874' });
         }
 
-        if (is_task_started) {
+        if (is_task_started || is_new_trial) {
             getTaskInfo(new_task_id);
         }
 
-        if (is_task_started || is_task_finished) {
-            printDebug("background", `Task state changed. Old: ${old_task_id}, New: ${new_task_id}`);
+        if (is_task_started || is_task_finished || is_new_trial) {
+            printDebug("background", `Task state changed. Task: ${old_task_id}->${new_task_id}, Trial: ${old_trial_num}->${new_trial_num}`);
             broadcastToTabs({ command: 'refresh_task_status' });
             if (!await hasPendingAnnotation()) {
                 await closeAllIrrelevantTabs();
             }
         }
         await setCurrentTask(new_task_id);
+        await setCurrentTrialNum(new_trial_num);
         return new_task_id;
     } catch (error) {
         console.error("Error checking active task ID:", error.message);
         if (error.message === "Authentication failed.") {
             await setCurrentTask(-1);
+            await setCurrentTrialNum(0);
             await _remove_session(['access_token', 'refresh_token', 'username', 'logged_in']);
             chrome.runtime.sendMessage({ command: "alter_logging_status", log_status: false });
             chrome.action.setBadgeText({ text: '' });

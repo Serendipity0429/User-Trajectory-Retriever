@@ -507,8 +507,9 @@ def active_task(request):
         return JsonResponse({"task_id": -1})
 
     task_id = task.id
+    trial_num = task.num_trial + 1
     print_debug("Current Task ID: ", task_id)
-    return JsonResponse({"task_id": task_id})
+    return JsonResponse({"task_id": task_id, "trial_num": trial_num})
 
 
 # Initialize the task
@@ -741,7 +742,7 @@ def get_task_info(request):
         return HttpResponse(f"No task found with task_id={task_id}", status=404)
 
     question = task.content.question
-    trial_num = task.num_trial
+    trial_num = task.num_trial + 1
     return JsonResponse({"question": question, "trial_num": trial_num})
 
 

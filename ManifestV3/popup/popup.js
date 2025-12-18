@@ -538,6 +538,16 @@ async function testConnection(serverType) {
 (async function initialize() {
     await initializeConfig(); // Wait for config to be loaded
 
+    // Optimistic UI update to prevent flash
+    const { logged_in } = await _get_session(['logged_in']);
+    if (logged_in) {
+        switchUiState(false);
+        const { username } = await _get_session(['username']);
+        if(username) document.getElementById('username_text_logged').textContent = "User: " + username;
+    } else {
+        switchUiState(true);
+    }
+
     // --- Control Panel Logic ---
     const controlPanelOpenBtn = document.getElementById('control-panel-open-btn');
     const controlPanelCloseBtn = document.getElementById('control-panel-close-btn');

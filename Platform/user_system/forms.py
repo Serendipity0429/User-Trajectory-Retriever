@@ -190,7 +190,7 @@ class SignupForm(forms.Form):
     )
     field_of_expertise = forms.CharField(
         required=True,
-        label="Field of Profession",
+        label="Field of Profession / Major",
         widget=forms.TextInput(
             attrs={
                 "class": "form-control login-field",
@@ -329,7 +329,7 @@ class EditInfoForm(forms.ModelForm):
             "occupation": forms.Select(attrs={"class": "form-select"}),
             "education": forms.Select(attrs={"class": "form-select"}),
             "field_of_expertise": forms.TextInput(
-                attrs={"class": "form-control", "placeholder": "Field of Profession"}
+                attrs={"class": "form-control", "placeholder": "Field of Profession / Major"}
             ),
             "llm_frequency": forms.Select(attrs={"class": "form-select"}),
             "llm_history": forms.Select(attrs={"class": "form-select"}),

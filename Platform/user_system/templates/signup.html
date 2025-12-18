@@ -164,7 +164,7 @@
                             <div class="col-md-6 mb-3">
                                 <div class="form-floating">
                                     <input type="text" name="field_of_expertise" class="form-control {% if form.field_of_expertise.errors %}is-invalid{% endif %}" id="id_field_of_expertise" value="{{ form.field_of_expertise.value|default_if_none:'' }}">
-                                    <label for="id_field_of_expertise"><i class="bi bi-lightbulb-fill me-2"></i>Field of Profession</label>
+                                    <label for="id_field_of_expertise"><i class="bi bi-lightbulb-fill me-2"></i>Field of Profession / Major</label>
                                     {% if form.field_of_expertise.errors %}
                                         <div class="invalid-feedback">
                                             {{ form.field_of_expertise.errors.as_text }}
@@ -301,7 +301,7 @@
                         <div class="form-check mb-3">
                             <input class="form-check-input" type="checkbox" value="" id="consentCheck" required>
                             <label class="form-check-label" for="consentCheck">
-                                I have read and agree to the <a href="{% url 'user_system:informed_consent' %}">Informed Consent Form</a>.
+                                I have read and agree to the <a href="{% url 'user_system:informed_consent' %}" style="color: rgba(var(--bs-link-color-rgb), var(--bs-link-opacity, 1));text-decoration: underline;">Informed Consent Form</a>.
                             </label>
                         </div>
 

@@ -23,6 +23,7 @@ from django.contrib.auth import (
     login as auth_login,
     logout as auth_logout,
     get_user_model,
+    update_session_auth_hash,
 )
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
@@ -232,30 +233,18 @@ def signup(request):
             profile.field_of_expertise = form.cleaned_data["field_of_expertise"]
             profile.llm_frequency = form.cleaned_data["llm_frequency"]
             profile.llm_history = form.cleaned_data["llm_history"]
+            profile.english_proficiency = form.cleaned_data["english_proficiency"]
+            profile.web_search_proficiency = form.cleaned_data["web_search_proficiency"]
+            profile.web_agent_familiarity = form.cleaned_data["web_agent_familiarity"]
+            profile.web_agent_frequency = form.cleaned_data["web_agent_frequency"]
             profile.save()
 
             # Clean up the session
             request.session.pop("consent_agreed", None)
 
             return HttpResponseRedirect(reverse("user_system:login"))
-        else:
-            # Store form data and errors in session, then redirect
-            request.session["signup_form_data"] = request.POST
-            request.session["signup_form_errors"] = form.errors.as_json()
-            return HttpResponseRedirect(reverse("user_system:signup"))
     else:
-        # On GET, check for session data from a failed POST
-        form_data = request.session.pop("signup_form_data", None)
-        # Clear any lingering error session data, as it's not needed
-        request.session.pop("signup_form_errors", None)
-
-        if form_data:
-            # Recreate the form with the user's data.
-            # Validation errors will be regenerated when the template accesses them.
-            form = SignupForm(form_data)
-        else:
-            # This is a fresh GET, create an empty form
-            form = SignupForm()
+        form = SignupForm()
 
     return render(request, "signup.html", {"form": form})
 
@@ -312,8 +301,11 @@ def edit_password(request):
 
     if request.method == "POST" and form.is_valid():
         if request.user.check_password(form.cleaned_data["cur_password"]):
-            request.user.set_password(form.cleaned_data["new_password"])
-            request.user.save()
+            user = request.user
+            user.set_password(form.cleaned_data["new_password"])
+            user.save()
+            update_session_auth_hash(request, user)
+            messages.success(request, "Your password was successfully updated!")
             return HttpResponseRedirect(reverse("user_system:info"))
         else:
             error_message = "Incorrect current password."
@@ -342,9 +334,12 @@ def forget_password(request):
             # Assuming send_reset_password_email is a utility function you have defined
             # from .utils import send_reset_password_email
             send_reset_password_email(request.get_host(), reset_request)
-            return HttpResponseRedirect(reverse("user_system:login"))
+            request.session['reset_email'] = form.cleaned_data["email"]
+            return HttpResponseRedirect(reverse("user_system:password_reset_sent"))
         except User.DoesNotExist:
             error_message = "Email address not found."
+            # Reset form to ensure new captcha is generated
+            form = ForgetPasswordForm(initial={"email": form.cleaned_data["email"]})
     elif request.method == "POST":
         error_message = form.errors
 
@@ -356,6 +351,13 @@ def forget_password(request):
             "error_message": error_message,
         },
     )
+
+
+def password_reset_sent(request):
+    email = request.session.get('reset_email', 'your email address')
+    # Optional: Clear the email from session if you only want to show it once
+    # request.session.pop('reset_email', None)
+    return render(request, "password_reset_sent.html", {"email": email})
 
 
 def reset_password(request, token_str):

@@ -311,7 +311,7 @@ h2.text-success {
     padding: 5px 7px;
 }
 
-.form-floating > .form-control {
+.form-floating > .form-control:not([type='number']) {
     padding-right: 2.5rem;
 }
 

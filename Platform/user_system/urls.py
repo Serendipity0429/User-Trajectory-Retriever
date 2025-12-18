@@ -20,6 +20,7 @@ urlpatterns = [
     path(
         "reset_password/<str:token_str>/", views.reset_password, name="reset_password"
     ),
+    path("password_reset_sent/", views.password_reset_sent, name="password_reset_sent"),
     path("forget_password/", views.forget_password, name="forget_password"),
     path("search/", views.UserSearchView.as_view(), name="user_search"),
     path("check_web_session/", views.check_web_session, name="check_web_session"),

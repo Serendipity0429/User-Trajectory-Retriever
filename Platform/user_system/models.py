@@ -56,13 +56,15 @@ class Profile(models.Model):
         ("usually", "About daily"),
         ("sometimes", "A few times a week"),
         ("rarely", "Less than weekly"),
+        ("never", "Never"),
     )
     LLM_HISTORY_CHOICES = (
         ("", ""),
-        ("very short", "less than one year"),
-        ("short", "one to three years"),
-        ("long", "three to five years"),
-        ("very long", "five years or longer"),
+        ("very_short", "Less than 3 months"),
+        ("short", "3 months to 6 months"),
+        ("medium", "6 months to 1 years"),
+        ("long", "1 to 3 years"),
+        ("very_long", "More than 3 years"),
     )
     GENDER_CHOICES = (
         ("", ""),
@@ -75,6 +77,13 @@ class Profile(models.Model):
         ("student", "Student"),
         ("engineer", "Engineer"),
         ("teacher", "Teacher"),
+        ("researcher", "Researcher"),
+        ("designer", "Designer"),
+        ("marketing", "Marketing Specialist"),
+        ("healthcare", "Healthcare Professional"),
+        ("business", "Business Owner/Manager"),
+        ("retired", "Retired"),
+        ("unemployed", "Unemployed"),
         ("other", "Other"),
     )
     EDUCATION_CHOICES = (
@@ -95,10 +104,11 @@ class Profile(models.Model):
     )
     WEB_SEARCH_PROFICIENCY_CHOICES = (
         ("", ""),
+        ("not_proficient", "Poor"),
+        ("slightly_proficient", "Intermediate"),
+        ("moderately_proficient", "Advanced"),
+        ("very_proficient", "Very proficient"),
         ("expert", "Expert"),
-        ("advanced", "Advanced"),
-        ("intermediate", "Intermediate"),
-        ("beginner", "Beginner"),
     )
     WEB_AGENT_FAMILIARITY_CHOICES = (
         ("", ""),

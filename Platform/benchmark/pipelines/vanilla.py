@@ -15,19 +15,6 @@ class VanillaLLMAdhocPipeline(BaseAdhocPipeline):
     def __str__(self):
         return "Vanilla LLM Ad-hoc Pipeline"
         
-    def get_settings_snapshot(self):
-        return {
-            'llm_settings': {
-                'llm_base_url': self.llm_settings.llm_base_url,
-                'llm_model': self.llm_settings.llm_model,
-                'max_retries': self.llm_settings.max_retries,
-                'allow_reasoning': self.llm_settings.allow_reasoning, # Reverted to use settings
-                'temperature': getattr(self.llm_settings, 'temperature', 0.0),
-                'top_p': getattr(self.llm_settings, 'top_p', 1.0),
-                'max_tokens': getattr(self.llm_settings, 'max_tokens', None)
-            }
-        }
-        
     def create_run_object(self):
         run_name = f"{str(self)} - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
         snapshot = self.get_settings_snapshot()
@@ -77,19 +64,6 @@ class VanillaLLMMultiTurnPipeline(BaseMultiTurnPipeline):
         
     def __str__(self):
         return "Vanilla LLM Multi-Turn Pipeline"
-
-    def get_settings_snapshot(self):
-        return {
-            'llm_settings': {
-                'llm_base_url': self.llm_settings.llm_base_url,
-                'llm_model': self.llm_settings.llm_model,
-                'max_retries': self.llm_settings.max_retries,
-                'allow_reasoning': self.llm_settings.allow_reasoning, # Reverted to use settings
-                'temperature': getattr(self.llm_settings, 'temperature', 0.0),
-                'top_p': getattr(self.llm_settings, 'top_p', 1.0),
-                'max_tokens': getattr(self.llm_settings, 'max_tokens', None)
-            }
-        }
 
     def create_session(self, settings, question_text, ground_truths, group):
         return MultiTurnSession.objects.create(

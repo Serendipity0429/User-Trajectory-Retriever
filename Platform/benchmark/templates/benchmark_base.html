@@ -10,9 +10,12 @@
 {% endblock content %}
 
 {% block scripts %}
-    <script src="{% static 'js/benchmark/benchmark_common.js' %}"></script>
+    <script src="{% static 'js/benchmark/benchmark_utils.js' %}"></script>
+    <script src="{% static 'js/benchmark/benchmark_renderer.js' %}"></script>
+    <script src="{% static 'js/benchmark/benchmark_adhoc.js' %}"></script>
+    <script src="{% static 'js/benchmark/benchmark_multiturn.js' %}"></script>
     <script>
-        // BenchmarkGlobals removed - URLs are now managed in benchmark_common.js
+        // BenchmarkGlobals removed - URLs are now managed in benchmark_utils.js
     </script>
     {% block benchmark_extra_js %}{% endblock benchmark_extra_js %}
 {% endblock scripts %}

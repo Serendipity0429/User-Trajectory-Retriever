@@ -149,7 +149,21 @@ class BasePipeline:
         raise NotImplementedError("Subclasses must implement the 'run' method.")
         
     def get_settings_snapshot(self):
-        raise NotImplementedError("Subclasses must implement get_settings_snapshot")
+        """
+        Returns the base settings snapshot with LLM settings.
+        Subclasses can extend this.
+        """
+        return {
+            'llm_settings': {
+                'llm_base_url': self.llm_settings.llm_base_url,
+                'llm_model': self.llm_settings.llm_model,
+                'max_retries': getattr(self.llm_settings, 'max_retries', 3), # Handle defaults safely
+                'allow_reasoning': getattr(self.llm_settings, 'allow_reasoning', False),
+                'temperature': getattr(self.llm_settings, 'temperature', 0.0),
+                'top_p': getattr(self.llm_settings, 'top_p', 1.0),
+                'max_tokens': getattr(self.llm_settings, 'max_tokens', None)
+            }
+        }
 
 
 class BaseAdhocPipeline(BasePipeline):
@@ -254,7 +268,6 @@ class BaseMultiTurnPipeline(BasePipeline):
             trial_number = 1
             final_is_correct = False
             final_answer = ""
-            completed_trials = []
             
             while trial_number <= self.max_retries and not is_session_completed:
                 if not self.check_active():
@@ -270,41 +283,26 @@ class BaseMultiTurnPipeline(BasePipeline):
                     'group_id': group.id
                 }
 
-                messages = self._construct_messages(session, trial, completed_trials)
-                
                 try:
-                    parsed_answer, full_response = self.get_llm_response(messages)
+                    # Delegate execution to run_single_turn
+                    # This method is overridden by subclasses (e.g. VanillaAgentPipeline) 
+                    # or used as-is (VanillaLLM, RAG)
+                    parsed_answer, is_correct, _ = self.run_single_turn(session, trial)
                 except Exception as e:
                     trial.status = 'error'
                     trial.save()
                     raise e
                 
-                try:
-                    # Circular import avoidance if needed, but here we assume task_manager.utils is fine
-                    from task_manager.utils import check_answer_llm
-                    is_correct = check_answer_llm(session.question, session.ground_truths, parsed_answer, client=self.client, model=self.model)
-                except Exception as e:
-                    print_debug(f"Judge failed: {e}")
-                    is_correct = None
-
-
-                trial.answer = parsed_answer
-                trial.full_response = full_response
-                trial.is_correct = is_correct
-                trial.feedback = "Correct" if is_correct else "Incorrect"
-                trial.status = 'completed'
-                trial.save()
+                # run_single_turn handles saving the trial
                 
-                completed_trials.append(trial)
-
                 yield {
                     'is_meta': True,
                     'type': 'trial_completed',
                     'session_id': session.id,
                     'trial_number': trial_number,
                     'is_correct': is_correct,
-                    'answer': parsed_answer, # Send parsed answer for display/check validity
-                    'full_response': full_response,
+                    'answer': parsed_answer, 
+                    'full_response': trial.full_response, # Access stored full response
                     'group_id': group.id
                 }
 

@@ -11,13 +11,12 @@ import os
 import json
 from user_system.decorators import admin_required
 from django.db import OperationalError
-import traceback
 from user_system.utils import print_debug
 
 import httpx
 from task_manager.utils import check_answer_rule, check_answer_llm, redis_client
 from .search_utils import get_search_engine
-from .utils import count_questions_in_file
+from .utils import count_questions_in_file, handle_api_error, handle_async_api_error, print_debug
 from .models import (
     LLMSettings,
     SearchSettings,
@@ -53,6 +52,13 @@ from .pipelines.agent import (
 )
 from .pipeline_manager import PipelineManager
 from benchmark.prompts import PROMPTS
+
+PIPELINE_CLASS_MAP = {
+    'vanilla': VanillaLLMMultiTurnPipeline,
+    'rag': RagMultiTurnPipeline,
+    'vanilla_agent': VanillaAgentPipeline,
+    'browser_agent': BrowserAgentPipeline,
+}
 
 # Helper functions removed - use Model.get_effective_settings() instead.
 
@@ -806,101 +812,70 @@ def create_session_group(request):
 
 
 @require_POST
+@handle_api_error
 def create_session(request):
-    try:
-        data = json.loads(request.body)
-        question_text = data.get("question")
-        ground_truths = data.get("ground_truths")
-        group_id = data.get("group_id")
-        pipeline_type = data.get(
-            "pipeline_type", "vanilla_llm_multi_turn" 
-        )  # Default to 'vanilla_llm_multi_turn'
+    data = json.loads(request.body)
+    question_text = data.get("question")
+    ground_truths = data.get("ground_truths")
+    group_id = data.get("group_id")
+    raw_pipeline_type = data.get("pipeline_type", "vanilla_llm_multi_turn")
 
-        if not question_text or not ground_truths:
-            return JsonResponse(
-                {"error": "Question and ground truths are required."}, status=400
-            )
+    if not question_text or not ground_truths:
+        return JsonResponse(
+            {"error": "Question and ground truths are required."}, status=400
+        )
 
-        # Determine settings for snapshot
-        llm_settings = LLMSettings.get_effective_settings()
-        snapshot = {
-            "llm_settings": {
-                "llm_base_url": llm_settings.llm_base_url,
-                "llm_model": llm_settings.llm_model,
-                "max_retries": llm_settings.max_retries,
-            }
+    # Normalize pipeline type string
+    pipeline_type = 'vanilla'
+    if "rag" in raw_pipeline_type and "agent" not in raw_pipeline_type:
+        pipeline_type = 'rag'
+    elif "browser_agent" in raw_pipeline_type:
+        pipeline_type = 'browser_agent'
+    elif "vanilla_agent" in raw_pipeline_type:
+        pipeline_type = 'vanilla_agent'
+    
+    # Determine settings for snapshot
+    llm_settings = LLMSettings.get_effective_settings()
+    snapshot = {
+        "llm_settings": {
+            "llm_base_url": llm_settings.llm_base_url,
+            "llm_model": llm_settings.llm_model,
+            "max_retries": llm_settings.max_retries,
         }
+    }
 
-        if "rag" in pipeline_type and "agent" not in pipeline_type:
-            # rag_settings removed as prompt is hardcoded
-            search_settings = SearchSettings.get_effective_settings()
-            snapshot["search_settings"] = {
-                "search_provider": search_settings.search_provider,
-                "search_limit": search_settings.search_limit,
-                "serper_fetch_full_content": search_settings.fetch_full_content,
-            }
-        
-        if "agent" in pipeline_type or "browser_agent" in pipeline_type: # Updated for browser agent
-             # Snapshot for agent if needed, mostly LLM settings + search
-             search_settings = SearchSettings.get_effective_settings()
-             snapshot["search_settings"] = {
-                "search_provider": search_settings.search_provider,
-                "search_limit": search_settings.search_limit,
-                "serper_fetch_full_content": search_settings.fetch_full_content,
-             }
+    if pipeline_type != 'vanilla':
+         search_settings = SearchSettings.get_effective_settings()
+         snapshot["search_settings"] = {
+            "search_provider": search_settings.search_provider,
+            "search_limit": search_settings.search_limit,
+            "serper_fetch_full_content": search_settings.fetch_full_content,
+         }
 
-        # Ensure Group exists
-        if group_id:
-            group = get_object_or_404(MultiTurnRun, pk=group_id)
-            # We assume existing group has its snapshot.
-        else:
-            # Create a new ad-hoc group for this single session
-            group_name = (
-                f"Ad-hoc Session - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-            )
-            group = MultiTurnRun.objects.create(
-                name=group_name, settings_snapshot=snapshot
-            )
+    # Ensure Group exists
+    if group_id:
+        group = get_object_or_404(MultiTurnRun, pk=group_id)
+    else:
+        # Create a new ad-hoc group for this single session
+        group_name = (
+            f"Ad-hoc Session - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+        )
+        group = MultiTurnRun.objects.create(
+            name=group_name, settings_snapshot=snapshot
+        )
 
-        session_data = {
-            "question": question_text,
-            "ground_truths": ground_truths,
-            "run": group, # Was 'group'
-        }
+    session = MultiTurnSession.objects.create(
+        question=question_text,
+        ground_truths=ground_truths,
+        run=group,
+        pipeline_type=pipeline_type
+    )
 
-        if "rag" in pipeline_type and "agent" not in pipeline_type:
-            session_data['pipeline_type'] = 'rag'
-            
-            session = MultiTurnSession.objects.create(**session_data)
+    trial = MultiTurnTrial.objects.create(
+        session=session, trial_number=1, status="processing"
+    )
 
-            trial = MultiTurnTrial.objects.create(
-                session=session, trial_number=1, status="processing"
-            )
-
-        elif pipeline_type == "browser_agent":
-            session_data['pipeline_type'] = 'browser_agent'
-            session = MultiTurnSession.objects.create(**session_data)
-            trial = MultiTurnTrial.objects.create(
-                session=session, trial_number=1, status="processing"
-            )
-
-        elif pipeline_type == "vanilla_agent":
-            session_data['pipeline_type'] = 'vanilla_agent'
-            session = MultiTurnSession.objects.create(**session_data)
-            trial = MultiTurnTrial.objects.create(
-                session=session, trial_number=1, status="processing"
-            )
-
-        else:
-            session_data['pipeline_type'] = 'vanilla'
-            session = MultiTurnSession.objects.create(**session_data)
-            trial = MultiTurnTrial.objects.create(
-                session=session, trial_number=1, status="processing"
-            )
-
-        return JsonResponse({"session_id": session.id, "trial_id": trial.id})
-    except Exception as e:
-        return JsonResponse({"error": str(e)}, status=500)
+    return JsonResponse({"session_id": session.id, "trial_id": trial.id})
 
 
 @admin_required
@@ -1028,99 +1003,71 @@ def retry_session(request, trial_id):
         return JsonResponse({"error": str(e)}, status=500)
 
 
-import traceback
-
-
 @admin_required
+@handle_api_error
 def run_trial(request, trial_id):
-    try:
-        try:
-            trial = MultiTurnTrial.objects.select_related(
-                "session", "session__run"
-            ).get(pk=trial_id)
-        except MultiTurnTrial.DoesNotExist:
-             return JsonResponse({"error": "Trial not found"}, status=404)
+    trial = get_object_or_404(MultiTurnTrial.objects.select_related("session", "session__run"), pk=trial_id)
+    session = trial.session
+    snapshot = session.run.settings_snapshot if session.run else {}
 
-        session = trial.session
-        snapshot = session.run.settings_snapshot if session.run else {}
+    # Resolve LLM Settings
+    llm_s = snapshot.get("llm_settings", {})
+    base_url = llm_s.get("llm_base_url")
+    model = llm_s.get("llm_model")
+    api_key = config("LLM_API_KEY", default=None)
 
-        # Resolve LLM Settings
-        llm_s = snapshot.get("llm_settings", {})
-        base_url = llm_s.get("llm_base_url")
-        model = llm_s.get("llm_model")
-        api_key = config("LLM_API_KEY", default=None) # Start with Env var
+    # Fallback to DB defaults if missing
+    if not api_key or not model:
+        db_settings = LLMSettings.get_effective_settings()
+        if not api_key:
+            api_key = config("LLM_API_KEY", default=db_settings.llm_api_key)
+        if not base_url:
+            base_url = config("LLM_BASE_URL", default=db_settings.llm_base_url)
+        if not model:
+            model = db_settings.llm_model or config("LLM_MODEL", default="gpt-4o")
 
-        # Fallback to DB defaults if missing
-        if not api_key or not model:
-            db_settings = LLMSettings.get_effective_settings()
-            if not api_key:
-                api_key = config("LLM_API_KEY", default=db_settings.llm_api_key)
-            if not base_url:
-                base_url = config("LLM_BASE_URL", default=db_settings.llm_base_url)
-            if not model:
-                model = db_settings.llm_model or config("LLM_MODEL", default="gpt-4o")
+    common_kwargs = {
+        "base_url": base_url, 
+        "api_key": api_key, 
+        "model": model, 
+        "max_retries": 1
+    }
 
-        # Define Pipeline Mapping
-        # factory_func: (kwargs) -> pipeline instance or result
-        # 'use_manager': bool, indicating if it goes through PipelineManager (async/browser)
-        
-        common_kwargs = {
-            "base_url": base_url, 
-            "api_key": api_key, 
-            "model": model, 
-            "max_retries": 1
+    pipeline_type = session.pipeline_type
+    
+    if pipeline_type == 'browser_agent':
+         # Browser Agent uses PipelineManager (Async)
+        factory_kwargs = {
+            **common_kwargs,
+            "pipeline_id": session.run_tag,
         }
-
-        if session.pipeline_type == 'browser_agent':
-             # Browser Agent uses PipelineManager
-            factory_kwargs = {
-                **common_kwargs,
-                "pipeline_id": session.run_tag,
-            }
-            answer, is_correct, search_results, error_msg = PipelineManager.get_instance().run_trial(
-                session.id, trial.id, factory_kwargs
-            )
-            if error_msg:
-                raise Exception(error_msg)
-        
-        else:
-            # Synchronous Pipelines
-            if session.pipeline_type == 'rag':
-                pipeline = RagMultiTurnPipeline(
-                    **common_kwargs
-                )
-            elif session.pipeline_type == 'vanilla_agent':
-                pipeline = VanillaAgentPipeline(**common_kwargs)
-            else: # Default: Vanilla LLM
-                pipeline = VanillaLLMMultiTurnPipeline(**common_kwargs)
-            
-            answer, is_correct, search_results = pipeline.run_single_turn(session, trial)
-
-        if is_correct:
-            session.is_completed = True
-            session.save()
-
-        num_docs_used = len(search_results) if search_results else 0
-
-        return JsonResponse(
-            {
-                "answer": answer,
-                "trial_id": trial.id,
-                "is_correct": is_correct,
-                "num_docs_used": num_docs_used,
-            }
+        answer, is_correct, search_results, error_msg = PipelineManager.get_instance().run_trial(
+            session.id, trial.id, factory_kwargs
         )
+        if error_msg:
+            raise Exception(error_msg)
+    
+    else:
+        # Synchronous Pipelines
+        PipelineClass = PIPELINE_CLASS_MAP.get(pipeline_type, VanillaLLMMultiTurnPipeline)
+        pipeline = PipelineClass(**common_kwargs)
+        
+        answer, is_correct, search_results = pipeline.run_single_turn(session, trial)
 
-    except Exception as e:
-        traceback.print_exc()
-        try:
-            # Attempt to mark trial as error if possible
-            if 'trial' in locals() and trial.status == 'processing':
-                trial.status = 'error'
-                trial.save()
-        except:
-            pass # Ignore errors during error handling
-        return JsonResponse({"error": str(e), "trial_id": trial_id}, status=500)
+    if is_correct:
+        session.is_completed = True
+        session.save()
+
+    num_docs_used = len(search_results) if search_results else 0
+
+    return JsonResponse(
+        {
+            "answer": answer,
+            "trial_id": trial.id,
+            "is_correct": is_correct,
+            "num_docs_used": num_docs_used,
+        }
+    )
 
 
 @admin_required
@@ -1194,98 +1141,71 @@ def _get_common_llm_settings(request):
     return base_url, api_key, model, max_retries
 
 
+@handle_api_error
 def _run_pipeline_generic(request, pipeline_class, redis_prefix_template, **kwargs):
     """
     Generic handler for running synchronous pipelines.
-    
-    Args:
-        request: The Django request object.
-        pipeline_class: The class of the pipeline to instantiate.
-        redis_prefix_template: A format string for the Redis key prefix. 
-                               Should contain placeholders for format() if needed.
-        **kwargs: Additional arguments to pass to the pipeline constructor 
     """
-    try:
-        base_url, api_key, model, max_retries = _get_common_llm_settings(request)
-        
-        pipeline_id = request.POST.get("pipeline_id")
-        dataset_id = request.POST.get("dataset_id")
+    base_url, api_key, model, max_retries = _get_common_llm_settings(request)
+    
+    pipeline_id = request.POST.get("pipeline_id")
+    dataset_id = request.POST.get("dataset_id")
 
-        if not api_key:
-            return JsonResponse(
-                {"error": "An API Key is required to run the benchmark."}, status=400
-            )
-
-        # Construct Redis key
-        redis_key = None
-        if pipeline_id:
-            try:
-                # Attempt to format with kwargs
-                prefix = redis_prefix_template.format(**kwargs)
-            except KeyError:
-                # Fallback if format fails or no placeholders
-                prefix = redis_prefix_template
-                
-            redis_key = f"{prefix}:{pipeline_id}"
-            redis_client.set(redis_key, "1", ex=3600)
-
-        # Prepare Constructor Arguments
-        # Start with common args
-        constructor_args = {
-            "base_url": base_url,
-            "api_key": api_key,
-            "model": model,
-            "pipeline_id": pipeline_id,
-            "dataset_id": dataset_id,
-        }
-        
-        # Add max_retries if the class expects it (BaseMultiTurnPipeline and subclasses)
-        # We check simply if it's in the signature or just pass it if it accepts **kwargs
-        # But safest is to check if it's a multi-turn/agent pipeline.
-        # Adhoc pipelines don't usually take max_retries in constructor in current impl?
-        # Let's check the classes.
-        # VanillaLLMMultiTurnPipeline: (..., max_retries, ...)
-        # VanillaLLMAdhocPipeline: (..., dataset_id=None) - NO max_retries
-        # RagAdhocPipeline: (..., rag_prompt_template, ...) - NO max_retries
-        # RagMultiTurnPipeline: (..., max_retries,  ...)
-        # VanillaAgentPipeline: (..., max_retries, ...)
-        
-        if issubclass(pipeline_class, (BaseMultiTurnPipeline, VanillaAgentPipeline)):
-             constructor_args["max_retries"] = max_retries
-             
-        # Add specific kwargs
-        constructor_args.update(kwargs)
-
-        pipeline = pipeline_class(**constructor_args)
-
-        return StreamingHttpResponse(
-            serialize_events(pipeline.run()), content_type="application/json"
+    if not api_key:
+        return JsonResponse(
+            {"error": "An API Key is required to run the benchmark."}, status=400
         )
 
-    except Exception as e:
-        traceback.print_exc()
-        return JsonResponse({"error": str(e)}, status=500)
+    # Construct Redis key
+    redis_key = None
+    if pipeline_id:
+        try:
+            # Attempt to format with kwargs
+            prefix = redis_prefix_template.format(**kwargs)
+        except KeyError:
+            # Fallback if format fails or no placeholders
+            prefix = redis_prefix_template
+            
+        redis_key = f"{prefix}:{pipeline_id}"
+        redis_client.set(redis_key, "1", ex=3600)
+
+    # Prepare Constructor Arguments
+    constructor_args = {
+        "base_url": base_url,
+        "api_key": api_key,
+        "model": model,
+        "pipeline_id": pipeline_id,
+        "dataset_id": dataset_id,
+    }
+    
+    if issubclass(pipeline_class, (BaseMultiTurnPipeline, VanillaAgentPipeline)):
+            constructor_args["max_retries"] = max_retries
+            
+    # Add specific kwargs
+    constructor_args.update(kwargs)
+
+    pipeline = pipeline_class(**constructor_args)
+
+    return StreamingHttpResponse(
+        serialize_events(pipeline.run()), content_type="application/json"
+    )
 
 
+@handle_api_error
 def _stop_pipeline_generic(request, redis_prefix_template):
     """
     Generic handler for stopping pipelines.
     """
-    try:
-        data = json.loads(request.body)
-        pipeline_id = data.get("pipeline_id")
+    data = json.loads(request.body)
+    pipeline_id = data.get("pipeline_id")
+    
+    kwargs = {}
         
-        # Extract dynamic parts if needed from data
-        # Only needed for RagMultiTurn really
-        kwargs = {}
-            
-        if pipeline_id:
-            prefix = redis_prefix_template.format(**kwargs)
-            redis_client.delete(f"{prefix}:{pipeline_id}")
-            
-        return JsonResponse({"status": "ok"})
-    except Exception as e:
-        return JsonResponse({"status": "error", "message": str(e)}, status=400)
+    if pipeline_id:
+        prefix = redis_prefix_template.format(**kwargs)
+        redis_client.delete(f"{prefix}:{pipeline_id}")
+        
+    return JsonResponse({"status": "ok"})
 
 
 @admin_required
@@ -1703,67 +1623,48 @@ def browser_agent(request):
     return render(request, "agent_browser.html", context)
 
 
+@handle_async_api_error
 async def _run_pipeline_generic_async(request, pipeline_class, redis_prefix_template, **kwargs):
     """
     Generic handler for running asynchronous pipelines (like Browser Agent).
     """
-    try:
-        # Since _get_common_llm_settings is synchronous and accesses DB, wrap it
-        # However, it accesses DB. Better to do basic extraction or use sync_to_async
-        # For simplicity, we can extract from request manually here or make _get_common_llm_settings safe.
-        # But _get_common_llm_settings calls LLMSettings.get_effective_settings() which hits DB.
-        
-        # Async-safe settings retrieval
-        @async_to_sync
-        async def get_settings_async():
-            return LLMSettings.get_effective_settings()
-        
-        # Since we are in an async view, we can't call sync DB methods directly.
-        # But `request.POST` is already available.
-        # Let's just use sync_to_async wrapper for the DB part.
-        
-        db_settings = await sync_to_async(LLMSettings.get_effective_settings)()
-        
-        base_url = request.POST.get("llm_base_url") or db_settings.llm_base_url
-        api_key = request.POST.get("llm_api_key") or db_settings.llm_api_key
-        model = request.POST.get("llm_model") or db_settings.llm_model or "gpt-3.5-turbo"
-        max_retries = int(request.POST.get("max_retries", 3))
+    # Async-safe settings retrieval
+    db_settings = await sync_to_async(LLMSettings.get_effective_settings)()
+    
+    base_url = request.POST.get("llm_base_url") or db_settings.llm_base_url
+    api_key = request.POST.get("llm_api_key") or db_settings.llm_api_key
+    model = request.POST.get("llm_model") or db_settings.llm_model or "gpt-3.5-turbo"
+    max_retries = int(request.POST.get("max_retries", 3))
 
-        pipeline_id = request.POST.get("pipeline_id")
-        dataset_id = request.POST.get("dataset_id")
-        
-        if not api_key:
-             return JsonResponse(
-                {"error": "An API Key is required to run the benchmark."}, status=400
-            )
-
-        if pipeline_id:
-             redis_key = f"{redis_prefix_template}:{pipeline_id}"
-             # Async redis usage if we had async redis client, but redis_client is sync.
-             # We can run it in thread or just use it if it's fast enough (it usually is)
-             # but strictly speaking strict async should use async redis.
-             # We'll use sync_to_async for safety.
-             await sync_to_async(redis_client.set)(redis_key, "1", ex=3600)
-
-        # Factory creation is async for BrowserAgent
-        pipeline = await pipeline_class.create(
-            base_url=base_url,
-            api_key=api_key,
-            model=model,
-            max_retries=max_retries,
-            pipeline_id=pipeline_id,
-            dataset_id=dataset_id,
-            **kwargs
+    pipeline_id = request.POST.get("pipeline_id")
+    dataset_id = request.POST.get("dataset_id")
+    
+    if not api_key:
+            return JsonResponse(
+            {"error": "An API Key is required to run the benchmark."}, status=400
         )
 
-        return StreamingHttpResponse(serialize_events_async(pipeline.run()), content_type="application/json")
+    if pipeline_id:
+            redis_key = f"{redis_prefix_template}:{pipeline_id}"
+            await sync_to_async(redis_client.set)(redis_key, "1", ex=3600)
 
-    except Exception as e:
-        return JsonResponse({"error": str(e)}, status=500)
+    # Factory creation is async for BrowserAgent
+    pipeline = await pipeline_class.create(
+        base_url=base_url,
+        api_key=api_key,
+        model=model,
+        max_retries=max_retries,
+        pipeline_id=pipeline_id,
+        dataset_id=dataset_id,
+        **kwargs
+    )
+
+    return StreamingHttpResponse(serialize_events_async(pipeline.run()), content_type="application/json")
 
 
 @admin_required
 @require_POST
+@handle_async_api_error
 async def run_browser_agent_pipeline(request):
     return await _run_pipeline_generic_async(
         request, 

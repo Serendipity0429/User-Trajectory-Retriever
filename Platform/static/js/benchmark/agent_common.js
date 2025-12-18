@@ -3,26 +3,58 @@ window.AgentBenchmark = (function() {
     const trialState = {};
     let globalConfig = {};
 
-    function init(config) {
-        globalConfig = {
-            pipelineType: 'vanilla_agent', // default
-            csvPrefix: 'vanilla-agent-data',
-            title: 'Agent Trajectory',
+    const CONFIGS = {
+        'vanilla_agent': {
+            pipelineType: 'vanilla_agent',
+            csvPrefix: 'vanilla-agent',
+            title: 'Vanilla Agent Trajectory',
             mainIconClass: 'bi-robot',
             mainColorClass: 'bg-primary',
             textClass: 'text-primary',
             loadingText: 'Agent is thinking...',
-            runningText: 'Agent is working...',
-            stepIcons: {
-                thought: 'bi-lightbulb',
-                action: 'bi-terminal',
-                observation: 'bi-hdd-network',
-                user: 'bi-person-circle',
-                system: 'bi-gear',
-                response: 'bi-chat-dots'
-            },
+            runningText: 'Agent is working...'
+        },
+        'browser_agent': {
+            pipelineType: 'browser_agent',
+            csvPrefix: 'browser-agent',
+            title: 'Browser Session',
+            mainIconClass: 'bi-browser-chrome',
+            mainColorClass: 'bg-info',
+            textClass: 'text-info',
+            loadingText: 'Agent is navigating...',
+            runningText: 'Browser Agent is working...'
+        }
+    };
+
+    const DEFAULT_STEP_ICONS = {
+        thought: 'bi-lightbulb',
+        action: 'bi-terminal',
+        observation: 'bi-hdd-network',
+        user: 'bi-person-circle',
+        system: 'bi-gear',
+        response: 'bi-chat-dots'
+    };
+
+    // New helper to init by type string
+    function initWithType(type) {
+        if (CONFIGS[type]) {
+            init(CONFIGS[type]);
+        } else {
+            console.error("Unknown agent type:", type);
+            // Fallback
+            init(CONFIGS['vanilla_agent']);
+        }
+    }
+
+    function init(config) {
+        globalConfig = {
+            stepIcons: { ...DEFAULT_STEP_ICONS },
             ...config
         };
+        // Merge stepIcons if provided in config
+        if (config.stepIcons) {
+             globalConfig.stepIcons = { ...DEFAULT_STEP_ICONS, ...config.stepIcons };
+        }
 
         // Override renderTrial
         BenchmarkUtils.BenchmarkRenderer.renderTrial = function(trial, isCompleted, trialCount, maxRetries) {
@@ -687,6 +719,7 @@ window.AgentBenchmark = (function() {
     }
 
     return {
-        init: init
+        init: init,
+        initWithType: initWithType
     };
 })();

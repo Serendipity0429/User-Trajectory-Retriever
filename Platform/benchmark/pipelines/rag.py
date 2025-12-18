@@ -25,22 +25,13 @@ class RagAdhocPipeline(BaseAdhocPipeline):
         return "RAG Ad-hoc Pipeline"
 
     def get_settings_snapshot(self):
-        return {
-            'llm_settings': {
-                'llm_base_url': self.llm_settings.llm_base_url,
-                'llm_model': self.llm_settings.llm_model,
-                'max_retries': self.llm_settings.max_retries,
-                'allow_reasoning': self.llm_settings.allow_reasoning,
-                'temperature': getattr(self.llm_settings, 'temperature', 0.0),
-                'top_p': getattr(self.llm_settings, 'top_p', 1.0),
-                'max_tokens': getattr(self.llm_settings, 'max_tokens', None)
-            },
-            'search_settings': {
-                'search_provider': self.search_settings.search_provider,
-                'search_limit': self.search_settings.search_limit,
-                'serper_fetch_full_content': self.search_settings.fetch_full_content
-            }
+        snapshot = super().get_settings_snapshot()
+        snapshot['search_settings'] = {
+            'search_provider': self.search_settings.search_provider,
+            'search_limit': self.search_settings.search_limit,
+            'serper_fetch_full_content': self.search_settings.fetch_full_content
         }
+        return snapshot
 
     def create_run_object(self):
         run_name = f"RAG Ad-hoc Run {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
@@ -107,22 +98,13 @@ class RagMultiTurnPipeline(BaseMultiTurnPipeline):
 
     def get_settings_snapshot(self):
         search_settings = SearchSettings.get_effective_settings()
-        return {
-            'llm_settings': {
-                'llm_base_url': self.llm_settings.llm_base_url,
-                'llm_model': self.llm_settings.llm_model,
-                'max_retries': self.llm_settings.max_retries,
-                'allow_reasoning': self.llm_settings.allow_reasoning,
-                'temperature': getattr(self.llm_settings, 'temperature', 0.0),
-                'top_p': getattr(self.llm_settings, 'top_p', 1.0),
-                'max_tokens': getattr(self.llm_settings, 'max_tokens', None)
-            },
-            'search_settings': {
-                'search_provider': search_settings.search_provider,
-                'search_limit': search_settings.search_limit,
-                'serper_fetch_full_content': search_settings.fetch_full_content
-            }
+        snapshot = super().get_settings_snapshot()
+        snapshot['search_settings'] = {
+            'search_provider': search_settings.search_provider,
+            'search_limit': search_settings.search_limit,
+            'serper_fetch_full_content': search_settings.fetch_full_content
         }
+        return snapshot
 
     def create_session(self, settings, question_text, ground_truths, group):
         return MultiTurnSession.objects.create(

@@ -31,20 +31,14 @@ class VanillaAgentPipeline(BaseAgentPipeline):
         return "Vanilla Agent Pipeline"
 
     def get_settings_snapshot(self):
-        search_settings = SearchSettings.get_effective_settings()
         agent_settings = AgentSettings.get_effective_settings()
-        return {
-            'llm_settings': {
-                'llm_base_url': self.llm_settings.llm_base_url,
-                'llm_model': self.llm_settings.llm_model,
-                'max_retries': self.llm_settings.max_retries,
-            },
-            'pipeline_type': 'vanilla_agent',
-            'agent_config': {
-                'model_name': self.agent_model.model_name if hasattr(self.agent_model, 'model_name') else 'unknown',
-                'memory_type': agent_settings.memory_type
-            }
+        snapshot = super().get_settings_snapshot()
+        snapshot['pipeline_type'] = 'vanilla_agent'
+        snapshot['agent_config'] = {
+            'model_name': self.agent_model.model_name if hasattr(self.agent_model, 'model_name') else 'unknown',
+            'memory_type': agent_settings.memory_type
         }
+        return snapshot
 
     def create_session(self, settings, question_text, ground_truths, group):
         return MultiTurnSession.objects.create(
@@ -147,94 +141,6 @@ class VanillaAgentPipeline(BaseAgentPipeline):
     def run_single_turn(self, session, trial):
         return asyncio.run(self._run_single_turn_async(session, trial))
 
-    def _process_single_session(self, group, question_text, ground_truths):
-        """
-        Process a single question session, including retries, utilizing the Vanilla Agent run_single_turn logic.
-        """
-        try:
-            session = self.create_session(self.llm_settings, question_text, ground_truths, group)
-
-            yield {
-                'is_meta': True,
-                'type': 'session_created',
-                'session_id': session.id,
-                'question': question_text,
-                'group_id': group.id,
-                'group_name': group.name
-            }
-
-            is_session_completed = False
-            trial_number = 1
-            final_is_correct = False
-            final_answer = ""
-            
-            while trial_number <= self.max_retries and not is_session_completed:
-                if not self.check_active():
-                    break
-
-                trial = self.create_trial(session, trial_number)
-                
-                yield {
-                    'is_meta': True,
-                    'type': 'trial_started',
-                    'session_id': session.id,
-                    'trial_number': trial_number,
-                    'group_id': group.id
-                }
-
-                try:
-                    # Execute agent logic
-                    # run_single_turn returns (answer, is_correct, search_results)
-                    parsed_answer, is_correct, _ = self.run_single_turn(session, trial)
-                except Exception as e:
-                    trial.status = 'error'
-                    trial.save()
-                    raise e
-                
-                # run_single_turn already handles saving trial status, correctness, etc.
-                
-                yield {
-                    'is_meta': True,
-                    'type': 'trial_completed',
-                    'session_id': session.id,
-                    'trial_number': trial_number,
-                    'is_correct': is_correct,
-                    'answer': parsed_answer,
-                    'full_response': trial.full_response,
-                    'group_id': group.id
-                }
-
-                final_answer = parsed_answer
-                final_is_correct = is_correct
-
-                if is_correct:
-                    is_session_completed = True
-                else:
-                    trial_number += 1
-            
-            session.is_completed = True
-            session.save()
-
-            yield {
-                'question': question_text,
-                'correct': final_is_correct,
-                'trials': trial_number if final_is_correct else (trial_number - 1),
-                'session_id': session.id,
-                'final_answer': final_answer,
-                'ground_truths': ground_truths,
-                'max_retries': self.max_retries,
-                'group_name': group.name,
-                'group_id': group.id
-            }
-
-        except Exception as e:
-            yield {'error': str(e), 'question': question_text}
-
-        # Check correctness
-        answer, is_correct = self.save_trial_result(session, trial, answer, full_response)
-
-        return answer, is_correct, [] # No search results returned explicitly, they are in trace
-
 
 class BrowserAgentPipeline(BaseAgentPipeline):
     def __init__(self, base_url, api_key, model, max_retries, pipeline_id=None, dataset_id=None):
@@ -263,18 +169,13 @@ class BrowserAgentPipeline(BaseAgentPipeline):
 
     def get_settings_snapshot(self):
         agent_settings = AgentSettings.get_effective_settings()
-        return {
-            'llm_settings': {
-                'llm_base_url': self.llm_settings.llm_base_url,
-                'llm_model': self.llm_settings.llm_model,
-                'max_retries': self.llm_settings.max_retries,
-            },
-            'pipeline_type': 'browser_agent',
-            'agent_config': {
-                'model_name': self.agent_model.model_name if hasattr(self.agent_model, 'model_name') else 'unknown',
-                'memory_type': agent_settings.memory_type
-            }
+        snapshot = super().get_settings_snapshot()
+        snapshot['pipeline_type'] = 'browser_agent'
+        snapshot['agent_config'] = {
+            'model_name': self.agent_model.model_name if hasattr(self.agent_model, 'model_name') else 'unknown',
+            'memory_type': agent_settings.memory_type
         }
+        return snapshot
 
     def create_session(self, settings, question_text, ground_truths, group):
         return MultiTurnSession.objects.create(

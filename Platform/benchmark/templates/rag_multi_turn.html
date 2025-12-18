@@ -329,5 +329,12 @@
 {% endblock %}
 
 {% block benchmark_extra_js %}
-<script src="{% static 'js/benchmark/rag_multi_turn.js' %}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    BenchmarkUtils.MultiTurnPage.init({
+        pipelineType: 'rag_multi_turn',
+        csvPrefix: 'rag-multiturn'
+    });
+});
+</script>
 {% endblock %}

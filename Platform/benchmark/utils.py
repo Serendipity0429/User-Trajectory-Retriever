@@ -1,9 +1,39 @@
 import logging
 import re
+from functools import wraps
 from django.conf import settings
+from django.http import JsonResponse
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
+
+
+def handle_api_error(view_func):
+    """
+    Decorator to handle exceptions in API views and return a JSON error response.
+    """
+    @wraps(view_func)
+    def _wrapped_view(request, *args, **kwargs):
+        try:
+            return view_func(request, *args, **kwargs)
+        except Exception as e:
+            print_debug(f"Error in {view_func.__name__}: {e}")
+            return JsonResponse({"status": "error", "message": str(e), "error": str(e)}, status=500)
+    return _wrapped_view
+
+
+def handle_async_api_error(view_func):
+    """
+    Decorator to handle exceptions in Async API views.
+    """
+    @wraps(view_func)
+    async def _wrapped_view(request, *args, **kwargs):
+        try:
+            return await view_func(request, *args, **kwargs)
+        except Exception as e:
+            print_debug(f"Error in {view_func.__name__}: {e}")
+            return JsonResponse({"status": "error", "message": str(e), "error": str(e)}, status=500)
+    return _wrapped_view
 
 
 def print_debug(*args, **kwargs):

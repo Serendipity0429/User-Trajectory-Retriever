@@ -240,6 +240,13 @@
 
 {% block benchmark_extra_js %}
 
-<script src="{% static 'js/benchmark/vanilla_llm_adhoc.js' %}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    BenchmarkUtils.AdhocPage.init({
+        pipelineType: 'vanilla_adhoc',
+        csvPrefix: 'vanilla-adhoc'
+    });
+});
+</script>
 
 {% endblock %}

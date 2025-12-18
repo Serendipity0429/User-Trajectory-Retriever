@@ -282,5 +282,27 @@
 {% endblock %}
 
 {% block benchmark_extra_js %}
-<script src="{% static 'js/benchmark/rag_adhoc.js' %}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    BenchmarkUtils.AdhocPage.init({
+        pipelineType: 'rag_adhoc',
+        csvPrefix: 'rag-adhoc',
+        buildFormData: function(formData) {
+            formData.append('rag_prompt_template', document.getElementById('rag_prompt_template').value);
+            
+            const searchProviderEl = document.getElementById('search_provider');
+            if (searchProviderEl) formData.append('search_provider', searchProviderEl.value);
+            
+            const searchLimitEl = document.getElementById('search_limit');
+            if (searchLimitEl) formData.append('search_limit', searchLimitEl.value);
+            
+            const serperKeyEl = document.getElementById('serper_api_key');
+            if (serperKeyEl) formData.append('serper_api_key', serperKeyEl.value);
+            
+            const fullContentEl = document.getElementById('serper_fetch_full_content');
+            if (fullContentEl) formData.append('serper_fetch_full_content', fullContentEl.checked);
+        }
+    });
+});
+</script>
 {% endblock %}

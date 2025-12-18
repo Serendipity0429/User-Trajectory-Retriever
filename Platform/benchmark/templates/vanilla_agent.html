@@ -265,5 +265,9 @@
 
 {% block benchmark_extra_js %}
 <script src="{% static 'js/benchmark/agent_common.js' %}"></script>
-<script src="{% static 'js/benchmark/vanilla_agent.js' %}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    window.AgentBenchmark.initWithType('vanilla_agent');
+});
+</script>
 {% endblock %}

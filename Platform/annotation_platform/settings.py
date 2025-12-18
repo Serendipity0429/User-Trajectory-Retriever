@@ -10,13 +10,15 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 import os
-import mimetypes
 from decouple import config
 from django.contrib.messages import constants as messages
 
-mimetypes.add_type("application/javascript", ".cjs", True)
-
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
+
+# Configure WhiteNoise to serve .cjs files with the correct MIME type
+WHITENOISE_MIMETYPES = {
+    '.cjs': 'application/javascript',
+}
 
 
 # Quick-start development settings - unsuitable for production

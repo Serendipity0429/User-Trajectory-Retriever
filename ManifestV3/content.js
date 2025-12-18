@@ -251,7 +251,7 @@ async function initialize() {
             });
         });
 
-        const login_response = await withRetry(checkLoginStatus);
+        const login_response = await withRetry(checkLoginStatus, 100);
 
         if (!login_response || !login_response.log_status) {
             printDebug("content", "User is not logged in. Exiting content script.");
@@ -259,7 +259,7 @@ async function initialize() {
             return;
         }
 
-        await withRetry(updateTaskStatus);
+        await withRetry(updateTaskStatus, 100);
 
         if (!getTaskStatus()) {
             printDebug("content", "No active task. Exiting content script.");
@@ -272,8 +272,6 @@ async function initialize() {
 
         // // Wait a bit for the page to stabilize (frameworks hydration, etc.)
         await new Promise(resolve => setTimeout(resolve, 500) );
-
-
 
         unblockInteractions();
         viewState.initialize();

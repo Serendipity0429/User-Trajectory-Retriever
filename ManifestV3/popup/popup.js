@@ -111,7 +111,7 @@ function displayActiveTask(task_id, task_info) {
         activeTaskEl.textContent = "Connection Error";
         activeTaskEl.style.color = "#e13636";
         taskTrialEl.textContent = "0";
-    } else {
+    } else if (active_task_id > -1) {
         if (task_info) {
             taskTrialEl.textContent = task_info.trial_num;
             switchTaskButtonStatus('on', task_info.trial_num);
@@ -121,6 +121,12 @@ function displayActiveTask(task_id, task_info) {
         }
         activeTaskEl.textContent = active_task_id;
         activeTaskEl.style.color = "";
+    } else {
+        // Fallback for unexpected values
+        switchTaskButtonStatus('off');
+        activeTaskEl.textContent = "Error: Invalid Task ID";
+        activeTaskEl.style.color = "#e13636";
+        taskTrialEl.textContent = "N/A";
     }
 }
 
@@ -175,11 +181,14 @@ function switchTaskButtonStatus(task_status, trial_num = 0) {
     const startTaskBtn = document.getElementById('startTaskBtn');
     const endTaskBtn = document.getElementById('submitAnswerBtn');
     const cancelTaskBtn = document.getElementById('cancelAnnotationBtn');
-    const config = getConfig();
+    const config = getConfig(true); // Suppress error if config not ready
 
     startTaskBtn.style.display = is_active ? 'none' : 'block';
     endTaskBtn.style.display = is_active ? 'block' : 'none';
-    cancelTaskBtn.style.display = config.is_dev || trial_num > config.cancel_trial_threshold ? 'block' : 'none';
+    
+    // Default to hiding cancel button if config is missing (safe default)
+    const showCancel = config ? (config.is_dev || trial_num > config.cancel_trial_threshold) : false;
+    cancelTaskBtn.style.display = showCancel ? 'block' : 'none';
 
     startTaskBtn.disabled = is_active;
     endTaskBtn.disabled = !is_active;

@@ -10,8 +10,11 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 import os
+import mimetypes
 from decouple import config
 from django.contrib.messages import constants as messages
+
+mimetypes.add_type("application/javascript", ".cjs", True)
 
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 
@@ -227,8 +230,8 @@ CSRF_TRUSTED_ORIGINS = [
     "http://localhost:8080",
     "http://127.0.0.1:8000",
     IP_TO_LAUNCH.rstrip("/"),
-    "chrome-extension://bbjnmhakmlafhniehkjmpcgfalppcjmf",
 ]
+
 CSRF_TRUSTED_ORIGINS_REGEXES = [
     r"^chrome-extension://.*$",
 ]

@@ -3,7 +3,7 @@
 // --- Utility Functions ---
 
 function printDebug(source, ...messages) {
-    const config = getConfig();
+    const config = getConfig(true);
     if (config && config.is_dev) {
         console.log(`[${source}]`, ...messages);
     }
@@ -393,7 +393,7 @@ function injectMessageBoxStylesheet() {
         .utr-message-box.size-medium { min-width: 15vw; max-width: 25vw; padding: 1.2vw; font-size: 1.2vw; }
         .utr-message-box.size-large { min-width: 20vw; max-width: 30vw; padding: 1.4vw; font-size: 1.6vw; }
 
-        #task-question-box.utr-message-box { min-width: 15vw; max-width: 25vw; padding: 1.2vw; font-size: 1.2vw; line-height: 1.5; }
+        #task-question-box.utr-message-box { line-height: 1.5; }
 
         @media (max-width: 768px) {
             .utr-message-box, #task-question-box.utr-message-box {
@@ -401,7 +401,7 @@ function injectMessageBoxStylesheet() {
                 max-width: 300px !important;
             }
             .utr-message-box.size-small { font-size: 0.9rem !important; padding: 1rem !important; }
-            .utr-message-box.size-medium, #task-question-box.utr-message-box { font-size: 1rem !important; padding: 1.2rem !important; }
+            .utr-message-box.size-medium { font-size: 1rem !important; padding: 1.2rem !important; }
             .utr-message-box.size-large { font-size: 1.1rem !important; padding: 1.4rem !important; }
         }
     `;
@@ -429,9 +429,7 @@ async function displayMessageBox(options) {
 
     const box = document.createElement('div');
     box.className = `rr-ignore loaded-box rr-block utr-message-box type-${type}`;
-    if(id !== 'task-question-box'){
-        box.classList.add(`size-${boxSize}`);
-    }
+    box.classList.add(`size-${boxSize}`);
 
     if (id) {
         box.id = id;

@@ -87,9 +87,11 @@ function initializeConfig() {
 }
 
 // --- Accessor Function ---
-function getConfig() {
+function getConfig(suppressError = false) {
     if (!config) {
-        console.error("Configuration has not been initialized. Please call initializeConfig() first.");
+        if (!suppressError) {
+            console.error("Configuration has not been initialized. Please call initializeConfig() first.");
+        }
         return null;
     }
     return config;

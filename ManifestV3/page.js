@@ -214,10 +214,17 @@ class ViewState {
                     unitPage.addRRWebEvent(event);
                 },
                 // recordCrossOriginIframes: true, // TODO: Add iframe support
-                recordCanvas: true, // NOTICE: enable canvas recording, which is under experimental stage
                 // inlineImages: true, // NOTICE: enable image inlining to capture images as base64
                 // dsheet: true, // NOTICE: enable stylesheet inlining to capture custom styles
                 // collectFonts: true, // NOTICE: enable font collection to capture custom fonts
+                recordCanvas: true, // NOTICE: enable canvas recording, which is under experimental stage
+                sampling: {
+                    canvas: 15,
+                },
+                dataURLOptions: {
+                    type: 'image/webp',
+                    quality: 0.8,
+                },
             });
         } 
         printDebug("page", "rrweb recording started.");
@@ -296,5 +303,8 @@ class ViewState {
 window._utrt_routine_interval = null;
 const unitPage = new UnitPage();
 const pageManager = new PageManager();
+// Initialize immediately to capture data even if flush occurs before viewState.initialize()
+unitPage.initialize();
+pageManager.initialize();
 const viewState = new ViewState(unitPage, pageManager);
 

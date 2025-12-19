@@ -53,6 +53,8 @@ async function getElementDetails() {
 }
 
 const MSG_TYPE_POPUP = "msg_from_popup";
+const MSG_TYPE_CONTENT = "msg_from_content";
+
 
 let _content_vars = {
     url_now: window.location.href,
@@ -152,7 +154,7 @@ async function displayQuestionBox(question) {
 
 async function updateEvidenceCount() {
     const task_id = await new Promise((resolve) => {
-        chrome.runtime.sendMessage({ type: MSG_TYPE_POPUP, command: "get_active_task" }, (response) => {
+        chrome.runtime.sendMessage({ type: MSG_TYPE_CONTENT, command: "get_active_task" }, (response) => {
             resolve(response ? response.task_id : -1);
         });
     });
@@ -169,7 +171,7 @@ async function updateEvidenceCount() {
 
 async function getTaskInfo() {
     return new Promise((resolve, reject) => {
-        chrome.runtime.sendMessage({ type: MSG_TYPE_POPUP, command: "get_task_info" }, async function (response) {
+        chrome.runtime.sendMessage({ type: MSG_TYPE_CONTENT, command: "get_task_info" }, async function (response) {
             if (chrome.runtime.lastError) {
                 console.error("Error getting task info:", chrome.runtime.lastError.message);
                 return reject(chrome.runtime.lastError);
@@ -185,7 +187,7 @@ async function getTaskInfo() {
 function updateTaskStatus() {
     printDebug("content", "Checking if task is active...");
     return new Promise((resolve, reject) => {
-        chrome.runtime.sendMessage({ type: MSG_TYPE_POPUP, command: "get_active_task" }, function (response) {
+        chrome.runtime.sendMessage({ type: MSG_TYPE_CONTENT, command: "get_active_task" }, function (response) {
             if (chrome.runtime.lastError) {
                 console.error("Error checking task status:", chrome.runtime.lastError.message);
                 _content_vars.is_task_active = false;
@@ -218,8 +220,8 @@ function removeExistingBoxes() {
 }
 
 async function setupTaskUI() {
-    removeExistingBoxes();
     await getTaskInfo();
+    updateEvidenceCount();
     if (!_is_server_page(_content_vars.url_now)) {
         displayMessageBox({ message: "You can start your task now!" });
     }
@@ -243,7 +245,7 @@ async function initialize() {
         await initializeConfig(); // Ensure config is loaded before proceeding
 
         const checkLoginStatus = () => new Promise((resolve, reject) => {
-            chrome.runtime.sendMessage({ type: MSG_TYPE_POPUP, command: "check_logging_status" }, (response) => {
+            chrome.runtime.sendMessage({ type: MSG_TYPE_CONTENT, command: "check_logging_status" }, (response) => {
                 if (chrome.runtime.lastError) {
                     return reject(chrome.runtime.lastError);
                 }

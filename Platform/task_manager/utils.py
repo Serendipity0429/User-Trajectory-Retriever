@@ -527,10 +527,10 @@ def reset_states(new_page=True):
         <div class="utrt-message">Please wait, this page will close automatically.</div>
         <script>
             function requestClose() {{
-                window.postMessage({{ type: "UTR_RESET_STATES_REQUEST", new_page: "{'true' if new_page else 'false'}"}}, "*");
+                window.postMessage({{ type: "UTR_RESET_STATES_REQUEST", new_page: {'true' if new_page else 'false'}}}, "*");
             }}
             requestClose();
-            setInterval(requestClose, 500);
+            setInterval(requestClose, 50);
         </script>
     </body>
     </html>

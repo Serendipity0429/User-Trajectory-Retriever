@@ -2,7 +2,6 @@
 window.addEventListener('message', (event) => {
     // We only accept messages from ourselves
     if (event.source !== window) {
-        // console.warn('Ignored message from different source:', event.source);
         return;
     }
 

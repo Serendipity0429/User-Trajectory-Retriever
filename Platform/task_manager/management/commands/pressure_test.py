@@ -12,6 +12,8 @@ import subprocess
 import os
 import tempfile
 from urllib.parse import quote_plus
+import requests
+import concurrent.futures
 
 
 class Command(BaseCommand):
@@ -58,6 +60,22 @@ class Command(BaseCommand):
             type=int,
             default=1024,  # Default to 1MB
             help="The size of the rrweb_record payload in Kilobytes (KB).",
+        )
+        parser.add_argument(
+            "--url",
+            type=str,
+            default="http://127.0.0.1:8000/task/data/",
+            help="The target URL for the pressure test.",
+        )
+        parser.add_argument(
+            "--token",
+            type=str,
+            help="Pre-generated JWT token to use for authentication (skips user creation).",
+        )
+        parser.add_argument(
+            "--multi-user-file",
+            type=str,
+            help="Path to a JSON file containing a list of access tokens for concurrent user simulation.",
         )
 
     def _generate_pseudo_data(self, payload_size_kb):
@@ -130,6 +148,10 @@ class Command(BaseCommand):
         }
 
     def handle(self, *args, **options):
+        if options["multi_user_file"]:
+            self.run_multi_user_test(options)
+            return
+
         User = get_user_model()
         username = "pressure_test_user"
         password = "password"
@@ -147,7 +169,7 @@ class Command(BaseCommand):
             return
 
         self.setup_and_run_test(User, username, password, options)
-        if not options["no_cleanup"]:
+        if not options["no_cleanup"] and not options.get("token"):
             self.cleanup(User, username)
 
     def create_user(self, User, username, password):
@@ -203,21 +225,25 @@ class Command(BaseCommand):
         )
 
     def setup_and_run_test(self, User, username, password, options):
-        # 1. Setup User and Task
-        user = self.create_user(User, username, password)
-        dataset, _ = TaskDataset.objects.get_or_create(name="pressure_test_dataset")
-        entry, _ = TaskDatasetEntry.objects.get_or_create(
-            belong_dataset=dataset,
-            question="Pressure Test",
-            answer=json.dumps(["Done"]),
-        )
-        Task.objects.update_or_create(
-            user=user, active=True, defaults={"content": entry}
-        )
+        if options.get("token"):
+            access_token = options["token"]
+        else:
+            # 1. Setup User and Task
+            user = self.create_user(User, username, password)
+            dataset, _ = TaskDataset.objects.get_or_create(name="pressure_test_dataset")
+            entry, _ = TaskDatasetEntry.objects.get_or_create(
+                belong_dataset=dataset,
+                question="Pressure Test",
+                answer=json.dumps(["Done"]),
+            )
+            Task.objects.update_or_create(
+                user=user, active=True, defaults={"content": entry}
+            )
 
-        # 2. Generate Token and Data
-        refresh = RefreshToken.for_user(user)
-        access_token = str(refresh.access_token)
+            # 2. Generate Token and Data
+            refresh = RefreshToken.for_user(user)
+            access_token = str(refresh.access_token)
+
         sample_data = self._generate_pseudo_data(options["payload_size"])
 
         json_data_string = json.dumps(sample_data)
@@ -236,6 +262,7 @@ class Command(BaseCommand):
             self.stdout.write(
                 f"Running End-to-End Pressure Test with {options['payload_size']}KB payload..."
             )
+            self.stdout.write(f"Target URL: {options['url']}")
             self.stdout.write(self.style.SUCCESS("=" * 50))
 
             num_requests = options["requests"]
@@ -252,7 +279,7 @@ class Command(BaseCommand):
                 "application/x-www-form-urlencoded",
                 "-H",
                 f"Authorization: Bearer {access_token}",
-                "http://127.0.0.1:8000/task/data/",
+                options["url"],
             ]
 
             try:
@@ -308,3 +335,90 @@ class Command(BaseCommand):
             self.stdout.write(
                 self.style.WARNING(f"User {username} not found, nothing to clean up.")
             )
+
+    def run_multi_user_test(self, options):
+        token_file = options["multi_user_file"]
+        url = options["url"]
+        requests_per_user = options["requests"]
+        
+        # We ignore 'concurrency' option here because concurrency is determined by the number of tokens/users
+        # provided in the file, assuming we want to simulate ALL of them active at once.
+        # However, we can use a ThreadPoolExecutor to limit actual thread concurrency if needed,
+        # but the goal is typically to simulate N users.
+        
+        try:
+            with open(token_file, 'r') as f:
+                tokens = json.load(f)
+        except Exception as e:
+            self.stdout.write(self.style.ERROR(f"Failed to read token file: {e}"))
+            return
+
+        num_users = len(tokens)
+        self.stdout.write(self.style.SUCCESS("=" * 50))
+        self.stdout.write(f"Starting Multi-User Pressure Test")
+        self.stdout.write(f"Target URL: {url}")
+        self.stdout.write(f"Users (Tokens): {num_users}")
+        self.stdout.write(f"Requests per user: {requests_per_user}")
+        self.stdout.write(f"Total Requests: {num_users * requests_per_user}")
+        self.stdout.write(self.style.SUCCESS("=" * 50))
+
+        # Generate payload once
+        sample_data = self._generate_pseudo_data(options["payload_size"])
+        json_data_string = json.dumps(sample_data)
+        compressed_data = zlib.compress(json_data_string.encode("utf-8"))
+        base64_encoded_data = base64.b64encode(compressed_data).decode("utf-8")
+        # requests library handles url encoding, so we send the raw base64 in the dict if using data=...
+        # But our API expects 'message=...' form encoded.
+        payload = {"message": base64_encoded_data}
+
+        start_time = time.time()
+        
+        with concurrent.futures.ThreadPoolExecutor(max_workers=num_users) as executor:
+            futures = [
+                executor.submit(self._single_user_worker, token, url, payload, requests_per_user)
+                for token in tokens
+            ]
+            
+            results = []
+            for future in concurrent.futures.as_completed(futures):
+                results.append(future.result())
+
+        total_time = time.time() - start_time
+        
+        # Aggregate Results
+        total_requests = sum(r['success'] + r['fail'] for r in results)
+        total_failed = sum(r['fail'] for r in results)
+        avg_latency = sum(r['avg_latency'] for r in results) / len(results) if results else 0
+        
+        self.stdout.write(self.style.SUCCESS("\n" + "=" * 50))
+        self.stdout.write("Test Completed.")
+        self.stdout.write(f"Total Time: {total_time:.2f}s")
+        self.stdout.write(f"Total Requests: {total_requests}")
+        self.stdout.write(f"Failed Requests: {total_failed}")
+        self.stdout.write(f"Avg Latency per User-Session: {avg_latency:.2f}s (Total time for N requests)")
+        self.stdout.write(f"Throughput: {total_requests / total_time:.2f} req/s")
+        self.stdout.write(self.style.SUCCESS("=" * 50))
+
+    def _single_user_worker(self, token, url, payload, num_requests):
+        headers = {"Authorization": f"Bearer {token}"}
+        success = 0
+        fail = 0
+        start = time.time()
+        
+        for _ in range(num_requests):
+            try:
+                # Using a session for keep-alive if desired, or plain requests
+                resp = requests.post(url, data=payload, headers=headers)
+                if resp.status_code == 200:
+                    success += 1
+                else:
+                    fail += 1
+            except Exception:
+                fail += 1
+        
+        duration = time.time() - start
+        return {
+            "success": success,
+            "fail": fail,
+            "avg_latency": duration # Total duration for this user's batch
+        }

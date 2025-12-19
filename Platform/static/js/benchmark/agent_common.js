@@ -237,6 +237,12 @@ window.AgentBenchmark = (function() {
                     </div>
                 </div>
              `;
+             
+             // Reset renderedCount if we are re-rendering the DOM for a processing trial
+             if (trialState[trial.id]) {
+                 trialState[trial.id].renderedCount = 0;
+             }
+
              // Trigger polling
              setTimeout(() => startPolling(trial.id), 100);
         } else {

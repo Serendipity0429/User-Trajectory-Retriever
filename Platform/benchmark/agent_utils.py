@@ -82,20 +82,46 @@ def create_memory(memory_type, user_id, update_callback=None):
     """Helper to initialize agent memory based on settings."""
     print_debug(f"Initializing memory with type: {memory_type}")
     
+    memory = None
     if memory_type == 'mem0' and Mem0LongTermMemory:
         try:
-            return Mem0LongTermMemory(user_id=user_id)
+            memory = Mem0LongTermMemory(user_id=user_id)
         except Exception as e:
             print_debug(f"Failed to init Mem0: {e}")
 
     elif memory_type == 'reme' and ReMePersonalLongTermMemory:
         try:
-            return ReMePersonalLongTermMemory(user_id=user_id)
+            memory = ReMePersonalLongTermMemory(user_id=user_id)
         except Exception as e:
             print_debug(f"Failed to init ReMe: {e}")
             
-    # Default fallback
-    return StreamingMemory(update_callback=update_callback) if update_callback else InMemoryMemory()
+    if memory is None:
+        # Default fallback to StreamingMemory which handles callback internally
+        return StreamingMemory(update_callback=update_callback) if update_callback else InMemoryMemory()
+
+    # If we initialized a third-party memory AND have a callback, wrap the add method
+    if update_callback:
+        original_add = memory.add
+        
+        async def wrapped_add(memories, **kwargs):
+            # Call original
+            await original_add(memories, **kwargs)
+            
+            # Trigger callback
+            try:
+                # Try standard get_memory interface
+                msgs = await memory.get_memory()
+                if msgs is not None:
+                     update_callback(msgs)
+            except Exception as e:
+                print_debug(f"Error in memory callback wrapper: {e}")
+                # Fallback: try accessing content directly if available
+                if hasattr(memory, 'content'):
+                    update_callback(list(memory.content))
+
+        memory.add = wrapped_add
+        
+    return memory
 
 class VanillaAgentFactory:
     @staticmethod

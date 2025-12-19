@@ -6,7 +6,7 @@ from datetime import datetime
 from asgiref.sync import sync_to_async
 from agentscope.message import Msg
 from ..models import LLMSettings, SearchSettings, MultiTurnRun, MultiTurnSession, MultiTurnTrial, AgentSettings
-from ..utils import print_debug
+from ..utils import print_debug, count_questions_in_file
 from ..agent_utils import VanillaAgentFactory, BrowserAgentFactory
 from ..mcp_manager import MCPManager
 from .base import BaseAgentPipeline, REDIS_PREFIX_BROWSER_AGENT
@@ -142,6 +142,22 @@ class VanillaAgentPipeline(BaseAgentPipeline):
         return asyncio.run(self._run_single_turn_async(session, trial))
 
 
+# Helper for reading questions file safely in chunks/lines without DB access
+def question_file_iterator(file_path):
+    if not file_path:
+        return
+    with open(file_path, 'r', encoding='utf-8') as f:
+        for line in f:
+            if not line.strip():
+                continue
+            try:
+                data = json.loads(line)
+                if 'answer' in data and 'ground_truths' not in data:
+                    data['ground_truths'] = data['answer']
+                yield data
+            except json.JSONDecodeError:
+                continue
+
 class BrowserAgentPipeline(BaseAgentPipeline):
     def __init__(self, base_url, api_key, model, max_retries, pipeline_id=None, dataset_id=None):
         super().__init__(base_url, api_key, model, max_retries, pipeline_id, dataset_id)
@@ -159,10 +175,13 @@ class BrowserAgentPipeline(BaseAgentPipeline):
 
     @classmethod
     async def create(cls, base_url, api_key, model, max_retries, pipeline_id=None, dataset_id=None):
-        instance = await sync_to_async(cls)(base_url, api_key, model, max_retries, pipeline_id, dataset_id)
-        # Skip MCP initialization during creation to avoid loop binding issues
-        instance.agent_model, instance.agent_toolkit = await sync_to_async(BrowserAgentFactory.init_agentscope)(instance.temp_settings)
-        return instance
+        try:
+            print_debug("BrowserAgentPipeline: Creating instance (lightweight)...")
+            instance = await sync_to_async(cls)(base_url, api_key, model, max_retries, pipeline_id, dataset_id)
+            return instance
+        except Exception as e:
+            print_debug(f"BrowserAgentPipeline: Error in create: {e}")
+            raise e
 
     def __str__(self):
         return "Browser Agent Pipeline"
@@ -172,7 +191,7 @@ class BrowserAgentPipeline(BaseAgentPipeline):
         snapshot = super().get_settings_snapshot()
         snapshot['pipeline_type'] = 'browser_agent'
         snapshot['agent_config'] = {
-            'model_name': self.agent_model.model_name if hasattr(self.agent_model, 'model_name') else 'unknown',
+            'model_name': self.agent_model.model_name if hasattr(self, 'agent_model') and self.agent_model and hasattr(self.agent_model, 'model_name') else 'unknown',
             'memory_type': agent_settings.memory_type
         }
         return snapshot
@@ -293,48 +312,90 @@ class BrowserAgentPipeline(BaseAgentPipeline):
         self.mcp_client = None
 
     async def run(self):
+        yield {'is_meta': True, 'type': 'info', 'message': 'Pipeline started. Initializing AgentScope...'}
+        await asyncio.sleep(0.1) # Yield control to ensure message flushes
+        
+        try:
+            # Lazy Init of AgentScope here to allow feedback
+            if not self.agent_model or not self.agent_toolkit:
+                 # Run in separate thread to avoid blocking event loop
+                 self.agent_model, self.agent_toolkit = await sync_to_async(BrowserAgentFactory.init_agentscope, thread_sensitive=False)(self.temp_settings)
+                 yield {'is_meta': True, 'type': 'info', 'message': 'AgentScope initialized.'}
+                 await asyncio.sleep(0.1)
+        except Exception as e:
+            print_debug(f"BrowserAgentPipeline: Error initializing AgentScope: {e}")
+            yield {'error': f"Failed to initialize AgentScope: {e}"}
+            return
+
         def create_run_obj():
             name = f"{str(self)}- {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}" 
             snapshot = self.get_settings_snapshot()
             return MultiTurnRun.objects.create(name=name, settings_snapshot=snapshot)
 
-        group = await sync_to_async(create_run_obj)()
+        try:
+            group = await sync_to_async(create_run_obj)()
+            yield {'is_meta': True, 'type': 'info', 'message': f'Run object created: {group.name}'}
+        except Exception as e:
+             print_debug(f"BrowserAgentPipeline: Error creating run object: {e}")
+             yield {'error': f"Failed to initialize run: {e}"}
+             return
         
+        file_path = None
         total_questions = 0
-        questions_iterator = None
         
         try:
-            total_questions = await sync_to_async(self.get_total_questions)()
-            questions_iterator = await sync_to_async(self.load_questions)()
+            yield {'is_meta': True, 'type': 'info', 'message': 'Resolving questions file...'}
+            # 1. Resolve File Path (DB Access)
+            file_path = await sync_to_async(self.get_questions_file_path)()
+            print_debug(f"BrowserAgentPipeline: Using questions file at {file_path}")
+            
+            # 2. Get Total Count (File I/O)
+            total_questions = await sync_to_async(count_questions_in_file)(file_path)
+            print_debug(f"BrowserAgentPipeline: Total questions: {total_questions}")
+            yield {'is_meta': True, 'type': 'info', 'message': f'Loaded {total_questions} questions.'}
+
         except Exception as e:
+            print_debug(f"BrowserAgentPipeline: Error initializing: {e}")
             yield {'error': str(e)}
             await sync_to_async(self.stop_token)()
             return
 
         yield {'is_meta': True, 'type': 'total_count', 'count': total_questions}
         
+        # 3. Create Iterator (No DB Access)
+        questions_iterator = question_file_iterator(file_path)
+        
+        count = 0
         try:
-            # Use a ThreadPoolExecutor to run the synchronous generator iteration in a separate thread
-            # to avoid blocking the asyncio event loop.
-            loop = asyncio.get_running_loop()
-            executor = futures.ThreadPoolExecutor()
-
-            # Iterate over the synchronous generator in the executor
-            # Each `data` item will be awaited.
-            data_generator = iter(questions_iterator)
+            yield {'is_meta': True, 'type': 'info', 'message': 'Starting execution loop...'}
             while True:
                 if not await sync_to_async(self.check_active)():
+                    yield {'is_meta': True, 'type': 'info', 'message': 'Pipeline stopped by user.'}
                     break
+                
                 try:
-                    data = await loop.run_in_executor(executor, next, data_generator)
+                    # Use sync_to_async(next) to fetch the next item from the file
+                    # This runs the file reading in a thread
+                    data = await sync_to_async(next)(questions_iterator)
+                    count += 1
                 except StopIteration:
+                    yield {'is_meta': True, 'type': 'info', 'message': 'All questions processed.'}
                     break # Generator is exhausted
+                except Exception as e:
+                    print_debug(f"BrowserAgentPipeline: Error reading next question: {e}")
+                    yield {'error': f"Error reading question: {e}"}
+                    break
 
                 question_text = data['question']
                 ground_truths = data.get('ground_truths', [])
                 
+                yield {'is_meta': True, 'type': 'info', 'message': f'Processing question {count}/{total_questions}: {question_text[:30]}...'}
+
                 async for event in self._process_single_session_async(group, question_text, ground_truths):
                     yield event
+        except Exception as e:
+            print_debug(f"BrowserAgentPipeline: Unexpected error in run loop: {e}")
+            yield {'error': f"Unexpected pipeline error: {e}"}
         finally:
             await self.cleanup()
             await sync_to_async(self.stop_token)()

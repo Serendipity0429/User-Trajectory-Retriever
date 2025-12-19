@@ -3,6 +3,7 @@ from django.views.decorators.http import require_POST, require_http_methods
 from asgiref.sync import async_to_sync, sync_to_async
 import re
 import csv
+import asyncio
 from django.shortcuts import render, get_object_or_404
 from django.http import JsonResponse, StreamingHttpResponse, HttpResponse
 import openai
@@ -1604,13 +1605,42 @@ def browser_agent(request):
     return render(request, "agent_browser.html", context)
 
 
-@handle_async_api_error
-async def _run_pipeline_generic_async(request, pipeline_class, redis_prefix_template, **kwargs):
+def sync_iterator_from_async(async_gen):
     """
-    Generic handler for running asynchronous pipelines (like Browser Agent).
+    Bridge an async generator to a sync iterator for WSGI compatibility.
+    Runs the async generator in a new event loop.
     """
-    # Async-safe settings retrieval
-    db_settings = await sync_to_async(LLMSettings.get_effective_settings)()
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        iter_ = async_gen.__aiter__()
+        while True:
+            try:
+                # Run the next step of the async generator in the loop
+                item = loop.run_until_complete(iter_.__anext__())
+                yield item
+            except StopAsyncIteration:
+                break
+    finally:
+        try:
+            # Cancel all running tasks
+            pending = asyncio.all_tasks(loop)
+            for task in pending:
+                task.cancel()
+            # Run the loop until all tasks are cancelled
+            if pending:
+                loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+        except Exception:
+            pass
+        loop.close()
+
+@handle_api_error
+def _run_pipeline_generic_async_wrapper(request, pipeline_class, redis_prefix_template, **kwargs):
+    """
+    Synchronous wrapper for running asynchronous pipelines (like Browser Agent) in WSGI.
+    """
+    # Sync settings retrieval
+    db_settings = LLMSettings.get_effective_settings()
     
     base_url = request.POST.get("llm_base_url") or db_settings.llm_base_url
     api_key = request.POST.get("llm_api_key") or db_settings.llm_api_key
@@ -1627,27 +1657,40 @@ async def _run_pipeline_generic_async(request, pipeline_class, redis_prefix_temp
 
     if pipeline_id:
             redis_key = f"{redis_prefix_template}:{pipeline_id}"
-            await sync_to_async(redis_client.set)(redis_key, "1", ex=3600)
+            redis_client.set(redis_key, "1", ex=3600)
 
-    # Factory creation is async for BrowserAgent
-    pipeline = await pipeline_class.create(
-        base_url=base_url,
-        api_key=api_key,
-        model=model,
-        max_retries=max_retries,
-        pipeline_id=pipeline_id,
-        dataset_id=dataset_id,
-        **kwargs
-    )
+    # Use a thread-safe async runner to create the pipeline
+    def create_pipeline_sync():
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            return loop.run_until_complete(pipeline_class.create(
+                base_url=base_url,
+                api_key=api_key,
+                model=model,
+                max_retries=max_retries,
+                pipeline_id=pipeline_id,
+                dataset_id=dataset_id,
+                **kwargs
+            ))
+        finally:
+            loop.close()
 
-    return StreamingHttpResponse(serialize_events_async(pipeline.run()), content_type="application/json")
+    pipeline = create_pipeline_sync()
+
+    # Stream the response using the sync iterator bridge
+    # We serialize events synchronously as they come out of the bridge
+    def serialize_events_sync_bridge():
+        for event in sync_iterator_from_async(pipeline.run()):
+            yield json.dumps(event) + "\n"
+
+    return StreamingHttpResponse(serialize_events_sync_bridge(), content_type="application/json")
 
 
 @admin_required
 @require_POST
-@handle_async_api_error
-async def run_browser_agent_pipeline(request):
-    return await _run_pipeline_generic_async(
+def run_browser_agent_pipeline(request):
+    return _run_pipeline_generic_async_wrapper(
         request, 
         BrowserAgentPipeline, 
         "browser_agent_pipeline_active"

@@ -150,7 +150,10 @@ class VanillaAgentFactory:
         Initialize AgentScope with the project's LLM settings.
         """
         # Initialize basic agentscope environment (logging, etc.)
-        agentscope.init(logging_level="INFO")
+        try:
+            agentscope.init(logging_level="INFO", use_monitor=False)
+        except TypeError:
+            agentscope.init(logging_level="INFO")
         
         # Create model instance directly
         model = OpenAIChatModel(
@@ -193,7 +196,11 @@ class BrowserAgentFactory:
         Initialize AgentScope with the project's LLM settings.
         Returns model and toolkit. MCP connection is handled externally.
         """
-        agentscope.init(logging_level="INFO")
+        try:
+            agentscope.init(logging_level="INFO", use_monitor=False)
+        except TypeError:
+            agentscope.init(logging_level="INFO")
+
         model = OpenAIChatModel(
             model_name=llm_settings.llm_model,
             api_key=llm_settings.llm_api_key,

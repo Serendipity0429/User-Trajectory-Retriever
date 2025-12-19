@@ -1,9 +1,10 @@
 from django.contrib import admin
-from django.urls import path, include
+from django.urls import path, include, re_path
 from django.conf import settings
 from django.conf.urls.static import static
 from django.views.generic.base import RedirectView
 from django.contrib.staticfiles.urls import staticfiles_urlpatterns
+from annotation_platform.views import protected_serve
 
 urlpatterns = [
     path("", RedirectView.as_view(url="/task/home/", permanent=True), name="home"),
@@ -26,6 +27,14 @@ urlpatterns += staticfiles_urlpatterns()
 
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+else:
+    urlpatterns += [
+        re_path(
+            r"^media/(?P<path>.*)$",
+            protected_serve,
+            {"document_root": settings.MEDIA_ROOT},
+        ),
+    ]
 
 handler404 = "annotation_platform.views.custom_error_view"
 handler403 = "annotation_platform.views.custom_permission_denied_view"

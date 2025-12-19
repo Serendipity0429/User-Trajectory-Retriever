@@ -1,4 +1,6 @@
 from django.shortcuts import render
+from django.views.static import serve
+from django.conf import settings
 
 
 def custom_error_view(request, exception=None):
@@ -25,3 +27,7 @@ def custom_server_error_view(request):
         {"message": "An internal server error occurred."},
         status=500,
     )
+
+
+def protected_serve(request, path, document_root=None, show_indexes=False):
+    return serve(request, path, document_root, show_indexes)

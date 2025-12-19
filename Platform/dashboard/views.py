@@ -27,6 +27,7 @@ from discussion.models import Bulletin, Post, Comment
 
 from user_system.forms import InformedConsentForm
 from task_manager.forms import ExtensionVersionForm
+from core.filters import Q_VALID_USER, Q_VALID_USER_REL, Q_VALID_TASK_USER, Q_VALID_TRIAL_USER
 
 def is_superuser(user):
     return user.is_superuser
@@ -35,10 +36,10 @@ def is_superuser(user):
 @user_passes_test(is_superuser)
 def view_current_consent(request):
     latest_consent = InformedConsent.get_latest()
-    total_users_count = User.objects.count()
+    total_users_count = User.participants.count()
 
     if latest_consent and latest_consent.pk:
-        signed_users_count = User.objects.filter(
+        signed_users_count = User.participants.filter(
             agreed_consent_version=latest_consent
         ).count()
         return JsonResponse(
@@ -112,7 +113,7 @@ def admin_statistics_api(request):
     # User statistics
     thirty_days_ago = timezone.now() - timedelta(days=30)
     user_signups = (
-        User.objects.filter(date_joined__gte=thirty_days_ago)
+        User.participants.filter(date_joined__gte=thirty_days_ago)
         .extra(select={"date": "date(date_joined)"})
         .values("date")
         .annotate(count=Count("id"))
@@ -123,7 +124,7 @@ def admin_statistics_api(request):
     }
 
     def get_profile_distribution(field, choices):
-        counts = Profile.objects.values(field).annotate(count=Count(field))
+        counts = Profile.objects.filter(Q_VALID_USER_REL).values(field).annotate(count=Count(field))
         return {
             "labels": [
                 dict(choices).get(c[field], "N/A") for c in counts if c[field]
@@ -144,7 +145,7 @@ def admin_statistics_api(request):
 
     # Task statistics
     task_creations = (
-        Task.objects.filter(start_timestamp__gte=thirty_days_ago)
+        Task.valid_objects.filter(start_timestamp__gte=thirty_days_ago)
         .extra(select={"date": "date(start_timestamp)"})
         .values("date")
         .annotate(count=Count("id"))
@@ -154,14 +155,14 @@ def admin_statistics_api(request):
         "labels": [x["date"] for x in task_creations], "data": [x["count"] for x in task_creations]
     }
 
-    completed_tasks = Task.objects.filter(cancelled=False, active=False, end_timestamp__isnull=False)
+    completed_tasks = Task.valid_objects.filter(cancelled=False, active=False, end_timestamp__isnull=False)
     task_time_distribution = [
         (task.end_timestamp - task.start_timestamp).total_seconds()
         for task in completed_tasks
     ]
     statistics["task_time_distribution"] = task_time_distribution
 
-    all_trials = TaskTrial.objects.filter(end_timestamp__isnull=False)
+    all_trials = TaskTrial.objects.filter(Q_VALID_TASK_USER, end_timestamp__isnull=False)
     trial_time_distribution = [
         (trial.end_timestamp - trial.start_timestamp).total_seconds()
         for trial in all_trials
@@ -203,8 +204,8 @@ def admin_statistics_api(request):
     else:
         statistics["trial_count_distribution"] = {"labels": [], "data": []}
 
-    def get_annotation_distribution(model, field, mapping):
-        counts = model.objects.values(field).annotate(count=Count(field))
+    def get_annotation_distribution(model, field, mapping, q_obj):
+        counts = model.objects.filter(q_obj).values(field).annotate(count=Count(field))
         return {
             "labels": [mapping.get(str(c[field])) for c in counts if c[field] is not None],
             "data": [c["count"] for c in counts if c[field] is not None],
@@ -228,27 +229,27 @@ def admin_statistics_api(request):
 
 
     statistics["familiarity_distribution"] = get_annotation_distribution(
-        PreTaskAnnotation, "familiarity", familiarity_mapping
+        PreTaskAnnotation, "familiarity", familiarity_mapping, Q_VALID_TASK_USER
     )
     statistics["pre_task_difficulty_distribution"] = get_annotation_distribution(
-        PreTaskAnnotation, "difficulty", difficulty_mapping
+        PreTaskAnnotation, "difficulty", difficulty_mapping, Q_VALID_TASK_USER
     )
     statistics["post_task_difficulty_distribution"] = get_annotation_distribution(
-        PostTaskAnnotation, "difficulty_actual", difficulty_mapping
+        PostTaskAnnotation, "difficulty_actual", difficulty_mapping, Q_VALID_TASK_USER
     )
     statistics["effort_distribution"] = get_annotation_distribution(
-        PreTaskAnnotation, "effort", effort_mapping
+        PreTaskAnnotation, "effort", effort_mapping, Q_VALID_TASK_USER
     )
 
     # Aha Moment
-    aha_moment_counts = PostTaskAnnotation.objects.values('aha_moment_type').annotate(count=Count('aha_moment_type')).exclude(aha_moment_type__isnull=True)
+    aha_moment_counts = PostTaskAnnotation.objects.filter(Q_VALID_TASK_USER).values('aha_moment_type').annotate(count=Count('aha_moment_type')).exclude(aha_moment_type__isnull=True)
     statistics["aha_moment_distribution"] = {
         "labels": [item['aha_moment_type'] for item in aha_moment_counts],
         "data": [item['count'] for item in aha_moment_counts]
     }
 
     # Trial Correctness
-    is_correct_counts = TaskTrial.objects.values('is_correct').annotate(count=Count('is_correct'))
+    is_correct_counts = TaskTrial.objects.filter(Q_VALID_TASK_USER).values('is_correct').annotate(count=Count('is_correct'))
     def get_correctness_label(value):
         if value is True: return "Correct"
         if value is False: return "Incorrect"
@@ -260,30 +261,30 @@ def admin_statistics_api(request):
     
     # Confidence
     statistics["confidence_distribution"] = get_annotation_distribution(
-        TaskTrial, "confidence", confidence_mapping
+        TaskTrial, "confidence", confidence_mapping, Q_VALID_TASK_USER
     )
     
     # Answer Formulation Method
-    answer_formulation_counts = TaskTrial.objects.values('answer_formulation_method').annotate(count=Count('answer_formulation_method')).exclude(answer_formulation_method='undefined').exclude(answer_formulation_method__isnull=True)
+    answer_formulation_counts = TaskTrial.objects.filter(Q_VALID_TASK_USER).values('answer_formulation_method').annotate(count=Count('answer_formulation_method')).exclude(answer_formulation_method='undefined').exclude(answer_formulation_method__isnull=True)
     statistics["answer_formulation_method_distribution"] = {
         "labels": [item['answer_formulation_method'] for item in answer_formulation_counts],
         "data": [item['count'] for item in answer_formulation_counts]
     }
     
     # Evidence Type
-    evidence_type_counts = Justification.objects.values('evidence_type').annotate(count=Count('evidence_type'))
+    evidence_type_counts = Justification.objects.filter(Q_VALID_TRIAL_USER).values('evidence_type').annotate(count=Count('evidence_type'))
     statistics["evidence_type_distribution"] = {
         "labels": [item['evidence_type'] for item in evidence_type_counts],
         "data": [item['count'] for item in evidence_type_counts]
     }
 
     # Dwell Time
-    dwell_times = Webpage.objects.exclude(dwell_time__isnull=True).values_list('dwell_time', flat=True)
+    dwell_times = Webpage.objects.filter(Q_VALID_USER_REL).exclude(dwell_time__isnull=True).values_list('dwell_time', flat=True)
     statistics["dwell_time_distribution"] = list(dwell_times)
 
 
-    def get_json_field_distribution(model, field):
-        all_values = model.objects.exclude(**{f"{field}__isnull": True}).values_list(
+    def get_json_field_distribution(model, field, q_obj):
+        all_values = model.objects.filter(q_obj).exclude(**{f"{field}__isnull": True}).values_list(
             field, flat=True
         )
         counts = Counter()
@@ -292,8 +293,8 @@ def admin_statistics_api(request):
                 counts.update(sublist)
         return {"labels": list(counts.keys()), "data": list(counts.values())}
 
-    statistics["cancellation_reasons"] = get_json_field_distribution(CancelAnnotation, "category")
-    statistics["reflection_failures"] = get_json_field_distribution(ReflectionAnnotation, "failure_category")
+    statistics["cancellation_reasons"] = get_json_field_distribution(CancelAnnotation, "category", Q_VALID_TASK_USER)
+    statistics["reflection_failures"] = get_json_field_distribution(ReflectionAnnotation, "failure_category", Q_VALID_TRIAL_USER)
 
     return JsonResponse(statistics)
 
@@ -384,17 +385,17 @@ def admin_page(request):
     # Dashboard metrics for full page load
     context.update(
         {
-            "total_users": User.objects.count(),
+            "total_users": User.participants.count(),
             "superusers": User.objects.filter(is_superuser=True).count(),
-            "active_users": User.objects.filter(
+            "active_users": User.participants.filter(
                 last_login__gte=timezone.now() - timedelta(days=30)
             ).count(),
-            "total_tasks": Task.objects.count(),
-            "completed_tasks": Task.objects.filter(
+            "total_tasks": Task.valid_objects.count(),
+            "completed_tasks": Task.valid_objects.filter(
                 cancelled=False, active=False
             ).count(),
-            "cancelled_tasks": Task.objects.filter(cancelled=True).count(),
-            "active_tasks": Task.objects.filter(active=True).count(),
+            "cancelled_tasks": Task.valid_objects.filter(cancelled=True).count(),
+            "active_tasks": Task.valid_objects.filter(active=True).count(),
             "total_bulletins": Bulletin.objects.count(),
             "total_posts": Post.objects.count(),
             "total_comments": Comment.objects.count(),

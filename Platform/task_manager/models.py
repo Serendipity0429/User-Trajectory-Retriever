@@ -4,6 +4,7 @@
 from django.db import models
 
 from user_system.models import User
+from core.filters import Q_VALID_USER_REL
 
 
 # Task Dataset
@@ -23,6 +24,11 @@ class TaskDatasetEntry(models.Model):
     num_associated_tasks = models.IntegerField(
         default=0
     )  # number of tasks associated with this entry
+
+
+class ValidTaskManager(models.Manager):
+    def get_queryset(self):
+        return super().get_queryset().filter(Q_VALID_USER_REL)
 
 
 # Task
@@ -47,6 +53,9 @@ class Task(models.Model):
 
     # trial-and-error
     num_trial = models.IntegerField(default=0)  # number of trials
+
+    objects = models.Manager()
+    valid_objects = ValidTaskManager()
 
 
 # Pre-task annotation

@@ -2,10 +2,11 @@
 # -*- coding: utf-8 -*-
 
 from django.db import models
-from django.contrib.auth.models import AbstractUser
+from django.contrib.auth.models import AbstractUser, UserManager
 from django.utils import timezone
 import uuid
 from datetime import timedelta
+from core.filters import Q_VALID_USER
 
 user_group_list = (
     ("admin", "Admin"),
@@ -13,9 +14,15 @@ user_group_list = (
 )
 
 
+class ParticipantManager(UserManager):
+    def get_queryset(self):
+        return super().get_queryset().filter(Q_VALID_USER)
+
+
 class User(AbstractUser):
     login_num = models.IntegerField(default=0)
     is_primary_superuser = models.BooleanField(default=False)
+    is_test_account = models.BooleanField(default=False)
     extension_session_token = models.CharField(max_length=255, blank=True, null=True)
     last_login_from = models.GenericIPAddressField(blank=True, null=True)
     consent_agreed = models.BooleanField(default=False)
@@ -26,6 +33,9 @@ class User(AbstractUser):
         on_delete=models.SET_NULL,
         related_name="users",
     )
+
+    objects = UserManager()
+    participants = ParticipantManager()
 
 
 

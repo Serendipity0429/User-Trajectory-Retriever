@@ -19,7 +19,7 @@ from .utils import (
     stop_annotating,
     decompress_json_data,
     store_data,
-    close_window,
+    reset_states,
     get_active_task_dataset,
     start_annotating,
     wait_until_data_stored,
@@ -27,6 +27,7 @@ from .utils import (
     get_pending_annotation,
     render_status_page,
     shuffle_choices,
+    close_window,
 )
 from .models import (
     TaskDataset,
@@ -236,7 +237,7 @@ def pre_task_annotation(request):
 
         stop_annotating(request)
 
-        return close_window()
+        return reset_states()
 
     else:
         if Task.objects.filter(user=user, active=True).exists():
@@ -361,7 +362,7 @@ def post_task_annotation(request, task_id):
             if PostTaskAnnotation.objects.filter(belong_task=task).exists():
                 print_debug(f"PostTaskAnnotation for task {task_id} already exists.")
                 stop_annotating(request)
-                return close_window()
+                return reset_states()
 
             post_annotation = PostTaskAnnotation()
             post_annotation.difficulty_actual = request.POST.get("difficulty_actual")
@@ -383,7 +384,7 @@ def post_task_annotation(request, task_id):
             task.save()
 
             stop_annotating(request)
-            return close_window()
+            return reset_states()
         else:
             stop_annotating(request)
             return HttpResponse("Task not found", status=404)
@@ -987,7 +988,7 @@ def cancel_annotation(request, task_id):
             if CancelAnnotation.objects.filter(belong_task=task).exists():
                 print_debug(f"CancelAnnotation for task {task_id} already exists.")
                 stop_annotating(request)
-                return close_window()
+                return reset_states()
 
             start_timestamp = task.start_timestamp
             num_trial = task.num_trial
@@ -1042,7 +1043,7 @@ def cancel_annotation(request, task_id):
             cancel_annotation.save()
 
             stop_annotating(request)
-            return close_window()
+            return reset_states()
 
     else:
         task = Task.objects.filter(id=task_id, user=user).first()

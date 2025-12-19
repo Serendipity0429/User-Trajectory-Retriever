@@ -466,7 +466,7 @@ def check_answer(entry, user_answer, llm=True):
         return check_answer_rule(question, authentic_answers, user_answer)
 
 
-def close_window():
+def reset_states():
     # This script sends a message to our `close_helper.js` content script,
     # which then securely communicates with the background script to close the tab.
     html_content = """
@@ -526,7 +526,21 @@ def close_window():
         <div class="utrt-spinner"></div>
         <div class="utrt-message">Please wait, this page will close automatically.</div>
         <script>
-            window.postMessage({ type: "UTR_CLOSE_WINDOW_REQUEST" }, "*");
+            window.postMessage({ type: "UTR_RESET_STATES_REQUEST" }, "*");
+        </script>
+    </body>
+    </html>
+    """
+    return HttpResponse(html_content)
+
+def close_window():
+    # Close the page itself
+    html_content  = """
+    <!DOCTYPE html>
+    <html>
+    <body>
+        <script>
+            window.close();
         </script>
     </body>
     </html>

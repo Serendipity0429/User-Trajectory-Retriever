@@ -116,7 +116,7 @@ class AgentSettings(SingletonModel):
         ('reme', 'ReMe Memory'),
     ]
     
-    memory_type = models.CharField(max_length=50, choices=MEMORY_TYPE_CHOICES, default='no_memory', help_text="Select the long-term memory mechanism.")
+    memory_type = models.CharField(max_length=50, choices=MEMORY_TYPE_CHOICES, default='naive', help_text="Select the long-term memory mechanism.")
     
     def __str__(self):
         return "Agent Settings"

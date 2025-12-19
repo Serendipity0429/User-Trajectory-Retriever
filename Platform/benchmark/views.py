@@ -89,6 +89,8 @@ def home(request):
         "llm_settings": settings,
         "search_settings": search_settings,
         "agent_settings": agent_settings,
+        "agent_memory_choices": AgentSettings.MEMORY_TYPE_CHOICES,
+        "search_provider_choices": SearchSettings.PROVIDER_CHOICES,
         "datasets": datasets,
     }
     return render(request, "home.html", context)
@@ -285,6 +287,9 @@ def vanilla_llm_adhoc(request):
         "selected_run": selected_run,
         "run_results_json": json.dumps(run_results),
         "llm_settings": settings_obj,
+        "agent_settings": AgentSettings.get_effective_settings(),
+        "agent_memory_choices": AgentSettings.MEMORY_TYPE_CHOICES,
+        "search_provider_choices": SearchSettings.PROVIDER_CHOICES,
         "questions": questions,
         "total_questions": len(questions),
         "datasets": datasets,
@@ -499,6 +504,9 @@ def vanilla_llm_multi_turn(request):
         "groups": groups,
         "individual_sessions": individual_sessions,
         "llm_settings": LLMSettings.get_effective_settings(),
+        "agent_settings": AgentSettings.get_effective_settings(),
+        "agent_memory_choices": AgentSettings.MEMORY_TYPE_CHOICES,
+        "search_provider_choices": SearchSettings.PROVIDER_CHOICES,
         "datasets": datasets,
     }
     return render(request, "vanilla_llm_multi_turn.html", context)
@@ -545,6 +553,9 @@ def rag_multi_turn(request):
         "individual_sessions": individual_sessions,
         "llm_settings": LLMSettings.get_effective_settings(),
         "search_settings": SearchSettings.get_effective_settings(),
+        "agent_settings": AgentSettings.get_effective_settings(),
+        "agent_memory_choices": AgentSettings.MEMORY_TYPE_CHOICES,
+        "search_provider_choices": SearchSettings.PROVIDER_CHOICES,
         "datasets": datasets,
     }
     return render(request, "rag_multi_turn.html", context)
@@ -592,6 +603,8 @@ def vanilla_agent(request):
         "llm_settings": LLMSettings.get_effective_settings(),
         "search_settings": SearchSettings.get_effective_settings(),
         "agent_settings": AgentSettings.get_effective_settings(),
+        "agent_memory_choices": AgentSettings.MEMORY_TYPE_CHOICES,
+        "search_provider_choices": SearchSettings.PROVIDER_CHOICES,
         "datasets": datasets,
     }
     return render(request, "vanilla_agent.html", context)
@@ -619,6 +632,9 @@ def rag_adhoc(request):
         "total_questions": len(questions),
         "llm_settings": LLMSettings.get_effective_settings(),
         "search_settings": SearchSettings.get_effective_settings(),
+        "agent_settings": AgentSettings.get_effective_settings(),
+        "agent_memory_choices": AgentSettings.MEMORY_TYPE_CHOICES,
+        "search_provider_choices": SearchSettings.PROVIDER_CHOICES,
         "datasets": datasets,
     }
 
@@ -1581,6 +1597,8 @@ def browser_agent(request):
         "individual_sessions": individual_sessions,
         "llm_settings": LLMSettings.get_effective_settings(),
         "agent_settings": AgentSettings.get_effective_settings(),
+        "agent_memory_choices": AgentSettings.MEMORY_TYPE_CHOICES,
+        "search_provider_choices": SearchSettings.PROVIDER_CHOICES,
         "datasets": datasets,
     }
     return render(request, "agent_browser.html", context)

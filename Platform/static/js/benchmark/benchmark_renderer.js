@@ -830,10 +830,9 @@ window.BenchmarkUtils.BenchmarkRenderer = {
              }
              if (memory) {
                  const memoryMap = {
-                     'no_memory': 'No LTM',
-                     'local_memory': 'Local File',
-                     'dict_memory': 'Dict Memory',
-                     'vector_memory': 'Vector (Mem0)'
+                     'naive': 'Naive Memory',
+                     'mem0': 'Mem0 Memory',
+                     'reme': 'ReMe Memory'
                  };
                  addItem('Agent Memory', memoryMap[memory] || memory, 'bi-memory');
              }

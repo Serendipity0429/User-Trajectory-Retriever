@@ -161,8 +161,9 @@
                                 <div class="mb-3">
                                     <label for="search_provider" class="form-label small text-muted fw-bold">Select Provider</label>
                                     <select class="form-select" id="search_provider">
-                                        <option value="mcp" {% if search_settings.search_provider == 'mcp' %}selected{% endif %}>MCP Server (Default)</option>
-                                        <option value="serper" {% if search_settings.search_provider == 'serper' %}selected{% endif %}>Serper API (Google Search)</option>
+                                        {% for value, label in search_provider_choices %}
+                                            <option value="{{ value }}" {% if search_settings.search_provider == value %}selected{% endif %}>{{ label }}</option>
+                                        {% endfor %}
                                     </select>
                                     <div class="form-text small text-muted mt-2"><i class="bi bi-info-circle me-1"></i> The search backend used for retrieving context in RAG pipelines.</div>
                                 </div>
@@ -225,10 +226,9 @@
                                 <div class="mb-3">
                                     <label for="agent_memory_type" class="form-label small text-muted fw-bold">Long-Term Memory</label>
                                     <select class="form-select" id="agent_memory_type">
-                                        <option value="no_memory" {% if agent_settings.memory_type == 'no_memory' %}selected{% endif %}>No Long-Term Memory (Default)</option>
-                                        <option value="local_memory" {% if agent_settings.memory_type == 'local_memory' %}selected{% endif %}>Local File Memory</option>
-                                        <option value="dict_memory" {% if agent_settings.memory_type == 'dict_memory' %}selected{% endif %}>Dict Memory</option>
-                                        <option value="vector_memory" {% if agent_settings.memory_type == 'vector_memory' %}selected{% endif %}>Vector Memory (Mem0)</option>
+                                        {% for value, label in agent_memory_choices %}
+                                            <option value="{{ value }}" {% if agent_settings.memory_type == value %}selected{% endif %}>{{ label }}</option>
+                                        {% endfor %}
                                     </select>
                                     <div class="form-text small text-muted mt-2"><i class="bi bi-info-circle me-1"></i> Choose the memory mechanism for the agent.</div>
                                 </div>
@@ -252,11 +252,3 @@
         </div>
     </div>
 </div>
-<script>
-    // Initialize settings logic when modal is loaded
-    document.addEventListener('DOMContentLoaded', function() {
-        if (typeof BenchmarkSettings !== 'undefined') {
-            BenchmarkSettings.init();
-        }
-    });
-</script>

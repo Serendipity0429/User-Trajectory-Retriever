@@ -170,9 +170,8 @@ async function checkActiveTask() {
         const new_task_id = (data !== null && data !== undefined && !isNaN(data)) ? parseInt(data, 10) : -1;
         const new_trial_num = response.trial_num || 0;
 
-        const is_task_started = old_task_id === -1 && new_task_id > -1;
-        const is_task_finished = old_task_id > -1 && new_task_id === -1;
-        const is_new_trial = old_task_id === new_task_id && old_task_id > -1 && old_trial_num !== new_trial_num;
+        const is_task_id_changed = old_task_id !== new_task_id;
+        const is_new_trial = !is_task_id_changed && old_task_id > -1 && old_trial_num !== new_trial_num;
 
         if (new_task_id > -1) {
             chrome.action.setBadgeText({ text: 'on' });
@@ -184,14 +183,13 @@ async function checkActiveTask() {
             chrome.action.setBadgeBackgroundColor({ color: '#660874' });
         }
 
-        if (is_task_started || is_new_trial) {
-            getTaskInfo(new_task_id);
-        }
-
-        if (is_task_started || is_task_finished || is_new_trial) {
+        if (is_task_id_changed || is_new_trial) {
+            if (new_task_id > -1) {
+                getTaskInfo(new_task_id);
+            }
             printDebug("background", `Task state changed. Task: ${old_task_id}->${new_task_id}, Trial: ${old_trial_num}->${new_trial_num}`);
             broadcastToTabs({ command: 'refresh_task_status' });
-            if (!await hasPendingAnnotation()) {
+            if (is_task_id_changed && !await hasPendingAnnotation()) {
                 await closeAllIrrelevantTabs();
             }
         }
@@ -241,7 +239,9 @@ async function closeAllIrrelevantTabs() {
             .map(tab => tab.id);
 
         if (irrelevant_tab_ids.length > 0) {
-            await chrome.tabs.create({ url: config.urls.initial_page, active: false });
+            if (tabs.length === irrelevant_tab_ids.length) {
+                await chrome.tabs.create({ url: config.urls.initial_page, active: true });
+            }
             await chrome.tabs.remove(irrelevant_tab_ids);
         }
     } catch (error) {

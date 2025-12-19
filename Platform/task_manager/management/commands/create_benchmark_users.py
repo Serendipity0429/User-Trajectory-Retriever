@@ -29,11 +29,29 @@ class Command(BaseCommand):
             default="benchmark_tokens.json",
             help="Output file for the tokens.",
         )
+        parser.add_argument(
+            "--cleanup",
+            action="store_true",
+            help="Delete all users created with the specified prefix.",
+        )
 
     def handle(self, *args, **options):
         User = get_user_model()
-        count = options["count"]
         prefix = options["prefix"]
+
+        if options["cleanup"]:
+            self.stdout.write(f"Cleaning up users with prefix '{prefix}'...")
+            users_to_del = User.objects.filter(username__startswith=prefix)
+            count = users_to_del.count()
+            users_to_del.delete()
+            
+            from task_manager.models import TaskDataset
+            TaskDataset.objects.filter(name="pressure_test_dataset").delete()
+            
+            self.stdout.write(self.style.SUCCESS(f"Successfully deleted {count} benchmark users."))
+            return
+
+        count = options["count"]
         output_file = options["output"]
 
         self.stdout.write(f"Creating {count} users with prefix '{prefix}'...")

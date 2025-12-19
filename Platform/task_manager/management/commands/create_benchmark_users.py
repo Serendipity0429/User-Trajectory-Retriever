@@ -45,7 +45,6 @@ class Command(BaseCommand):
             count = users_to_del.count()
             users_to_del.delete()
             
-            from task_manager.models import TaskDataset
             TaskDataset.objects.filter(name="pressure_test_dataset").delete()
             
             self.stdout.write(self.style.SUCCESS(f"Successfully deleted {count} benchmark users."))

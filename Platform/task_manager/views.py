@@ -27,7 +27,6 @@ from .utils import (
     get_pending_annotation,
     render_status_page,
     shuffle_choices,
-    close_window,
 )
 from .models import (
     TaskDataset,
@@ -1190,7 +1189,8 @@ def reflection_annotation(request, task_trial_id):
                 f"ReflectionAnnotation for trial {task_trial.id} already exists."
             )
             stop_annotating(request)
-            return close_window()
+            return reset_states(new_page=False)
+
 
         ref_annotation = ReflectionAnnotation(
             belong_task_trial=task_trial,
@@ -1206,7 +1206,7 @@ def reflection_annotation(request, task_trial_id):
 
         stop_annotating(request)
 
-        return close_window()
+        return reset_states(new_page=False)
 
     else:
         if ReflectionAnnotation.objects.filter(belong_task_trial=task_trial).exists():

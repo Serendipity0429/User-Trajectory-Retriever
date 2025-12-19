@@ -787,7 +787,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 break;
             case 'close_or_redirect':
                 const tabs = await chrome.tabs.query({ windowId: sender.tab.windowId });
-                if (tabs.length <= 1 && tabs[0].id === sender.tab.id) {
+                const new_page = message.new_page && message.new_page == "true";
+                if (new_page && tabs.length <= 1 && tabs[0].id === sender.tab.id) {
                     // This is the last tab in the window. Create a new one before closing.
                     await chrome.tabs.create({ url: config.urls.initial_page, active: true });
                     await chrome.tabs.remove(sender.tab.id);

@@ -43,7 +43,7 @@
     ]
   },
   "content_security_policy": {
-    "extension_pages": "script-src 'self'; connect-src http://127.0.0.1:8000 http://101.6.41.59:32904 http://101.6.43.73:32904;"
+    "extension_pages": "script-src 'self'; connect-src http://127.0.0.1:8000 http://localhost:8000 http://101.6.41.59:32904 http://101.6.43.73:32904;"
   },
   "content_scripts": [
     {
@@ -125,6 +125,7 @@
     {
       "matches": [
         "http://127.0.0.1:8000/*",
+        "http://localhost:8000/*",
         "http://101.6.41.59:32904/*",
         "http://101.6.43.73:32904/*"
       ],

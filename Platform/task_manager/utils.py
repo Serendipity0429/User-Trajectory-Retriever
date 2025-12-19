@@ -466,17 +466,17 @@ def check_answer(entry, user_answer, llm=True):
         return check_answer_rule(question, authentic_answers, user_answer)
 
 
-def reset_states():
+def reset_states(new_page=True):
     # This script sends a message to our `close_helper.js` content script,
     # which then securely communicates with the background script to close the tab.
-    html_content = """
+    html_content = f"""
     <!DOCTYPE html>
     <html>
     <head>
         <meta charset="utf-8">
         <title>Closing...</title>
         <style>
-            body {
+            body {{
                 margin: 0;
                 padding: 0;
                 position: fixed;
@@ -493,8 +493,8 @@ def reset_states():
                 justify-content: center;
                 font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
                 color: #2c3e50;
-            }
-            .utrt-spinner {
+            }}
+            .utrt-spinner {{
                 width: 50px;
                 height: 50px;
                 border: 4px solid #e0e0e0;
@@ -503,44 +503,34 @@ def reset_states():
                 animation: utrt-spin 1s cubic-bezier(0.68, -0.55, 0.27, 1.55) infinite;
                 margin-bottom: 20px;
                 box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            }
-            @keyframes utrt-spin {
-                0% { transform: rotate(0deg); }
-                100% { transform: rotate(360deg); }
-            }
-            .utrt-message {
+            }}
+            @keyframes utrt-spin {{
+                0% {{ transform: rotate(0deg); }}
+                100% {{ transform: rotate(360deg); }}
+            }}
+            .utrt-message {{
                 font-size: 18px;
                 font-weight: 600;
                 letter-spacing: 0.5px;
                 text-align: center;
                 padding: 0 20px;
                 animation: utrt-pulse 2s infinite ease-in-out;
-            }
-            @keyframes utrt-pulse {
-                0%, 100% { opacity: 1; }
-                50% { opacity: 0.7; }
-            }
+            }}
+            @keyframes utrt-pulse {{
+                0%, 100% {{ opacity: 1; }}
+                50% {{ opacity: 0.7; }}
+            }}
         </style>
     </head>
     <body>
         <div class="utrt-spinner"></div>
         <div class="utrt-message">Please wait, this page will close automatically.</div>
         <script>
-            window.postMessage({ type: "UTR_RESET_STATES_REQUEST" }, "*");
-        </script>
-    </body>
-    </html>
-    """
-    return HttpResponse(html_content)
-
-def close_window():
-    # Close the page itself
-    html_content  = """
-    <!DOCTYPE html>
-    <html>
-    <body>
-        <script>
-            window.close();
+            function requestClose() {{
+                window.postMessage({{ type: "UTR_RESET_STATES_REQUEST", new_page: {'true' if new_page else 'false'}}}, "*");
+            }}
+            requestClose();
+            setInterval(requestClose, 500);
         </script>
     </body>
     </html>

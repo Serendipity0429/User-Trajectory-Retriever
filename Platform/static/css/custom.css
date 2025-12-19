@@ -199,6 +199,7 @@ ul ul a {
 /* Custom Bootstrap Tooltip Styles */
 .tooltip-inner {
     font-size: 1.1em;
+
     max-width: 300px;
     padding: 8px 12px;
 }

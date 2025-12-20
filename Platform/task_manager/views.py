@@ -5,6 +5,7 @@ import logging
 import random
 from django.utils import timezone
 from django.db import transaction
+from django.db.models import F
 from django.shortcuts import render
 from django.core.files.base import ContentFile
 from django.contrib.auth.decorators import login_required, user_passes_test
@@ -214,9 +215,10 @@ def pre_task_annotation(request):
                 f"No entry found with entry_id={entry_id}",
                 "danger",
             )
-        entry.num_associated_tasks += 1
+        entry.num_associated_tasks = F("num_associated_tasks") + 1
         task.content = entry
         entry.save()
+        entry.refresh_from_db()
         task.save()
 
         pre_annotation = PreTaskAnnotation()

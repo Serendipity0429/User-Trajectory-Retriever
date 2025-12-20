@@ -28,7 +28,7 @@ from django.contrib.auth import (
 )
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
-from django.db.models import Q
+from django.db.models import Q, F
 from django.templatetags.static import static
 from django.contrib import messages
 from django.views import View
@@ -74,9 +74,10 @@ def token_login(request):
                 ip = request.META.get("REMOTE_ADDR")
             user.last_login_from = ip
 
-            user.login_num += 1
+            user.login_num = F("login_num") + 1
             user.last_login = now()
             user.save()
+            user.refresh_from_db()
 
             refresh = RefreshToken.for_user(user)
             # Add session_token to the token payload

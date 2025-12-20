@@ -16,5 +16,5 @@ def update_num_associated_tasks(sender, instance, **kwargs):
 @receiver(post_save, sender=TaskTrial)
 def update_num_associated_tasks_submission(sender, instance, **kwargs):
     task = instance.belong_task
-    task.num_trial += 1  # Increment the number of trials
+    task.num_trial = F("num_trial") + 1  # Increment the number of trials
     task.save()

@@ -504,11 +504,11 @@ async function displayMessageBox(options) {
 
     if (duration > 0) {
         setTimeout(() => {
+            if (hoverable) {
+                hoverableMessageBoxManager.remove(box);
+            }
             box.style.opacity = '0';
             setTimeout(() => {
-                if (hoverable) {
-                    hoverableMessageBoxManager.remove(box);
-                }
                 box.remove();
             }, 500);
         }, duration);

@@ -49,6 +49,11 @@ def parse_json(value):
 
 
 @register.filter
+def is_list(value):
+    return isinstance(value, list)
+
+
+@register.filter
 def format_duration(duration):
     if duration is None:
         return ""

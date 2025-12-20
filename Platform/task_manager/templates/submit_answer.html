@@ -195,11 +195,11 @@
 
                         <div class="mb-4 p-3 border rounded">
                             <h5><strong>4. Answer Formulation Method</strong></h5>
-                            <p> What did you primarily do to formulate your answer? <strong> Please select only one answer </strong>.</p>
+                            <p> What did you do to formulate your answer? <strong> You can select multiple options </strong>.</p>
                             <div class="w-100" role="group" aria-label="Answer Formulation Method">
                                 {% for value, text in answer_formulation_choices %}
                                 <div class="d-flex mb-2">
-                                    <input type="radio" class="btn-check" name="answer_formulation_method" id="afm{{ forloop.counter }}" value="{{ value }}" autocomplete="off" required>
+                                    <input type="checkbox" class="btn-check" name="answer_formulation_method" id="afm{{ forloop.counter }}" value="{{ value }}" autocomplete="off">
                                     <label class="btn btn-outline-primary {% if value != 'other' %}w-100{% endif %} text-start" for="afm{{ forloop.counter }}">{{ text|safe }}</label>
                                     {% if value == 'other' %}
                                     <input type="text" class="form-control form-control-sm ms-2" name="answer_formulation_method_other" placeholder="Please specify..." disabled>
@@ -208,7 +208,7 @@
                                 </div>
                                 {% endfor %}
                             </div>
-                            <div class="invalid-feedback">Please select a method.</div>
+                            <div id="afm-invalid-feedback" class="invalid-feedback">Please select at least one method.</div>
                         </div>
 
                     </form>
@@ -552,11 +552,17 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Reasoning Method Other
-    document.querySelectorAll('input[name="answer_formulation_method"]').forEach(radio => {
-        radio.addEventListener('change', function() {
-            const otherInput = document.querySelector('input[name="answer_formulation_method_other"]');
-            if (otherInput) {
-                otherInput.disabled = this.value !== 'other';
+    document.querySelectorAll('input[name="answer_formulation_method"]').forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            if (this.value === 'other') {
+                const otherInput = document.querySelector('input[name="answer_formulation_method_other"]');
+                if (otherInput) {
+                    otherInput.disabled = !this.checked;
+                    if (!this.checked) {
+                        otherInput.value = '';
+                        otherInput.classList.remove('is-invalid');
+                    }
+                }
             }
         });
     });
@@ -604,12 +610,13 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         // Validation for answer formulation method
-        const answerFormulationMethod = document.querySelector('input[name="answer_formulation_method"]:checked');
+        const selectedAFM = document.querySelectorAll('input[name="answer_formulation_method"]:checked');
+        const otherAFMCheckbox = document.querySelector('input[name="answer_formulation_method"][value="other"]');
         const answerFormulationMethodOther = document.querySelector('input[name="answer_formulation_method_other"]');
-        if (!answerFormulationMethod) {
+        if (selectedAFM.length === 0) {
             document.querySelector('.w-100[aria-label="Answer Formulation Method"]').classList.add('is-invalid');
             isValid = false;
-        } else if (answerFormulationMethod.value === 'other' && answerFormulationMethodOther.value.trim() === '') {
+        } else if (otherAFMCheckbox && otherAFMCheckbox.checked && answerFormulationMethodOther.value.trim() === '') {
             answerFormulationMethodOther.classList.add('is-invalid');
             answerFormulationMethodOther.focus();
             isValid = false;
@@ -690,11 +697,11 @@ document.addEventListener('DOMContentLoaded', function() {
             document.querySelector('.btn-group[aria-label="Confidence"]').classList.remove('is-invalid');
         });
     });
-    document.querySelectorAll('input[name="answer_formulation_method"]').forEach(radio => {
-        radio.addEventListener('change', () => {
+    document.querySelectorAll('input[name="answer_formulation_method"]').forEach(checkbox => {
+        checkbox.addEventListener('change', () => {
             document.querySelector('.w-100[aria-label="Answer Formulation Method"]').classList.remove('is-invalid');
             const answerFormulationMethodOther = document.querySelector('input[name="answer_formulation_method_other"]');
-            if (answerFormulationMethodOther) {
+            if (answerFormulationMethodOther && !checkbox.checked && checkbox.value === 'other') {
                 answerFormulationMethodOther.classList.remove('is-invalid');
             }
         });

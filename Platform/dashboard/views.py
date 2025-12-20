@@ -23,6 +23,7 @@ from task_manager.models import (
     Task, ExtensionVersion, TaskTrial, PreTaskAnnotation, PostTaskAnnotation,
     CancelAnnotation, ReflectionAnnotation, Justification, Webpage
 )
+from task_manager.mappings import ANSWER_FORMULATION_MAP
 from discussion.models import Bulletin, Post, Comment
 
 from user_system.forms import InformedConsentForm
@@ -265,10 +266,27 @@ def admin_statistics_api(request):
     )
     
     # Answer Formulation Method
-    answer_formulation_counts = TaskTrial.objects.filter(Q_VALID_TASK_USER).values('answer_formulation_method').annotate(count=Count('answer_formulation_method')).exclude(answer_formulation_method='undefined').exclude(answer_formulation_method__isnull=True)
+    afm_mapping = ANSWER_FORMULATION_MAP["mapping"]
+    afm_data = TaskTrial.objects.filter(Q_VALID_TASK_USER).values_list('answer_formulation_method', flat=True)
+    afm_flat = []
+    for item in afm_data:
+        if isinstance(item, list):
+            afm_flat.extend(item)
+        elif item and item != 'undefined':
+            afm_flat.append(item)
+    
+    afm_counts = Counter(afm_flat)
+    
+    def clean_afm_label(key):
+        val = afm_mapping.get(key, key)
+        # Strip simple HTML tags if they exist
+        text = val.replace("<strong>", "").replace("</strong>", "")
+        # Get the part before colon if exists (e.g., "Direct Answer: ...")
+        return text.split(':')[0].strip()
+
     statistics["answer_formulation_method_distribution"] = {
-        "labels": [item['answer_formulation_method'] for item in answer_formulation_counts],
-        "data": [item['count'] for item in answer_formulation_counts]
+        "labels": [clean_afm_label(k) for k in afm_counts.keys()],
+        "data": list(afm_counts.values())
     }
     
     # Evidence Type

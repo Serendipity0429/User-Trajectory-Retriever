@@ -159,9 +159,12 @@ class TaskTrial(models.Model):
     is_correct = models.BooleanField(null=True)
 
     confidence = models.IntegerField(default=-1)  # confidence level, 0->4, low -> high
-    answer_formulation_method = models.CharField(
-        max_length=100, default="undefined"
-    )  # reasoning method used, e.g. "deductive", "inductive", etc.
+    answer_formulation_method = models.JSONField(
+        default=list
+    )  # reasoning method used, e.g. ["deductive", "inductive"]
+    answer_formulation_method_other = models.TextField(
+        null=True, blank=True
+    )  # other reasoning method used
 
     belong_task = models.ForeignKey(
         Task,

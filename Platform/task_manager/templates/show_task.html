@@ -390,7 +390,20 @@
                                                 </div>
                                             </div>
                                         </div>
-                                        <p class="mt-3"><strong>Answer Formulation Method:</strong><br> <ul><li class="text-muted">{{ ANSWER_FORMULATION_MAP|get_item:trial.answer_formulation_method|safe }}</li></ul></p>
+                                        <p class="mt-3"><strong>Answer Formulation Method:</strong><br>
+                                            <ul>
+                                                {% if trial.answer_formulation_method|is_list %}
+                                                    {% for method in trial.answer_formulation_method %}
+                                                    <li class="text-muted">{{ ANSWER_FORMULATION_MAP|get_item:method|safe }}</li>
+                                                    {% endfor %}
+                                                {% else %}
+                                                    <li class="text-muted">{{ ANSWER_FORMULATION_MAP|get_item:trial.answer_formulation_method|safe }}</li>
+                                                {% endif %}
+                                                {% if trial.answer_formulation_method_other %}
+                                                <li class="text-muted">Other: {{ trial.answer_formulation_method_other }}</li>
+                                                {% endif %}
+                                            </ul>
+                                        </p>
                                     </div>
                                 </div>
 

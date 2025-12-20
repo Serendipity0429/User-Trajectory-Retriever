@@ -1306,7 +1306,10 @@ def submit_answer(request, task_id):
             answer = answer if answer else ""
 
             confidence = request.POST.get("confidence")
-            answer_formulation_method = request.POST.get("answer_formulation_method")
+            answer_formulation_method = request.POST.getlist("answer_formulation_method")
+            answer_formulation_method_other = request.POST.get(
+                "answer_formulation_method_other"
+            )
 
             current_trial_num = task.num_trial + 1
 
@@ -1320,6 +1323,7 @@ def submit_answer(request, task_id):
             task_trial.end_timestamp = timezone.now()
             task_trial.confidence = confidence
             task_trial.answer_formulation_method = answer_formulation_method
+            task_trial.answer_formulation_method_other = answer_formulation_method_other
 
             is_correct = check_answer(task.content, task_trial.answer)
             task_trial.is_correct = is_correct

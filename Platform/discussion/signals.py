@@ -8,6 +8,7 @@ from msg_system.utils import send_system_message
 from django.urls import reverse
 from django.db.models import Q
 from django.utils import timezone
+from django.conf import settings
 
 
 @receiver(post_save, sender=Comment)
@@ -19,8 +20,9 @@ def notify_post_author_on_new_comment(sender, instance, created, **kwargs):
 
         if author != commenter:
             post_url = reverse("post_detail", args=[post.pk])
+            full_post_url = f"{settings.IP_TO_LAUNCH.rstrip('/')}{post_url}"
             subject = f"New comment on your post '{post.title}'"
-            body = f"{commenter.username} has commented on your post '{post.title}'.\n\n[View Post]({post_url})"
+            body = f"{commenter.username} has commented on your post '{post.title}'.<br><br><a href='{full_post_url}'>View Post</a>"
             send_system_message(author, subject, body)
 
 
@@ -32,24 +34,18 @@ def notify_users_on_new_bulletin(sender, instance, created, **kwargs):
             return
 
         bulletin_url = reverse("bulletin_detail", args=[instance.pk])
+        full_bulletin_url = f"{settings.IP_TO_LAUNCH.rstrip('/')}{bulletin_url}"
         subject = f"New Bulletin: {instance.title}"
-        body = f"A new bulletin has been posted in the '{instance.category}' category. You can view it in the discussion forum.\n\n[View Bulletin]({bulletin_url})"
+        body = f"A new bulletin has been posted in the '{instance.category}' category. You can view it in the discussion forum.<br><br><a href='{full_bulletin_url}' style='color: rgba(var(--bs-link-color-rgb), var(--bs-link-opacity, 1));text-decoration: underline;'>[View Bulletin]{full_bulletin_url}</a>"
 
         message = Message.objects.create(sender=admin_user, subject=subject, body=body)
 
-        recipient_table = MessageRecipient._meta.db_table
-        user_table = User._meta.db_table
-
-        with connection.cursor() as cursor:
-            cursor.execute(
-                f"""
-                INSERT INTO {recipient_table} (message_id, user_id, is_read, is_pinned)
-                SELECT %s, id, false, false
-                FROM {user_table}
-                WHERE is_superuser = false
-            """,
-                [message.id],
-            )
+        recipients = User.objects.filter(is_superuser=False)
+        message_recipients = [
+            MessageRecipient(message=message, user=user, is_read=False, is_pinned=False)
+            for user in recipients
+        ]
+        MessageRecipient.objects.bulk_create(message_recipients)
 
 
 @receiver(post_save, sender=User)
@@ -66,6 +62,7 @@ def notify_new_user_of_active_bulletins(sender, instance, created, **kwargs):
 
         for bulletin in active_bulletins:
             bulletin_url = reverse("bulletin_detail", args=[bulletin.pk])
+            full_bulletin_url = f"{settings.IP_TO_LAUNCH.rstrip('/')}{bulletin_url}"
             subject = f"New Bulletin: {bulletin.title}"
-            body = f"A new bulletin has been posted in the '{bulletin.category}' category. You can view it in the discussion forum.\n\n[View Bulletin]({bulletin_url})"
+            body = f"A new bulletin has been posted in the '{bulletin.category}' category. You can view it in the discussion forum.<br><br><a href='{full_bulletin_url}' style='color: rgba(var(--bs-link-color-rgb), var(--bs-link-opacity, 1));text-decoration: underline;'>[View Bulletin]{full_bulletin_url}</a>"
             send_system_message(instance, subject, body)

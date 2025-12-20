@@ -185,16 +185,21 @@ async function checkActiveTask() {
 
         if (is_task_id_changed || is_new_trial) {
             if (new_task_id > -1) {
-                getTaskInfo(new_task_id);
+                await getTaskInfo(new_task_id);
             }
+        }
+        
+        await setCurrentTask(new_task_id);
+        await setCurrentTrialNum(new_trial_num);
+
+        if (is_task_id_changed || is_new_trial) {
             printDebug("background", `Task state changed. Task: ${old_task_id}->${new_task_id}, Trial: ${old_trial_num}->${new_trial_num}`);
             broadcastToTabs({ command: 'refresh_task_status' });
             if (is_task_id_changed && !await hasPendingAnnotation()) {
                 await closeAllIrrelevantTabs();
             }
         }
-        await setCurrentTask(new_task_id);
-        await setCurrentTrialNum(new_trial_num);
+
         return new_task_id;
     } catch (error) {
         console.error("Error checking active task ID:", error.message);

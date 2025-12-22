@@ -585,7 +585,7 @@ def get_pending_annotation(user):
         pending_post_task = Task.objects.filter(
             user=user,
             cancelled=False,
-            end_timestamp__isnull=False,
+            end_timestamp__isnull=False, # not null end_timestamp indicates the task ended
             posttaskannotation__isnull=True,
             cancelannotation__isnull=True,
         ).first()

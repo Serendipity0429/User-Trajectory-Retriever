@@ -291,6 +291,159 @@
                 </div>
             </div>
         </div>
+        
+        <!-- New Success & Efficiency Analysis Section -->
+        <div class="col-12">
+            <div class="card shadow-sm mb-4">
+                <div class="card-header" data-bs-toggle="collapse" href="#successAnalysisCollapse" role="button" aria-expanded="true" aria-controls="successAnalysisCollapse">
+                    <i class="bi bi-speedometer2 me-2"></i>
+                    Success & Efficiency Analysis
+                </div>
+                <div class="collapse show" id="successAnalysisCollapse">
+                    <div class="card-body">
+                         <div class="analysis-loader d-flex flex-column justify-content-center align-items-center" style="min-height: 200px;">
+                            <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                        </div>
+                        <div class="analysis-content" style="display: none;">
+                            <div class="row g-3">
+                                <!-- KPI Cards -->
+                                <div class="col-md-3">
+                                    <div class="card h-100 border-start border-4 border-success shadow-sm">
+                                        <div class="card-body text-center">
+                                            <h6 class="text-uppercase text-muted small fw-bold mb-2">Success Rate</h6>
+                                            <h2 class="mb-0 fw-bold text-success display-6"><span id="successRateVal">--</span>%</h2>
+                                            <small class="text-muted">of completed tasks</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="card h-100 border-start border-4 border-danger shadow-sm">
+                                        <div class="card-body text-center">
+                                            <h6 class="text-uppercase text-muted small fw-bold mb-2">Cancel Rate</h6>
+                                            <h2 class="mb-0 fw-bold text-danger display-6"><span id="cancelRateVal">--</span>%</h2>
+                                            <small class="text-muted">of all tasks</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="card h-100 border-start border-4 border-info shadow-sm">
+                                        <div class="card-body text-center">
+                                            <h6 class="text-uppercase text-muted small fw-bold mb-2">Self-Correction</h6>
+                                            <h2 class="mb-0 fw-bold text-info display-6"><span id="selfCorrectionRateVal">--</span>%</h2>
+                                            <small class="text-muted">of successful tasks</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="card h-100 border-start border-4 border-primary shadow-sm">
+                                        <div class="card-body text-center">
+                                            <h6 class="text-uppercase text-muted small fw-bold mb-2">First Try Success</h6>
+                                            <h2 class="mb-0 fw-bold text-primary display-6"><span id="firstTrySuccessRateVal">--</span>%</h2>
+                                            <small class="text-muted">of successful tasks</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="row mt-4">
+                                <div class="col-lg-6 mb-4">
+                                     <div class="card h-100 shadow-sm">
+                                        <div class="card-header bg-light d-flex align-items-center">
+                                            <i class="bi bi-pie-chart me-2 text-primary"></i>
+                                            <h6 class="mb-0 fw-bold">Success Composition</h6>
+                                        </div>
+                                        <div class="card-body d-flex align-items-center justify-content-center p-2">
+                                            <div class="w-100" style="height: 250px;"><canvas id="successCompositionChart"></canvas></div>
+                                        </div>
+                                    </div>
+                                </div>
+                                 <div class="col-lg-6 mb-4">
+                                    <div class="card bg-light h-100 border-0">
+                                        <div class="card-body">
+                                            <h6 class="fw-bold text-dark mb-3"><i class="bi bi-info-circle me-2"></i>Metric Definitions</h6>
+                                            <ul class="list-unstyled small text-muted">
+                                                <li class="mb-2"><strong>Success Rate:</strong> Tasks that were completed and had at least one correct trial.</li>
+                                                <li class="mb-2"><strong>Cancel Rate:</strong> Tasks that were explicitly cancelled by the user.</li>
+                                                <li class="mb-2"><strong>Self-Correction Rate:</strong> Successful tasks where the user failed on the first attempt but eventually succeeded.</li>
+                                                <li class="mb-2"><strong>First Try Success:</strong> Successful tasks where the user got the correct answer on the very first attempt.</li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Navigation & Behavior Analysis Section -->
+        <div class="col-12">
+            <div class="card shadow-sm mb-4">
+                <div class="card-header" data-bs-toggle="collapse" href="#navBehaviorCollapse" role="button" aria-expanded="true" aria-controls="navBehaviorCollapse">
+                    <i class="bi bi-compass me-2"></i>
+                    Navigation & Behavior Analysis
+                </div>
+                <div class="collapse show" id="navBehaviorCollapse">
+                    <div class="card-body">
+                         <div class="analysis-loader d-flex flex-column justify-content-center align-items-center" style="min-height: 200px;">
+                            <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                        </div>
+                        <div class="analysis-content" style="display: none;">
+                            <div class="row g-3 mb-4">
+                                <!-- KPI Cards -->
+                                <div class="col-md-4">
+                                    <div class="card h-100 bg-light border-0">
+                                        <div class="card-body text-center">
+                                            <h6 class="text-uppercase text-muted small fw-bold mb-2">Avg Trajectory Length</h6>
+                                            <h2 class="mb-0 fw-bold text-dark display-6"><span id="avgTrajectoryLengthVal">--</span></h2>
+                                            <small class="text-muted">pages visited per task</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="card h-100 bg-light border-0">
+                                        <div class="card-body text-center">
+                                            <h6 class="text-uppercase text-muted small fw-bold mb-2">Avg Pre-Task Time</h6>
+                                            <h2 class="mb-0 fw-bold text-dark display-6"><span id="avgPreTaskTimeVal">--</span>s</h2>
+                                            <small class="text-muted">annotation duration</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="card h-100 bg-light border-0">
+                                        <div class="card-body text-center">
+                                            <h6 class="text-uppercase text-muted small fw-bold mb-2">Avg Post-Task Time</h6>
+                                            <h2 class="mb-0 fw-bold text-dark display-6"><span id="avgPostTaskTimeVal">--</span>s</h2>
+                                            <small class="text-muted">annotation duration</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-12">
+                                     <div class="card h-100 shadow-sm">
+                                        <div class="card-header bg-light d-flex align-items-center">
+                                            <i class="bi bi-globe me-2 text-primary"></i>
+                                            <h6 class="mb-0 fw-bold">Top 10 Visited Domains</h6>
+                                        </div>
+                                        <div class="card-body p-2">
+                                            <div class="w-100" style="height: 300px;"><canvas id="topDomainsChart"></canvas></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div class="col-12">
             <div class="card shadow-sm mb-4">
                 <div class="card-header" data-bs-toggle="collapse" href="#taskDataAnalysisCollapse" role="button" aria-expanded="true" aria-controls="taskDataAnalysisCollapse">
@@ -822,7 +975,10 @@ document.addEventListener('DOMContentLoaded', function() {
                                 title: { display: true, font: { size: 16 } }
                             },
                             y: {
-                                ticks: { font: { size: 14 } },
+                                ticks: { 
+                                    font: { size: 14 },
+                                    autoSkip: false // Ensure all labels are shown
+                                },
                                 title: { display: true, font: { size: 16 } }
                             }
                         }
@@ -881,6 +1037,32 @@ document.addEventListener('DOMContentLoaded', function() {
             ChartFactory.createBar('englishProficiencyChart', statistics.english_proficiency_distribution.labels, statistics.english_proficiency_distribution.data, 'English Proficiency', CHART_COLORS.green, true);
             ChartFactory.createBar('webSearchProficiencyChart', statistics.web_search_proficiency_distribution.labels, statistics.web_search_proficiency_distribution.data, 'Web Search Proficiency', CHART_COLORS.orange, true);
             
+            // --- Success & Efficiency Metrics ---
+            if (statistics.success_rate !== undefined) {
+                document.getElementById('successRateVal').textContent = statistics.success_rate;
+                document.getElementById('cancelRateVal').textContent = statistics.cancel_rate;
+                document.getElementById('selfCorrectionRateVal').textContent = statistics.self_correction_rate;
+                document.getElementById('firstTrySuccessRateVal').textContent = statistics.first_try_success_rate;
+                
+                // Success Composition Chart
+                const successCounts = statistics.success_metrics_counts;
+                ChartFactory.createDoughnut(
+                    'successCompositionChart', 
+                    ['First Try Success', 'Self-Corrected'], 
+                    [successCounts.first_try_success, successCounts.self_corrected],
+                    [CHART_COLORS.blue, CHART_COLORS.orange]
+                );
+            }
+
+            // --- Navigation & Behavior Metrics ---
+            if (statistics.avg_trajectory_length !== undefined) {
+                document.getElementById('avgTrajectoryLengthVal').textContent = statistics.avg_trajectory_length;
+                document.getElementById('avgPreTaskTimeVal').textContent = statistics.avg_pre_task_duration;
+                document.getElementById('avgPostTaskTimeVal').textContent = statistics.avg_post_task_duration;
+                
+                ChartFactory.createBar('topDomainsChart', statistics.top_domains.labels, statistics.top_domains.data, 'Visit Count', CHART_COLORS.blue, true);
+            }
+
             ChartFactory.createLine('taskCreationsChart', statistics.task_creations.labels, statistics.task_creations.data, 'New Tasks', CHART_COLORS.red);
             
             ChartFactory.createPie('taskFamiliarityChart', statistics.familiarity_distribution.labels, statistics.familiarity_distribution.data);

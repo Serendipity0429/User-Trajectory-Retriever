@@ -10,6 +10,7 @@ from django.views.decorators.http import require_POST
 from django.core.signing import Signer, BadSignature
 from django.contrib.auth import login as auth_login
 from django.db.models import Count, Q, Avg
+from django.db.models.functions import TruncDate
 from django.core.paginator import Paginator
 from django.utils import timezone
 from datetime import timedelta
@@ -17,13 +18,18 @@ import markdown
 import json
 from collections import Counter, defaultdict
 import numpy as np
+from urllib.parse import urlparse
+from django.conf import settings
+from django.db import connection
 
 from user_system.models import User, InformedConsent, Profile
 from task_manager.models import (
     Task, ExtensionVersion, TaskTrial, PreTaskAnnotation, PostTaskAnnotation,
     CancelAnnotation, ReflectionAnnotation, Justification, Webpage
 )
-from task_manager.mappings import ANSWER_FORMULATION_MAP
+from task_manager.mappings import (
+    ANSWER_FORMULATION_MAP, FAMILIARITY_MAP, DIFFICULTY_MAP, EFFORT_MAP, CONFIDENCE_MAP
+)
 from discussion.models import Bulletin, Post, Comment
 
 from user_system.forms import InformedConsentForm
@@ -115,7 +121,7 @@ def admin_statistics_api(request):
     thirty_days_ago = timezone.now() - timedelta(days=30)
     user_signups = (
         User.participants.filter(date_joined__gte=thirty_days_ago)
-        .extra(select={"date": "date(date_joined)"})
+        .annotate(date=TruncDate("date_joined"))
         .values("date")
         .annotate(count=Count("id"))
         .order_by("date")
@@ -147,7 +153,7 @@ def admin_statistics_api(request):
     # Task statistics
     task_creations = (
         Task.valid_objects.filter(start_timestamp__gte=thirty_days_ago)
-        .extra(select={"date": "date(start_timestamp)"})
+        .annotate(date=TruncDate("start_timestamp"))
         .values("date")
         .annotate(count=Count("id"))
         .order_by("date")
@@ -156,7 +162,10 @@ def admin_statistics_api(request):
         "labels": [x["date"] for x in task_creations], "data": [x["count"] for x in task_creations]
     }
 
-    completed_tasks = Task.valid_objects.filter(cancelled=False, active=False, end_timestamp__isnull=False)
+    completed_tasks = Task.valid_objects.filter(
+        cancelled=False, active=False, end_timestamp__isnull=False
+    ).prefetch_related('tasktrial_set')
+    
     task_time_distribution = [
         (task.end_timestamp - task.start_timestamp).total_seconds()
         for task in completed_tasks
@@ -182,9 +191,18 @@ def admin_statistics_api(request):
 
     # Trial time box plot series data
     trial_times_by_num = defaultdict(list)
+    
+    # Calculate global 99th percentile to filter extreme outliers
+    all_durations = [(t.end_timestamp - t.start_timestamp).total_seconds() for t in all_trials]
+    if all_durations:
+        cutoff_threshold = np.percentile(all_durations, 99)
+    else:
+        cutoff_threshold = float('inf')
+
     for trial in all_trials:
         duration = (trial.end_timestamp - trial.start_timestamp).total_seconds()
-        trial_times_by_num[trial.num_trial].append(duration)
+        if duration <= cutoff_threshold:
+            trial_times_by_num[trial.num_trial].append(duration)
     
     sorted_trial_nums = sorted(trial_times_by_num.keys())
     trial_time_distribution_detail = {
@@ -205,28 +223,77 @@ def admin_statistics_api(request):
     else:
         statistics["trial_count_distribution"] = {"labels": [], "data": []}
 
+    # --- Advanced Success Metrics ---
+    total_valid_tasks = Task.valid_objects.count()
+    total_completed_count = completed_tasks.count()
+    total_cancelled_count = Task.valid_objects.filter(cancelled=True).count()
+    
+    # Cancel Rate
+    cancel_rate = (total_cancelled_count / total_valid_tasks * 100) if total_valid_tasks > 0 else 0
+    statistics["cancel_rate"] = round(cancel_rate, 1)
+
+    # Success Analysis (within completed tasks)
+    successful_tasks_count = 0
+    self_corrected_count = 0
+    first_try_success_count = 0
+    
+    # Pre-fetch trials for efficiency
+    # We need to know if a completed task has at least one correct trial
+    # and if the first trial was correct or not.
+    for task in tasks_with_trial_counts:
+        trials = task.tasktrial_set.all().order_by('start_timestamp')
+        if not trials:
+            continue
+        
+        # Check for any correct trial
+        has_success = False
+        first_trial_correct = False
+        
+        for idx, trial in enumerate(trials):
+            if trial.is_correct:
+                has_success = True
+                if idx == 0:
+                    first_trial_correct = True
+                break # Found success, stop checking for success status
+        
+        if has_success:
+            successful_tasks_count += 1
+            if first_trial_correct:
+                first_try_success_count += 1
+            else:
+                self_corrected_count += 1
+
+    # Success Rate (relative to completed tasks)
+    success_rate = (successful_tasks_count / total_completed_count * 100) if total_completed_count > 0 else 0
+    statistics["success_rate"] = round(success_rate, 1)
+
+    # Self-Correction Rate (relative to SUCCESSFUL tasks)
+    # i.e., what % of solved tasks required > 1 attempt?
+    self_correction_rate = (self_corrected_count / successful_tasks_count * 100) if successful_tasks_count > 0 else 0
+    statistics["self_correction_rate"] = round(self_correction_rate, 1)
+
+    # First Attempt Success Rate (relative to SUCCESSFUL tasks)
+    first_try_success_rate = (first_try_success_count / successful_tasks_count * 100) if successful_tasks_count > 0 else 0
+    statistics["first_try_success_rate"] = round(first_try_success_rate, 1)
+    
+    statistics["success_metrics_counts"] = {
+        "total_completed": total_completed_count,
+        "successful": successful_tasks_count,
+        "self_corrected": self_corrected_count,
+        "first_try_success": first_try_success_count
+    }
+
     def get_annotation_distribution(model, field, mapping, q_obj):
         counts = model.objects.filter(q_obj).values(field).annotate(count=Count(field))
         return {
-            "labels": [mapping.get(str(c[field])) for c in counts if c[field] is not None],
+            "labels": [mapping.get(str(c[field]), str(c[field])) for c in counts if c[field] is not None],
             "data": [c["count"] for c in counts if c[field] is not None],
         }
 
-    familiarity_mapping = {
-        "0": "Not familiar at all", "1": "Slightly familiar", "2": "Moderately familiar",
-        "3": "Very familiar", "4": "Expert",
-    }
-    difficulty_mapping = {
-        "0": "Very easy", "1": "Easy", "2": "Moderate", "3": "Hard", "4": "Very hard",
-    }
-    effort_mapping = {
-        "0": "Less than 5 minutes", "1": "5-15 minutes", "2": "15-30 minutes",
-        "3": "30-60 minutes", "4": "1-2 hours", "5": "More than 2 hours"
-    }
-    confidence_mapping = {
-        "0": "Not confident at all", "1": "Slightly confident", "2": "Moderately confident",
-        "3": "Very confident", "4": "Completely confident",
-    }
+    familiarity_mapping = {str(k): v for k, v in FAMILIARITY_MAP["mapping"].items()}
+    difficulty_mapping = {str(k): v for k, v in DIFFICULTY_MAP["mapping"].items()}
+    effort_mapping = {str(k): v for k, v in EFFORT_MAP["mapping"].items()}
+    confidence_mapping = {str(k): v for k, v in CONFIDENCE_MAP["mapping"].items()}
 
 
     statistics["familiarity_distribution"] = get_annotation_distribution(
@@ -298,7 +365,16 @@ def admin_statistics_api(request):
 
     # Dwell Time
     dwell_times = Webpage.objects.filter(Q_VALID_USER_REL).exclude(dwell_time__isnull=True).values_list('dwell_time', flat=True)
-    statistics["dwell_time_distribution"] = list(dwell_times)
+    # Ensure values are integers and filter out errors
+    cleaned_dwell_times = []
+    for dt in dwell_times:
+        try:
+            val = int(dt)
+            if val >= 0:
+                cleaned_dwell_times.append(val)
+        except (ValueError, TypeError):
+            continue
+    statistics["dwell_time_distribution"] = cleaned_dwell_times
 
 
     def get_json_field_distribution(model, field, q_obj):
@@ -307,12 +383,91 @@ def admin_statistics_api(request):
         )
         counts = Counter()
         for sublist in all_values:
+            # Parse JSON string if necessary
+            if isinstance(sublist, str):
+                try:
+                    sublist = json.loads(sublist)
+                except json.JSONDecodeError:
+                    continue
+            
             if sublist:
-                counts.update(sublist)
+                # If it's a list, update with items; if single item (unlikely for JSON list field but possible), update with it
+                if isinstance(sublist, list):
+                    counts.update(sublist)
+                else:
+                    counts.update([sublist])
         return {"labels": list(counts.keys()), "data": list(counts.values())}
 
     statistics["cancellation_reasons"] = get_json_field_distribution(CancelAnnotation, "category", Q_VALID_TASK_USER)
     statistics["reflection_failures"] = get_json_field_distribution(ReflectionAnnotation, "failure_category", Q_VALID_TRIAL_USER)
+
+    # --- Navigation & Behavior Analysis ---
+    
+    # Average Trajectory Length (Pages per Task)
+    # We count webpages per task, then average those counts
+    trajectory_stats = Webpage.objects.filter(Q_VALID_USER_REL).values('belong_task').annotate(page_count=Count('id')).aggregate(avg_length=Avg('page_count'))
+    statistics["avg_trajectory_length"] = round(trajectory_stats['avg_length'] or 0, 1)
+
+    # Annotation Burden (Time in seconds)
+    avg_pre = PreTaskAnnotation.objects.filter(Q_VALID_TASK_USER).aggregate(avg=Avg('duration'))
+    avg_post = PostTaskAnnotation.objects.filter(Q_VALID_TASK_USER).aggregate(avg=Avg('duration'))
+    statistics["avg_pre_task_duration"] = round(avg_pre['avg'] or 0, 1)
+    statistics["avg_post_task_duration"] = round(avg_post['avg'] or 0, 1)
+
+    # Top Visited Domains
+    domains = []
+    
+    if getattr(settings, 'DATABASE_TYPE', 'sqlite') == 'postgres':
+        # Optimized for PostgreSQL: Extract domain in DB
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT 
+                    substring(url from '.*://([^/]*)') as domain,
+                    COUNT(*) as count
+                FROM task_manager_webpage
+                INNER JOIN user_system_user ON task_manager_webpage.user_id = user_system_user.id
+                WHERE (user_system_user.is_superuser = false AND user_system_user.is_staff = false)
+                GROUP BY domain
+                ORDER BY count DESC
+                LIMIT 10;
+            """)
+            top_domains_counts = cursor.fetchall()
+            # Clean up www. prefix in Python if needed, or refine regex
+            # Simple cleanup for consistency
+            cleaned_counts = []
+            for domain, count in top_domains_counts:
+                if domain:
+                    d = domain.lower()
+                    if d.startswith('www.'): d = d[4:]
+                    cleaned_counts.append((d, count))
+            
+            # Re-aggregate if stripping www caused duplicates
+            final_counts = Counter()
+            for d, c in cleaned_counts:
+                final_counts[d] += c
+            top_domains_counts = final_counts.most_common(10)
+
+    else:
+        # Fallback for SQLite: Process in Python with iterator to save memory
+        # Use iterator() to fetch rows one by one instead of loading all into memory
+        all_urls = Webpage.objects.filter(Q_VALID_USER_REL).values_list('url', flat=True).iterator()
+        
+        for url in all_urls:
+            try:
+                parsed = urlparse(url)
+                if parsed.netloc:
+                    domain = parsed.netloc.lower()
+                    if domain.startswith('www.'):
+                        domain = domain[4:]
+                    domains.append(domain)
+            except Exception:
+                continue
+        top_domains_counts = Counter(domains).most_common(10)
+
+    statistics["top_domains"] = {
+        "labels": [item[0] for item in top_domains_counts],
+        "data": [item[1] for item in top_domains_counts]
+    }
 
     return JsonResponse(statistics)
 

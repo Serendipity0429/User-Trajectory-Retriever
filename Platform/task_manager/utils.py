@@ -580,12 +580,12 @@ def get_pending_annotation(user):
     """
     Checks for pending annotations for a user and returns the URL to the annotation page if found.
     """
-    # Check for pending post-task annotations
     try:
+        # Check for pending post-task annotations
         pending_post_task = Task.objects.filter(
             user=user,
-            active=False,
             cancelled=False,
+            end_timestamp__isnull=False,
             posttaskannotation__isnull=True,
             cancelannotation__isnull=True,
         ).first()

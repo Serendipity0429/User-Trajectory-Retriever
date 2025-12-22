@@ -163,7 +163,7 @@ def admin_statistics_api(request):
     }
 
     completed_tasks = Task.valid_objects.filter(
-        cancelled=False, active=False, end_timestamp__isnull=False
+        active=False, end_timestamp__isnull=False
     ).prefetch_related('tasktrial_set')
     
     task_time_distribution = [

@@ -83,7 +83,6 @@ DIFFICULTY_EXPLANATION_MAP = {
 CONFIDENCE_MAP = {
     "random": False,
     "mapping": {
-        -1: "Not Rated",
         1: "1 - Just a guess",
         2: "2 - Not very confident",
         3: "3 - Fairly confident",

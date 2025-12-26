@@ -621,10 +621,10 @@
                                     <div class="card h-100 shadow-sm">
                                         <div class="card-header bg-light d-flex align-items-center">
                                             <i class="bi bi-clock-history me-2 text-info"></i>
-                                            <h6 class="mb-0 fw-bold">Dwell Time (Histogram)</h6>
+                                            <h6 class="mb-0 fw-bold">Dwell Time (Box Plot)</h6>
                                         </div>
                                         <div class="card-body p-2">
-                                            <div id="dwellTimeHistogramChart" style="height: 220px;"></div>
+                                            <div id="dwellTimeBoxPlotChart" style="height: 220px;"></div>
                                         </div>
                                     </div>
                                 </div>
@@ -859,6 +859,11 @@ document.addEventListener('DOMContentLoaded', function() {
             };
             Chart.register(noDataPlugin);
 
+            // Ensure numeric data for Dwell Time to prevent categorical plotting
+            if (statistics.dwell_time_distribution) {
+                statistics.dwell_time_distribution = statistics.dwell_time_distribution.map(Number);
+            }
+
             const renderPlotlyChart = (elementId, data, layout) => {
                 if (data && data.length > 0) {
                     Plotly.newPlot(elementId, data, layout);
@@ -996,12 +1001,26 @@ document.addEventListener('DOMContentLoaded', function() {
             };
 
             const PlotlyFactory = {
-                createHistogram: (id, data, xLabel, yLabel, color) => {
-                    const layout = { ...plotlyLayout, xaxis: { ...plotlyLayout.xaxis, title: xLabel }, yaxis: { ...plotlyLayout.yaxis, title: yLabel }};
+                createHistogram: (id, data, xLabel, yLabel, color, options = {}) => {
+                    const layout = { 
+                        ...plotlyLayout, 
+                        xaxis: { ...plotlyLayout.xaxis, title: xLabel }, 
+                        yaxis: { ...plotlyLayout.yaxis, title: yLabel },
+                        bargap: options.bargap !== undefined ? options.bargap : 0.1
+                    };
+
+                    if (options.logScaleX) {
+                        layout.xaxis.type = 'log';
+                        layout.xaxis.autorange = true;
+                    } else {
+                        layout.xaxis.type = 'linear';
+                    }
+
                     const trace = (data && data.length > 0) ? [{
                         x: data,
                         type: 'histogram',
-                        marker: { color: color }
+                        marker: { color: color },
+                        nbinsx: options.nbinsx
                     }] : [];
                     renderPlotlyChart(id, trace, layout);
                 },
@@ -1084,7 +1103,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // --- Plotly.js Instances ---
             PlotlyFactory.createHistogram('taskTimeHistogramChart', statistics.task_time_distribution, 'Time (seconds)', 'Count', CHART_COLORS.blue);
             PlotlyFactory.createBoxPlot('taskTimeBoxPlotChart', statistics.task_time_distribution, 'Time (seconds)', 'Task Time', CHART_COLORS.purple);
-            PlotlyFactory.createHistogram('dwellTimeHistogramChart', statistics.dwell_time_distribution, 'Dwell Time (seconds)', 'Count', CHART_COLORS.green);
+            PlotlyFactory.createBoxPlot('dwellTimeBoxPlotChart', statistics.dwell_time_distribution, 'Time (seconds)', 'Dwell Time', CHART_COLORS.green);
             
             // Trial Time Box Plot Series (Custom Logic)
             const trialTimeBoxPlotLayout = { ...plotlyLayout, yaxis: { ...plotlyLayout.yaxis, title: 'Time (seconds)' }};

@@ -371,7 +371,7 @@ def admin_statistics_api(request):
         try:
             val = int(dt)
             if val >= 0:
-                cleaned_dwell_times.append(val)
+                cleaned_dwell_times.append(val / 1000.0)
         except (ValueError, TypeError):
             continue
     statistics["dwell_time_distribution"] = cleaned_dwell_times

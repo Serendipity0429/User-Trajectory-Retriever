@@ -401,6 +401,12 @@ class BrowserAgentPipeline(BaseAgentPipeline):
             await sync_to_async(self.stop_token)()
 
     async def run_single_turn_async(self, session, trial, auto_cleanup=False):
+        # Ensure model and toolkit are initialized (needed for adhoc runs)
+        # If we are reconnecting (mcp_client is None), we MUST recreate the toolkit
+        # to avoid "tool already registered" errors from the previous connection.
+        if not self.agent_model or not self.agent_toolkit or not self.mcp_client:
+             self.agent_model, self.agent_toolkit = await sync_to_async(BrowserAgentFactory.init_agentscope, thread_sensitive=False)(self.temp_settings)
+
         # Lazy init for MCP client (handle loop changes or delayed init)
         if not self.mcp_client:
              self.mcp_client = await self.mcp_manager.connect(self.agent_toolkit)

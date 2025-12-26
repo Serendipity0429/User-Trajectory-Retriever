@@ -3,6 +3,7 @@ from django.db.models import Count, Avg, Q
 from task_manager.models import Task, Webpage, PreTaskAnnotation, PostTaskAnnotation, TaskTrial
 from user_system.models import User
 from collections import defaultdict, Counter
+from tqdm import tqdm
 
 class Command(BaseCommand):
     help = 'Detect potentially sloppy annotators based on heuristics'
@@ -30,21 +31,27 @@ class Command(BaseCommand):
         user_flags = defaultdict(list)
         
         # --- PHASE 1: Analyze Completed Tasks (Per Task Analysis) ---
-        completed_tasks = Task.objects.filter(active=False, cancelled=False, end_timestamp__isnull=False).select_related('user').prefetch_related('tasktrial_set')
+        # We check completed tasks AND any task with trials (to catch repetitive answers in abandoned tasks)
+        analyzed_tasks = Task.objects.filter(
+            Q(active=False, cancelled=False, end_timestamp__isnull=False) | 
+            Q(tasktrial__isnull=False)
+        ).distinct().select_related('user').prefetch_related('tasktrial_set')
         
-        for task in completed_tasks:
+        for task in tqdm(analyzed_tasks, desc="Analyzing Tasks"):
             reasons = []
+            is_completed = not task.active and not task.cancelled and task.end_timestamp is not None
             
-            # 1. Short Task Duration
-            if task.end_timestamp and task.start_timestamp:
+            # 1. Short Task Duration (Only for completed tasks)
+            if is_completed and task.start_timestamp:
                 duration = (task.end_timestamp - task.start_timestamp).total_seconds()
                 if duration < min_task_dur:
                     reasons.append(f"Short Task Duration ({int(duration)}s)")
             
-            # 2. Low Page Visits
-            page_count = Webpage.objects.filter(belong_task=task).count()
-            if page_count < min_pages:
-                reasons.append(f"Low Page Visits ({page_count})")
+            # 2. Low Page Visits (Only for completed tasks)
+            if is_completed:
+                page_count = Webpage.objects.filter(belong_task=task).count()
+                if page_count < min_pages:
+                    reasons.append(f"Low Page Visits ({page_count})")
             
             # 3. Rushed Annotations
             try:
@@ -67,14 +74,26 @@ class Command(BaseCommand):
                     if t_dur > max_trial_dur:
                         reasons.append(f"Excessive Trial Duration ({int(t_dur)}s)")
                         break # Flag task once
-
+                        
             # 5. Repetitive Answers (Within Task)
             if options['check_repetitive'] and trials.count() > 1:
-                answers = [t.answer.strip().lower() for t in trials if t.answer]
-                if answers:
-                    most_common = Counter(answers).most_common(1)
-                    if most_common and most_common[0][1] == len(answers) and len(answers) > 1:
-                        reasons.append(f"Identical Answers in All {len(answers)} Trials")
+                ordered_trials = trials.order_by('num_trial')
+                consecutive_repeats = 0
+                prev_answer = None
+                
+                for t in ordered_trials:
+                    curr_answer = t.answer.strip().lower() if t.answer else ""
+                    if not curr_answer or curr_answer == "undefined":
+                        prev_answer = None
+                        continue
+                        
+                    if prev_answer and curr_answer == prev_answer:
+                        consecutive_repeats += 1
+                    
+                    prev_answer = curr_answer
+                
+                if consecutive_repeats > 0:
+                    reasons.append(f"Identical Answers in Succeeding Trials ({consecutive_repeats} repeats)")
 
             if reasons:
                 user_flags[task.user.username].append({
@@ -86,7 +105,7 @@ class Command(BaseCommand):
         # --- PHASE 2: User-Level Stats (Global Analysis) ---
         all_users = User.participants.all()
         
-        for user in all_users:
+        for user in tqdm(all_users, desc="Global User Analysis"):
             user_tasks = Task.objects.filter(user=user)
             total_started = user_tasks.count()
             
@@ -100,6 +119,27 @@ class Command(BaseCommand):
                         'id': 'N/A',
                         'reasons': [f"High Abandonment Rate ({completed}/{total_started} completed, {int(completion_rate*100)}%)"]
                     })
+
+        # --- Report Generation ---
+        total_flagged_users = len(user_flags)
+        
+        if total_flagged_users == 0:
+            self.stdout.write(self.style.SUCCESS("No suspicious behavior detected."))
+            return
+
+        sorted_users = sorted(user_flags.items(), key=lambda x: len(x[1]), reverse=True)
+
+        for username, flags in sorted_users:
+            self.stdout.write(self.style.ERROR(f"User: {username} - {len(flags)} Issues"))
+            for item in flags:
+                reasons_str = ", ".join(item['reasons'])
+                if item['type'] == 'task':
+                    self.stdout.write(f"  Task {item['id']}: {reasons_str}")
+                else:
+                    self.stdout.write(f"  Global Warning: {reasons_str}")
+            self.stdout.write("")
+
+        self.stdout.write(self.style.SUCCESS(f"Analysis complete. Found {total_flagged_users} users with potential issues."))
 
         # --- Report Generation ---
         total_flagged_users = len(user_flags)

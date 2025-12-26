@@ -166,16 +166,16 @@ def setup_development_data() -> None:
 
     # Create test users.
     print_info("Creating test users...")
-    users = {"test": "thuirtest"}
+    users = {"test": "Thu1234!"}
     test_user_num = 2
     for i in range(test_user_num):
-        users[f"user{i}"] = f"thuiruser{i}"
+        users[f"user{i}"] = "Thu1234!"
     for username, password in users.items():
         run_manage_py_command("create_test_user", username, password)
 
     # Create a primary superuser.
     print_info("Creating test superuser...")
-    run_manage_py_command("create_test_superuser", "admin", "thuirthuir", "--primary")
+    run_manage_py_command("create_test_superuser", "admin", "Thu1234!", "--primary")
 
     print_success("--- Development data setup complete ---")
 

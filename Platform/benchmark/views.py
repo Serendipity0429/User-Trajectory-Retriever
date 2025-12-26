@@ -1296,6 +1296,9 @@ def export_session(request, session_id):
         pipeline_type = "rag_multi_turn"
 
     snapshot = session.run.settings_snapshot if session.run else {}
+    # remove api key from snapshot if present
+    if snapshot and "llm_settings" in snapshot:
+        snapshot["llm_settings"].pop("llm_api_key", None)
 
     max_retries = 3
     if snapshot and "llm_settings" in snapshot:

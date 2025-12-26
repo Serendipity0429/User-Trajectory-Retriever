@@ -37,6 +37,7 @@ class MCPManager:
             )
             await self.client.connect()
             await toolkit.register_mcp_client(self.client)
+            
             print_debug(f"Registered MCP tools from {self.client.name}")
             return self.client
                 

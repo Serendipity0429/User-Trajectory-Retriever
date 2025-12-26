@@ -8,8 +8,48 @@ from django.core.mail import EmailMultiAlternatives
 import smtplib
 from django.conf import settings
 import logging
+import re
 
 logger = logging.getLogger(__name__)
+
+
+def check_password_strength(password):
+    """
+    Check if the password meets the complexity requirements.
+    Requirements:
+    1. Length >= 8
+    2. Contains uppercase letters
+    3. Contains lowercase letters
+    4. Contains numbers
+    5. Contains special characters (but safe ones)
+    """
+    if ' ' in password:
+        return False, "Password must not contain spaces."
+
+    if len(password) < 8:
+        return False, "Password must be at least 8 characters long."
+
+    if not re.search(r"[A-Z]", password):
+        return False, "Password must contain at least one uppercase letter."
+
+    if not re.search(r"[a-z]", password):
+        return False, "Password must contain at least one lowercase letter."
+
+    if not re.search(r"[0-9]", password):
+        return False, "Password must contain at least one number."
+
+    # Allowed special characters: !@#$%^&*()_+-=[]{}|;:,.<>?
+    # This regex checks if there is at least one character from the allowed set.
+    if not re.search(r"[!@#$%^&*()_+\-=\[\]{}|;:,.<>?]", password):
+        return False, "Password must contain at least one special character."
+
+    # Check for invalid characters (potential injection attack vectors or just unsupported)
+    # We want to allow ONLY alphanumeric and the specific special chars.
+    if not re.match(r"^[a-zA-Z0-9!@#$%^&*()_+\-=\[\]{}|;:,.<>?]+$", password):
+        return False, "Password contains invalid characters."
+
+    return True, None
+
 
 def authenticate(username, password):
     """

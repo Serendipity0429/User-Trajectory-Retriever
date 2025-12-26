@@ -3,6 +3,7 @@
 
 from django import forms
 from .models import User, Profile, InformedConsent
+from .utils import check_password_strength
 from django.contrib.auth.forms import (
     AuthenticationForm,
     UserCreationForm as AuthUserCreationForm,
@@ -283,6 +284,12 @@ class SignupForm(forms.Form):
         cleaned_data = super(SignupForm, self).clean()
         password = cleaned_data.get("password")
         password_retype = cleaned_data.get("password_retype")
+
+        if password:
+            is_valid, msg = check_password_strength(password)
+            if not is_valid:
+                self.add_error("password", msg)
+
         if password and password_retype and password != password_retype:
             self.add_error("password_retype", "The two passwords do not match.")
 
@@ -380,6 +387,12 @@ class EditPasswordForm(forms.Form):
         cleaned_data = super(EditPasswordForm, self).clean()
         password = cleaned_data.get("new_password")
         password_retype = cleaned_data.get("new_password_retype")
+
+        if password:
+            is_valid, msg = check_password_strength(password)
+            if not is_valid:
+                self.add_error("new_password", msg)
+
         if password and password_retype and password != password_retype:
             self.add_error("new_password_retype", "The two passwords do not match.")
 
@@ -436,6 +449,11 @@ class ResetPasswordForm(forms.Form):
         cleaned_data = super(ResetPasswordForm, self).clean()
         password = cleaned_data.get("new_password")
         password_retype = cleaned_data.get("new_password_retype")
+
+        if password:
+            is_valid, msg = check_password_strength(password)
+            if not is_valid:
+                self.add_error("new_password", msg)
 
         if password and password_retype and password != password_retype:
             self.add_error("new_password_retype", "The two passwords do not match.")

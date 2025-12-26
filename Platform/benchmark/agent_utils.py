@@ -19,6 +19,7 @@ except ImportError:
 
 from agentscope.formatter import OpenAIChatFormatter
 from agentscope.model import OpenAIChatModel
+from agentscope.embedding import OpenAITextEmbedding
 from agentscope.mcp import StdIOStatefulClient
 from .utils import print_debug
 from asgiref.sync import sync_to_async
@@ -78,20 +79,32 @@ class StreamingMemory(InMemoryMemory):
             # self.content is a list, accessing it is sync
             self.update_callback(list(self.content))
 
-def create_memory(memory_type, user_id, update_callback=None):
+def create_memory(memory_type, user_id, update_callback=None, model=None, llm_settings=None):
     """Helper to initialize agent memory based on settings."""
     print_debug(f"Initializing memory with type: {memory_type}")
     
+    embedding_model = None
+    if llm_settings:
+        try:
+             # Default to text-embedding-3-small if not configured elsewhere
+             # Assuming standard OpenAI compatible API for embeddings
+            embedding_model = OpenAITextEmbedding(
+                api_key=llm_settings.llm_api_key, 
+                model_name="text-embedding-3-small"
+            )
+        except Exception as e:
+            print_debug(f"Failed to init embedding model: {e}")
+
     memory = None
     if memory_type == 'mem0' and Mem0LongTermMemory:
         try:
-            memory = Mem0LongTermMemory(user_id=user_id)
+            memory = Mem0LongTermMemory(user_name=user_id, model=model, embedding_model=embedding_model)
         except Exception as e:
             print_debug(f"Failed to init Mem0: {e}")
 
     elif memory_type == 'reme' and ReMePersonalLongTermMemory:
         try:
-            memory = ReMePersonalLongTermMemory(user_id=user_id)
+            memory = ReMePersonalLongTermMemory(user_name=user_id, model=model, embedding_model=embedding_model)
         except Exception as e:
             print_debug(f"Failed to init ReMe: {e}")
             
@@ -132,7 +145,8 @@ class VanillaAgentFactory:
         toolkit.register_tool_function(answer_question)
         
         agent_settings = AgentSettings.get_effective_settings()
-        memory = create_memory(agent_settings.memory_type, "vanilla_agent_user", update_callback)
+        llm_settings = LLMSettings.get_effective_settings()
+        memory = create_memory(agent_settings.memory_type, "vanilla_agent_user", update_callback, model=model, llm_settings=llm_settings)
 
         return ReActAgent(
             name="Assistant",
@@ -172,7 +186,8 @@ class BrowserAgentFactory:
         print_debug(f"BrowserAgent Toolkit Tools: {list(toolkit.tools.keys())}")
         
         agent_settings = await sync_to_async(AgentSettings.get_effective_settings)()
-        memory = create_memory(agent_settings.memory_type, "browser_agent_user", update_callback)
+        llm_settings = await sync_to_async(LLMSettings.get_effective_settings)()
+        memory = create_memory(agent_settings.memory_type, "browser_agent_user", update_callback, model=model, llm_settings=llm_settings)
 
         agent = ReActAgent(
             name="BrowserAgent",

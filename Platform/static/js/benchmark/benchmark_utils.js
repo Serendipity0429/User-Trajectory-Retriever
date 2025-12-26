@@ -1091,6 +1091,63 @@ window.BenchmarkUtils = {
         }
     },
 
+    /**
+     * Display the results of a run.
+     * @param {object} runData - The run data object { name, results: [] }.
+     * @param {function} updateSummaryFunc - Function to update the summary statistics UI.
+     * @param {string} pipelineType - The type of pipeline (e.g., 'vanilla_adhoc', 'rag_adhoc').
+     */
+    displayRunResults: function(runData, updateSummaryFunc, pipelineType = 'vanilla_adhoc') {
+        const resultsContainer = document.getElementById('pipeline-results-container');
+        const progressContainer = document.getElementById('progress-container');
+        const saveRunBtn = document.getElementById('save-run-btn');
+        const resultsHeader = document.getElementById('results-header-text');
+        const resultsBody = document.getElementById('pipeline-results-body');
+
+        if (resultsContainer) resultsContainer.style.display = 'block';
+        if (progressContainer) progressContainer.style.display = 'none';
+        
+        if (resultsHeader) resultsHeader.textContent = `Results for: ${runData.name}`;
+        if (resultsBody) resultsBody.innerHTML = '';
+        
+        // Ensure status and processing rows are cleared
+        const statusDiv = document.getElementById('pipeline-status');
+        if (statusDiv) statusDiv.style.display = 'none';
+        const processingRow = document.getElementById('processing-row');
+        if (processingRow) processingRow.remove();
+
+        let stats = {
+            total: runData.results.length,
+            ruleCorrect: 0,
+            llmCorrect: 0,
+            llmErrors: 0,
+            agreements: 0,
+            totalDocsUsed: 0
+        };
+
+        if (runData.results) {
+            runData.results.forEach((result, index) => {
+                const summary = BenchmarkUtils.BenchmarkRenderer.renderResultRow(result, resultsBody, index + 1, pipelineType);
+                result.rowId = summary.rowId; 
+                
+                if (summary.ruleCorrect) stats.ruleCorrect++;
+                if (summary.llmCorrect) stats.llmCorrect++;
+                if (summary.llmCorrect === null) stats.llmErrors++;
+                if (summary.llmCorrect !== null && summary.ruleCorrect === summary.llmCorrect) {
+                    stats.agreements++;
+                }
+                stats.totalDocsUsed += (result.num_docs_used || 0);
+            });
+        }
+
+        if (updateSummaryFunc) {
+            updateSummaryFunc(stats);
+        }
+
+        const retryBtn = document.getElementById('retry-btn');
+        if (retryBtn) retryBtn.style.display = 'none';
+    },
+
     MultiTurnUtils: {
         /**
          * Render a multi-turn session, including question, ground truths, and trials.

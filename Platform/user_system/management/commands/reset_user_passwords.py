@@ -17,7 +17,6 @@ class Command(BaseCommand):
             if user.is_superuser or user.is_primary_superuser or user.is_test_account or user.is_staff:
                 self.stdout.write(self.style.WARNING(f"Skipping admin/test user {user.username}"))
                 continue
-
             if not user.email:
                 self.stdout.write(self.style.WARNING(f"Skipping user {user.username}: No email address"))
                 continue

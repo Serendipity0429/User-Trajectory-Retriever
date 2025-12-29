@@ -113,13 +113,13 @@
                     <ul id="answer-list" class="list-group list-group-flush mt-2">
                         {% if user_final_answer %}
                         <li class="list-group-item list-group-item-success d-flex justify-content-between align-items-center">
-                            {{ user_final_answer|split:"-"|last|striptags }}
+                            {{ user_final_answer|striptags }}
                             <span class="badge bg-success-light">Your Answer</span>
                         </li>
                         {% endif %}
                         {% for item in task_answer %}
                             {% if item != user_final_answer %}
-                            <li class="list-group-item">{{ item|split:"-"|last|striptags }}</li>
+                            <li class="list-group-item">{{ item|striptags }}</li>
                             {% endif %}
                         {% endfor %}
                     </ul>

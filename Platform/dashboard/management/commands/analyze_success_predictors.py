@@ -18,11 +18,18 @@ class Command(BaseCommand):
         # Let's use strict success (all correct) vs strict failure (all wrong) for contrast.
         
         tasks = Task.objects.prefetch_related('tasktrial_set', 'webpage_set')
+        total_all_tasks = tasks.count()
+        self.stdout.write(f"Scanning {total_all_tasks} tasks...")
         
         success_group = []
         failure_group = []
         
+        processed = 0
         for t in tasks:
+            processed += 1
+            if processed % 200 == 0:
+                 self.stdout.write(f"Scanned {processed}/{total_all_tasks} tasks...")
+
             trials = list(t.tasktrial_set.all())
             if not trials: continue
             

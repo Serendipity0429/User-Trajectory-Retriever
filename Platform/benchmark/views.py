@@ -80,6 +80,39 @@ def get_trial_trace(request, trial_id):
 
 
 @admin_required
+def get_trial_prompt(request, trial_id):
+    """
+    Reconstructs the full prompt (messages) sent to the LLM for a specific trial.
+    Supported for Vanilla and RAG multi-turn baselines.
+    """
+    trial = get_object_or_404(MultiTurnTrial.objects.select_related("session", "session__run"), pk=trial_id)
+    session = trial.session
+    pipeline_type = session.pipeline_type
+    
+    if pipeline_type not in ['vanilla', 'rag']:
+        return JsonResponse({"error": "Prompt reconstruction only supported for Vanilla and RAG baselines."}, status=400)
+    
+    try:
+        # Instantiate pipeline without real keys (only for message construction)
+        PipelineClass = PIPELINE_CLASS_MAP.get(pipeline_type)
+        pipeline = PipelineClass(base_url="", api_key="", model="", max_retries=1)
+        
+        # Get previous trials for history reconstruction
+        completed_trials = list(session.trials.filter(
+            trial_number__lt=trial.trial_number, 
+            status='completed'
+        ).order_by('trial_number'))
+        
+        # Reconstruct messages
+        messages = pipeline._construct_messages(session, trial, completed_trials)
+        
+        return JsonResponse({"status": "ok", "messages": messages})
+    except Exception as e:
+        print_debug(f"Error in get_trial_prompt: {e}")
+        return JsonResponse({"status": "error", "error": str(e)}, status=500)
+
+
+@admin_required
 def home(request):
     settings = LLMSettings.get_effective_settings()
     search_settings = SearchSettings.get_effective_settings()

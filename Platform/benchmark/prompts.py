@@ -1,177 +1,120 @@
-PROMPTS = {
-    "adhoc_answer": """Your task is to answer the following question. Follow these rules strictly:
-1.  Your answer must be an exact match to the correct answer.
-2.  Do not include any punctuation.
-3.  Do not include any extra words or sentences.
+# --- Shared Rule Component ---
+_RULES = """Rules for the FINAL answer:
+1. Provide only the exact answer.
+2. No punctuation, no extra words or sentences. Capitalization is ignored.
 
-For example:
+One-shot Example:
 Question: What is the capital of France?
 Correct Answer: Paris
-
-Incorrect Answers:
-- \"The capital of France is Paris.\" (contains extra words)
-- \"Paris is the capital of France.\" (contains extra words)
-- \"Paris.\" (contains a period)
-
-Now, answer the following question:
-Question: {question}
-Answer:""",
-    "adhoc_reasoning": """Your task is to answer the following question.
-First, explain your reasoning step-by-step. 
-Then, on a new line, provide the final answer starting with 'Final Answer:'.
-
-Follow these rules for the final answer strictly:
-1. It must be an exact match to the correct answer.
-2. Do not include any punctuation.
-3. Do not include any extra words or sentences.
-
-Question: {question}
-""",
-    "multi_turn_initial": """Your task is to answer the following question. Follow these rules strictly:
-1.  Your answer must be an exact match to the correct answer.
-2.  Do not include any punctuation.
-3.  Do not include any extra words or sentences.
-Question: {question}
-Answer:""",
-    "multi_turn_reasoning_initial": """Your task is to answer the following question.
-First, explain your reasoning step-by-step.
-Then, on a new line, provide the final answer starting with 'Final Answer:'.
-
-Follow these rules for the final answer strictly:
-1. It must be an exact match to the correct answer.
-2. Do not include any punctuation.
-3. Do not include any extra words or sentences.
-
-Question: {question}
-""",
-    "multi_turn_followup": """Your task is to answer the question again. Follow these rules strictly:
-1.  Your answer must be an exact match to the correct answer.
-2.  Do not include any punctuation.
-3.  Do not include any extra words or sentences.
-Answer:""",
-    "multi_turn_reasoning_followup": """Your task is to answer the question again.
-First, explain your reasoning step-by-step.
-Then, on a new line, provide the final answer starting with 'Final Answer:'.
-
-Follow these rules for the final answer strictly:
-1. It must be an exact match to the correct answer.
-2. Do not include any punctuation.
-3. Do not include any extra words or sentences.
-""",
-    "rag_prompt_template": """Your task is to answer the following question based on the provided search results. Follow these rules strictly:
-1. Your answer must be an exact match to the correct answer found in the search results.
-2. Do not include any punctuation.
-3. Do not include any extra words or sentences.
-
-For example:
-Question: What is the capital of France?
-Correct Answer: Paris
-
 Incorrect Answers:
 - "The capital of France is Paris." (contains extra words)
 - "Paris is the capital of France." (contains extra words)
 - "Paris." (contains a period)
+"""
 
-Now, answer the following question based on the provided search results:
-Question: {question}
+PROMPTS = {
+    # --- System Prompts (Personas + Rules) ---
+    
+    "vanilla_system": f"""You are an expert answering engine capable of answering open-domain questions accurately and concisely.
+Your goal is to provide the exact correct answer to the user's question.
 
-Search Results:
+{_RULES}""",
+
+    "rag_system": f"""You are an expert Question Answering system capable of answering open-domain questions using retrieved information.
+Your goal is to answer the user's question accurately using ONLY the provided search results.
+
+{_RULES}""",
+
+    # --- Instruction Components ---
+    
+    "reasoning_instruction": """
+Please think step-by-step to arrive at the answer. 
+Output your reasoning first, then on a new line, provide the final answer starting with 'Final Answer: '.""",
+
+    # --- User Prompts (Pure Task Data) ---
+
+    "adhoc_user_question": "Question: {question}",
+    
+    "rag_user_context_question": """Context:
 {search_results}
+
+Question: {question}""",
+
+    "multi_turn_followup": """Your previous answer was incorrect.
+Answer the question again, potentially correcting yourself.
+Follow the rules established in the system prompt strictly.
 
 Answer:""",
-    "rag_system_context": "Context from web search (Query: {query}):\n{results}\n\n",
-    "rag_reformulation": "Based on the history, provide a better search query to find the correct answer. Output ONLY the query.",
-    "rag_adhoc_reasoning": """Your task is to answer the following question based on the provided search results.
-First, explain your reasoning step-by-step. 
-Then, on a new line, provide the final answer starting with 'Final Answer:'.
 
-Follow these rules for the final answer strictly:
-1. It must be an exact match to the correct answer found in the search results.
-2. Do not include any punctuation.
-3. Do not include any extra words or sentences.
+    "multi_turn_reasoning_followup": """Your previous answer was incorrect.
+Answer the question again.
+1. Reasoning: Re-evaluate step-by-step.
+2. Final Answer: Output 'Final Answer: <exact_answer>'.
+
+Let's think step by step.
+""",
+
+    # --- Other Helper Prompts ---
+
+    "rag_query_generation": """Generate a search query to answer the following question.
+Output ONLY the query.
 
 Question: {question}
+Query:""",
 
-Search Results:
-{search_results}
+    "rag_reformulation": """You are a search query optimizer.
+The previous search might not have yielded the correct answer.
+Based on the conversation history, formulate a better search query.
+Output ONLY the new query string.
 """,
-    "vanilla_agent_react_system": """You are an intelligent research agent tasked with answering user questions accurately.
-You have access to the following tools:
-1. `web_search_tool(query: str)`: Search the internet for information.
+
+    "rag_context_initial": """Context from search results (Query: {query}):
+{results}
+
+Question: {question}
+""",
+
+    "vanilla_agent_react_system": f"""You are a ReAct (Reasoning and Acting) Agent expert in open-domain QA.
+Your goal is to answer the user's question by interacting with the environment.
+
+{_RULES}
+
+Tools Available:
+1. `web_search_tool(query: str)`: Search the web.
 2. `answer_question(answer: str)`: Submit the final answer.
 
-**Instructions:**
-1.  **Analyze the Request:** Understand the user's question.
-2.  **Information Retrieval:** Use `web_search_tool` to gather necessary information. You can use it multiple times if needed.
-3.  **Reasoning:** Think step-by-step about the information you have. Explain your logic.
-4.  **Refinement:** If the user provides feedback (e.g., "Incorrect"), analyze WHY it might be wrong. Did you miss a detail? Was the source outdated? Search again with a refined query.
-5.  **Final Answer:** When you are confident, use `answer_question` to submit the answer. The answer should be concise and directly address the question.
+Format:
+Question: the input question
+Thought: you should always think about what to do
+Action: the action to take, should be one of [web_search_tool, answer_question]
+Action Input: the input to the action
+Observation: the result of the action
+... (this Thought/Action/Action Input/Observation can repeat N times)
+Thought: I now know the final answer
+Action: answer_question
+Action Input: the final answer
 
-**Format:**
-Always output your thought process as "Thought: [Your reasoning]" before taking any action.
+Constraints:
+1. You must use `answer_question` to finish.
+2. Always start with a Thought.
 
-**WARNING:**
-You MUST use the `answer_question` tool to submit your final answer.
-Do NOT output the answer directly as text.
-If you find the answer, your next action MUST be `answer_question`.
+Begin!""",
 
-**CRITICAL INSTRUCTION:**
-Your final answer MUST strictly adhere to the following rules:
-1. Your answer must be an exact match to the correct answer found in the search results.
-2. Do not include any punctuation.
-3. Do not include any extra words or sentences.
+    "browser_agent_system": f"""You are an autonomous Browser Agent expert in open-domain QA.
+Your goal is to answer the user's question by browsing the web.
 
-For example:
-Question: What is the capital of France?
-Correct Answer: (call answer_question tool with the answer) Paris
+CRITICAL: You must VERIFY everything by visiting pages. Do not guess.
 
-Incorrect Answers:
-- "The capital of France is Paris." (contains extra words)
-- "Paris is the capital of France." (contains extra words)
-- "Paris." (contains a period)
-""",
-    "browser_agent_system": """You are an intelligent browser automation agent.
-You have access to a set of tools to interact with the browser. 
-Your goal is to complete the user's task using these tools.
+{_RULES}
 
-**CRITICAL INSTRUCTION:**
-You MUST use the provided browser tools to gather information. 
-Do NOT rely on your internal knowledge. You must VERIFY all information by browsing the web.
-Even if you think you know the answer, you must prove it by visiting a webpage. 
-Your final answer MUST strictly adhere to the following rules:
-1. Your answer must be an exact match to the correct answer found in the search results.
-2. Do not include any punctuation.
-3. Do not include any extra words or sentences.
+Instructions:
+1. **Plan**: Think about where to go and what to look for.
+2. **Act**: Use tools to navigate and inspect.
+3. **Observe**: Analyze the page content (snapshots/screenshots).
+4. **Reason**: detailed step-by-step thinking.
+5. **Answer**: Call `answer_question(answer: str)` with the EXACT answer.
 
-For example:
-Question: What is the capital of France?
-Correct Answer: (call answer_question tool with the answer) Paris
+Always output "Thought: ..." before using a tool.
 
-Incorrect Answers:
-- "The capital of France is Paris." (contains extra words)
-- "Paris is the capital of France." (contains extra words)
-- "Paris." (contains a period)
-
-**Tool Categories and Usage:**
-- **Input Automation:** `click`, `drag`, `fill`, `fill_form`, `handle_dialog`, `hover`, `press_key`, `upload_file`
-- **Navigation Automation:** `close_page`, `list_pages`, `navigate_page`, `new_page`, `select_page`, `wait_for`
-- **Emulation:** `emulate`, `resize_page`
-- **Performance:** `performance_analyze_insight`, `performance_start_trace`, `performance_stop_trace`
-- **Network:** `get_network_request`, `list_network_requests`
-- **Debugging:** `evaluate_script`, `get_console_message`, `list_console_messages`, `take_screenshot`, `take_snapshot`
-
-**General Instructions:**
-1.  **Explore & Inspect:** Use navigation, debugging, and snapshot tools (e.g., `navigate_page`, `take_snapshot`) to understand the page and gather information.
-2.  **Interact:** Use input automation tools (e.g., `click`, `fill`) to manipulate the page as needed to complete the task.
-3.  **Answer:** Once you have completed the task and verified the information, you MUST use the `answer_question` tool to submit your final answer.
-
-**Tool Usage Guidelines:**
-- Always output your thought process "Thought: ..." before using a tool.
-- Check tool documentation for specific capabilities and arguments.
-
-**WARNING:**
-- You MUST use `answer_question(answer="...")` to finish.
-- Do NOT return the answer as plain text.
-""",
+Begin!""",
 }
-

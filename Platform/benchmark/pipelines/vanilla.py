@@ -28,12 +28,17 @@ class VanillaLLMAdhocPipeline(BaseAdhocPipeline):
 
     def process_question(self, run, question, ground_truths):
 
+        sys_prompt = PROMPTS["vanilla_system"]
         if self.llm_settings.allow_reasoning:
-            prompt = PROMPTS["adhoc_reasoning"].format(question=question)
-        else:
-            prompt = PROMPTS["adhoc_answer"].format(question=question)
+            sys_prompt += PROMPTS["reasoning_instruction"]
         
-        answer, full_response = self.get_llm_response([{"role": "user", "content": prompt}])
+        user_prompt = PROMPTS["adhoc_user_question"].format(question=question)
+        
+        messages = [
+            {"role": "system", "content": sys_prompt},
+            {"role": "user", "content": user_prompt}
+        ]
+        answer, full_response = self.get_llm_response(messages)
 
         rule_result = check_answer_rule(question, ground_truths, answer)
         llm_result = check_answer_llm(question, ground_truths, answer, client=self.client, model=self.model)
@@ -88,22 +93,26 @@ class VanillaLLMMultiTurnPipeline(BaseMultiTurnPipeline):
         settings_snapshot = session.run.settings_snapshot
         allow_reasoning = settings_snapshot.get('llm_settings', {}).get('allow_reasoning', False) # Reverted to use settings
 
-        # 1. Initial Prompt
+        # 1. System and Initial Prompt
+        sys_prompt = PROMPTS["vanilla_system"]
         if allow_reasoning:
-            initial_prompt = PROMPTS["multi_turn_reasoning_initial"].format(question=session.question)
-        else:
-            initial_prompt = PROMPTS["multi_turn_initial"].format(question=session.question)
+            sys_prompt += PROMPTS["reasoning_instruction"]
         
-        messages.append({"role": "user", "content": initial_prompt})
+        initial_user_prompt = PROMPTS["adhoc_user_question"].format(question=session.question)
+        
+        messages.append({"role": "system", "content": sys_prompt})
+        messages.append({"role": "user", "content": initial_user_prompt})
 
         # 2. History
         for i, past_trial in enumerate(completed_trials):
-            if past_trial.answer:
+            if past_trial.full_response:
+                messages.append({"role": "assistant", "content": past_trial.full_response})
+            elif past_trial.answer:
                 messages.append({"role": "assistant", "content": past_trial.answer})
             # Only add the generic feedback if this is NOT the last completed trial.
             # The last trial's feedback is handled by the follow-up prompt.
             if i < len(completed_trials) - 1:
-                messages.append({"role": "user", "content": "Your previous answer was incorrect."})
+                messages.append({"role": "user", "content": "Your previous answer was incorrect. Please re-examine the question and try again."})
 
         # 3. Follow-up instructions (only if we have history)
         if completed_trials:

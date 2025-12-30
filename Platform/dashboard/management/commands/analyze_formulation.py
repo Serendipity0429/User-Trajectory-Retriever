@@ -9,6 +9,8 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS('Starting Formulation Analysis...'))
         
         trials = TaskTrial.objects.prefetch_related('justifications').exclude(answer='undefined')
+        total_trials = trials.count()
+        self.stdout.write(f"Total trials to analyze: {total_trials}")
         
         strategies = {
             'verbatim': {'correct': 0, 'total': 0}, 
@@ -17,8 +19,13 @@ class Command(BaseCommand):
         }
         
         count = 0
+        processed = 0
         
-        for t in trials:
+        for t in trials.iterator(chunk_size=100):
+            processed += 1
+            if processed % 500 == 0:
+                self.stdout.write(f"Processed {processed}/{total_trials} trials...")
+
             ans = t.answer.lower().strip()
             if not ans: continue
             

@@ -19,9 +19,9 @@ window.BenchmarkUtils.MultiTurnPage = {
                         const btn = e.target.closest('.view-search-results-btn');
                         try {
                             const results = JSON.parse(decodeURIComponent(btn.dataset.results));
-                            const container = document.getElementById('modal-search-results-container');
-                            BenchmarkUtils.BenchmarkRenderer.renderModalSearchResults(results, container);
-                            const modal = new bootstrap.Modal(document.getElementById('searchResultsListModal'));
+                            const container = document.getElementById('modal-generic-content-container');
+                            BenchmarkUtils.BenchmarkRenderer.renderModalSearchResults(results, container, 'benchmarkGenericModal');
+                            const modal = new bootstrap.Modal(document.getElementById('benchmarkGenericModal'));
                             modal.show();
                         } catch (err) {
                             console.error("Error opening results modal:", err);
@@ -30,6 +30,39 @@ window.BenchmarkUtils.MultiTurnPage = {
                     }
                 });
             }
+
+            // --- Prompt Viewing Listener ---
+            document.addEventListener('click', function(e) {
+                if (e.target && e.target.closest('.view-prompt-btn')) {
+                    const btn = e.target.closest('.view-prompt-btn');
+                    const trialId = btn.dataset.trialId;
+                    
+                    if (!trialId) return;
+                    
+                    const originalHtml = btn.innerHTML;
+                    btn.disabled = true;
+                    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+
+                    fetch(BenchmarkUrls.multiTurn.getTrialPrompt(trialId))
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.status === 'ok') {
+                            const formattedPrompt = JSON.stringify(data.messages, null, 2);
+                            BenchmarkUtils.BenchmarkRenderer.renderPromptModal(formattedPrompt, 'modal-generic-content-container', 'benchmarkGenericModal', 'Full LLM Prompt');
+                        } else {
+                            alert(data.error || "Failed to load prompt.");
+                        }
+                    })
+                    .catch(err => {
+                        console.error("Error fetching prompt:", err);
+                        alert("Failed to load prompt details.");
+                    })
+                    .finally(() => {
+                        btn.disabled = false;
+                        btn.innerHTML = originalHtml;
+                    });
+                }
+            });
 
             let activeSessionId = null;
             let currentPipelineResults = [];

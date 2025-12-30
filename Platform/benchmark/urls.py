@@ -56,6 +56,7 @@ urlpatterns = [
     path("api/multi_turn/retry_session/<int:trial_id>/", views.retry_session, name="retry_session"),
     path("api/multi_turn/stop_session/", views.stop_session, name="stop_session"),
     path("api/multi_turn/get_trial_trace/<int:trial_id>/", views.get_trial_trace, name="get_trial_trace"),
+    path("api/multi_turn/get_trial_prompt/<int:trial_id>/", views.get_trial_prompt, name="get_trial_prompt"),
 
     # Run Loading (Specific Types)
     path('api/multi_turn/load_run/<int:group_id>/', views.load_vanilla_llm_multi_turn_run, name='load_vanilla_llm_multi_turn_run'),

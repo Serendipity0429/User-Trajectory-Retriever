@@ -59,19 +59,20 @@ def count_questions_in_file(file_path):
 
 def extract_final_answer(text):
     """
-    Strictly extracts the final answer from an LLM response by looking for "Final Answer:".
-    If the marker is not found, it returns an empty string, indicating parsing failure.
+    Extracts the final answer from an LLM response by looking for "Final Answer:".
+    Robust to case and Markdown formatting (e.g., **Final Answer:**).
+    If the marker is not found, it returns the original text.
     """
     if not text:
         return ""
         
-    # Strictly look for "Final Answer:"
-    marker = "Final Answer:"
+    # Regex to find "Final Answer" with optional bolding/casing and optional colon
+    # Matches: "Final Answer:", "**Final Answer**:", "final answer:", "FINAL ANSWER"
+    pattern = r"(?i)(\*\*|#+\s*)?Final Answer(\*\*)?:"
     
-    if marker in text:
-        # Return the text after the marker, stripped of leading/trailing whitespace
-        # Splitting by marker and taking the last part allows for robustness if "Final Answer:" appears multiple times (unlikely but safe)
-        return text.split(marker)[-1].strip()
+    match = re.search(pattern, text)
+    if match:
+        # Return everything after the match
+        return text[match.end():].lower().strip()
     else:
-        # If the marker is not found, return an empty string
         return text

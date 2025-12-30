@@ -1,4 +1,5 @@
 from django.core.management.base import BaseCommand
+from django.db.models import Prefetch
 from task_manager.models import Task, Webpage
 from urllib.parse import urlparse
 import statistics
@@ -9,7 +10,12 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         self.stdout.write(self.style.SUCCESS('Starting Temporal Dynamics Analysis...'))
         
-        tasks = Task.objects.filter(webpage__isnull=False).distinct()
+        # Optimize query with Prefetch
+        tasks = Task.objects.filter(webpage__isnull=False).distinct().prefetch_related(
+            Prefetch('webpage_set', queryset=Webpage.objects.order_by('start_timestamp', 'id'))
+        )
+        total_tasks = tasks.count()
+        self.stdout.write(f"Analyzing {total_tasks} tasks...")
         
         # Buckets for phases
         phases = {
@@ -19,11 +25,16 @@ class Command(BaseCommand):
         }
         
         valid_tasks = 0
+        processed = 0
         
         SEARCH_DOMAINS = ['google.com', 'bing.com', 'baidu.com', 'duckduckgo.com', 'yahoo.com']
 
         for task in tasks:
-            pages = list(task.webpage_set.all().order_by('start_timestamp'))
+            processed += 1
+            if processed % 200 == 0:
+                self.stdout.write(f"Processed {processed}/{total_tasks} tasks...")
+
+            pages = list(task.webpage_set.all())
             n = len(pages)
             if n < 3: continue 
             

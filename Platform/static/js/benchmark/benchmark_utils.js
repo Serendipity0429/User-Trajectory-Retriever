@@ -52,6 +52,7 @@ const BenchmarkUrls = {
         deleteSession: (id) => `${API_PREFIX}/multi_turn/delete_session/${id}/`,
         stopSession: `${API_PREFIX}/multi_turn/stop_session/`,
         exportSession: (id) => `${API_PREFIX}/multi_turn/export_session/${id}/`,
+        getTrialPrompt: (id) => `${API_PREFIX}/multi_turn/get_trial_prompt/${id}/`,
     },
 
     // Multi-turn: Vanilla LLM

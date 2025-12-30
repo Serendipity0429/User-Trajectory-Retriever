@@ -23,11 +23,18 @@ class Command(BaseCommand):
             self.stdout.write(f"Analyzed {cancelled_tasks.count()} cancelled tasks.")
             self.stdout.write(f"Thrashing Detected: {thrashing_count} tasks ({thrashing_count/cancelled_tasks.count()*100:.1f}%)")
         
-        sample_pages = Webpage.objects.exclude(event_list=[]).exclude(event_list__exact='[]').order_by('-id')[:200]
+        all_pages = Webpage.objects.exclude(event_list=[]).exclude(event_list__exact='[]').order_by('-id')
+        total_pages = all_pages.count()
+        self.stdout.write(f"\nAnalyzing {total_pages} pages for Rage Clicks...")
         
         rage_click_pages = 0
+        processed_count = 0
         
-        for p in sample_pages:
+        for p in all_pages.iterator(chunk_size=100):
+            processed_count += 1
+            if processed_count % 1000 == 0:
+                 self.stdout.write(f"Processed {processed_count}/{total_pages} pages...")
+
             try:
                 events = p.event_list
                 if isinstance(events, str): events = json.loads(events)
@@ -47,6 +54,6 @@ class Command(BaseCommand):
                 pass
                 
         self.stdout.write(f"\n[Rage Click Analysis]")
-        self.stdout.write(f"Pages with Rage Clicks: {rage_click_pages} (Sample 200)")
+        self.stdout.write(f"Pages with Rage Clicks: {rage_click_pages} ({rage_click_pages/total_pages*100:.1f}%)")
 
         self.stdout.write('-----------------------------------')

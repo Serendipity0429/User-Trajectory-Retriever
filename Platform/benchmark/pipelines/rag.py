@@ -54,12 +54,20 @@ class RagAdhocPipeline(BaseAdhocPipeline):
         search_results = self.search_engine.search(search_query)
         formatted_results = self.search_engine.format_results(search_results)
         
+        sys_prompt = PROMPTS["rag_system"]
         if self.llm_settings.allow_reasoning:
-            prompt = PROMPTS["rag_adhoc_reasoning"].format(question=question, search_results=formatted_results)
-        else:
-            prompt = PROMPTS["rag_prompt_template"].replace('{question}', question).replace('{search_results}', formatted_results)
+            sys_prompt += PROMPTS["reasoning_instruction"]
         
-        answer, full_response = self.get_llm_response([{"role": "user", "content": prompt}])
+        user_prompt = PROMPTS["rag_user_context_question"].format(
+            question=question, 
+            search_results=formatted_results
+        )
+        
+        messages = [
+            {"role": "system", "content": sys_prompt},
+            {"role": "user", "content": user_prompt}
+        ]
+        answer, full_response = self.get_llm_response(messages)
         
         rule_result = check_answer_rule(question, ground_truths, answer)
         llm_result = check_answer_llm(question, ground_truths, answer, client=self.client, model=self.model)
@@ -131,8 +139,10 @@ class RagMultiTurnPipeline(BaseMultiTurnPipeline):
         allow_reasoning = settings_snapshot.get('llm_settings', {}).get('allow_reasoning', False)
 
         # Check if trial already has search results (e.g. from history reconstruction or manual run)
-        if search_results is None and trial.search_results:
-            search_results = trial.search_results
+        # Logic: If search_query is present, we assume search has been attempted.
+        # We accept empty list [] as valid results (no hits).
+        if search_results is None and trial.search_query:
+            search_results = trial.search_results if trial.search_results is not None else []
             current_search_query = trial.search_query
 
         if search_results is None:
@@ -155,8 +165,10 @@ class RagMultiTurnPipeline(BaseMultiTurnPipeline):
                 
                 # Reconstruct history from previous_messages and last_trial
                 for past_trial in completed_trials:
-                    if past_trial.answer:
-                            reform_messages.append({"role": "assistant", "content": f"Previous Answer: {past_trial.answer}"})
+                    if past_trial.full_response:
+                        reform_messages.append({"role": "assistant", "content": f"Previous Answer: {past_trial.full_response}"})
+                    elif past_trial.answer:
+                        reform_messages.append({"role": "assistant", "content": f"Previous Answer: {past_trial.answer}"})
                     reform_messages.append({"role": "user", "content": "The previous answer was incorrect."})
 
                 reform_messages.append({"role": "user", "content": PROMPTS["rag_reformulation"]})
@@ -181,21 +193,27 @@ class RagMultiTurnPipeline(BaseMultiTurnPipeline):
         trial.search_results = search_results
         trial.save()
 
-        # New logic: Static system instruction + Dynamic context in User prompt
-        messages.append({"role": "system", "content": PROMPTS["rag_system_instruction"]})
+        # System Prompt
+        sys_prompt = PROMPTS["rag_system"]
+        if allow_reasoning:
+            sys_prompt += PROMPTS["reasoning_instruction"]
+        
+        messages.append({"role": "system", "content": sys_prompt})
 
-        user_content = PROMPTS["rag_context_initial"].format(
-            query=current_search_query, 
-            results=formatted_results, 
+        # User context + question
+        user_content = PROMPTS["rag_user_context_question"].format(
+            search_results=formatted_results, 
             question=session.question
         )
         messages.append({"role": "user", "content": user_content})
 
         for i, past_trial in enumerate(completed_trials):
-            if past_trial.answer:
+            if past_trial.full_response:
+                messages.append({"role": "assistant", "content": past_trial.full_response})
+            elif past_trial.answer:
                 messages.append({"role": "assistant", "content": past_trial.answer})
             if i < len(completed_trials) - 1:
-                messages.append({"role": "user", "content": "Your previous answer was incorrect."})
+                messages.append({"role": "user", "content": "Your previous answer was incorrect. Please re-examine the question and try again."})
 
         # 3. Follow-up instructions
         if completed_trials:

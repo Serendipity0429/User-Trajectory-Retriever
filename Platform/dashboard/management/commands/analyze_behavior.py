@@ -1,5 +1,5 @@
 from django.core.management.base import BaseCommand
-from django.db.models import Avg, Sum
+from django.db.models import Avg, Sum, Prefetch
 from task_manager.models import Task, Webpage, PostTaskAnnotation
 from urllib.parse import urlparse, parse_qs
 from collections import defaultdict
@@ -26,10 +26,14 @@ class Command(BaseCommand):
             except:
                 return False
 
+        # Optimized query with Prefetch
         tasks = Task.objects.filter(
             end_timestamp__isnull=False,
             webpage__isnull=False
-        ).distinct().prefetch_related('webpage_set', 'posttaskannotation')
+        ).distinct().prefetch_related(
+            Prefetch('webpage_set', queryset=Webpage.objects.order_by('start_timestamp', 'id')),
+            'posttaskannotation'
+        )
 
         total_tasks = 0
         search_time_ratios = []
@@ -39,8 +43,14 @@ class Command(BaseCommand):
         
         difficulty_metrics = defaultdict(list) 
 
+        processed_count = 0
         for task in tasks:
-            pages = list(task.webpage_set.all().order_by('id'))
+            processed_count += 1
+            if processed_count % 100 == 0:
+                self.stdout.write(f"Processed {processed_count} tasks...")
+
+            # Use the prefetched cache
+            pages = list(task.webpage_set.all())
             if not pages:
                 continue
             

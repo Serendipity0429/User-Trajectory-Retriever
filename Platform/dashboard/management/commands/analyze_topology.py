@@ -1,5 +1,6 @@
 from django.core.management.base import BaseCommand
 from django.db import models
+from django.db.models import Prefetch
 from task_manager.models import Task, Webpage
 from urllib.parse import urlparse
 import statistics
@@ -12,14 +13,21 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS('Starting Topological Analysis...'))
         
         tasks = Task.objects.annotate(page_count=models.Count('webpage')).filter(page_count__gt=2)
-        tasks = tasks.order_by('-id')[:500]
+        tasks = tasks.prefetch_related(
+            Prefetch('webpage_set', queryset=Webpage.objects.order_by('id'))
+        ).order_by('-id')
         
         depths = []
         branching_factors = []
         star_dominance = [] 
         
+        processed_count = 0
         for task in tasks:
-            pages = list(task.webpage_set.all().order_by('id'))
+            processed_count += 1
+            if processed_count % 100 == 0:
+                self.stdout.write(f"Processed {processed_count} tasks...")
+            
+            pages = list(task.webpage_set.all())
             if not pages:
                 continue
                 

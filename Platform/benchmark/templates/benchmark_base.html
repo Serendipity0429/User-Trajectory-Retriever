@@ -9,6 +9,28 @@
     </main>
 {% endblock content %}
 
+{% block modal_container %}
+    <!-- Generic Modal for Benchmark (Prompts, Reasoning, etc.) -->
+    <div class="modal fade" id="benchmarkGenericModal" tabindex="-1" aria-labelledby="benchmarkGenericModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="benchmarkGenericModalLabel">Details</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="modal-generic-content-container">
+                        <!-- Content injected via JS -->
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock modal_container %}
+
 {% block scripts %}
     <script src="{% static 'js/benchmark/benchmark_utils.js' %}"></script>
     <script src="{% static 'js/benchmark/benchmark_renderer.js' %}"></script>

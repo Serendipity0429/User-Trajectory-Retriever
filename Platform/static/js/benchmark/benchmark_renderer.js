@@ -606,19 +606,38 @@ window.BenchmarkUtils.BenchmarkRenderer = {
                      statusBadge = '<span class="badge bg-danger rounded-pill shadow-sm"><i class="bi bi-x-lg me-1"></i>Incorrect</span>';
                 }
             }
+
+            // --- Added: Prompt Viewing Button ---
+            let promptButton = '';
+            if (trial.id) {
+                 promptButton = `
+                    <button class="btn btn-sm btn-outline-secondary ms-2 view-prompt-btn" 
+                            data-trial-id="${trial.id}" 
+                            title="View Full Prompt">
+                        <i class="bi bi-eye"></i> Prompt
+                    </button>`;
+            }
     
             trialDiv.innerHTML = `
                 <div class="card border-0 shadow-sm overflow-hidden">
                     <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
-                        <h6 class="mb-0 fw-bold text-secondary text-uppercase small" style="letter-spacing: 1px;">
-                            <i class="bi bi-arrow-return-right me-2"></i>Trial #${trial.trial_number}
-                        </h6>
+                        <div class="d-flex align-items-center">
+                            <h6 class="mb-0 fw-bold text-secondary text-uppercase small" style="letter-spacing: 1px;">
+                                <i class="bi bi-arrow-return-right me-2"></i>Trial #${trial.trial_number}
+                            </h6>
+                            ${promptButton} 
+                        </div>
                         <div>${statusBadge}</div>
                     </div>
                     <div class="card-body bg-light bg-opacity-10">
                         ${trialBody}
                     </div>
                 </div>`;
+            
+            // Add event listener binding logic after HTML insertion (handled by parent usually, or we use delegation)
+            // But since this returns a string/element, the caller appends it. 
+            // We should use event delegation on the container 'trials-container' in benchmark_multiturn.js
+            
             return trialDiv;
         },
     displayRunResults: function(runData, updateSummaryFunc, pipelineType = 'vanilla_adhoc') {

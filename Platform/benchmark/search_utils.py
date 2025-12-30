@@ -11,6 +11,18 @@ import random
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from .utils import print_debug
 
+def remove_null_bytes(data):
+    """
+    Recursively removes null bytes from strings in the data structure.
+    """
+    if isinstance(data, str):
+        return data.replace('\x00', '')
+    if isinstance(data, list):
+        return [remove_null_bytes(item) for item in data]
+    if isinstance(data, dict):
+        return {k: remove_null_bytes(v) for k, v in data.items()}
+    return data
+
 class WebSearch(ABC):
     @abstractmethod
     def search(self, query: str) -> list:
@@ -266,7 +278,7 @@ class MCPSearch(WebSearch):
 
         if search_result and "content" in search_result and len(search_result['content']) > 0:
             text_content = search_result['content'][0]['text']
-            return self._parse_mcp_text_response(text_content)
+            return remove_null_bytes(self._parse_mcp_text_response(text_content))
         else:
             return [{"error": "Did not receive a valid search result or content is empty."}]
     
@@ -451,7 +463,7 @@ class SerperSearch(WebSearch):
             if items_to_fetch:
                 self.crawler.batch_extract(items_to_fetch)
 
-            return all_results
+            return remove_null_bytes(all_results)
 
         except Exception as e:
             print_debug(f"Error calling Serper API: {e}")

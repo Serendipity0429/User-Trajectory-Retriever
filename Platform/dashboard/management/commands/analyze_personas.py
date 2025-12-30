@@ -1,5 +1,5 @@
 from django.core.management.base import BaseCommand
-from django.db.models import Avg, Count, Sum
+from django.db.models import Avg, Count, Sum, Q, F, FloatField, ExpressionWrapper
 from user_system.models import User
 from task_manager.models import Task, Webpage
 import statistics
@@ -13,29 +13,41 @@ class Command(BaseCommand):
         users = User.objects.all()
         user_metrics = []
         
+        processed_count = 0
+        total_users = users.count()
+        self.stdout.write(f"Analyzing {total_users} users...")
+
         for u in users:
+            processed_count += 1
+            if processed_count % 10 == 0:
+                self.stdout.write(f"Processed {processed_count}/{total_users} users...")
+
             tasks = Task.objects.filter(user=u, end_timestamp__isnull=False)
             task_count = tasks.count()
             if task_count < 5:
                 continue
             
-            avg_pages_list = []
-            for t in tasks:
-                p_count = t.webpage_set.count()
-                avg_pages_list.append(p_count)
-            avg_pages_per_task = statistics.mean(avg_pages_list)
-            
+            # Efficiently count average pages per task for this user
+            avg_pages_per_task = tasks.annotate(p_count=Count('webpage')).aggregate(avg=Avg('p_count'))['avg']
+            if avg_pages_per_task is None:
+                continue
+
             u_pages = Webpage.objects.filter(user=u)
             page_visits_count = u_pages.count()
             if page_visits_count == 0:
                 continue
 
-            dwells = [p.dwell_time for p in u_pages if p.dwell_time]
-            avg_dwell = statistics.mean(dwells) if dwells else 0
+            # Efficiently calculate average dwell time
+            avg_dwell = u_pages.filter(dwell_time__isnull=False).aggregate(avg=Avg('dwell_time'))['avg']
+            avg_dwell = avg_dwell if avg_dwell else 0
             
-            search_count = u_pages.filter(url__icontains='google').count() + \
-                           u_pages.filter(url__icontains='bing').count() + \
-                           u_pages.filter(url__icontains='baidu').count()
+            # Efficiently count search pages
+            search_count = u_pages.filter(
+                Q(url__icontains='google') | 
+                Q(url__icontains='bing') | 
+                Q(url__icontains='baidu')
+            ).count()
+            
             search_ratio = search_count / page_visits_count
             
             user_metrics.append({

@@ -101,7 +101,7 @@ class BasePipeline:
         except Exception:
             return 0
 
-    def get_llm_response(self, messages, temperature=None):
+    def get_llm_response(self, messages, temperature=None, allow_reasoning=None):
         """
         Sends messages to LLM and parses the response based on current settings.
         Returns: (parsed_answer, full_response)
@@ -111,6 +111,9 @@ class BasePipeline:
             
         top_p = getattr(self.llm_settings, 'top_p', 1.0)
         max_tokens = getattr(self.llm_settings, 'max_tokens', None)
+        
+        # Determine whether to extract final answer
+        should_extract = allow_reasoning if allow_reasoning is not None else getattr(self.llm_settings, 'allow_reasoning', False)
 
         kwargs = {
             "model": self.model,
@@ -129,7 +132,7 @@ class BasePipeline:
                 response = self.client.chat.completions.create(**kwargs)
                 full_response = response.choices[0].message.content
                 
-                if self.llm_settings.allow_reasoning:
+                if should_extract:
                     answer = extract_final_answer(full_response)
                 else:
                     answer = full_response
@@ -374,8 +377,12 @@ class BaseMultiTurnPipeline(BasePipeline):
         
         messages = self._construct_messages(session, trial, completed_trials)
         
+        # Extract allow_reasoning from session snapshot to ensure consistency
+        settings_snapshot = session.run.settings_snapshot
+        allow_reasoning = settings_snapshot.get('llm_settings', {}).get('allow_reasoning', False)
+        
         try:
-            answer, full_response = self.get_llm_response(messages)
+            answer, full_response = self.get_llm_response(messages, allow_reasoning=allow_reasoning)
         except Exception as e:
             trial.status = 'error'
             trial.save()

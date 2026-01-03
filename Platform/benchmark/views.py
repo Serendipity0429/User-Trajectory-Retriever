@@ -951,9 +951,15 @@ def get_session(request, session_id):
             
             if not t.get("query_instruction"):
                 if t["trial_number"] == 1:
-                    user_p = PROMPTS["rag_query_generation"].format(question=session.question)
+                    if allow_reasoning:
+                        user_p = PROMPTS["rag_query_generation_cot"].format(question=session.question)
+                    else:
+                        user_p = PROMPTS["rag_query_generation"].format(question=session.question)
                 else:
-                    user_p = PROMPTS["rag_reformulation"]
+                    if allow_reasoning:
+                        user_p = PROMPTS["rag_reformulation_cot"]
+                    else:
+                        user_p = PROMPTS["rag_reformulation"]
                 t["query_instruction"] = f"*** SYSTEM PROMPT ***\n{sys_p}\n\n*** USER INPUT ***\n{user_p}"
             
             if not t.get("final_answer_instruction"):
@@ -979,6 +985,28 @@ def get_session(request, session_id):
                 "query_instruction",
             )
         )
+        
+        # Post-process for Vanilla to reconstruct instructions if missing
+        if session.pipeline_type == 'vanilla':
+            snapshot = session.run.settings_snapshot if session.run else {}
+            allow_reasoning = snapshot.get('llm_settings', {}).get('allow_reasoning', False)
+            
+            sys_p = PROMPTS["vanilla_system"]
+            if allow_reasoning:
+                sys_p += PROMPTS["reasoning_instruction"]
+                
+            for t in trials:
+                t['allow_reasoning'] = allow_reasoning
+                
+                if not t.get("query_instruction"):
+                    if t["trial_number"] == 1:
+                        user_p = PROMPTS["adhoc_user_question"].format(question=session.question)
+                        t["query_instruction"] = f"*** SYSTEM PROMPT ***\n{sys_p}\n\n*** USER INPUT ***\n{user_p}"
+                    else:
+                        if allow_reasoning:
+                            t["query_instruction"] = PROMPTS["multi_turn_reasoning_followup"]
+                        else:
+                            t["query_instruction"] = PROMPTS["multi_turn_followup"]
 
     return JsonResponse(
         {

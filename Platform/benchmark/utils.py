@@ -59,33 +59,41 @@ def count_questions_in_file(file_path):
 
 def extract_final_answer(text):
     """
-    Extracts the final answer from an LLM response by looking for "Final Answer:".
-    Robust to case and Markdown formatting (e.g., **Final Answer:**).
-    If the marker is not found, it returns the original text.
+    Extracts the final answer from an LLM response.
+    1. Handles <think>...</think> blocks by removing them.
+    2. Looks for "Final Answer:".
+    Robust to case and Markdown formatting.
     """
     if not text:
         return ""
         
+    # Remove <think> blocks if present
+    text = re.sub(r'(?s)<think>.*?</think>', '', text).strip()
+        
     # Regex to find "Final Answer" with optional bolding/casing and optional colon
-    # Matches: "Final Answer:", "**Final Answer**:", "final answer:", "FINAL ANSWER", "Answer:", "Final Answer" (at start of line)
     pattern = r"(?i)(\*\*|#+\s*)?(Final Answer|Answer)(\*\*)?:?"
     
-    # We want to find the LAST occurrence of this pattern to avoid false positives in reasoning
+    # We want to find the LAST occurrence of this pattern to avoid false positives
     matches = list(re.finditer(pattern, text))
     if matches:
         last_match = matches[-1]
-        # Check if it looks like a header (e.g. followed by newline or space)
-        # But simply taking the last one is usually safe for these structured prompts
         return text[last_match.end():].lower().strip()
     else:
-        return text
+        # If no "Final Answer" marker found but there was a think block, 
+        # the remaining text IS likely the answer.
+        return text.lower().strip()
 
 def extract_query(text):
     """
-    Extracts the query from an LLM response by looking for "Query:".
+    Extracts the query from an LLM response.
+    1. Handles <think>...</think> blocks by removing them.
+    2. Looks for "Query:".
     """
     if not text:
         return ""
+        
+    # Remove <think> blocks if present
+    text = re.sub(r'(?s)<think>.*?</think>', '', text).strip()
         
     pattern = r"(?i)(\*\*|#+\s*)?Query(\*\*)?:?"
     
@@ -94,4 +102,6 @@ def extract_query(text):
         last_match = matches[-1]
         return text[last_match.end():].strip().strip('"').strip("'")
     else:
+        # If no "Query" marker found but there was a think block,
+        # the remaining text IS likely the query.
         return text.strip().strip('"').strip("'")

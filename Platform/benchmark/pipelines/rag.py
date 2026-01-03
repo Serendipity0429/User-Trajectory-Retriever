@@ -154,10 +154,18 @@ class RagMultiTurnPipeline(BaseMultiTurnPipeline):
         
         # If the trial has already performed its search, append the conversational steps
         if trial.search_query:
+            allow_reasoning = session.run.settings_snapshot.get('llm_settings', {}).get('allow_reasoning', False)
+            
             if trial.trial_number == 1:
-                instruction = PROMPTS["rag_query_generation"].format(question=session.question)
+                if allow_reasoning:
+                    instruction = PROMPTS["rag_query_generation_cot"].format(question=session.question)
+                else:
+                    instruction = PROMPTS["rag_query_generation"].format(question=session.question)
             else:
-                instruction = PROMPTS["rag_reformulation"]
+                if allow_reasoning:
+                    instruction = PROMPTS["rag_reformulation_cot"]
+                else:
+                    instruction = PROMPTS["rag_reformulation"]
             
             formatted_results = self.search_engine.format_results(trial.search_results or [])
             
@@ -169,7 +177,6 @@ class RagMultiTurnPipeline(BaseMultiTurnPipeline):
             final_instr = PROMPTS["rag_answer_instruction"].format(formatted_results=formatted_results)
             
             # Re-inject reasoning instruction if enabled (as models tend to forget distant system prompts)
-            allow_reasoning = session.run.settings_snapshot.get('llm_settings', {}).get('allow_reasoning', False)
             if allow_reasoning:
                 final_instr += PROMPTS["reasoning_reminder"]
                 final_instr += "\n\nStart your response with 'Reasoning:'."
@@ -203,9 +210,15 @@ class RagMultiTurnPipeline(BaseMultiTurnPipeline):
         for past_trial in completed_trials:
             # 1. Query Instruction
             if past_trial.trial_number == 1:
-                instruction = PROMPTS["rag_query_generation"].format(question=session.question)
+                if allow_reasoning:
+                    instruction = PROMPTS["rag_query_generation_cot"].format(question=session.question)
+                else:
+                    instruction = PROMPTS["rag_query_generation"].format(question=session.question)
             else:
-                instruction = PROMPTS["rag_reformulation"]
+                if allow_reasoning:
+                    instruction = PROMPTS["rag_reformulation_cot"]
+                else:
+                    instruction = PROMPTS["rag_reformulation"]
             
             # 2. Assistant's Query
             messages.append({"role": "user", "content": instruction})
@@ -289,7 +302,6 @@ class RagMultiTurnPipeline(BaseMultiTurnPipeline):
                 trial.search_query = raw_query_response.strip().strip('"').strip("'")
             
             trial.search_results = self.search_engine.search(trial.search_query)
-            trial.query_instruction = instruction
             trial.save()
 
         # 2. Answer Question

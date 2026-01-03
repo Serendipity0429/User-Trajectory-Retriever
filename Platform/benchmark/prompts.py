@@ -28,11 +28,12 @@ Your goal is to answer the user's question accurately using the provided search 
     # --- Instruction Components ---
     
     "reasoning_instruction": """Please think step-by-step to arrive at the answer. 
-Output your reasoning first, then on a new line, provide the final answer starting with 'Final Answer: '.""",
+Wrap your thinking process inside <think>...</think> tags, then provide the final answer starting with 'Final Answer: '.""",
 
     "reasoning_reminder": """Format your response exactly as follows:
-Reasoning:
+<think>
 <step-by-step reasoning>
+</think>
 
 Final Answer:
 <final answer only>""",
@@ -59,7 +60,7 @@ Answer:""",
 
     "multi_turn_reasoning_followup": """Your previous answer was incorrect.
 Answer the question again.
-1. Reasoning: Re-evaluate step-by-step.
+1. Wrap your thinking in <think>...</think> tags.
 2. Final Answer: Output 'Final Answer: <exact_answer>'.
 
 Let's think step by step.
@@ -75,7 +76,9 @@ Query:""",
 
     "rag_query_generation_cot": """Generate a search query to answer the following question.
 Format your response as follows:
-Reasoning: <step-by-step thinking>
+<think>
+<step-by-step thinking>
+</think>
 Query: <search query only>
 
 Question: {question}""",
@@ -90,7 +93,9 @@ Output ONLY the new query string.
 The previous search did not have yielded the correct answer.
 Based on the conversation history, formulate a better search query.
 Format your response as follows:
-Reasoning: <step-by-step thinking>
+<think>
+<step-by-step thinking>
+</think>
 Query: <search query only>
 """,
 

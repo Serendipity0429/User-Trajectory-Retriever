@@ -67,12 +67,31 @@ def extract_final_answer(text):
         return ""
         
     # Regex to find "Final Answer" with optional bolding/casing and optional colon
-    # Matches: "Final Answer:", "**Final Answer**:", "final answer:", "FINAL ANSWER"
-    pattern = r"(?i)(\*\*|#+\s*)?Final Answer(\*\*)?:"
+    # Matches: "Final Answer:", "**Final Answer**:", "final answer:", "FINAL ANSWER", "Answer:", "Final Answer" (at start of line)
+    pattern = r"(?i)(\*\*|#+\s*)?(Final Answer|Answer)(\*\*)?:?"
     
-    match = re.search(pattern, text)
-    if match:
-        # Return everything after the match
-        return text[match.end():].lower().strip()
+    # We want to find the LAST occurrence of this pattern to avoid false positives in reasoning
+    matches = list(re.finditer(pattern, text))
+    if matches:
+        last_match = matches[-1]
+        # Check if it looks like a header (e.g. followed by newline or space)
+        # But simply taking the last one is usually safe for these structured prompts
+        return text[last_match.end():].lower().strip()
     else:
         return text
+
+def extract_query(text):
+    """
+    Extracts the query from an LLM response by looking for "Query:".
+    """
+    if not text:
+        return ""
+        
+    pattern = r"(?i)(\*\*|#+\s*)?Query(\*\*)?:?"
+    
+    matches = list(re.finditer(pattern, text))
+    if matches:
+        last_match = matches[-1]
+        return text[last_match.end():].strip().strip('"').strip("'")
+    else:
+        return text.strip().strip('"').strip("'")

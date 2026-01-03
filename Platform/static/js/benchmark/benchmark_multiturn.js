@@ -119,7 +119,7 @@ window.BenchmarkUtils.MultiTurnPage = {
                 fetch(BenchmarkUrls.multiTurn.getSession(sessionId))
                     .then(res => res.json())
                     .then(data => {
-                        BenchmarkUtils.MultiTurnUtils.renderSession(data.session, data.trials, { sessionTrials: [] }); 
+                        BenchmarkUtils.MultiTurnUtils.renderSession(data.session, data.trials, { sessionTrials: [], pipelineType: pipelineType }); 
                         window.sessionTrials = data.trials; 
                         
                         const settingsWhitelist = ['llm_model', 'llm_base_url', 'max_retries', 'allow_reasoning'];

@@ -21,15 +21,21 @@ Your goal is to provide the exact correct answer to the user's question.
 {_RULES}""",
 
     "rag_system": f"""You are an expert Question Answering system capable of answering open-domain questions using retrieved information.
-Your goal is to answer the user's question accurately using ONLY the provided search results.
+Your goal is to answer the user's question accurately using the provided search results.
 
 {_RULES}""",
 
     # --- Instruction Components ---
     
-    "reasoning_instruction": """
-Please think step-by-step to arrive at the answer. 
+    "reasoning_instruction": """Please think step-by-step to arrive at the answer. 
 Output your reasoning first, then on a new line, provide the final answer starting with 'Final Answer: '.""",
+
+    "reasoning_reminder": """Format your response exactly as follows:
+Reasoning:
+<step-by-step reasoning>
+
+Final Answer:
+<final answer only>""",
 
     # --- User Prompts (Pure Task Data) ---
 
@@ -40,6 +46,11 @@ Output your reasoning first, then on a new line, provide the final answer starti
 
 Question: {question}""",
 
+    "rag_answer_instruction": """Here are the search results you can use to answer the question. Each result is wrapped in <source i> ... </source i> tags, where i is the result number.
+{formatted_results}""",
+
+    "simple_answer_instruction": "\nPlease provide the final answer.",
+    
     "multi_turn_followup": """Your previous answer was incorrect.
 Answer the question again, potentially correcting yourself.
 Follow the rules established in the system prompt strictly.
@@ -62,10 +73,25 @@ Output ONLY the query.
 Question: {question}
 Query:""",
 
+    "rag_query_generation_cot": """Generate a search query to answer the following question.
+Format your response as follows:
+Reasoning: <step-by-step thinking>
+Query: <search query only>
+
+Question: {question}""",
+
     "rag_reformulation": """You are a search query optimizer.
-The previous search might not have yielded the correct answer.
+The previous search did not have yielded the correct answer.
 Based on the conversation history, formulate a better search query.
 Output ONLY the new query string.
+""",
+
+    "rag_reformulation_cot": """You are a search query optimizer.
+The previous search did not have yielded the correct answer.
+Based on the conversation history, formulate a better search query.
+Format your response as follows:
+Reasoning: <step-by-step thinking>
+Query: <search query only>
 """,
 
     "rag_context_initial": """Context from search results (Query: {query}):

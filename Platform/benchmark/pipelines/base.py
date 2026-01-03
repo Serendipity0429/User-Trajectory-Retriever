@@ -377,6 +377,13 @@ class BaseMultiTurnPipeline(BasePipeline):
         
         messages = self._construct_messages(session, trial, completed_trials)
         
+        # Extract the last user message to use as the instruction
+        instruction = ""
+        for msg in reversed(messages):
+            if msg.get("role") == "user":
+                instruction = msg.get("content", "")
+                break
+        
         # Extract allow_reasoning from session snapshot to ensure consistency
         settings_snapshot = session.run.settings_snapshot
         allow_reasoning = settings_snapshot.get('llm_settings', {}).get('allow_reasoning', False)
@@ -396,6 +403,7 @@ class BaseMultiTurnPipeline(BasePipeline):
         trial.full_response = full_response # Save full response too
         trial.is_correct = is_correct
         trial.feedback = "Correct" if is_correct else "Incorrect"
+        trial.query_instruction = instruction
         trial.status = 'completed'
         trial.save()
         
@@ -407,7 +415,8 @@ class BaseMultiTurnPipeline(BasePipeline):
                 "answer": trial.answer,
                 "feedback": trial.feedback,
                 "is_correct": trial.is_correct,
-                "full_response": trial.full_response
+                "full_response": trial.full_response,
+                "query_instruction": trial.query_instruction
             }
             redis_client.set(f"trial_status:{trial.id}", json.dumps(status_data), ex=3600) # Expire in 1 hour
         except Exception as e:

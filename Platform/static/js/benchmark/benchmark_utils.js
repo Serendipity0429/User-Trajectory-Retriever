@@ -281,7 +281,6 @@ window.BenchmarkUtils = {
             top_p: document.getElementById('top_p') ? document.getElementById('top_p').value : '',
             max_tokens: document.getElementById('max_tokens') ? document.getElementById('max_tokens').value : '',
             
-            rag_prompt_template: document.getElementById('rag_prompt_template') ? document.getElementById('rag_prompt_template').value : '',
             
             search_provider: document.getElementById('search_provider') ? document.getElementById('search_provider').value : '',
             search_limit: document.getElementById('search_limit') ? document.getElementById('search_limit').value : '',
@@ -309,7 +308,6 @@ window.BenchmarkUtils = {
             top_p: document.getElementById('top_p') ? document.getElementById('top_p').value : '',
             max_tokens: document.getElementById('max_tokens') ? document.getElementById('max_tokens').value : '',
             
-            rag_prompt_template: document.getElementById('rag_prompt_template') ? document.getElementById('rag_prompt_template').value : '',
             
             search_provider: document.getElementById('search_provider') ? document.getElementById('search_provider').value : '',
             search_limit: document.getElementById('search_limit') ? document.getElementById('search_limit').value : '',
@@ -357,8 +355,6 @@ window.BenchmarkUtils = {
                     if (document.getElementById('max_tokens') && data.max_tokens !== undefined) document.getElementById('max_tokens').value = data.max_tokens;
 
 
-                    // Apply RAG settings
-                    if (document.getElementById('rag_prompt_template') && data.rag_prompt_template) document.getElementById('rag_prompt_template').value = data.rag_prompt_template;
                     
                     // Apply Search settings
                     if (document.getElementById('search_provider') && data.search_provider) {
@@ -493,7 +489,7 @@ window.BenchmarkUtils = {
         const settingsIds = [
             'llm_base_url', 'llm_model', 'llm_api_key', 'max_retries', 'allow_reasoning',
             'temperature', 'top_p', 'max_tokens',
-            'rag_prompt_template',
+            
             'search_provider', 'search_limit', 'serper_api_key', 'serper_fetch_full_content',
             'agent_memory_type'
         ];
@@ -1163,7 +1159,8 @@ window.BenchmarkUtils = {
             const {
                 sessionTrials, // Assuming this is defined in the script that calls this
                 sessionContainerId = 'session-container',
-                noSessionSelectedId = 'no-session-selected'
+                noSessionSelectedId = 'no-session-selected',
+                pipelineType = 'vanilla_llm_multi_turn'
             } = options;
 
             // Update external sessionTrials reference if provided
@@ -1182,7 +1179,7 @@ window.BenchmarkUtils = {
             const trialsContainer = document.getElementById('trials-container');
             trialsContainer.innerHTML = '';
             trials.forEach(trial => {
-                trialsContainer.appendChild(BenchmarkUtils.BenchmarkRenderer.renderTrial(trial, session.is_completed, trials.length, session.max_retries));
+                trialsContainer.appendChild(BenchmarkUtils.BenchmarkRenderer.renderTrial(trial, session.is_completed, trials.length, session.max_retries, session.question, pipelineType));
             });
             
             document.getElementById(sessionContainerId).style.display = 'block';

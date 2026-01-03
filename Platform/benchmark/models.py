@@ -181,6 +181,9 @@ class MultiTurnTrial(models.Model):
     is_correct = models.BooleanField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='processing')
+    query_instruction = models.TextField(blank=True, null=True, help_text="Prompt for query generation (Step 1)")
+    query_full_response = models.TextField(blank=True, null=True, help_text="Full CoT for query generation")
+    final_answer_instruction = models.TextField(blank=True, null=True, help_text="Prompt for final answer generation (Step 2)")
     
     # RAG specific fields (nullable)
     search_query = models.TextField(blank=True, null=True)
@@ -233,6 +236,7 @@ class AdhocResult(models.Model):
     is_correct_llm = models.BooleanField(null=True, default=None) # Allow null for errors/uncertainty
     
     # RAG specific fields
+    search_query = models.TextField(blank=True, null=True)
     num_docs_used = models.IntegerField(default=0)
     search_results = models.JSONField(default=list, blank=True, null=True)
 

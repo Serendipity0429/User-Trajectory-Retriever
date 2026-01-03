@@ -13,10 +13,10 @@ from .utils import print_debug
 
 def remove_null_bytes(data):
     """
-    Recursively removes null bytes from strings in the data structure.
+    Recursively removes null bytes and replacement characters from strings.
     """
     if isinstance(data, str):
-        return data.replace('\x00', '')
+        return data.replace('\x00', '').replace('\ufffd', '')
     if isinstance(data, list):
         return [remove_null_bytes(item) for item in data]
     if isinstance(data, dict):
@@ -300,9 +300,9 @@ class MCPSearch(WebSearch):
             # Prefer content if available and longer than snippet, otherwise use snippet
             text = content if content and len(content) > len(snippet) else snippet
             
-            formatted.append(f"[{i+1}] {title}\n{text}")
+            formatted.append(f"<source {i+1}> {title}\n{text}</source {i+1}>")
             
-        return "\n\n".join(formatted)
+        return "".join(formatted)
 
 class WebCrawler:
     def __init__(self, timeout=6, max_content_length=500000):
@@ -325,9 +325,66 @@ class WebCrawler:
                 'Connection': 'keep-alive',
                 'Upgrade-Insecure-Requests': '1',
             }
-            response = requests.get(url, headers=headers, timeout=self.timeout)
-            response.raise_for_status()
-            return self._parse_content(response.text)
+            # Stream to check headers first
+            with requests.get(url, headers=headers, timeout=self.timeout, stream=True) as response:
+                response.raise_for_status()
+                
+                # 1. Content-Type Check
+                content_type = response.headers.get('Content-Type', '').lower()
+                allowed_types = ['text/html', 'application/xhtml+xml', 'application/xml', 'text/plain', 'application/json']
+                if not any(t in content_type for t in allowed_types):
+                    print_debug(f"Skipping non-text content: {url} ({content_type})")
+                    return ""
+
+                # 2. Content Inspection (Magic Numbers & Decoding)
+                # Read first few KB to check for binary signatures
+                content_sample = b""
+                for chunk in response.iter_content(chunk_size=4096):
+                    content_sample += chunk
+                    if len(content_sample) >= 4096:
+                        break
+                
+                # Check for common binary signatures (PDF, Zip/Jar/Docx, PNG, JPEG, GIF)
+                if content_sample.startswith(b'%PDF') or \
+                   content_sample.startswith(b'PK\x03\x04') or \
+                   content_sample.startswith(b'\x89PNG') or \
+                   content_sample.startswith(b'\xff\xd8\xff') or \
+                   content_sample.startswith(b'GIF8'):
+                    print_debug(f"Skipping binary content (signature detected): {url}")
+                    return ""
+
+                # Load full content (since we already consumed some, simplistic approach is to just use response.content but we used stream=True)
+                # To get full content safely after partial read with stream=True is tricky without re-requesting or managing buffer.
+                # simpler: just read the rest.
+                full_content = content_sample
+                # Read remainder
+                # Note: iter_content continues from where we left off
+                for chunk in response.iter_content(chunk_size=8192):
+                    full_content += chunk
+                    if len(full_content) > self.max_content_length:
+                        break # Stop downloading if too large
+                
+                # 3. Decoding & Heuristics
+                encoding = response.encoding or response.apparent_encoding or 'utf-8'
+                try:
+                    text = full_content.decode(encoding, errors='replace')
+                except (LookupError, TypeError):
+                    text = full_content.decode('utf-8', errors='replace')
+                
+                # Heuristic: If replacement char density is high, it's likely binary garbage
+                if len(text) > 0:
+                    replacement_ratio = text.count('\ufffd') / len(text)
+                    if replacement_ratio > 0.05: # > 5% garbage
+                        print_debug(f"Skipping likely binary content (high garbage ratio): {url}")
+                        return ""
+                    
+                    # Heuristic: If non-printable char density is high (excluding whitespace)
+                    # Simple check: remove printables and whitespace, check what's left
+                    # printable_ratio = ... (maybe too expensive for python regex on large text)
+                    pass
+
+                return self._parse_content(text)
+
         except Exception as e:
             print_debug(f"WebCrawler error for {url}: {e}")
             return ""
@@ -363,6 +420,10 @@ class WebCrawler:
         return self._clean_text(main_content)
 
     def _clean_text(self, text: str) -> str:
+        # Remove null bytes and replacement characters
+        text = text.replace('\x00', '').replace('\ufffd', '')
+        # Remove ASCII control characters (0-31) except newlines/tabs/returns
+        text = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', '', text)
         # Remove excessive whitespace
         text = re.sub(r'\s+', ' ', text)
         return text.strip()[:self.max_content_length]
@@ -480,9 +541,9 @@ class SerperSearch(WebSearch):
             title = r.get('title', 'No Title')
             content = r.get('content', '')
             
-            formatted.append(f"[{i+1}] {title}\n{content}")
+            formatted.append(f"<source {i+1}> {title}\n{content}</source {i+1}>")
             
-        return "\n\n".join(formatted)
+        return "".join(formatted)
 
 # For easy swapping of search implementations
 def get_search_engine() -> WebSearch:

@@ -49,9 +49,6 @@
                             <button class="nav-link" id="search-tab" data-bs-toggle="tab" data-bs-target="#search-settings" type="button" role="tab" aria-controls="search-settings" aria-selected="false"><i class="bi bi-globe2 me-2"></i>Search Provider</button>
                         </li>
                         <li class="nav-item" role="presentation">
-                            <button class="nav-link" id="rag-tab" data-bs-toggle="tab" data-bs-target="#rag-settings" type="button" role="tab" aria-controls="rag-settings" aria-selected="false"><i class="bi bi-layers me-2"></i>RAG Pipeline</button>
-                        </li>
-                        <li class="nav-item" role="presentation">
                             <button class="nav-link" id="agent-tab" data-bs-toggle="tab" data-bs-target="#agent-settings" type="button" role="tab" aria-controls="agent-settings" aria-selected="false"><i class="bi bi-robot me-2"></i>Agent</button>
                         </li>
                     </ul>
@@ -195,24 +192,6 @@
                                     <button class="btn btn-outline-secondary bg-white text-muted" type="button" id="toggle-serper-key-visibility">
                                         <i class="bi bi-eye"></i>
                                     </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- RAG Settings -->
-                    <div class="tab-pane" id="rag-settings" role="tabpanel" aria-labelledby="rag-tab">
-
-                        <div class="card border-0 shadow-sm mb-4">
-                            <div class="card-body bg-light rounded-3">
-                                <div class="d-flex justify-content-between align-items-center mb-2">
-                                    <h6 class="text-primary fw-bold mb-0"><i class="bi bi-code-square me-2"></i>System Prompt Template</h6>
-                                </div>
-                                <div class="mb-2">
-                                    <textarea class="form-control border-secondary" id="rag_prompt_template" rows="5" style="font-family: 'Menlo', 'Monaco', 'Courier New', monospace; font-size: 0.85rem; background-color: #e9ecef;" disabled readonly>The RAG prompt template is currently hardcoded to ensure benchmark consistency. You can view the template in 'prompts.py'.</textarea>
-                                </div>
-                                <div class="form-text small text-muted">
-                                    <i class="bi bi-exclamation-circle me-1"></i> Required placeholders: <code>{question}</code>, <code>{search_results}</code>.
                                 </div>
                             </div>
                         </div>

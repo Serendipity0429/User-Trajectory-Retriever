@@ -854,6 +854,10 @@ def create_session(request):
             "llm_base_url": llm_settings.llm_base_url,
             "llm_model": llm_settings.llm_model,
             "max_retries": llm_settings.max_retries,
+            "allow_reasoning": getattr(llm_settings, "allow_reasoning", False),
+            "temperature": getattr(llm_settings, "temperature", 0.0),
+            "top_p": getattr(llm_settings, "top_p", 1.0),
+            "max_tokens": getattr(llm_settings, "max_tokens", None),
         }
     }
 
@@ -929,8 +933,37 @@ def get_session(request, session_id):
                 "search_query",
                 "search_results",
                 "full_response",
+                "query_instruction",
+                "query_full_response",
+                "final_answer_instruction",
             )
         )
+        # Reconstruct missing instructions on the fly
+        snapshot = session.run.settings_snapshot if session.run else {}
+        allow_reasoning = snapshot.get('llm_settings', {}).get('allow_reasoning', False)
+        
+        sys_p = PROMPTS["rag_system"]
+        if allow_reasoning:
+            sys_p += PROMPTS["reasoning_instruction"]
+
+        for t in trials:
+            t['allow_reasoning'] = allow_reasoning # Inject setting for frontend debugging
+            
+            if not t.get("query_instruction"):
+                if t["trial_number"] == 1:
+                    user_p = PROMPTS["rag_query_generation"].format(question=session.question)
+                else:
+                    user_p = PROMPTS["rag_reformulation"]
+                t["query_instruction"] = f"*** SYSTEM PROMPT ***\n{sys_p}\n\n*** USER INPUT ***\n{user_p}"
+            
+            if not t.get("final_answer_instruction"):
+                # Use default formatting or search results formatting
+                # Note: search_results formatting is usually too large, we just show the prompt template part
+                base_instr = PROMPTS["rag_answer_instruction"].format(formatted_results="[Retrieved Webpages Content]")
+                if allow_reasoning:
+                    t["final_answer_instruction"] = base_instr + PROMPTS["reasoning_reminder"]
+                else:
+                    t["final_answer_instruction"] = base_instr + PROMPTS["simple_answer_instruction"]
 
     else:
         trials = list(
@@ -943,6 +976,7 @@ def get_session(request, session_id):
                 "created_at",
                 "status",
                 "full_response",
+                "query_instruction",
             )
         )
 

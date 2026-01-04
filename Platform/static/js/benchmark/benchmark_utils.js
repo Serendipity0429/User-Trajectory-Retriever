@@ -1174,7 +1174,7 @@ window.BenchmarkUtils = {
 
             const gtContainer = document.getElementById('session-ground-truths');
             gtContainer.innerHTML = '';
-            gtContainer.appendChild(BenchmarkUtils.BenchmarkRenderer.renderGroundTruthsBadges(session.ground_truths));
+            gtContainer.appendChild(BenchmarkUtils.BenchmarkRenderer.renderGroundTruthsList(session.ground_truths));
 
             const trialsContainer = document.getElementById('trials-container');
             trialsContainer.innerHTML = '';

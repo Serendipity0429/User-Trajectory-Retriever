@@ -91,14 +91,18 @@ class TraceFormatter:
                                  real_answer_found = args['answer']
 
                  content_str = json.dumps(calls, indent=2)
-                 trace_data.append({
-                     "role": m.role,
-                     "name": m.name,
-                     "step_type": "action",
-                     "content": f"Tool Call: {content_str}",
-                     "timestamp": getattr(m, 'timestamp', None)
-                 })
+                 
+                 # Robust check for content existence
+                 has_content = False
                  if m.content:
+                     if isinstance(m.content, str) and m.content.strip():
+                         has_content = True
+                     elif isinstance(m.content, list) and len(m.content) > 0:
+                         has_content = True
+                     elif isinstance(m.content, dict):
+                         has_content = True
+
+                 if has_content:
                      trace_data.append({
                          "role": m.role,
                          "name": m.name,
@@ -106,6 +110,23 @@ class TraceFormatter:
                          "content": extract_text(m.content),
                          "timestamp": getattr(m, 'timestamp', None)
                      })
+                 else:
+                     # Add placeholder thought if missing to ensure UI consistency
+                     trace_data.append({
+                         "role": m.role,
+                         "name": m.name,
+                         "step_type": "thought",
+                         "content": "Thinking Process (Agent initiated tool call directly)",
+                         "timestamp": getattr(m, 'timestamp', None)
+                     })
+
+                 trace_data.append({
+                     "role": m.role,
+                     "name": m.name,
+                     "step_type": "action",
+                     "content": content_str,
+                     "timestamp": getattr(m, 'timestamp', None)
+                 })
                  continue
 
             # 2. Handle Structured Content (e.g. Tool Results/Observations from agentscope)
@@ -144,7 +165,7 @@ class TraceFormatter:
                                 "role": m.role,
                                 "name": m.name,
                                 "step_type": "action",
-                                "content": f"Tool Call: {json.dumps(item, indent=2)}",
+                                "content": json.dumps(item, indent=2),
                                 "timestamp": getattr(m, 'timestamp', None)
                             })
 
@@ -166,6 +187,12 @@ class TraceFormatter:
                                 try: item['output'] = json.loads(output)
                                 except: pass
                             
+                            output_content = json.dumps(item, indent=2)
+                            if item.get('name') == 'web_search_tool':
+                                # Ensure we dump the list if possible to help frontend detection
+                                if isinstance(item.get('output'), list):
+                                    output_content = json.dumps(item.get('output'), indent=2)
+
                             if item.get('name') == 'answer_question':
                                 should_stop = True
                             
@@ -173,7 +200,7 @@ class TraceFormatter:
                                 "role": m.role,
                                 "name": m.name,
                                 "step_type": "observation",
-                                "content": json.dumps(item, indent=2),
+                                "content": output_content,
                                 "timestamp": getattr(m, 'timestamp', None)
                             })
                         else:
@@ -204,6 +231,30 @@ class TraceFormatter:
             
             # 3. Handle Text Content (Thoughts/Standard messages)
             if isinstance(content, str):
+                # Fallback: Check for JSON answer in text (robustness)
+                import re
+                json_match = re.search(r'\{\s*"answer"\s*:\s*"(.*?)"\s*\}', content)
+                if json_match:
+                     real_answer_found = json_match.group(1)
+                     # Treat this block as an action to trigger final answer bubble
+                     trace_data.append({
+                         "role": m.role,
+                         "name": m.name,
+                         "step_type": "action",
+                         "content": f'{{"name": "answer_question", "input": {{"answer": "{real_answer_found}"}}}}',
+                         "timestamp": getattr(m, 'timestamp', None)
+                     })
+                     # Simulate observation
+                     trace_data.append({
+                         "role": m.role,
+                         "name": m.name,
+                         "step_type": "observation",
+                         "content": "Answer submitted successfully.",
+                         "timestamp": getattr(m, 'timestamp', None)
+                     })
+                     should_stop = True
+                     continue
+
                 blocks = parse_react_content(content)
                 for b in blocks:
                     trace_data.append({

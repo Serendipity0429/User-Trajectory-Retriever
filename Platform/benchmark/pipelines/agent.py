@@ -7,6 +7,7 @@ from asgiref.sync import sync_to_async
 from agentscope.message import Msg
 from ..models import LLMSettings, SearchSettings, MultiTurnRun, MultiTurnSession, MultiTurnTrial, AgentSettings
 from ..utils import print_debug, count_questions_in_file
+from ..prompts import PROMPTS
 from ..agent_utils import VanillaAgentFactory, BrowserAgentFactory
 from ..mcp_manager import MCPManager
 from .base import BaseAgentPipeline, REDIS_PREFIX_BROWSER_AGENT
@@ -63,16 +64,16 @@ class VanillaAgentPipeline(BaseAgentPipeline):
         
         history_msgs = []
         if trial.trial_number > 1:
-            history_msgs.append(Msg(name="User", role="user", content=f"Task: {session.question}"))
+            history_msgs.append(Msg(name="User", role="user", content=f"Please answer the question: {session.question}"))
             for pt in completed_trials:
                 if pt.answer:
                     history_msgs.append(Msg(name="Assistant", role="assistant", content=pt.full_response))
-                history_msgs.append(Msg(name="User", role="user", content=f"Incorrect. Feedback: {pt.feedback}"))
+                history_msgs.append(Msg(name="User", role="user", content=f"Incorrect."))
             
             last_pt = completed_trials[-1]
-            current_msg = Msg(name="User", role="user", content=f"Your previous attempt was incorrect. Feedback: {last_pt.feedback}. Please re-evaluate the task and try again.")
+            current_msg = Msg(name="User", role="user", content=f"Your previous attempt was incorrect. Please try again to find the correct answer.")
         else:
-            current_msg = Msg(name="User", role="user", content=f"Task: {session.question}")
+            current_msg = Msg(name="User", role="user", content=f"Please answer the question: {session.question}")
 
         initial_history_len = len(history_msgs)
 
@@ -80,6 +81,15 @@ class VanillaAgentPipeline(BaseAgentPipeline):
             try:
                 relevant_msgs = msgs[initial_history_len:] if len(msgs) > initial_history_len else []
                 trace_data, _ = self._serialize_trace(relevant_msgs)
+                
+                # Prepend System Prompt
+                system_prompt_step = {
+                    "role": "system",
+                    "content": PROMPTS["vanilla_agent_react_system"],
+                    "step_type": "text"
+                }
+                trace_data = [system_prompt_step] + trace_data
+
                 key = f"trial_trace:{trial.id}"
                 
                 try:
@@ -124,6 +134,14 @@ class VanillaAgentPipeline(BaseAgentPipeline):
         if real_answer_found:
             answer = real_answer_found
             
+        # Prepend System Prompt
+        system_prompt_step = {
+            "role": "system",
+            "content": PROMPTS["vanilla_agent_react_system"],
+            "step_type": "text"
+        }
+        trace_data = [system_prompt_step] + trace_data
+
         full_response = json.dumps(trace_data)
         
         if not trace_data:
@@ -219,7 +237,7 @@ class BrowserAgentPipeline(BaseAgentPipeline):
         messages = []
         # If it's the first trial, the question is the primary message
         if trial.trial_number == 1:
-            messages.append(Msg(name="User", role="user", content=f"Task: {session.question}"))
+            messages.append(Msg(name="User", role="user", content=f"Please answer the question: {session.question}"))
         else:
             # For subsequent trials (retries), we'll provide feedback
             # This mimics the ReAct agent's feedback mechanism
@@ -426,17 +444,17 @@ class BrowserAgentPipeline(BaseAgentPipeline):
         history_msgs = []
         if trial.trial_number > 1:
             # Reconstruct history for the browser agent for retries
-            history_msgs.append(Msg(name="User", role="user", content=f"Task: {session.question}"))
+            history_msgs.append(Msg(name="User", role="user", content=f"Please answer the question: {session.question}"))
             for i, pt in enumerate(trials_list):
                 if pt.answer:
                     history_msgs.append(Msg(name="Assistant", role="assistant", content=pt.full_response))
                 if i < len(trials_list) - 1:
-                    history_msgs.append(Msg(name="User", role="user", content=f"Incorrect. Feedback: {pt.feedback}"))
+                    history_msgs.append(Msg(name="User", role="user", content=f"Incorrect."))
             
             last_pt = trials_list[-1]
-            current_msg = Msg(name="User", role="user", content=f"Your previous attempt was incorrect. Feedback: {last_pt.feedback}. Please re-evaluate the task and try again.")
+            current_msg = Msg(name="User", role="user", content=f"Your previous attempt was incorrect. Please try again to find the correct answer.")
         else:
-            current_msg = Msg(name="User", role="user", content=f"Task: {session.question}")
+            current_msg = Msg(name="User", role="user", content=f"Please answer the question: {session.question}")
 
         initial_history_len = len(history_msgs)
 
@@ -444,6 +462,15 @@ class BrowserAgentPipeline(BaseAgentPipeline):
             try:
                 relevant_msgs = msgs[initial_history_len:] if len(msgs) > initial_history_len else []
                 trace_data, _ = self._serialize_trace(relevant_msgs)
+                
+                # Prepend System Prompt
+                system_prompt_step = {
+                    "role": "system",
+                    "content": PROMPTS["browser_agent_system"],
+                    "step_type": "text"
+                }
+                trace_data = [system_prompt_step] + trace_data
+
                 key = f"trial_trace:{trial.id}"
                 
                 # Use the running loop to schedule the Redis write in a thread pool
@@ -514,6 +541,14 @@ class BrowserAgentPipeline(BaseAgentPipeline):
         if real_answer_found:
             answer = real_answer_found
         
+        # Prepend System Prompt
+        system_prompt_step = {
+            "role": "system",
+            "content": PROMPTS["browser_agent_system"],
+            "step_type": "text"
+        }
+        trace_data = [system_prompt_step] + trace_data
+
         full_response = json.dumps(trace_data)
         
         if not trace_data:

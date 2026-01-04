@@ -115,21 +115,22 @@ Tools Available:
 2. `answer_question(answer: str)`: Submit the final answer.
 
 Format:
-Question: the input question
-Thought: you should always think about what to do
-Action: the action to take, should be one of [web_search_tool, answer_question]
-Action Input: the input to the action
-Observation: the result of the action
-... (this Thought/Action/Action Input/Observation can repeat N times)
-Thought: I now know the final answer
+Thought: your reasoning
+Action: tool name
+Action Input: tool arguments
+
+Example:
+Thought: I'll search for the capital of France.
+Action: web_search_tool
+Action Input: {{"query": "capital of France"}}
+Observation: ...
+Thought: The answer is Paris.
 Action: answer_question
-Action Input: the final answer
+Action Input: {{"answer": "Paris"}}
 
 Constraints:
 1. You must use `answer_question` to finish.
-2. Always start with a Thought.
-
-Begin!""",
+2. Always start with a Thought.""",
 
     "browser_agent_system": f"""You are an autonomous Browser Agent expert in open-domain QA.
 Your goal is to answer the user's question by browsing the web.
@@ -145,7 +146,5 @@ Instructions:
 4. **Reason**: detailed step-by-step thinking.
 5. **Answer**: Call `answer_question(answer: str)` with the EXACT answer.
 
-Always output "Thought: ..." before using a tool.
-
-Begin!""",
+Always output "Thought: ..." before using a tool.""",
 }

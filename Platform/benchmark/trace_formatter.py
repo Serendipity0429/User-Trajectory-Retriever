@@ -77,7 +77,7 @@ class TraceFormatter:
             # 1. Handle Tool Calls (Action)
             if m_dict.get('tool_calls') or m_dict.get('function_call'):
                  calls = m_dict.get('tool_calls') or m_dict.get('function_call')
-                 
+                             
                  # Try to extract answer from tool call
                  if isinstance(calls, list):
                      for call in calls:
@@ -89,9 +89,27 @@ class TraceFormatter:
                                  except: pass
                              if isinstance(args, dict) and 'answer' in args:
                                  real_answer_found = args['answer']
-
+            
+                         # SPECIAL HANDLING: "think" tool
+                         if call.get('name') == 'think' or call.get('function', {}).get('name') == 'think':
+                             # Extract thought
+                             args = call.get('input') or call.get('function', {}).get('arguments')
+                             if isinstance(args, str):
+                                 try: args = json.loads(args)
+                                 except: pass
+                             if isinstance(args, dict) and 'thought' in args:
+                                 # We treat this tool call as a PURE thought step, NOT an action
+                                 trace_data.append({
+                                     "role": m.role,
+                                     "name": m.name,
+                                     "step_type": "thought",
+                                     "content": args['thought'],
+                                     "timestamp": getattr(m, 'timestamp', None)
+                                 })
+                                 continue # Skip adding it as an action
+            
                  content_str = json.dumps(calls, indent=2)
-                 
+                             
                  # Robust check for content existence
                  has_content = False
                  if m.content:
@@ -101,7 +119,7 @@ class TraceFormatter:
                          has_content = True
                      elif isinstance(m.content, dict):
                          has_content = True
-
+            
                  if has_content:
                      trace_data.append({
                          "role": m.role,
@@ -110,16 +128,8 @@ class TraceFormatter:
                          "content": extract_text(m.content),
                          "timestamp": getattr(m, 'timestamp', None)
                      })
-                 else:
-                     # Add placeholder thought if missing to ensure UI consistency
-                     trace_data.append({
-                         "role": m.role,
-                         "name": m.name,
-                         "step_type": "thought",
-                         "content": "Thinking Process (Agent initiated tool call directly)",
-                         "timestamp": getattr(m, 'timestamp', None)
-                     })
-
+                             
+                 # Only add action if it wasn't just a think tool (which we continued/skipped above)
                  trace_data.append({
                      "role": m.role,
                      "name": m.name,
@@ -128,7 +138,7 @@ class TraceFormatter:
                      "timestamp": getattr(m, 'timestamp', None)
                  })
                  continue
-
+            
             # 2. Handle Structured Content (e.g. Tool Results/Observations from agentscope)
             content = m.content
             if isinstance(content, list):
@@ -136,13 +146,13 @@ class TraceFormatter:
                     # Clean up nested JSON in tool results and SPLIT content
                     import copy
                     cleaned_content = copy.deepcopy(content)
-                    
+                                
                     current_texts = []
-                    
+                                
                     for item in cleaned_content:
                         if isinstance(item, dict) and item.get('type') == 'text':
                             current_texts.append(item.get('text', ''))
-                        
+                                    
                         elif isinstance(item, dict) and item.get('type') == 'tool_use':
                             # Flush texts as thought
                             if current_texts:
@@ -154,13 +164,26 @@ class TraceFormatter:
                                     "timestamp": getattr(m, 'timestamp', None)
                                 })
                                 current_texts = []
-                            
+                                        
                             # Add action
                             if item.get('name') == 'answer_question':
                                  args = item.get('input')
                                  if isinstance(args, dict) and 'answer' in args:
                                      real_answer_found = args['answer']
-
+                                        
+                            # Handle think tool in structured content
+                            if item.get('name') == 'think':
+                                args = item.get('input')
+                                if isinstance(args, dict) and 'thought' in args:
+                                     trace_data.append({
+                                         "role": m.role,
+                                         "name": m.name,
+                                         "step_type": "thought",
+                                         "content": args['thought'],
+                                         "timestamp": getattr(m, 'timestamp', None)
+                                     })
+                                     continue # Skip action for think tool
+            
                             trace_data.append({
                                 "role": m.role,
                                 "name": m.name,
@@ -168,9 +191,12 @@ class TraceFormatter:
                                 "content": json.dumps(item, indent=2),
                                 "timestamp": getattr(m, 'timestamp', None)
                             })
-
-                        elif isinstance(item, dict) and item.get('type') == 'tool_result':
-                            # Flush texts
+                                    
+                        # Handle think tool observation (skip it or treat as hidden)
+                        elif isinstance(item, dict) and item.get('type') == 'tool_result' and item.get('name') == 'think':
+                             continue # Hide the observation of thinking
+            
+                        elif isinstance(item, dict) and item.get('type') == 'tool_result':                            # Flush texts
                             if current_texts:
                                 trace_data.append({
                                     "role": m.role,

@@ -1,5 +1,6 @@
 import os
 import json
+import asyncio
 import agentscope
 from .search_utils import get_search_engine
 from .models import LLMSettings, AgentSettings
@@ -97,15 +98,41 @@ def create_memory(memory_type, user_id, model=None, llm_settings=None):
             print_debug(f"Failed to init ReMe: {e}")
             
     if memory is None:
-        return InMemoryMemory()
+        memory = InMemoryMemory()
+    
+    # Implementation of the update hook upon initialization
+    # This allows pipelines to subscribe to memory updates for real-time trace rendering
+    memory._update_hook = None
+    original_add = memory.add
+    
+    async def wrapped_add(*args, **kwargs):
+        await original_add(*args, **kwargs)
+        if callable(memory._update_hook):
+            # The hook can be sync or async
+            res = memory._update_hook()
+            if asyncio.iscoroutine(res):
+                await res
+                
+    memory.add = wrapped_add
         
     return memory
+
+def think(thought: str):
+    """
+    Use this tool to record your thinking process or reasoning step.
+    This helps you plan before taking actions.
+    
+    Args:
+        thought (str): The detailed reasoning content.
+    """
+    return ToolResponse(content=thought)
 
 class VanillaAgentFactory:
     @staticmethod
     def create_agent(model, verbose: bool = False):
         # Create Toolkit and register tool
         toolkit = Toolkit()
+        toolkit.register_tool_function(think)
         toolkit.register_tool_function(web_search_tool)
         toolkit.register_tool_function(answer_question)
         
@@ -141,7 +168,7 @@ class VanillaAgentFactory:
             client_kwargs={
                 "base_url": llm_settings.llm_base_url,
             },
-            stream=True 
+            stream=False 
         )
         return model
 class BrowserAgentFactory:
@@ -187,10 +214,11 @@ class BrowserAgentFactory:
             client_kwargs={
                 "base_url": llm_settings.llm_base_url,
             },
-            stream=True 
+            stream=False 
         )
         
         toolkit = Toolkit()
+        toolkit.register_tool_function(think)
         toolkit.register_tool_function(answer_question)
 
         return model, toolkit

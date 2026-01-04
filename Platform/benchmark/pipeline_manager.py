@@ -25,22 +25,26 @@ class PipelineManager:
                 cls._instance = cls()
         return cls._instance
 
-    def run_trial(self, session_id, trial_id, factory_kwargs):
+    def run_trial(self, session_id, trial_id, factory_kwargs, pipeline_class):
         """
         Submit a run_trial task to the background loop and wait for result.
         factory_kwargs: dict containing base_url, api_key, model, max_retries
         """
         future = asyncio.run_coroutine_threadsafe(
-            self._run_trial_async(session_id, trial_id, factory_kwargs),
+            self._run_trial_async(session_id, trial_id, factory_kwargs, pipeline_class),
             self.loop
         )
         return future.result()
 
-    async def _run_trial_async(self, session_id, trial_id, factory_kwargs):
+    async def _run_trial_async(self, session_id, trial_id, factory_kwargs, pipeline_class):
         # 1. Get or Create Pipeline
         if session_id not in self.pipelines:
             try:
-                pipeline = await BrowserAgentPipeline.create(**factory_kwargs)
+                if hasattr(pipeline_class, 'create'):
+                    pipeline = await pipeline_class.create(**factory_kwargs)
+                else:
+                    pipeline = await sync_to_async(pipeline_class)(**factory_kwargs)
+                    
                 self.pipelines[session_id] = pipeline
             except Exception as e:
                 return None, False, [], f"Pipeline Initialization Error: {str(e)}"

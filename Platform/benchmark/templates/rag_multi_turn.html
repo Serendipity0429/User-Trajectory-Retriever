@@ -1,5 +1,6 @@
 {% extends "benchmark_base.html" %}
 {% load static %}
+{% load benchmark_extras %}
 
 {% block title %}Multi-Turn Web RAG Baseline{% endblock %}
 
@@ -226,7 +227,7 @@
                                         <small class="text-muted">{{ session.created_at|date:"Y-m-d H:i" }}</small>
                                     </div>
                                     <p class="mb-1 small text-muted">{{ session.question|truncatechars:80 }}</p>
-                                    <span class="badge bg-secondary" style="font-size: 0.7em;">{{ session.pipeline_type }}</span>
+                                    {{ session.pipeline_type|pipeline_badge }}
                                 </div>
                                 {% endfor %}
                             </div>
@@ -243,7 +244,7 @@
                                 <small class="text-muted">{{ session.created_at|date:"Y-m-d H:i" }}</small>
                             </div>
                             <p class="mb-1 small text-muted">{{ session.question|truncatechars:100 }}</p>
-                            <span class="badge bg-secondary" style="font-size: 0.7em;">{{ session.pipeline_type }}</span>
+                            {{ session.pipeline_type|pipeline_badge }}
                         </div>
                     </div>
                     {% endfor %}

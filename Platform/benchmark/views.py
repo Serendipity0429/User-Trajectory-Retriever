@@ -30,6 +30,7 @@ from .models import (
 from .forms import BenchmarkDatasetForm
 
 from datetime import datetime
+from difflib import SequenceMatcher
 
 # Import from the new pipelines module
 from .pipelines.base import (
@@ -58,8 +59,123 @@ PIPELINE_CLASS_MAP = {
     'browser_agent': BrowserAgentPipeline,
 }
 
-# Helper functions removed - use Model.get_effective_settings() instead.
+# ==========================================
+# Helpers
+# ==========================================
 
+def _render_benchmark_view(request, pipeline_type, template_name):
+    """
+    Generic helper to render benchmark views (Vanilla, RAG, Agent, etc.)
+    Reduces duplication of context loading logic.
+    """
+    # Load questions from the default file (hard_questions_refined.jsonl)
+    # Ideally this should be dynamic, but matching existing behavior
+    questions = []
+    try:
+        file_path = os.path.join(
+            os.path.dirname(__file__), "..", "data", "hard_questions_refined.jsonl"
+        )
+        if os.path.exists(file_path):
+            with open(file_path, "r") as f:
+                for line in f:
+                    if line.strip():
+                        questions.append(json.loads(line))
+    except Exception:
+        pass
+
+    # Load sessions and group them
+    groups = (
+        MultiTurnRun.objects.filter(sessions__pipeline_type=pipeline_type)
+        .exclude(name__startswith="Ad-hoc Session")
+        .prefetch_related(
+            models.Prefetch(
+                "sessions",
+                queryset=MultiTurnSession.objects.filter(pipeline_type=pipeline_type).order_by("-created_at"),
+            )
+        )
+        .order_by("-created_at")
+        .distinct()
+    )
+
+    individual_sessions = MultiTurnSession.objects.filter(
+        models.Q(run__name__startswith="Ad-hoc Session") | models.Q(run__isnull=True),
+        pipeline_type=pipeline_type
+    ).order_by("-created_at")
+
+    datasets = BenchmarkDataset.objects.all().order_by("-created_at")
+
+    context = {
+        "questions": questions,
+        "groups": groups,
+        "individual_sessions": individual_sessions,
+        "llm_settings": LLMSettings.get_effective_settings(),
+        "search_settings": SearchSettings.get_effective_settings(),
+        "agent_settings": AgentSettings.get_effective_settings(),
+        "agent_memory_choices": AgentSettings.MEMORY_TYPE_CHOICES,
+        "search_provider_choices": SearchSettings.PROVIDER_CHOICES,
+        "datasets": datasets,
+    }
+    return render(request, template_name, context)
+
+def _get_run_results(group_id, pipeline_types):
+    """
+    Generic helper to load run results for charts/graphs.
+    """
+    group = get_object_or_404(MultiTurnRun, pk=group_id)
+    if isinstance(pipeline_types, str):
+        pipeline_types = [pipeline_types]
+        
+    sessions = group.sessions.filter(pipeline_type__in=pipeline_types).prefetch_related("trials")
+    results = []
+    snapshot = group.settings_snapshot
+    max_retries = 3
+    if snapshot and "llm_settings" in snapshot:
+        max_retries = snapshot["llm_settings"].get("max_retries", 3)
+
+    for session in sessions:
+        trials = session.trials.all().order_by('trial_number')
+        last_trial = trials.last()
+        first_trial = trials.first()
+        
+        if last_trial:
+            result_entry = {
+                "question": session.question,
+                "correct": last_trial.is_correct,
+                "trials": session.trials.count(),
+                "session_id": session.id,
+                "final_answer": last_trial.answer,
+                "ground_truths": session.ground_truths,
+                "max_retries": max_retries,
+                "initial_correct": first_trial.is_correct if first_trial else None,
+                "pipeline_type": session.pipeline_type
+            }
+            
+            # Special logic for RAG: Calculate Query Shift
+            if 'rag_multi_turn' in pipeline_types:
+                query_shift = 0.0
+                if trials.count() > 1:
+                    total_shift = 0.0
+                    count = 0
+                    trial_list = list(trials)
+                    for i in range(len(trial_list) - 1):
+                        q1 = trial_list[i].search_query or ""
+                        q2 = trial_list[i+1].search_query or ""
+                        similarity = SequenceMatcher(None, q1, q2).ratio()
+                        total_shift += (1.0 - similarity)
+                        count += 1
+                    if count > 0:
+                        query_shift = total_shift / count
+                result_entry['query_shift'] = query_shift
+
+            results.append(result_entry)
+
+    return JsonResponse(
+        {"results": results, "group_name": group.name, "settings": snapshot}
+    )
+
+# ==========================================
+# Views
+# ==========================================
 
 def get_trial_trace(request, trial_id):
     """
@@ -429,154 +545,19 @@ def test_llm_connection(request):
 
 @admin_required
 def vanilla_llm_multi_turn(request):
-    # Load questions from the file
-    questions = []
-    try:
-        file_path = os.path.join(
-            os.path.dirname(__file__), "..", "data", "hard_questions_refined.jsonl"
-        )
-        with open(file_path, "r") as f:
-            for line in f:
-                questions.append(json.loads(line))
-    except FileNotFoundError:
-        pass
-
-    # Load sessions and group them
-    groups = (
-        MultiTurnRun.objects.filter(sessions__pipeline_type='vanilla_llm_multi_turn')
-        .exclude(name__startswith="Ad-hoc Session")
-        .prefetch_related(
-            models.Prefetch(
-                "sessions",
-                queryset=MultiTurnSession.objects.filter(pipeline_type='vanilla_llm_multi_turn').order_by("-created_at"),
-            )
-        )
-        .order_by("-created_at")
-        .distinct()
-    )
-
-    individual_sessions = MultiTurnSession.objects.filter(
-        run__name__startswith="Ad-hoc Session",
-        pipeline_type='vanilla_llm_multi_turn'
-    ).order_by("-created_at")
-
-    datasets = BenchmarkDataset.objects.all().order_by("-created_at")
-
-    context = {
-        "questions": questions,
-        "groups": groups,
-        "individual_sessions": individual_sessions,
-        "llm_settings": LLMSettings.get_effective_settings(),
-        "agent_settings": AgentSettings.get_effective_settings(),
-        "agent_memory_choices": AgentSettings.MEMORY_TYPE_CHOICES,
-        "search_provider_choices": SearchSettings.PROVIDER_CHOICES,
-        "datasets": datasets,
-    }
-    return render(request, "vanilla_llm_multi_turn.html", context)
-
+    return _render_benchmark_view(request, 'vanilla_llm_multi_turn', "vanilla_llm_multi_turn.html")
 
 @admin_required
 def rag_multi_turn(request):
-    # Load questions from the file
-    questions = []
-    try:
-        file_path = os.path.join(
-            os.path.dirname(__file__), "..", "data", "hard_questions_refined.jsonl"
-        )
-        with open(file_path, "r") as f:
-            for line in f:
-                questions.append(json.loads(line))
-    except FileNotFoundError:
-        pass
-
-    # Load sessions and group them
-    groups = (
-        MultiTurnRun.objects.filter(sessions__pipeline_type='rag_multi_turn')
-        .exclude(name__startswith="Ad-hoc Session")
-        .prefetch_related(
-            models.Prefetch(
-                "sessions",
-                queryset=MultiTurnSession.objects.filter(pipeline_type='rag_multi_turn').order_by("-created_at"),
-            )
-        )
-        .order_by("-created_at")
-        .distinct()
-    )
-
-    individual_sessions = MultiTurnSession.objects.filter(
-        run__name__startswith="Ad-hoc Session",
-        pipeline_type='rag_multi_turn'
-    ).order_by("-created_at")
-
-    datasets = BenchmarkDataset.objects.all().order_by("-created_at")
-
-    context = {
-        "questions": questions,
-        "groups": groups,
-        "individual_sessions": individual_sessions,
-        "llm_settings": LLMSettings.get_effective_settings(),
-        "search_settings": SearchSettings.get_effective_settings(),
-        "agent_settings": AgentSettings.get_effective_settings(),
-        "agent_memory_choices": AgentSettings.MEMORY_TYPE_CHOICES,
-        "search_provider_choices": SearchSettings.PROVIDER_CHOICES,
-        "datasets": datasets,
-    }
-    return render(request, "rag_multi_turn.html", context)
-
+    return _render_benchmark_view(request, 'rag_multi_turn', "rag_multi_turn.html")
 
 @admin_required
 def vanilla_agent(request):
-    # Load questions from the file
-    questions = []
-    try:
-        file_path = os.path.join(
-            os.path.dirname(__file__), "..", "data", "hard_questions_refined.jsonl"
-        )
-        with open(file_path, "r") as f:
-            for line in f:
-                questions.append(json.loads(line))
-    except FileNotFoundError:
-        pass
+    return _render_benchmark_view(request, 'vanilla_agent', "vanilla_agent.html")
 
-    # Load sessions and group them
-    groups = (
-        MultiTurnRun.objects.filter(sessions__pipeline_type='vanilla_agent')
-        .exclude(name__startswith="Ad-hoc Session")
-        .prefetch_related(
-            models.Prefetch(
-                "sessions",
-                queryset=MultiTurnSession.objects.filter(pipeline_type='vanilla_agent').order_by("-created_at"),
-            )
-        )
-        .order_by("-created_at")
-        .distinct()
-    )
-
-    individual_sessions = MultiTurnSession.objects.filter(
-        run__name__startswith="Ad-hoc Session",
-        pipeline_type='vanilla_agent'
-    ).order_by("-created_at")
-
-    datasets = BenchmarkDataset.objects.all().order_by("-created_at")
-
-    context = {
-        "questions": questions,
-        "groups": groups,
-        "individual_sessions": individual_sessions,
-        "llm_settings": LLMSettings.get_effective_settings(),
-        "search_settings": SearchSettings.get_effective_settings(),
-        "agent_settings": AgentSettings.get_effective_settings(),
-        "agent_memory_choices": AgentSettings.MEMORY_TYPE_CHOICES,
-        "search_provider_choices": SearchSettings.PROVIDER_CHOICES,
-        "datasets": datasets,
-    }
-    return render(request, "vanilla_agent.html", context)
-
-
-
-
-
-
+@admin_required
+def browser_agent(request):
+    return _render_benchmark_view(request, 'browser_agent', "browser_agent.html")
 
 @admin_required
 @require_POST
@@ -607,12 +588,6 @@ def save_agent_settings(request):
         return JsonResponse({"status": "ok"})
     except Exception as e:
         return JsonResponse({"status": "error", "message": str(e)}, status=400)
-
-
-
-
-
-
 
 
 @require_POST
@@ -898,20 +873,25 @@ def run_trial(request, trial_id):
 
     pipeline_type = session.pipeline_type
     
-    if pipeline_type == 'browser_agent':
-         # Browser Agent uses PipelineManager (Async)
+    if pipeline_type in ['browser_agent', 'vanilla_agent']:
+        # Stateful Agents use PipelineManager (Async)
         factory_kwargs = {
             **common_kwargs,
             "pipeline_id": session.run_tag,
         }
+        
+        PipelineClass = PIPELINE_CLASS_MAP.get(pipeline_type)
+        if not PipelineClass:
+            raise Exception(f"Unknown pipeline type: {pipeline_type}")
+
         answer, is_correct, search_results, error_msg = PipelineManager.get_instance().run_trial(
-            session.id, trial.id, factory_kwargs
+            session.id, trial.id, factory_kwargs, PipelineClass
         )
         if error_msg:
             raise Exception(error_msg)
     
     else:
-        # Synchronous Pipelines
+        # Synchronous Pipelines (Vanilla LLM, RAG)
         PipelineClass = PIPELINE_CLASS_MAP.get(pipeline_type, VanillaLLMMultiTurnPipeline)
         pipeline = PipelineClass(**common_kwargs)
         
@@ -1089,11 +1069,6 @@ def stop_vanilla_llm_multi_turn_pipeline(request):
 
 @admin_required
 @require_POST
-
-
-
-@admin_required
-@require_POST
 def run_rag_multi_turn_pipeline(request):
     return _run_pipeline_generic(
         request, 
@@ -1255,172 +1230,17 @@ def export_session(request, session_id):
 
 
 
-
-from difflib import SequenceMatcher
-
 @admin_required
 def load_vanilla_llm_multi_turn_run(request, group_id):
-    group = get_object_or_404(MultiTurnRun, pk=group_id)
-    # Filter sessions by type
-    sessions = group.sessions.filter(pipeline_type='vanilla_llm_multi_turn').prefetch_related("trials")
-    results = []
-    snapshot = group.settings_snapshot
-    max_retries = 3
-    if snapshot and "llm_settings" in snapshot:
-        max_retries = snapshot["llm_settings"].get("max_retries", 3)
-
-    for session in sessions:
-        trials = session.trials.all().order_by('trial_number')
-        last_trial = trials.last()
-        first_trial = trials.first()
-        
-        if last_trial:
-            results.append({
-                "question": session.question,
-                "correct": last_trial.is_correct,
-                "trials": session.trials.count(),
-                "session_id": session.id,
-                "final_answer": last_trial.answer,
-                "ground_truths": session.ground_truths,
-                "max_retries": max_retries,
-                "initial_correct": first_trial.is_correct if first_trial else None
-            })
-
-    return JsonResponse(
-        {"results": results, "group_name": group.name, "settings": snapshot}
-    )
+    return _get_run_results(group_id, 'vanilla_llm_multi_turn')
 
 @admin_required
 def load_rag_multi_turn_run(request, group_id):
-    group = get_object_or_404(MultiTurnRun, pk=group_id)
-    # Filter sessions by type
-    sessions = group.sessions.filter(pipeline_type='rag_multi_turn').prefetch_related("trials")
-    results = []
-    snapshot = group.settings_snapshot
-    max_retries = 3
-    if snapshot and "llm_settings" in snapshot:
-        max_retries = snapshot["llm_settings"].get("max_retries", 3)
-        
-    for session in sessions:
-        trials = session.trials.all().order_by('trial_number')
-        last_trial = trials.last()
-        first_trial = trials.first()
-        
-        # Calculate Query Shift
-        query_shift = 0.0
-        if trials.count() > 1:
-            total_shift = 0.0
-            count = 0
-            trial_list = list(trials)
-            for i in range(len(trial_list) - 1):
-                q1 = trial_list[i].search_query or ""
-                q2 = trial_list[i+1].search_query or ""
-                similarity = SequenceMatcher(None, q1, q2).ratio()
-                total_shift += (1.0 - similarity)
-                count += 1
-            if count > 0:
-                query_shift = total_shift / count
-
-        if last_trial:
-            results.append(
-                {
-                    "question": session.question,
-                    "correct": last_trial.is_correct,
-                    "trials": session.trials.count(),
-                    "session_id": session.id,
-                    "final_answer": last_trial.answer,
-                    "ground_truths": session.ground_truths,
-                    "max_retries": max_retries,
-                    "initial_correct": first_trial.is_correct if first_trial else None,
-                    "query_shift": query_shift
-                }
-            )
-    return JsonResponse(
-        {"results": results, "group_name": group.name, "settings": snapshot}
-    )
-
+    return _get_run_results(group_id, 'rag_multi_turn')
 
 @admin_required
 def load_agent_multi_turn_run(request, group_id):
-    group = get_object_or_404(MultiTurnRun, pk=group_id)
-    # Filter sessions by type 'vanilla_agent' or 'browser_agent'
-    sessions = group.sessions.filter(pipeline_type__in=['vanilla_agent', 'browser_agent']).prefetch_related("trials")
-    results = []
-    snapshot = group.settings_snapshot
-    max_retries = 3 # Default or from settings
-
-    for session in sessions:
-        trials = session.trials.all().order_by('trial_number')
-        last_trial = trials.last()
-        first_trial = trials.first()
-        
-        if last_trial:
-            results.append({
-                "question": session.question,
-                "correct": last_trial.is_correct,
-                "trials": session.trials.count(),
-                "session_id": session.id,
-                "final_answer": last_trial.answer,
-                "ground_truths": session.ground_truths,
-                "max_retries": max_retries,
-                "initial_correct": first_trial.is_correct if first_trial else None,
-                "pipeline_type": session.pipeline_type # Add pipeline_type to results
-            })
-
-    return JsonResponse(
-        {"results": results, "group_name": group.name, "settings": snapshot}
-    )
-
-
-
-
-
-@admin_required
-def browser_agent(request):
-    # Load questions from the file
-    questions = []
-    try:
-        file_path = os.path.join(
-            os.path.dirname(__file__), "..", "data", "hard_questions_refined.jsonl"
-        )
-        with open(file_path, "r") as f:
-            for line in f:
-                questions.append(json.loads(line))
-    except FileNotFoundError:
-        pass
-
-    # Load sessions and group them
-    groups = (
-        MultiTurnRun.objects.filter(sessions__pipeline_type='browser_agent')
-        .exclude(name__startswith="Ad-hoc Session")
-        .prefetch_related(
-            models.Prefetch(
-                "sessions",
-                queryset=MultiTurnSession.objects.filter(pipeline_type='browser_agent').order_by("-created_at"),
-            )
-        )
-        .order_by("-created_at")
-        .distinct()
-    )
-
-    individual_sessions = MultiTurnSession.objects.filter(
-        models.Q(run__name__startswith="Ad-hoc Session") | models.Q(run__isnull=True),
-        pipeline_type='browser_agent'
-    ).order_by("-created_at")
-
-    datasets = BenchmarkDataset.objects.all().order_by("-created_at")
-
-    context = {
-        "questions": questions,
-        "groups": groups,
-        "individual_sessions": individual_sessions,
-        "llm_settings": LLMSettings.get_effective_settings(),
-        "agent_settings": AgentSettings.get_effective_settings(),
-        "agent_memory_choices": AgentSettings.MEMORY_TYPE_CHOICES,
-        "search_provider_choices": SearchSettings.PROVIDER_CHOICES,
-        "datasets": datasets,
-    }
-    return render(request, "agent_browser.html", context)
+    return _get_run_results(group_id, ['vanilla_agent', 'browser_agent'])
 
 
 def sync_iterator_from_async(async_gen):
@@ -1527,8 +1347,3 @@ def web_search(request):
         return JsonResponse({"results": results})
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
-
-
-
-
-

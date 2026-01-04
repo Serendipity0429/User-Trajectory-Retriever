@@ -65,7 +65,7 @@ window.AgentBenchmark = (function() {
 
         // Initialize state
         if (!trialState[trialId]) {
-            trialState[trialId] = { renderedCount: 0, backoffDelay: 2000 };
+            trialState[trialId] = { renderedCount: 0, backoffDelay: 2000, lastStepWasStreaming: false };
         }
 
         const poll = () => {
@@ -76,7 +76,11 @@ window.AgentBenchmark = (function() {
                 return;
             }
 
-            const currentCount = trialState[trialId].renderedCount;
+            let currentCount = trialState[trialId].renderedCount;
+            // If the last step was streaming (partial), we need to re-fetch it to get updates
+            if (trialState[trialId].lastStepWasStreaming) {
+                currentCount = Math.max(0, currentCount - 1);
+            }
             
             fetch(`/benchmark/api/multi_turn/get_trial_trace/${trialId}/?cursor=${currentCount}`)
                 .then(res => res.json())
@@ -90,6 +94,23 @@ window.AgentBenchmark = (function() {
 
                         const wrapper = trialDiv.querySelector('.trial-wrapper');
                         if (wrapper) {
+                            // Safety: If starting fresh (cursor=0), clear existing bubbles to prevent duplication
+                            // of static content rendered by originalRenderTrial.
+                            if (currentCount === 0) {
+                                const existing = wrapper.querySelectorAll('.message-bubble');
+                                existing.forEach(el => el.remove());
+                            }
+
+                            // If we are replacing a streaming step, remove the last bubble
+                            if (trialState[trialId].lastStepWasStreaming) {
+                                // Find the last message bubble and remove it
+                                const bubbles = wrapper.querySelectorAll('.message-bubble');
+                                if (bubbles.length > 0) {
+                                    bubbles[bubbles.length - 1].remove();
+                                }
+                                trialState[trialId].renderedCount--; // Decrement count since we removed one
+                            }
+
                             // Check for processing indicator
                             const processingIndicator = wrapper.querySelector('.trial-processing-indicator');
                             let indicatorParent = null;
@@ -117,6 +138,17 @@ window.AgentBenchmark = (function() {
                         }
                         
                         trialState[trialId].renderedCount += newSteps.length;
+
+                        // Check if the last received step is streaming
+                        const lastStep = newSteps[newSteps.length - 1];
+                        if (lastStep && lastStep.is_streaming) {
+                            trialState[trialId].lastStepWasStreaming = true;
+                            // Shorten polling interval for smooth streaming
+                             trialState[trialId].backoffDelay = 500;
+                        } else {
+                            trialState[trialId].lastStepWasStreaming = false;
+                        }
+
                     } else {
                         trialState[trialId].backoffDelay = Math.min(trialState[trialId].backoffDelay * 1.5, 10000);
                     }

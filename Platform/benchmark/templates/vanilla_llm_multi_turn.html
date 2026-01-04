@@ -1,7 +1,8 @@
 {% extends "benchmark_base.html" %}
 {% load static %}
+{% load benchmark_extras %}
 
-{% block title %}Multi-Turn LLM Baseline{% endblock %}
+{% block title %}Vanilla LLM Multi-Turn Baseline{% endblock %}
 
 {% block content %}
 <div class="container-fluid mt-5 px-lg-4">
@@ -218,6 +219,7 @@
                                         <small class="text-muted">{{ session.created_at|date:"Y-m-d H:i" }}</small>
                                     </div>
                                     <p class="mb-1 small text-muted">{{ session.question|truncatechars:80 }}</p>
+                                    {{ session.pipeline_type|pipeline_badge }}
                                 </div>
                                 {% endfor %}
                             </div>
@@ -234,6 +236,7 @@
                                 <small class="text-muted">{{ session.created_at|date:"Y-m-d H:i" }}</small>
                             </div>
                             <p class="mb-1 small text-muted">{{ session.question|truncatechars:100 }}</p>
+                            {{ session.pipeline_type|pipeline_badge }}
                         </div>
                     </div>
                     {% endfor %}

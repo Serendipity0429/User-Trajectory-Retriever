@@ -12,18 +12,17 @@ from ..agent_utils import VanillaAgentFactory, BrowserAgentFactory
 from ..mcp_manager import MCPManager
 from .base import BaseAgentPipeline, REDIS_PREFIX_BROWSER_AGENT
 from task_manager.utils import redis_client
+import inspect
 
 class VanillaAgentPipeline(BaseAgentPipeline):
     def __init__(self, base_url, api_key, model, max_retries, pipeline_id=None, dataset_id=None):
         super().__init__(base_url, api_key, model, max_retries, pipeline_id, dataset_id)
         # Initialize AgentScope
-        # We need to create a temporary settings object to pass to the factory
-        # Since we might override settings in arguments
         self.temp_settings = LLMSettings(
             llm_base_url=base_url,
             llm_api_key=api_key,
             llm_model=model,
-            temperature=0.0 # Default for agent
+            temperature=0.0
         )
         self.agent_model = VanillaAgentFactory.init_agentscope(self.temp_settings)
         self.redis_prefix = f"vanilla_agent_pipeline_active"
@@ -57,18 +56,39 @@ class VanillaAgentPipeline(BaseAgentPipeline):
             status='processing'
         )
 
-    async def _run_single_turn_async(self, session, trial):
+    async def _update_trace(self, trial, turn_start_index, system_prompt_key):
+        """Helper to update the trace in Redis."""
+        try:
+            msgs = await self.active_agent.memory.get_memory()
+            relevant_msgs = msgs[turn_start_index:] if len(msgs) > turn_start_index else []
+            trace_data, _ = self._serialize_trace(relevant_msgs)
+            
+            # Prepend System Prompt
+            system_prompt_step = {
+                "role": "system",
+                "content": PROMPTS[system_prompt_key],
+                "step_type": "text"
+            }
+            trace_data = [system_prompt_step] + trace_data
+
+            key = f"trial_trace:{trial.id}"
+            
+            # Use threading to avoid blocking the event loop with sync Redis
+            await asyncio.to_thread(redis_client.set, key, json.dumps(trace_data), ex=3600)
+            
+        except Exception as e:
+            print_debug(f"Trace update failed: {e}")
+
+    async def run_single_turn_async(self, session, trial):
         # 1. Determine Message to Send
-        # IMPORTANT: Memory must be fresh for the first trial of a new session (new question)
         if trial.trial_number == 1:
             if hasattr(self, 'active_agent'):
-                self.active_agent = None # Clear legacy agent from previous question
+                self.active_agent = None 
             
             current_msg = Msg(name="User", role="user", content=PROMPTS["agent_user_question"].format(question=session.question))
             turn_start_index = 0
         
         elif hasattr(self, 'active_agent') and self.active_agent:
-            # Fetch feedback for retry
             last_trial = await sync_to_async(lambda: session.trials.filter(status='completed').last())()
             feedback = last_trial.feedback if last_trial else "Incorrect"
             current_msg = Msg(name="User", role="user", content=PROMPTS["vanilla_agent_retry_request"].format(feedback=feedback))
@@ -79,21 +99,37 @@ class VanillaAgentPipeline(BaseAgentPipeline):
             except:
                 turn_start_index = 0
         else:
-            # Fallback for trial > 1 if agent was lost (e.g. server restart)
             current_msg = Msg(name="User", role="user", content=PROMPTS["agent_user_question"].format(question=session.question))
             turn_start_index = 0
 
-        # 2. Create or Update Agent (No callback needed)
+        # 2. Create or Update Agent
         if not hasattr(self, 'active_agent') or not self.active_agent:
             self.active_agent = await sync_to_async(VanillaAgentFactory.create_agent)(
                 self.agent_model
             )
         
+        # Subscribe to memory updates for real-time trace rendering
+        # We use the hook implemented during agent initialization
+        self.active_agent.memory._update_hook = lambda: self._update_trace(trial, turn_start_index, "vanilla_agent_system_prompt")
+
         # 3. Run Agent
         response_msg = await self.active_agent(current_msg)
+
+        # DEBUG: Log raw response from AgentScope
+        try:
+            print_debug(f"Raw AgentScope Response - Content: {response_msg.content}, Tool Calls: {getattr(response_msg, 'tool_calls', 'N/A')}")
+        except Exception as e:
+            print_debug(f"Error logging raw response: {e}")
         
         # 4. Process Response
         trace_msgs = await self.active_agent.memory.get_memory()
+
+        # DEBUG: Log trace content to see if thoughts are present
+        try:
+            debug_content = [str(m.content)[:200] for m in trace_msgs]
+            print_debug(f"VanillaAgent Trace Content: {debug_content}")
+        except Exception as e:
+            print_debug(f"Error logging trace: {e}")
         
         raw_content = response_msg.content
         if isinstance(raw_content, list):
@@ -134,10 +170,17 @@ class VanillaAgentPipeline(BaseAgentPipeline):
         # 5. Save Result
         answer, is_correct = await sync_to_async(self.save_trial_result)(session, trial, answer, full_response)
         
+        # Unsubscribe to avoid memory leaks or side effects during idle time
+        self.active_agent.memory._update_hook = None
+        
         return answer, is_correct, []
 
+    async def cleanup(self):
+        """Cleanup resources."""
+        pass
+
     def run_single_turn(self, session, trial):
-        return asyncio.run(self._run_single_turn_async(session, trial))
+        return asyncio.run(self.run_single_turn_async(session, trial))
 
 
 # Helper for reading questions file safely in chunks/lines without DB access
@@ -381,6 +424,27 @@ class BrowserAgentPipeline(BaseAgentPipeline):
             await self.cleanup()
             await sync_to_async(self.stop_token)()
 
+    async def _update_trace(self, trial, turn_start_index, system_prompt_key):
+        """Helper to update the trace in Redis during streaming (BrowserAgent)."""
+        try:
+            msgs = await self.active_agent.memory.get_memory()
+            relevant_msgs = msgs[turn_start_index:] if len(msgs) > turn_start_index else []
+            trace_data, _ = self._serialize_trace(relevant_msgs)
+            
+            # Prepend System Prompt
+            system_prompt_step = {
+                "role": "system",
+                "content": PROMPTS[system_prompt_key],
+                "step_type": "text"
+            }
+            trace_data = [system_prompt_step] + trace_data
+
+            key = f"trial_trace:{trial.id}"
+            await asyncio.to_thread(redis_client.set, key, json.dumps(trace_data), ex=3600)
+            
+        except Exception as e:
+            print_debug(f"Streaming trace update failed: {e}")
+
     async def run_single_turn_async(self, session, trial, auto_cleanup=False):
         # Ensure model and toolkit are initialized
         if not self.agent_model or not self.agent_toolkit or not self.mcp_client:
@@ -391,7 +455,6 @@ class BrowserAgentPipeline(BaseAgentPipeline):
              self.mcp_client = await self.mcp_manager.connect(self.agent_toolkit)
 
         # 1. Determine Message to Send
-        # IMPORTANT: Memory must be fresh for the first trial of a new session (new question)
         if trial.trial_number == 1:
             if hasattr(self, 'active_agent'):
                 self.active_agent = None
@@ -400,22 +463,16 @@ class BrowserAgentPipeline(BaseAgentPipeline):
             turn_start_index = 0
             
         elif hasattr(self, 'active_agent') and self.active_agent:
-            # Re-fetch the last completed trial to get specific feedback (if available)
             last_trial = await sync_to_async(lambda: session.trials.filter(status='completed').last())()
             feedback = last_trial.feedback if last_trial else "Incorrect"
-            
-            # Simplified Feedback Message for existing agent
             current_msg = Msg(name="User", role="user", content=PROMPTS["browser_agent_retry_request"].format(feedback=feedback))
             
-            # Approximate start of new trace by current memory length
             try:
                 current_mem = await self.active_agent.memory.get_memory()
                 turn_start_index = len(current_mem) if current_mem else 0
             except:
                 turn_start_index = 0
-
         else:
-            # Fallback for trial > 1
             current_msg = Msg(name="User", role="user", content=PROMPTS["agent_user_question"].format(question=session.question))
             turn_start_index = 0
 
@@ -428,14 +485,11 @@ class BrowserAgentPipeline(BaseAgentPipeline):
                     self.agent_toolkit, 
                     self.mcp_client
                 )
-                
-                # If this is somehow a "fresh" agent but we are in trial > 1 (e.g. server restart),
-                # we technically should reconstruct history here. 
-                # But for this optimization, we assume the session is continuous in memory.
-                # If persistent state is lost, the agent starts fresh with just the question.
+            
+            # Subscribe to updates using the pre-initialized hook
+            self.active_agent.memory._update_hook = lambda: self._update_trace(trial, turn_start_index, "browser_agent_system_prompt")
 
             try:
-                import inspect
                 response = await self.active_agent(current_msg)
                 
                 if inspect.isasyncgen(response):
@@ -452,6 +506,20 @@ class BrowserAgentPipeline(BaseAgentPipeline):
 
         try:
             response_msg, trace_msgs = await run_agent_task()
+            
+            # DEBUG: Log raw response from AgentScope (Browser)
+            try:
+                print_debug(f"Raw BrowserAgent Response - Content: {response_msg.content}, Tool Calls: {getattr(response_msg, 'tool_calls', 'N/A')}")
+            except Exception as e:
+                print_debug(f"Error logging raw browser response: {e}")
+
+            # DEBUG: Log trace content to see if thoughts are present
+            try:
+                debug_content = [str(m.content)[:200] for m in trace_msgs]
+                print_debug(f"BrowserAgent Trace Content: {debug_content}")
+            except Exception as e:
+                print_debug(f"Error logging trace: {e}")
+
         except Exception as e:
             print_debug(f"Browser agent execution failed: {e}")
             raise e
@@ -501,6 +569,9 @@ class BrowserAgentPipeline(BaseAgentPipeline):
             return self.save_trial_result(session, trial, answer, full_response)
 
         answer, is_correct = await sync_to_async(save_result)()
+        
+        # Unsubscribe
+        self.active_agent.memory._update_hook = None
 
         return answer, is_correct, []
 

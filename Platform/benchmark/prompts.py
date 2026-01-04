@@ -124,23 +124,27 @@ Your goal is to answer the user's question by interacting with the environment.
 {_RULES}
 
 Tools Available:
-1. `think(thought: str)`: Record your wstep-by-step reasoning.
-2. `web_search_tool(query: str)`: Search the web.
-3. `answer_question(answer: str)`: Submit the final answer.
+1. `think(thought: str)`: Record your step-by-step reasoning.
+2. `web_search_tool(query: str)`: Search the web. Returns snippets only.
+3. `visit_page(url: str)`: Visit a web page to read its full content.
+4. `answer_question(answer: str)`: Submit the final answer.
 
 Instructions:
 1. You must use `answer_question` to finish.
-2. CRITICAL: You MUST use the `think` tool to explain your reasoning BEFORE using `web_search_tool` or `answer_question`.
-3. Do not output text directly. Use the tools provided.
+2. CRITICAL: You MUST use the `think` tool to explain your reasoning BEFORE using other tools.
+3. The search tool only provides snippets. You usually need to `visit_page` to verify information or get details.
+4. Do not output text directly. Use the tools provided.
 
 Example:
-1. Call `think(thought="I need to find the capital of France...")`
-2. Call `web_search_tool(query="capital of France")`
-3. Call `think(thought="The search result says Paris...")`
-4. Call `answer_question(answer="Paris")`
+1. Call `think(thought="I need to find...")`
+2. Call `web_search_tool(query="...")`
+3. Call `think(thought="The snippets look promising. I'll check the first one.")`
+4. Call `visit_page(url="http://...")`
+5. Call `think(thought="The page confirms...")`
+6. Call `answer_question(answer="...")`
 """,
 
-    "vanilla_agent_retry_request": "Your previous answer was incorrect. Feedback: {feedback}. Please re-examine the question and try again.",
+    "vanilla_agent_retry_request": "Your previous answer was incorrect. Please re-examine the question and try again.",
 
 
     # --- Browser Agent (Autonomous) ---
@@ -151,17 +155,14 @@ CRITICAL: You must VERIFY everything by visiting pages. Do not guess.
 
 {_RULES}
 
-Tools Available:
-1. `think(thought: str)`: Record your step-by-step reasoning.
-2. `web_search_tool(query: str)`: Search the web.
-3. `answer_question(answer: str)`: Submit the final answer.
-
 Instructions:
-1. **Reason**: Use `think` tool to plan and reason.
-2. **Act**: Use `web_search_tool` (or other browser tools) to navigate.
-3. **Answer**: Call `answer_question` with the EXACT answer.
+1. **Plan**: Think about where to go and what to look for.
+2. **Act**: Use tools to navigate and inspect.
+3. **Observe**: Analyze the page content (snapshots/screenshots).
+4. **Reason**: detailed step-by-step thinking.
+5. **Answer**: Call `answer_question(answer: str)` with the EXACT answer.
 
-IMPORTANT: Always use the `think` tool before taking any action. Do not skip the thinking step.""",
+IMPORTANT: Always output a "Thought: ..." text block before using any tool. This is required for your reasoning to be tracked.""",
 
     "browser_agent_retry_request": "Your previous answer was incorrect. Please re-examine the question and try again."
 }

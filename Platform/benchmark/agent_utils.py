@@ -2,7 +2,7 @@ import os
 import json
 import asyncio
 import agentscope
-from .search_utils import get_search_engine
+from .search_utils import get_search_engine, WebCrawler
 from .models import LLMSettings, AgentSettings
 from .prompts import PROMPTS
 from agentscope.agent import ReActAgent
@@ -27,14 +27,14 @@ from asgiref.sync import sync_to_async
 
 
 @sync_to_async
-def get_search_engine_safe():
-    return get_search_engine()
+def get_search_engine_safe(fetch_full_content=None):
+    return get_search_engine(fetch_full_content=fetch_full_content)
 
 async def web_search_tool(query: str):
     """
     Perform a web search to retrieve up-to-date information. 
-    Use this tool when you need external knowledge to answer the user's question.
     The output will be a list of search results containing titles, links, and snippets.
+    To see the full content of a result, use the `visit_page` tool with the link.
     
     Args:
         query (str): The specific search query string. Be precise.
@@ -43,7 +43,8 @@ async def web_search_tool(query: str):
         ToolResponse: The search results in JSON format.
     """
     try:
-        engine = await get_search_engine_safe()
+        # Force fetch_full_content=False to simulate human behavior (snippets only)
+        engine = await get_search_engine_safe(fetch_full_content=False)
         results = await sync_to_async(engine.search)(query)
         
         if not results:
@@ -56,6 +57,26 @@ async def web_search_tool(query: str):
         return ToolResponse(content=json.dumps(results))
     except Exception as e:
         return ToolResponse(content=f"Error executing search: {str(e)}")
+
+async def visit_page(url: str):
+    """
+    Visit a web page to read its full content.
+    Use this tool to get detailed information from a search result URL.
+    
+    Args:
+        url (str): The URL of the page to visit.
+    """
+    try:
+        crawler = WebCrawler()
+        # WebCrawler.extract is synchronous, run it in a thread
+        content = await sync_to_async(crawler.extract)(url)
+        
+        if not content:
+            return ToolResponse(content="Could not extract content from the page. It might be empty or inaccessible.")
+            
+        return ToolResponse(content=content)
+    except Exception as e:
+        return ToolResponse(content=f"Error visiting page: {str(e)}")
 
 def answer_question(answer: str):
     """
@@ -134,6 +155,7 @@ class VanillaAgentFactory:
         toolkit = Toolkit()
         toolkit.register_tool_function(think)
         toolkit.register_tool_function(web_search_tool)
+        toolkit.register_tool_function(visit_page)
         toolkit.register_tool_function(answer_question)
         
         agent_settings = AgentSettings.get_effective_settings()

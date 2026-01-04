@@ -305,46 +305,68 @@ class MCPSearch(WebSearch):
         return "".join(formatted)
 
 class WebCrawler:
-    def __init__(self, timeout=6, max_content_length=500000):
+    def __init__(self, timeout=10, max_content_length=500000):
         self.timeout = timeout
         self.max_content_length = max_content_length
         self.user_agents = [
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-            'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15'
         ]
 
     def extract(self, url: str) -> str:
+        # Method 1: Requests
+        content = self._extract_requests(url)
+        if content:
+            return content
+            
+        # Method 2: Curl Fallback
+        # Only try fallback if requests didn't return content (likely 403/401/Blocked)
+        print_debug(f"Requests failed or empty for {url}, trying curl fallback...")
+        content = self._extract_curl(url)
+        return content
+
+    def _extract_requests(self, url: str) -> str:
         try:
+            session = requests.Session()
             headers = {
                 'User-Agent': random.choice(self.user_agents),
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
-                'Accept-Language': 'en-US,en;q=0.9',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.5',
                 'Accept-Encoding': 'gzip, deflate, br',
                 'DNT': '1',
                 'Connection': 'keep-alive',
                 'Upgrade-Insecure-Requests': '1',
+                'Sec-Fetch-Dest': 'document',
+                'Sec-Fetch-Mode': 'navigate',
+                'Sec-Fetch-Site': 'none',
+                'Sec-Fetch-User': '?1',
             }
             # Stream to check headers first
-            with requests.get(url, headers=headers, timeout=self.timeout, stream=True) as response:
+            with session.get(url, headers=headers, timeout=self.timeout, stream=True) as response:
+                # If blocked, return empty to trigger fallback
+                if response.status_code in [403, 401, 429, 503]:
+                    print_debug(f"Requests blocked/failed: {url} ({response.status_code})")
+                    return ""
+                
                 response.raise_for_status()
                 
                 # 1. Content-Type Check
                 content_type = response.headers.get('Content-Type', '').lower()
                 allowed_types = ['text/html', 'application/xhtml+xml', 'application/xml', 'text/plain', 'application/json']
+                # Relaxed check: valid if ANY allowed type is in content_type string
                 if not any(t in content_type for t in allowed_types):
                     print_debug(f"Skipping non-text content: {url} ({content_type})")
                     return ""
 
                 # 2. Content Inspection (Magic Numbers & Decoding)
-                # Read first few KB to check for binary signatures
                 content_sample = b""
                 for chunk in response.iter_content(chunk_size=4096):
                     content_sample += chunk
                     if len(content_sample) >= 4096:
                         break
                 
-                # Check for common binary signatures (PDF, Zip/Jar/Docx, PNG, JPEG, GIF)
                 if content_sample.startswith(b'%PDF') or \
                    content_sample.startswith(b'PK\x03\x04') or \
                    content_sample.startswith(b'\x89PNG') or \
@@ -353,16 +375,11 @@ class WebCrawler:
                     print_debug(f"Skipping binary content (signature detected): {url}")
                     return ""
 
-                # Load full content (since we already consumed some, simplistic approach is to just use response.content but we used stream=True)
-                # To get full content safely after partial read with stream=True is tricky without re-requesting or managing buffer.
-                # simpler: just read the rest.
                 full_content = content_sample
-                # Read remainder
-                # Note: iter_content continues from where we left off
                 for chunk in response.iter_content(chunk_size=8192):
                     full_content += chunk
                     if len(full_content) > self.max_content_length:
-                        break # Stop downloading if too large
+                        break 
                 
                 # 3. Decoding & Heuristics
                 encoding = response.encoding or response.apparent_encoding or 'utf-8'
@@ -371,53 +388,82 @@ class WebCrawler:
                 except (LookupError, TypeError):
                     text = full_content.decode('utf-8', errors='replace')
                 
-                # Heuristic: If replacement char density is high, it's likely binary garbage
                 if len(text) > 0:
                     replacement_ratio = text.count('\ufffd') / len(text)
-                    if replacement_ratio > 0.05: # > 5% garbage
+                    if replacement_ratio > 0.05:
                         print_debug(f"Skipping likely binary content (high garbage ratio): {url}")
                         return ""
-                    
-                    # Heuristic: If non-printable char density is high (excluding whitespace)
-                    # Simple check: remove printables and whitespace, check what's left
-                    # printable_ratio = ... (maybe too expensive for python regex on large text)
-                    pass
 
                 return self._parse_content(text)
 
         except Exception as e:
-            print_debug(f"WebCrawler error for {url}: {e}")
+            print_debug(f"WebCrawler requests error for {url}: {e}")
             return ""
+
+    def _extract_curl(self, url: str) -> str:
+        try:
+            # -L: Follow redirects
+            # -s: Silent
+            # -S: Show error if fails
+            # --max-time: Timeout
+            command = [
+                'curl', '-L', '-s', '-S', 
+                '--max-time', str(self.timeout),
+                '-A', random.choice(self.user_agents),
+                url
+            ]
+            
+            result = subprocess.run(
+                command, 
+                capture_output=True, 
+                text=True, # Assuming utf-8 compatible output
+                encoding='utf-8',
+                errors='replace'
+            )
+            
+            if result.returncode != 0:
+                print_debug(f"Curl failed for {url}: {result.stderr}")
+                return ""
+                
+            return self._parse_content(result.stdout)
+            
+        except Exception as e:
+             print_debug(f"WebCrawler curl error for {url}: {e}")
+             return ""
 
     def _parse_content(self, html: str) -> str:
         if not html:
             return ""
-        soup = BeautifulSoup(html, 'html.parser')
-        
-        # Remove unwanted elements
-        for element in soup(['script', 'style', 'noscript', 'iframe', 'img', 'video', 'audio', 'canvas', 'svg', 'object', 'embed', 'applet', 'form', 'input', 'textarea', 'select', 'button', 'label', 'fieldset', 'legend', 'optgroup', 'option', 'nav', 'header', 'footer', 'aside']):
-            element.decompose()
+        try:
+            soup = BeautifulSoup(html, 'html.parser')
             
-        # Try to find main content
-        main_content = ""
-        # Priority selectors for main content
-        content_selectors = [
-            'article', 'main', '[role="main"]', '.content', '.post-content', 
-            '.entry-content', '.article-content', '#content', '#main'
-        ]
-        
-        for selector in content_selectors:
-            found = soup.select_one(selector)
-            if found:
-                text = found.get_text(separator=' ', strip=True)
-                if len(text) > 100:
-                    main_content = text
-                    break
-        
-        if not main_content:
-            main_content = soup.get_text(separator=' ', strip=True)
+            # Remove unwanted elements
+            for element in soup(['script', 'style', 'noscript', 'iframe', 'img', 'video', 'audio', 'canvas', 'svg', 'object', 'embed', 'applet', 'form', 'input', 'textarea', 'select', 'button', 'label', 'fieldset', 'legend', 'optgroup', 'option', 'nav', 'header', 'footer', 'aside']):
+                element.decompose()
+                
+            # Try to find main content
+            main_content = ""
+            # Priority selectors for main content
+            content_selectors = [
+                'article', 'main', '[role="main"]', '.content', '.post-content', 
+                '.entry-content', '.article-content', '#content', '#main'
+            ]
             
-        return self._clean_text(main_content)
+            for selector in content_selectors:
+                found = soup.select_one(selector)
+                if found:
+                    text = found.get_text(separator=' ', strip=True)
+                    if len(text) > 100:
+                        main_content = text
+                        break
+            
+            if not main_content:
+                main_content = soup.get_text(separator=' ', strip=True)
+                
+            return self._clean_text(main_content)
+        except Exception as e:
+            print_debug(f"Error parsing content: {e}")
+            return ""
 
     def _clean_text(self, text: str) -> str:
         # Remove null bytes and replacement characters
@@ -546,16 +592,18 @@ class SerperSearch(WebSearch):
         return "".join(formatted)
 
 # For easy swapping of search implementations
-def get_search_engine() -> WebSearch:
+def get_search_engine(fetch_full_content=None) -> WebSearch:
     from .models import SearchSettings
     settings = SearchSettings.load()
     limit = getattr(settings, 'search_limit', 5)
     
+    should_fetch = fetch_full_content if fetch_full_content is not None else settings.fetch_full_content
+    
     if settings.search_provider == 'serper':
         api_key = os.getenv('SERPER_API_KEY') or settings.serper_api_key
-        return SerperSearch(api_key=api_key, fetch_full_content=settings.fetch_full_content, search_limit=limit)
+        return SerperSearch(api_key=api_key, fetch_full_content=should_fetch, search_limit=limit)
     else:
         mcp = MCPSearch()
-        mcp.fetch_full_content = settings.fetch_full_content
+        mcp.fetch_full_content = should_fetch
         mcp.search_limit = limit
         return mcp

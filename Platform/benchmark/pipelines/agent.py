@@ -168,12 +168,12 @@ class VanillaAgentPipeline(BaseAgentPipeline):
              }])
 
         # 5. Save Result
-        answer, is_correct = await sync_to_async(self.save_trial_result)(session, trial, answer, full_response)
+        answer, is_correct_llm = await sync_to_async(self.save_trial_result)(session, trial, answer, full_response, trace_data)
         
         # Unsubscribe to avoid memory leaks or side effects during idle time
         self.active_agent.memory._update_hook = None
         
-        return answer, is_correct, []
+        return answer, is_correct_llm, []
 
     async def cleanup(self):
         """Cleanup resources."""
@@ -286,7 +286,7 @@ class BrowserAgentPipeline(BaseAgentPipeline):
                 }
 
                 try:
-                    parsed_answer, is_correct, _ = await self.run_single_turn_async(session, trial)
+                    parsed_answer, is_correct_llm, _ = await self.run_single_turn_async(session, trial)
                 except Exception as e:
                     def update_error():
                         trial.status = 'error'
@@ -299,16 +299,18 @@ class BrowserAgentPipeline(BaseAgentPipeline):
                     'type': 'trial_completed',
                     'session_id': session.id,
                     'trial_number': trial_number,
-                    'is_correct': is_correct,
+                    'is_correct': is_correct_llm,
+                    'is_correct_llm': is_correct_llm,
+                    'is_correct_rule': trial.is_correct_rule,
                     'answer': parsed_answer,
                     'full_response': trial.full_response,
                     'group_id': group.id
                 }
 
                 final_answer = parsed_answer
-                final_is_correct = is_correct
+                final_is_correct = is_correct_llm
 
-                if is_correct:
+                if is_correct_llm:
                     is_session_completed = True
                 else:
                     trial_number += 1
@@ -566,14 +568,14 @@ class BrowserAgentPipeline(BaseAgentPipeline):
 
         # 4. Save
         def save_result():
-            return self.save_trial_result(session, trial, answer, full_response)
+            return self.save_trial_result(session, trial, answer, full_response, trace_data)
 
-        answer, is_correct = await sync_to_async(save_result)()
+        answer, is_correct_llm = await sync_to_async(save_result)()
         
         # Unsubscribe
         self.active_agent.memory._update_hook = None
 
-        return answer, is_correct, []
+        return answer, is_correct_llm, []
 
     def run_single_turn(self, session, trial):
         # Auto-cleanup when running via sync wrapper (one-off execution)

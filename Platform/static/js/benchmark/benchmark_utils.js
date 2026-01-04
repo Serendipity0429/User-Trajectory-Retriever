@@ -1197,6 +1197,14 @@ window.BenchmarkUtils = {
             if(document.getElementById('stats-incorrect-count')) document.getElementById('stats-incorrect-count').textContent = incorrect;
             if(document.getElementById('stats-error-count')) document.getElementById('stats-error-count').textContent = error;
 
+            // Rule-based Accuracy & Coherence
+            const correctRule = results.filter(r => r.is_correct_rule === true).length;
+            const ruleAccuracy = (correctRule / total) * 100;
+            if(document.getElementById('stats-rule-accuracy')) document.getElementById('stats-rule-accuracy').textContent = `${ruleAccuracy.toFixed(2)}%`;
+
+            const avgCoherence = results.reduce((sum, r) => sum + (r.coherence || 0), 0) / total;
+            if(document.getElementById('stats-coherence')) document.getElementById('stats-coherence').textContent = `${(avgCoherence * 100).toFixed(2)}%`;
+
             // Average trials
             const totalTrials = results.reduce((sum, r) => sum + (r.trials || 0), 0);
             const avgTrials = totalTrials / total;
@@ -1208,20 +1216,20 @@ window.BenchmarkUtils = {
             if(document.getElementById('stats-avg-trials-success')) document.getElementById('stats-avg-trials-success').textContent = avgSuccessTrials.toFixed(2);
 
             // First try success
-            const firstTrySuccess = results.filter(r => r.correct === true && r.trials === 1).length;
+            const firstTrySuccess = results.filter(r => r.initial_correct === true).length;
             const firstTryRate = (firstTrySuccess / total) * 100;
             if(document.getElementById('stats-first-try-success')) document.getElementById('stats-first-try-success').textContent = `${firstTryRate.toFixed(2)}%`;
 
+            // Correction Gain
+            const correctionGain = accuracy - firstTryRate;
+            if(document.getElementById('stats-correction-gain')) document.getElementById('stats-correction-gain').textContent = `+${correctionGain.toFixed(2)}%`;
+
             // Give up rate (max retries reached and still incorrect)
-            // Assuming max retries is constant or we check if correct is false
-            const giveUp = results.filter(r => r.correct === false).length; // Simple approximation
+            const giveUp = results.filter(r => r.correct === false).length;
             const giveUpRate = (giveUp / total) * 100;
             if(document.getElementById('stats-give-up-rate')) document.getElementById('stats-give-up-rate').textContent = `${giveUpRate.toFixed(2)}%`;
 
             // Self-Correction Rate
-            // initial_correct is provided by the backend. 
-            // Denominator: Sessions where initial_correct is FALSE
-            // Numerator: Sessions where initial_correct is FALSE AND final correct is TRUE
             const initialFailures = results.filter(r => r.initial_correct === false);
             const selfCorrected = initialFailures.filter(r => r.correct === true);
             const selfCorrectionRate = initialFailures.length > 0 ? (selfCorrected.length / initialFailures.length) * 100 : 0;
@@ -1230,16 +1238,78 @@ window.BenchmarkUtils = {
                 document.getElementById('stats-self-correction-rate').title = `${selfCorrected.length} corrected out of ${initialFailures.length} initial failures`;
             }
 
-            // Avg Query Shift (RAG only)
-            if(document.getElementById('stats-avg-query-shift')) {
+            // Error Rate
+            const errorRate = (error / total) * 100;
+            if(document.getElementById('stats-error-rate')) document.getElementById('stats-error-rate').textContent = `${errorRate.toFixed(2)}%`;
+
+            // Baseline-Specific Metrics Injection
+            const specificContainer = document.getElementById('specific-metrics-container');
+            const specificRow = document.getElementById('specific-metrics-row');
+            if (specificContainer && specificRow) {
+                specificRow.innerHTML = '';
+                let hasSpecific = false;
+
+                // Avg Search Count (RAG only)
+                const searchCountSessions = results.filter(r => r.search_count !== undefined);
+                if (searchCountSessions.length > 0) {
+                    const totalSearch = searchCountSessions.reduce((sum, r) => sum + Number(r.search_count), 0);
+                    const avgSearch = totalSearch / searchCountSessions.length;
+                    
+                    const col = document.createElement('div');
+                    col.className = 'col-lg-3 col-md-6';
+                    col.innerHTML = `
+                       <div class="card text-center border-light shadow-sm h-100">
+                           <div class="card-body py-3">
+                               <h4 class="card-title mb-1">${avgSearch.toFixed(2)}</h4>
+                               <p class="card-text small mb-0 text-muted">Avg. Search Queries</p>
+                           </div>
+                       </div>`;
+                    specificRow.appendChild(col);
+                    hasSpecific = true;
+                }
+
+                // Avg Query Shift (RAG only)
                 const shiftSessions = results.filter(r => r.query_shift !== undefined && r.query_shift !== null);
                 if (shiftSessions.length > 0) {
                      const totalShift = shiftSessions.reduce((sum, r) => sum + Number(r.query_shift), 0);
                      const avgShift = totalShift / shiftSessions.length;
-                     document.getElementById('stats-avg-query-shift').textContent = avgShift.toFixed(3);
-                } else {
-                     document.getElementById('stats-avg-query-shift').textContent = "0.00";
+                     
+                     const col = document.createElement('div');
+                     col.className = 'col-lg-3 col-md-6';
+                     col.innerHTML = `
+                        <div class="card text-center border-light shadow-sm h-100">
+                            <div class="card-body py-3">
+                                <h4 class="card-title mb-1">${avgShift.toFixed(3)}</h4>
+                                <p class="card-text small mb-0 text-muted">Avg. Query Shift (Dist)</p>
+                            </div>
+                        </div>`;
+                     specificRow.appendChild(col);
+                     hasSpecific = true;
+                     
+                     // Keep hidden element updated for compatibility
+                     if(document.getElementById('stats-avg-query-shift')) document.getElementById('stats-avg-query-shift').textContent = avgShift.toFixed(3);
                 }
+
+                // Stubbornness Score (New)
+                const stubbornSessions = results.filter(r => r.stubborn_score !== undefined && r.stubborn_score !== null && r.stubborn_score > 0);
+                if (stubbornSessions.length > 0) {
+                     const totalStub = stubbornSessions.reduce((sum, r) => sum + Number(r.stubborn_score), 0);
+                     const avgStub = totalStub / stubbornSessions.length;
+                     
+                     const col = document.createElement('div');
+                     col.className = 'col-lg-3 col-md-6';
+                     col.innerHTML = `
+                        <div class="card text-center border-light shadow-sm h-100">
+                            <div class="card-body py-3">
+                                <h4 class="card-title mb-1">${(avgStub * 100).toFixed(2)}%</h4>
+                                <p class="card-text small mb-0 text-muted">Stubbornness Index</p>
+                            </div>
+                        </div>`;
+                     specificRow.appendChild(col);
+                     hasSpecific = true;
+                }
+
+                specificContainer.style.display = hasSpecific ? 'block' : 'none';
             }
         }
     },

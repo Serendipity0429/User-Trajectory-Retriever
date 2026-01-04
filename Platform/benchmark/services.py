@@ -27,7 +27,9 @@ class TrialService:
                         "status": trial.status,
                         "answer": trial.answer,
                         "feedback": trial.feedback,
-                        "is_correct": trial.is_correct,
+                        "is_correct": trial.is_correct_llm,
+                        "is_correct_llm": trial.is_correct_llm,
+                        "is_correct_rule": trial.is_correct_rule,
                         "full_response": trial.full_response if trial.status != 'processing' else None
                     }
                 except MultiTurnTrial.DoesNotExist:

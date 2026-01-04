@@ -6,7 +6,7 @@ import asyncio
 import time
 from datetime import datetime
 from concurrent import futures
-from task_manager.utils import redis_client
+from task_manager.utils import redis_client, check_answer_rule, check_answer_llm
 from ..utils import print_debug, extract_final_answer, count_questions_in_file
 from ..models import (
     LLMSettings, BenchmarkDataset, 
@@ -223,7 +223,7 @@ class BaseMultiTurnPipeline(BasePipeline):
                     # Delegate execution to run_single_turn
                     # This method is overridden by subclasses (e.g. VanillaAgentPipeline) 
                     # or used as-is (VanillaLLM, RAG)
-                    parsed_answer, is_correct, _ = self.run_single_turn(session, trial)
+                    parsed_answer, is_correct_llm, _ = self.run_single_turn(session, trial)
                 except Exception as e:
                     trial.status = 'error'
                     trial.save()
@@ -236,16 +236,18 @@ class BaseMultiTurnPipeline(BasePipeline):
                     'type': 'trial_completed',
                     'session_id': session.id,
                     'trial_number': trial_number,
-                    'is_correct': is_correct,
+                    'is_correct': is_correct_llm,
+                    'is_correct_llm': is_correct_llm,
+                    'is_correct_rule': trial.is_correct_rule,
                     'answer': parsed_answer, 
                     'full_response': trial.full_response, # Access stored full response
                     'group_id': group.id
                 }
 
                 final_answer = parsed_answer
-                final_is_correct = is_correct
+                final_is_correct = is_correct_llm
 
-                if is_correct:
+                if is_correct_llm:
                     is_session_completed = True
                 else:
                     trial_number += 1
@@ -331,14 +333,31 @@ class BaseMultiTurnPipeline(BasePipeline):
             raise e
 
         # Logic for checking answer
-        from task_manager.utils import check_answer_llm
-        is_correct = check_answer_llm(session.question, session.ground_truths, answer, client=self.client, model=self.model)
+        is_correct_llm = check_answer_llm(session.question, session.ground_truths, answer, client=self.client, model=self.model)
+        is_correct_rule = check_answer_rule(session.question, session.ground_truths, answer)
+
+        # Prepare trace (all messages sent + assistant response)
+        trace = []
+        for msg in messages:
+            trace.append({
+                "role": msg.get('role', 'unknown'),
+                "content": msg.get('content', ''),
+                "step_type": "text"
+            })
+        trace.append({
+            "role": "assistant",
+            "content": full_response,
+            "step_type": "text"
+        })
 
         trial.answer = answer
-        trial.full_response = full_response # Save full response too
-        trial.is_correct = is_correct
-        trial.feedback = "Correct" if is_correct else "Incorrect"
-        trial.query_instruction = instruction
+        trial.full_response = full_response
+        trial.is_correct_llm = is_correct_llm
+        trial.is_correct_rule = is_correct_rule
+        trial.feedback = "Correct" if is_correct_llm else "Incorrect"
+        
+        trial.log = trial.log or {}
+        trial.log['trace'] = trace
         trial.status = 'completed'
         trial.save()
         
@@ -349,31 +368,18 @@ class BaseMultiTurnPipeline(BasePipeline):
                 "status": "completed",
                 "answer": trial.answer,
                 "feedback": trial.feedback,
-                "is_correct": trial.is_correct,
+                "is_correct": trial.is_correct_llm,
+                "is_correct_llm": trial.is_correct_llm,
+                "is_correct_rule": trial.is_correct_rule,
                 "full_response": trial.full_response,
-                "query_instruction": trial.query_instruction
+                "trace": trace
             }
-            redis_client.set(f"trial_status:{trial.id}", json.dumps(status_data), ex=3600) # Expire in 1 hour
-            
-            # Cache Trace for UI (Vanilla/Base pipelines)
-            trace_data = []
-            for msg in messages:
-                trace_data.append({
-                    "role": msg.get('role', 'unknown'),
-                    "content": msg.get('content', ''),
-                    "step_type": "text"
-                })
-            trace_data.append({
-                "role": "assistant",
-                "content": full_response,
-                "step_type": "text"
-            })
-            redis_client.set(f"trial_trace:{trial.id}", json.dumps(trace_data), ex=3600)
-
+            redis_client.set(f"trial_status:{trial.id}", json.dumps(status_data), ex=3600)
+            redis_client.set(f"trial_trace:{trial.id}", json.dumps(trace), ex=3600)
         except Exception as e:
             print_debug(f"Failed to cache trial status/trace: {e}")
         
-        return answer, is_correct, getattr(trial, 'search_results', [])
+        return answer, is_correct_llm, []
 class BaseAgentPipeline(BaseMultiTurnPipeline):
     """
     Base class for Agent pipelines (Vanilla and Browser) to share trace serialization
@@ -382,18 +388,27 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
     def _serialize_trace(self, trace_msgs):
         return TraceFormatter.serialize(trace_msgs)
 
-    def save_trial_result(self, session, trial, answer, full_response):
+    def save_trial_result(self, session, trial, answer, full_response, trace_data):
         """
         Saves the trial result to DB and caches status in Redis.
-        Returns: (answer, is_correct)
+        Returns: (answer, is_correct_llm)
         """
-        from task_manager.utils import check_answer_llm
-        is_correct = check_answer_llm(session.question, session.ground_truths, answer, client=self.client, model=self.model)
+        is_correct_llm = check_answer_llm(session.question, session.ground_truths, answer, client=self.client, model=self.model)
+        is_correct_rule = check_answer_rule(session.question, session.ground_truths, answer)
 
         trial.answer = answer
         trial.full_response = full_response
-        trial.is_correct = is_correct
-        trial.feedback = "Correct" if is_correct else "Incorrect"
+        trial.is_correct_llm = is_correct_llm
+        trial.is_correct_rule = is_correct_rule
+        trial.feedback = "Correct" if is_correct_llm else "Incorrect"
+        
+        trial.log = trial.log or {}
+        trial.log['trace'] = trace_data
+        
+        # Calculate query metrics
+        query_metrics = self._calculate_query_metrics(trace_data)
+        trial.log.update(query_metrics)
+        
         trial.status = 'completed'
         trial.save()
 
@@ -404,11 +419,68 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
                 "status": "completed",
                 "answer": trial.answer,
                 "feedback": trial.feedback,
-                "is_correct": trial.is_correct,
-                "full_response": trial.full_response
+                "is_correct": trial.is_correct_llm,
+                "is_correct_llm": trial.is_correct_llm,
+                "is_correct_rule": trial.is_correct_rule,
+                "full_response": trial.full_response,
+                "trace": trace_data,
+                "query_metrics": query_metrics
             }
             redis_client.set(f"trial_status:{trial.id}", json.dumps(status_data), ex=3600)
         except Exception as e:
             print_debug(f"Failed to cache agent trial status: {e}")
             
-        return answer, is_correct
+        return answer, is_correct_llm
+
+    def _calculate_query_metrics(self, trace_data):
+        """
+        Extracts search queries from trace_data and calculates metrics.
+        """
+        queries = []
+        for step in trace_data:
+            if step.get('step_type') == 'action':
+                content = step.get('content', '')
+                try:
+                    # Content can be a JSON string of a list of tool calls
+                    actions = json.loads(content)
+                    if isinstance(actions, list):
+                        for action in actions:
+                            # Handle different AgentScope/OpenAI formats
+                            name = action.get('name') or action.get('function', {}).get('name')
+                            if name == 'web_search_tool':
+                                args = action.get('input') or action.get('function', {}).get('arguments')
+                                if isinstance(args, str):
+                                    try: args = json.loads(args)
+                                    except: pass
+                                if isinstance(args, dict) and 'query' in args:
+                                    queries.append(args['query'])
+                    elif isinstance(actions, dict):
+                         # Single action
+                         name = actions.get('name') or actions.get('function', {}).get('name')
+                         if name == 'web_search_tool':
+                                args = actions.get('input') or actions.get('function', {}).get('arguments')
+                                if isinstance(args, str):
+                                    try: args = json.loads(args)
+                                    except: pass
+                                if isinstance(args, dict) and 'query' in args:
+                                    queries.append(args['query'])
+                except:
+                    continue
+        
+        metrics = {
+            'search_queries': queries,
+            'query_count': len(queries),
+            'distinct_query_count': len(set(queries))
+        }
+        
+        # Simple query shift: percentage of consecutive queries that are different
+        if len(queries) > 1:
+            shifts = 0
+            for i in range(len(queries) - 1):
+                if queries[i] != queries[i+1]:
+                    shifts += 1
+            metrics['query_shift_ratio'] = shifts / (len(queries) - 1)
+        else:
+            metrics['query_shift_ratio'] = 0.0
+            
+        return metrics

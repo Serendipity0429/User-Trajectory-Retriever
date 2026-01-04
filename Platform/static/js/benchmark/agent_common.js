@@ -171,24 +171,42 @@ window.AgentBenchmark = (function() {
                         }
                         
                         // Update Verdict / Status Badge logic
-                        if (trialInfo.status === 'completed' && trialInfo.feedback) {
+                        if (trialInfo.status === 'completed' && (trialInfo.feedback || trialInfo.is_correct_rule !== undefined)) {
                              // Avoid double rendering if originalRenderTrial already handled it
                              if (wrapper.querySelector('.trial-verdict-container')) return;
 
-                             const isCorrect = trialInfo.is_correct;
-                             const verdictColor = isCorrect ? 'success' : 'danger';
-                             const verdictIcon = isCorrect ? 'bi-check-circle-fill' : 'bi-x-circle-fill';
-             
-                             const verdictHtml = `
-                                 <div class="d-flex justify-content-center mt-2 mb-2 fade-in trial-verdict-container">
+                             const isCorrectLLM = trialInfo.is_correct_llm !== undefined ? trialInfo.is_correct_llm : trialInfo.is_correct;
+                             const isCorrectRule = trialInfo.is_correct_rule;
+                             
+                             let verdictHtml = '<div class="d-flex flex-column align-items-center gap-2 mt-2 mb-2 fade-in trial-verdict-container">';
+                             
+                             // LLM Verdict
+                             if (isCorrectLLM !== undefined && isCorrectLLM !== null) {
+                                 const llmColor = isCorrectLLM ? 'success' : 'danger';
+                                 const llmIcon = isCorrectLLM ? 'bi-check-circle-fill' : 'bi-x-circle-fill';
+                                 verdictHtml += `
                                      <div class="card border-0 shadow-sm rounded-pill px-2" style="background-color: #f8f9fa;">
                                          <div class="card-body py-2 px-4 d-flex align-items-center">
-                                             <i class="bi ${verdictIcon} text-${verdictColor} fs-5 me-2"></i>
-                                             <div class="fw-bold text-${verdictColor} text-uppercase small" style="letter-spacing: 1px;">Verdict: ${trialInfo.feedback}</div>
+                                             <i class="bi ${llmIcon} text-${llmColor} fs-5 me-2"></i>
+                                             <div class="fw-bold text-${llmColor} text-uppercase small" style="letter-spacing: 1px;">Verdict (LLM): ${isCorrectLLM ? 'Correct' : 'Incorrect'}</div>
                                          </div>
-                                     </div>
-                                 </div>
-                             `;
+                                     </div>`;
+                             }
+
+                             // Rule Verdict
+                             if (isCorrectRule !== undefined && isCorrectRule !== null) {
+                                 const ruleColor = isCorrectRule ? 'success' : 'danger';
+                                 const ruleIcon = isCorrectRule ? 'bi-check-circle-fill' : 'bi-x-circle-fill';
+                                 verdictHtml += `
+                                     <div class="card border-0 shadow-sm rounded-pill px-2" style="background-color: #f8f9fa;">
+                                         <div class="card-body py-2 px-4 d-flex align-items-center">
+                                             <i class="bi ${ruleIcon} text-${ruleColor} fs-5 me-2"></i>
+                                             <div class="fw-bold text-${ruleColor} text-uppercase small" style="letter-spacing: 1px;">Verdict (Rule): ${isCorrectRule ? 'Correct' : 'Incorrect'}</div>
+                                         </div>
+                                     </div>`;
+                             }
+                             
+                             verdictHtml += '</div>';
                              wrapper.insertAdjacentHTML('beforeend', verdictHtml);
                         }
 

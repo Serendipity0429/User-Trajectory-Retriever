@@ -62,8 +62,8 @@ class PipelineManager:
         # run_single_turn_async(session, trial, auto_cleanup=False) 
         # auto_cleanup=False is default, ensuring connection stays alive.
         try:
-            answer, is_correct, search_results = await pipeline.run_single_turn_async(session, trial)
-            return answer, is_correct, search_results, None
+            answer, is_correct_llm, search_results = await pipeline.run_single_turn_async(session, trial)
+            return answer, is_correct_llm, search_results, None
         except Exception as e:
             def update_error():
                 trial.status = 'error'

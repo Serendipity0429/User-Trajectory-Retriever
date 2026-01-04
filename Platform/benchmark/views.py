@@ -138,34 +138,76 @@ def _get_run_results(group_id, pipeline_types):
         first_trial = trials.first()
         
         if last_trial:
+            # Calculate Coherence for this session (average over its trials)
+            session_coherence = 0.0
+            if trials.count() > 0:
+                matches = 0
+                for t in trials:
+                    if t.is_correct_llm == t.is_correct_rule:
+                        matches += 1
+                session_coherence = matches / trials.count()
+
             result_entry = {
                 "question": session.question,
-                "correct": last_trial.is_correct,
+                "correct": last_trial.is_correct_llm,
+                "is_correct_llm": last_trial.is_correct_llm,
+                "is_correct_rule": last_trial.is_correct_rule,
+                "coherence": session_coherence,
                 "trials": session.trials.count(),
                 "session_id": session.id,
                 "final_answer": last_trial.answer,
                 "ground_truths": session.ground_truths,
                 "max_retries": max_retries,
-                "initial_correct": first_trial.is_correct if first_trial else None,
+                "initial_correct": first_trial.is_correct_llm if first_trial else None,
+                "initial_correct_rule": first_trial.is_correct_rule if first_trial else None,
                 "pipeline_type": session.pipeline_type
             }
             
-            # Special logic for RAG: Calculate Query Shift
-            if 'rag_multi_turn' in pipeline_types:
+            # Special logic for RAG & Agents: Calculate Query Shift and Search Count
+            is_agent = any(t in pipeline_types for t in ['vanilla_agent', 'browser_agent'])
+            if 'rag_multi_turn' in pipeline_types or is_agent:
                 query_shift = 0.0
-                if trials.count() > 1:
+                search_count = 0
+                
+                trial_list = list(trials)
+                all_queries = []
+                
+                for t in trial_list:
+                    t_log = t.log or {}
+                    
+                    if is_agent:
+                        # Extract from agent log metrics
+                        t_queries = t_log.get("search_queries", [])
+                        all_queries.extend(t_queries)
+                        search_count += t_log.get("query_count", len(t_queries))
+                    else:
+                        # Extract from RAG trace/log
+                        trace = t_log.get("trace", [])
+                        q = None
+                        for msg in trace:
+                            content = msg.get("content", "")
+                            if msg.get("role") == "assistant" and "Search Query:" in content:
+                                q = content.replace("Search Query:", "").strip()
+                                break
+                        q = q or t_log.get("search_query")
+                        if q:
+                            all_queries.append(q)
+                            search_count += 1
+                
+                if len(all_queries) > 1:
                     total_shift = 0.0
-                    count = 0
-                    trial_list = list(trials)
-                    for i in range(len(trial_list) - 1):
-                        q1 = trial_list[i].search_query or ""
-                        q2 = trial_list[i+1].search_query or ""
-                        similarity = SequenceMatcher(None, q1, q2).ratio()
-                        total_shift += (1.0 - similarity)
-                        count += 1
-                    if count > 0:
-                        query_shift = total_shift / count
+                    shift_count = 0
+                    for i in range(len(all_queries) - 1):
+                        q1, q2 = all_queries[i], all_queries[i+1]
+                        if q1 and q2:
+                            similarity = SequenceMatcher(None, q1, q2).ratio()
+                            total_shift += (1.0 - similarity)
+                            shift_count += 1
+                    if shift_count > 0:
+                        query_shift = total_shift / shift_count
+                
                 result_entry['query_shift'] = query_shift
+                result_entry['search_count'] = search_count
 
             results.append(result_entry)
 
@@ -189,7 +231,6 @@ def get_trial_trace(request, trial_id):
     except Exception as e:
         print_debug(f"View Error in get_trial_trace: {e}")
         return JsonResponse({"status": "error", "error": str(e)}, status=500)
-
 
 @admin_required
 def get_trial_prompt(request, trial_id):
@@ -223,7 +264,6 @@ def get_trial_prompt(request, trial_id):
         print_debug(f"Error in get_trial_prompt: {e}")
         return JsonResponse({"status": "error", "error": str(e)}, status=500)
 
-
 @admin_required
 def home(request):
     settings = LLMSettings.get_effective_settings()
@@ -241,7 +281,6 @@ def home(request):
     }
     return render(request, "home.html", context)
 
-
 @admin_required
 def dataset_list(request):
     datasets = BenchmarkDataset.objects.all().order_by("-created_at")
@@ -252,7 +291,6 @@ def dataset_list(request):
             )
         }
     )
-
 
 @admin_required
 def get_dataset_questions(request, dataset_id):
@@ -272,7 +310,6 @@ def get_dataset_questions(request, dataset_id):
     except Exception as e:
         return JsonResponse({"status": "error", "message": str(e)}, status=500)
 
-
 @admin_required
 @require_POST
 def activate_dataset(request, dataset_id):
@@ -283,7 +320,6 @@ def activate_dataset(request, dataset_id):
         return JsonResponse({"status": "ok", "active_dataset_id": dataset.id})
     except Exception as e:
         return JsonResponse({"status": "error", "message": str(e)}, status=500)
-
 
 @admin_required
 @require_POST
@@ -316,7 +352,6 @@ def dataset_upload(request):
     else:
         return JsonResponse({"status": "error", "errors": form.errors}, status=400)
 
-
 @admin_required
 @require_http_methods(["DELETE"])
 def dataset_delete(request, dataset_id):
@@ -327,9 +362,7 @@ def dataset_delete(request, dataset_id):
     except Exception as e:
         return JsonResponse({"status": "error", "message": str(e)}, status=500)
 
-
 from django.core.files.base import ContentFile
-
 
 @admin_required
 @require_POST
@@ -381,7 +414,6 @@ def sync_datasets(request):
     except Exception as e:
         return JsonResponse({"status": "error", "message": str(e)}, status=500)
 
-
 @admin_required
 def get_default_settings(request):
     try:
@@ -421,7 +453,6 @@ def get_default_settings(request):
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
 
-
 @require_POST
 def batch_delete_sessions(request):
     try:
@@ -458,7 +489,6 @@ def batch_delete_sessions(request):
     except Exception as e:
         return JsonResponse({"status": "error", "message": str(e)}, status=500)
 
-
 @admin_required
 @require_POST
 def save_llm_settings(request):
@@ -492,7 +522,6 @@ def save_llm_settings(request):
         )
     except Exception as e:
         return JsonResponse({"status": "error", "message": str(e)}, status=400)
-
 
 @admin_required
 @require_POST
@@ -542,7 +571,6 @@ def test_llm_connection(request):
             status=400,
         )
 
-
 @admin_required
 def vanilla_llm_multi_turn(request):
     return _render_benchmark_view(request, 'vanilla_llm_multi_turn', "vanilla_llm_multi_turn.html")
@@ -576,7 +604,6 @@ def save_search_settings(request):
     except Exception as e:
         return JsonResponse({"status": "error", "message": str(e)}, status=400)
 
-
 @admin_required
 @require_POST
 def save_agent_settings(request):
@@ -589,7 +616,6 @@ def save_agent_settings(request):
     except Exception as e:
         return JsonResponse({"status": "error", "message": str(e)}, status=400)
 
-
 @require_POST
 def create_session_group(request):
     try:
@@ -601,7 +627,6 @@ def create_session_group(request):
         return JsonResponse({"group_id": group.id, "group_name": group.name})
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
-
 
 @require_POST
 @handle_api_error
@@ -664,7 +689,6 @@ def create_session(request):
 
     return JsonResponse({"session_id": session.id, "trial_id": trial.id})
 
-
 @admin_required
 def get_session(request, session_id):
     try:
@@ -686,90 +710,35 @@ def get_session(request, session_id):
     if pipeline_type == 'rag_multi_turn':
         trials = list(
             session.trials.values(
-                "id",
-                "trial_number",
-                "answer",
-                "feedback",
-                "is_correct",
-                "created_at",
-                "status",
-                "search_query",
-                "search_results",
-                "full_response",
-                "query_instruction",
-                "query_full_response",
-                "final_answer_instruction",
+                "id", "trial_number", "answer", "feedback", "is_correct_llm", "is_correct_rule",
+                "created_at", "status", "full_response", "log"
             )
         )
-        # Reconstruct missing instructions on the fly
-        snapshot = session.run.settings_snapshot if session.run else {}
-        allow_reasoning = snapshot.get('llm_settings', {}).get('allow_reasoning', False)
-        
-        sys_p = PROMPTS["rag_system_prompt"]
-        if allow_reasoning:
-            sys_p += PROMPTS["shared_reasoning_instruction"]
-
         for t in trials:
-            t['allow_reasoning'] = allow_reasoning # Inject setting for frontend debugging
+            t['is_correct'] = t['is_correct_llm']
+            log = t.get("log") or {}
+            t["trace"] = log.get("trace", [])
+            t["search_results"] = log.get("search_results", [])
             
-            if not t.get("query_instruction"):
-                if t["trial_number"] == 1:
-                    if allow_reasoning:
-                        user_p = PROMPTS["rag_query_gen_cot_prompt"].format(question=session.question)
-                    else:
-                        user_p = PROMPTS["rag_query_gen_prompt"].format(question=session.question)
-                else:
-                    if allow_reasoning:
-                        user_p = PROMPTS["rag_query_reform_cot_prompt"]
-                    else:
-                        user_p = PROMPTS["rag_query_reform_prompt"]
-                t["query_instruction"] = f"*** SYSTEM PROMPT ***\n{sys_p}\n\n*** USER INPUT ***\n{user_p}"
-            
-            if not t.get("final_answer_instruction"):
-                # Use default formatting or search results formatting
-                # Note: search_results formatting is usually too large, we just show the prompt template part
-                base_instr = PROMPTS["rag_context_wrapper"].format(formatted_results="[Retrieved Webpages Content]")
-                if allow_reasoning:
-                    t["final_answer_instruction"] = base_instr + PROMPTS["shared_reasoning_format"]
-                else:
-                    t["final_answer_instruction"] = base_instr + PROMPTS["shared_answer_request"]
+            # Derive search_query for UI from trace or metadata
+            q = None
+            for msg in t["trace"]:
+                if msg.get("role") == "assistant" and "Search Query:" in msg.get("content", ""):
+                    q = msg.get("content").replace("Search Query:", "").strip()
+                    break
+            t["search_query"] = q or log.get("search_query")
 
     else:
         trials = list(
             session.trials.values(
-                "id",
-                "trial_number",
-                "answer",
-                "feedback",
-                "is_correct",
-                "created_at",
-                "status",
-                "full_response",
-                "query_instruction",
+                "id", "trial_number", "answer", "feedback", "is_correct_llm", "is_correct_rule",
+                "created_at", "status", "full_response", "log"
             )
         )
-        
-        # Post-process for Vanilla to reconstruct instructions if missing
-        if pipeline_type == 'vanilla_llm_multi_turn':
-            snapshot = session.run.settings_snapshot if session.run else {}
-            allow_reasoning = snapshot.get('llm_settings', {}).get('allow_reasoning', False)
-            
-            sys_p = PROMPTS["vanilla_system_prompt"]
-            if allow_reasoning:
-                sys_p += PROMPTS["shared_reasoning_instruction"]
-                
-            for t in trials:
-                t['allow_reasoning'] = allow_reasoning
-                
-                if not t.get("query_instruction"):
-                    if t["trial_number"] == 1:
-                        user_p = PROMPTS["shared_user_question"].format(question=session.question)
-                        t["query_instruction"] = f"*** SYSTEM PROMPT ***\n{sys_p}\n\n*** USER INPUT ***\n{user_p}"
-                    else:
-                        if allow_reasoning:
-                            t["query_instruction"] = PROMPTS["vanilla_followup_reasoning_prompt"]
-                        else:
-                            t["query_instruction"] = PROMPTS["vanilla_followup_prompt"]
+        for t in trials:
+            t['is_correct'] = t['is_correct_llm']
+            log = t.get("log") or {}
+            t["trace"] = log.get("trace", [])
 
     return JsonResponse(
         {
@@ -788,7 +757,6 @@ def get_session(request, session_id):
         }
     )
 
-
 @admin_required
 @require_POST
 def retry_session(request, trial_id):
@@ -805,7 +773,7 @@ def retry_session(request, trial_id):
 
         original_trial.feedback = feedback
 
-        original_trial.is_correct = is_correct
+        original_trial.is_correct_llm = is_correct
 
         original_trial.save()
 
@@ -839,7 +807,6 @@ def retry_session(request, trial_id):
         return JsonResponse({"status": "retrying", "new_trial_id": new_trial.id})
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
-
 
 @admin_required
 @handle_api_error
@@ -884,7 +851,7 @@ def run_trial(request, trial_id):
         if not PipelineClass:
             raise Exception(f"Unknown pipeline type: {pipeline_type}")
 
-        answer, is_correct, search_results, error_msg = PipelineManager.get_instance().run_trial(
+        answer, is_correct_llm, search_results, error_msg = PipelineManager.get_instance().run_trial(
             session.id, trial.id, factory_kwargs, PipelineClass
         )
         if error_msg:
@@ -895,9 +862,9 @@ def run_trial(request, trial_id):
         PipelineClass = PIPELINE_CLASS_MAP.get(pipeline_type, VanillaLLMMultiTurnPipeline)
         pipeline = PipelineClass(**common_kwargs)
         
-        answer, is_correct, search_results = pipeline.run_single_turn(session, trial)
+        answer, is_correct_llm, search_results = pipeline.run_single_turn(session, trial)
 
-    if is_correct:
+    if is_correct_llm:
         session.is_completed = True
         session.save()
 
@@ -907,11 +874,12 @@ def run_trial(request, trial_id):
         {
             "answer": answer,
             "trial_id": trial.id,
-            "is_correct": is_correct,
+            "is_correct": is_correct_llm,
+            "is_correct_llm": is_correct_llm,
+            "is_correct_rule": trial.is_correct_rule,
             "num_docs_used": num_docs_used,
         }
     )
-
 
 @admin_required
 @require_POST
@@ -942,7 +910,6 @@ def stop_session(request):
     except Exception as e:
         return JsonResponse({"status": "error", "message": str(e)}, status=500)
 
-
 @admin_required
 @require_http_methods(["DELETE"])
 def delete_session(request, session_id):
@@ -960,7 +927,6 @@ def delete_session(request, session_id):
     except Exception as e:
         return JsonResponse({"status": "error", "message": str(e)}, status=500)
 
-
 @admin_required
 @require_http_methods(["DELETE"])
 def delete_session_group(request, group_id):
@@ -970,7 +936,6 @@ def delete_session_group(request, group_id):
         return JsonResponse({"status": "ok"})
     except Exception as e:
         return JsonResponse({"status": "error", "message": str(e)}, status=500)
-
 
 def _get_common_llm_settings(request):
     """
@@ -982,7 +947,6 @@ def _get_common_llm_settings(request):
     model = request.POST.get("llm_model") or db_settings.llm_model or "gpt-3.5-turbo"
     max_retries = int(request.POST.get("max_retries", 3))
     return base_url, api_key, model, max_retries
-
 
 @handle_api_error
 def _run_pipeline_generic(request, pipeline_class, redis_prefix_template, **kwargs):
@@ -1033,7 +997,6 @@ def _run_pipeline_generic(request, pipeline_class, redis_prefix_template, **kwar
         serialize_events(pipeline.run()), content_type="application/json"
     )
 
-
 @handle_api_error
 def _stop_pipeline_generic(request, redis_prefix_template):
     """
@@ -1050,7 +1013,6 @@ def _stop_pipeline_generic(request, redis_prefix_template):
         
     return JsonResponse({"status": "ok"})
 
-
 @admin_required
 @require_POST
 def run_vanilla_llm_multi_turn_pipeline(request):
@@ -1060,12 +1022,10 @@ def run_vanilla_llm_multi_turn_pipeline(request):
         "vanilla_llm_multi_turn_pipeline_active"
     )
 
-
 @admin_required
 @require_POST
 def stop_vanilla_llm_multi_turn_pipeline(request):
     return _stop_pipeline_generic(request, "vanilla_llm_multi_turn_pipeline_active")
-
 
 @admin_required
 @require_POST
@@ -1076,7 +1036,6 @@ def run_rag_multi_turn_pipeline(request):
         "rag_multi_turn_pipeline_active",
     )
 
-
 @admin_required
 @require_POST
 def stop_rag_multi_turn_pipeline(request):
@@ -1084,7 +1043,6 @@ def stop_rag_multi_turn_pipeline(request):
         request, 
         "rag_multi_turn_pipeline_active"
     )
-
 
 @admin_required
 @require_POST
@@ -1095,18 +1053,15 @@ def run_vanilla_agent_pipeline(request):
         "vanilla_agent_pipeline_active"
     )
 
-
 @admin_required
 @require_POST
 def stop_vanilla_agent_pipeline(request):
     return _stop_pipeline_generic(request, "vanilla_agent_pipeline_active")
 
-
 @admin_required
 @require_POST
 def stop_browser_agent_pipeline(request):
     return _stop_pipeline_generic(request, "browser_agent_pipeline_active")
-
 
 @admin_required
 def export_session(request, session_id):
@@ -1128,35 +1083,25 @@ def export_session(request, session_id):
     if snapshot and "llm_settings" in snapshot:
         max_retries = snapshot["llm_settings"].get("max_retries", 3)
 
-    if pipeline_type == 'rag_multi_turn':
-        trials = list(
-            session.trials.values(
-                "trial_number",
-                "answer",
-                "feedback",
-                "is_correct",
-                "created_at",
-                "search_query",
-                "search_results",
-            )
+    trials = list(
+        session.trials.values(
+            "trial_number", "answer", "feedback", "is_correct_llm", "is_correct_rule", 
+            "created_at", "full_response", "log"
         )
-    elif pipeline_type == 'vanilla_agent' or pipeline_type == 'browser_agent':
-         trials = list(
-            session.trials.values(
-                "trial_number", "answer", "feedback", "is_correct", "created_at", "full_response"
-            )
-        )
-    else:
-        trials = list(
-            session.trials.values(
-                "trial_number", "answer", "feedback", "is_correct", "created_at"
-            )
-        )
+    )
 
-    # Fix datetime serialization
+    # Fix datetime serialization and unpack log
     for trial in trials:
+        trial["is_correct"] = trial["is_correct_llm"] # Compatibility
         if trial.get("created_at"):
             trial["created_at"] = trial["created_at"].isoformat()
+            
+        log = trial.get("log") or {}
+        trial["trace"] = log.get("trace", [])
+        trial["search_results"] = log.get("search_results", [])
+        
+        # Unpack metadata for CSV if available
+        trial["search_query"] = log.get("search_query")
 
     export_format = request.GET.get("format", "json")
 
@@ -1177,7 +1122,8 @@ def export_session(request, session_id):
             "Trial Number",
             "Answer",
             "Feedback",
-            "Is Correct",
+            "Is Correct (LLM)",
+            "Is Correct (Rule)",
             "Trial Created At",
         ]
         if pipeline_type == 'rag_multi_turn':
@@ -1195,7 +1141,8 @@ def export_session(request, session_id):
                 trial.get("trial_number"),
                 trial.get("answer"),
                 trial.get("feedback"),
-                trial.get("is_correct"),
+                trial.get("is_correct_llm"),
+                trial.get("is_correct_rule"),
                 trial.get("created_at"),  # Already converted to string
             ]
             if pipeline_type == 'rag_multi_turn':
@@ -1227,21 +1174,108 @@ def export_session(request, session_id):
 
         return response
 
+def _calculate_session_metrics(trials, is_rag=False):
+    """
+    Computes stubbornness and query shift metrics for a session trajectory.
+    """
+    stubborn_score = 0.0
+    query_shift = 0.0
+    
+    if trials.count() <= 1:
+        return stubborn_score, (query_shift if is_rag else None)
 
+    total_stubbornness = 0.0
+    incorrect_transitions = 0
+    total_query_shift = 0.0
+    shift_count = 0
+    
+    trial_list = list(trials)
+    for i in range(len(trial_list) - 1):
+        # Query Shift (RAG only)
+        if is_rag:
+            q1 = trial_list[i].search_query or ""
+            q2 = trial_list[i+1].search_query or ""
+            similarity_q = SequenceMatcher(None, q1, q2).ratio()
+            total_query_shift += (1.0 - similarity_q)
+            shift_count += 1
+        
+        # Stubbornness (Similarity of answers after incorrect feedback)
+        if trial_list[i].is_correct is False:
+            ans1 = trial_list[i].answer or ""
+            ans2 = trial_list[i+1].answer or ""
+            similarity_a = SequenceMatcher(None, ans1, ans2).ratio()
+            total_stubbornness += similarity_a
+            incorrect_transitions += 1
 
+    if incorrect_transitions > 0:
+        stubborn_score = total_stubbornness / incorrect_transitions
+    
+    if is_rag and shift_count > 0:
+        query_shift = total_query_shift / shift_count
+        return stubborn_score, query_shift
+        
+    return stubborn_score, None
+
+def _get_multi_turn_run_results(group_id, pipeline_type):
+    """
+    Generic logic to fetch and format Multi-Turn benchmark results with research metrics.
+    """
+    group = get_object_or_404(MultiTurnRun, pk=group_id)
+    sessions = group.sessions.filter(pipeline_type=pipeline_type).prefetch_related("trials")
+    results = []
+    
+    # Resolve Max Retries from snapshot or settings
+    snapshot = group.settings_snapshot or {}
+    max_retries = 3
+    if "llm_settings" in snapshot:
+        max_retries = snapshot["llm_settings"].get("max_retries", 3)
+    else:
+        max_retries = LLMSettings.load().max_retries
+
+    is_rag = (pipeline_type == 'rag')
+
+    for session in sessions:
+        trials = session.trials.all().order_by('trial_number')
+        first_trial = trials.first()
+        last_trial = trials.last()
+        
+        if not last_trial:
+            continue
+            
+        stubborn_score, query_shift = _calculate_session_metrics(trials, is_rag=is_rag)
+
+        result_entry = {
+            "question": session.question,
+            "correct": last_trial.is_correct,
+            "trials": trials.count(),
+            "session_id": session.id,
+            "final_answer": last_trial.answer,
+            "ground_truths": session.ground_truths,
+            "max_retries": max_retries,
+            "initial_correct": first_trial.is_correct if first_trial else None,
+            "stubborn_score": stubborn_score
+        }
+        
+        if is_rag:
+            result_entry["query_shift"] = query_shift
+            
+        results.append(result_entry)
+
+    return JsonResponse(
+        {"results": results, "group_name": group.name, "settings": snapshot}
+    )
 
 @admin_required
 def load_vanilla_llm_multi_turn_run(request, group_id):
-    return _get_run_results(group_id, 'vanilla_llm_multi_turn')
+    return _get_multi_turn_run_results(group_id, 'vanilla')
 
 @admin_required
 def load_rag_multi_turn_run(request, group_id):
-    return _get_run_results(group_id, 'rag_multi_turn')
+    return _get_multi_turn_run_results(group_id, 'rag')
 
 @admin_required
 def load_agent_multi_turn_run(request, group_id):
     return _get_run_results(group_id, ['vanilla_agent', 'browser_agent'])
-
 
 def sync_iterator_from_async(async_gen):
     """
@@ -1324,7 +1358,6 @@ def _run_pipeline_generic_async_wrapper(request, pipeline_class, redis_prefix_te
 
     return StreamingHttpResponse(serialize_events_sync_bridge(), content_type="application/json")
 
-
 @admin_required
 @require_POST
 def run_browser_agent_pipeline(request):
@@ -1334,6 +1367,20 @@ def run_browser_agent_pipeline(request):
         "browser_agent_pipeline_active"
     )
 
+@admin_required
+@require_POST
+def stop_rag_multi_turn_pipeline(request):
+    try:
+        data = json.loads(request.body)
+        pipeline_id = data.get("pipeline_id")
+        reformulation_strategy = data.get("reformulation_strategy", "no_reform")
+        if pipeline_id:
+            redis_client.delete(
+                f"rag_multi_turn_{reformulation_strategy}_pipeline_active:{pipeline_id}"
+            )
+        return JsonResponse({"status": "ok"})
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)}, status=400)
 
 @require_POST
 def web_search(request):

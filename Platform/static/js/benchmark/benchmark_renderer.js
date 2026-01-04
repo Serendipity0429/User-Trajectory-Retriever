@@ -17,7 +17,7 @@ window.BenchmarkUtils.BenchmarkRenderer = {
                     <span class="visually-hidden">Loading...</span>
                 </div>
                 <div class="fw-medium">Processing Question:</div>
-                <div class="small text-dark fw-bold mt-1" style="max-width: 80%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                <div class="small text-dark fw-bold mt-1 processing-question-text">
                     ${item.question || 'Unknown'}
                 </div>
             </div>
@@ -376,20 +376,30 @@ window.BenchmarkUtils.BenchmarkRenderer = {
         td4.appendChild(this.renderGroundTruthsList(result.ground_truths));
         row.appendChild(td4);
 
-        // Cell 5: Status Badge
+        // Cell 5: Status Badge (LLM & Rule)
         const td5 = document.createElement('td');
         td5.className = 'px-4 text-center';
+        
+        const llmBadge = document.createElement('div');
+        llmBadge.className = 'mb-1';
         if (result.correct === true) {
-            td5.appendChild(this.createBadge(null, true));
+            llmBadge.appendChild(this.createBadge('LLM: Correct', true));
         } else if (result.correct === false) {
-            td5.appendChild(this.createBadge(null, false));
+            llmBadge.appendChild(this.createBadge('LLM: Incorrect', false));
         } else {
-                // Error/Unknown state
-                const span = document.createElement('span');
-                span.className = 'badge bg-warning text-dark';
-                span.textContent = 'Error';
-                td5.appendChild(span);
+            const span = document.createElement('span');
+            span.className = 'badge bg-warning text-dark';
+            span.textContent = 'LLM: Error';
+            llmBadge.appendChild(span);
         }
+        td5.appendChild(llmBadge);
+
+        if (result.is_correct_rule !== undefined && result.is_correct_rule !== null) {
+            const ruleBadge = document.createElement('div');
+            ruleBadge.appendChild(this.createBadge(result.is_correct_rule ? 'Rule: Correct' : 'Rule: Incorrect', result.is_correct_rule));
+            td5.appendChild(ruleBadge);
+        }
+        
         row.appendChild(td5);
 
         // Cell 6: Trials
@@ -432,7 +442,7 @@ window.BenchmarkUtils.BenchmarkRenderer = {
         const avatarBorder = '1px solid #dee2e6';
 
         const avatar = `
-            <div class="flex-shrink-0 ${isUser ? 'ms-3' : 'me-3'} d-none d-md-block" style="margin-top: 0;">
+            <div class="flex-shrink-0 ${isUser ? 'ms-3' : 'me-3'} d-none d-md-block avatar-container">
                 <div class="rounded-circle d-flex align-items-center justify-content-center shadow-sm" 
                         style="width: 36px; height: 36px; background-color: ${avatarColor}; border: ${avatarBorder};">
                     <i class="bi ${icon} ${avatarIconColor}"></i>
@@ -468,7 +478,7 @@ window.BenchmarkUtils.BenchmarkRenderer = {
         return `
             <div class="d-flex ${alignment} mb-3 message-bubble">
                 ${!isUser ? avatar : ''}
-                <div class="${bubbleClass} ${extraClass} ${textClass}" style="max-width: 85%; min-width: 200px; word-wrap: break-word; ${borderAccent}">
+                <div class="${bubbleClass} ${extraClass} ${textClass} message-bubble-content" style="${borderAccent}">
                     ${content}
                 </div>
                 ${isUser ? avatar : ''}
@@ -499,7 +509,7 @@ window.BenchmarkUtils.BenchmarkRenderer = {
                         <i class="bi bi-chevron-down ms-3 small"></i>
                      </button>
                      <div class="collapse show mt-2" id="${tId}">
-                        <div class="p-3 bg-light border-start border-3 border-warning rounded-3 small text-secondary font-monospace" style="white-space: pre-wrap;">${content}</div>
+                        <div class="p-3 bg-light border-start border-3 border-warning rounded-3 small text-secondary font-monospace thinking-process-content">${content}</div>
                      </div>
                 </div>
             `;
@@ -511,11 +521,11 @@ window.BenchmarkUtils.BenchmarkRenderer = {
             const toolHtml = `
                 <div class="d-flex flex-column">
                     <div class="d-flex align-items-center mb-2">
-                        <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 text-uppercase" style="font-size: 0.65rem; letter-spacing: 0.5px;">
+                        <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 text-uppercase agent-badge-text">
                             <i class="bi bi-tools me-1"></i> Tool Execution
                         </span>
                     </div>
-                    <div class="p-3 bg-white border rounded-3 shadow-sm font-monospace small text-dark" style="white-space: pre-wrap;">${content}</div>
+                    <div class="p-3 bg-white border rounded-3 shadow-sm font-monospace small text-dark tool-execution-content">${content}</div>
                 </div>
             `;
             return this.createMessageBubble('assistant', toolHtml, '', 'bi-gear');
@@ -554,7 +564,7 @@ window.BenchmarkUtils.BenchmarkRenderer = {
                                 <i class="bi bi-globe text-success"></i>
                             </div>
                             <div>
-                                <div class="fw-bold text-dark" style="font-size: 0.9rem;">Web Search Results</div>
+                                <div class="fw-bold text-dark search-results-title">Web Search Results</div>
                                 <div class="small text-muted">${resultsCount} relevant documents found</div>
                             </div>
                         </div>
@@ -574,7 +584,7 @@ window.BenchmarkUtils.BenchmarkRenderer = {
                 const obsHtml = `
                     <div class="d-flex flex-column">
                          <div class="d-flex align-items-center mb-2">
-                            <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 text-uppercase" style="font-size: 0.65rem; letter-spacing: 0.5px;">
+                            <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 text-uppercase agent-badge-text">
                                 <i class="bi bi-eye me-1"></i> Observation
                             </span>
                         </div>
@@ -590,8 +600,8 @@ window.BenchmarkUtils.BenchmarkRenderer = {
                 // Render ONLY Final Answer Bubble for answer_question observation
                 let answerBody = `
                    <div class="position-relative">
-                       <div class="text-uppercase text-muted fw-bold mb-2" style="font-size: 0.65rem; letter-spacing: 0.5px;">Response</div>
-                       <div class="fs-6 text-dark" style="line-height: 1.6;">${finalAnswerText || ''}</div>
+                       <div class="text-uppercase text-muted fw-bold mb-2 response-label">Response</div>
+                       <div class="fs-6 text-dark response-text">${finalAnswerText || ''}</div>
                    </div>
                    `;
                 
@@ -602,11 +612,11 @@ window.BenchmarkUtils.BenchmarkRenderer = {
                 const obsHtml = `
                     <div class="d-flex flex-column">
                          <div class="d-flex align-items-center mb-2">
-                            <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 text-uppercase" style="font-size: 0.65rem; letter-spacing: 0.5px;">
+                            <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 text-uppercase agent-badge-text">
                                 <i class="bi bi-eye me-1"></i> Observation
                             </span>
                         </div>
-                        <div class="p-3 bg-light border rounded-3 shadow-sm font-monospace small text-muted" style="white-space: pre-wrap; max-height: 300px; overflow-y: auto;">${content}</div>
+                        <div class="p-3 bg-light border rounded-3 shadow-sm font-monospace small text-muted generic-observation-content">${content}</div>
                     </div>
                 `;
                 return this.createMessageBubble('assistant', obsHtml, '', 'bi-eye');
@@ -618,9 +628,9 @@ window.BenchmarkUtils.BenchmarkRenderer = {
             const systemHtml = `
                 <div class="d-flex align-items-center mb-2 pb-2 border-bottom border-secondary border-opacity-25">
                     <i class="bi bi-cpu-fill text-secondary me-2"></i> 
-                    <span class="text-uppercase fw-bold text-secondary small" style="letter-spacing: 0.5px;">System Configuration</span>
+                    <span class="text-uppercase fw-bold text-secondary small system-config-header">System Configuration</span>
                 </div>
-                <div class="font-monospace text-muted small" style="white-space: pre-wrap; font-size: 0.85em; line-height: 1.5;">${content}</div>
+                <div class="font-monospace text-muted small system-config-content">${content}</div>
             `;
             return this.createMessageBubble('system', systemHtml, 'bg-light border-secondary border-opacity-10 shadow-none');
         }
@@ -639,286 +649,77 @@ window.BenchmarkUtils.BenchmarkRenderer = {
         trialDiv.className = 'trial-container position-relative'; 
         trialDiv.id = `trial-${trial.id}`;
 
-        const isRag = pipelineType.includes('rag');
-        const isAgent = pipelineType.includes('agent');
-
         let chatContent = '';
+        
+        // 1. Prioritize Trace (Unified for all baselines)
+        let trace = trial.trace || [];
+        if (typeof trace === 'string') {
+            try { trace = JSON.parse(trace); } catch(e) { trace = []; }
+        }
+        
+        // Fallback for Agent full_response if trace is missing
+        if (trace.length === 0 && trial.full_response && pipelineType.includes('agent')) {
+            try { trace = JSON.parse(trial.full_response); } catch(e) {}
+        }
 
-        if (isAgent) {
-            // --- AGENT PIPELINE RENDERING ---
-            let trace = [];
-            try {
-                if (trial.full_response) {
-                    trace = JSON.parse(trial.full_response);
-                }
-            } catch (e) {
-                console.error("Failed to parse agent trace", e);
-                trace = [{ role: 'assistant', content: trial.answer || "Error parsing trace." }];
-            }
-            
-            // If trace is empty but we have an answer (fallback)
-            if ((!trace || trace.length === 0) && trial.answer) {
-                 trace = [{ role: 'assistant', content: trial.answer }];
-            }
-
+        if (trace && trace.length > 0) {
             trace.forEach((step, idx) => {
                 chatContent += this.renderAgentStep(step, idx, trial.id, trial.answer);
             });
-
+            
             // If processing
             if (trial.status === 'processing') {
-                 chatContent += this.createMessageBubble('assistant', `<div class="d-flex align-items-center trial-processing-indicator"><span class="spinner-border spinner-border-sm text-primary me-2"></span>Agent is thinking...</div>`, '', 'bi-robot');
+                 const text = pipelineType.includes('agent') ? 'Agent is thinking...' : 'Synthesizing response...';
+                 chatContent += this.createMessageBubble('assistant', `<div class="d-flex align-items-center trial-processing-indicator"><span class="spinner-border spinner-border-sm text-primary me-2"></span>${text}</div>`, '', 'bi-robot');
             }
 
         } else {
-            // --- STANDARD / RAG PIPELINE RENDERING (EXISTING LOGIC) ---
-            
-            // 1. Instruction
-            if (trial.query_instruction && trial.query_instruction.includes('*** SYSTEM PROMPT ***')) {
-                const parts = trial.query_instruction.split('*** USER INPUT ***');
-                const systemPart = parts[0].replace('*** SYSTEM PROMPT ***', '').trim();
-                const userPart = parts[1] ? parts[1].trim() : '';
-
-                                if (systemPart) {
-                                    const systemHtml = `
-                                        <div class="d-flex align-items-center mb-2 pb-2 border-bottom border-secondary border-opacity-25">
-                                            <i class="bi bi-cpu-fill text-secondary me-2"></i> 
-                                            <span class="text-uppercase fw-bold text-secondary small" style="letter-spacing: 0.5px;">System Configuration</span>
-                                        </div>
-                                        <div class="font-monospace text-muted small" style="white-space: pre-wrap; font-size: 0.85em; line-height: 1.5;">${systemPart}</div>
-                                    `;
-                                    // Use a distinct 'system' role that maps to a specific style in createMessageBubble
-                                    chatContent += this.createMessageBubble('system', systemHtml, 'bg-light border-secondary border-opacity-10 shadow-none'); 
-                                }                                if (userPart) {
-                    chatContent += this.createMessageBubble('user', userPart);
-                }
-            } else {
-                    let instr = trial.query_instruction || trial.instruction;
-                    if (!instr && trial.trial_number === 1) instr = questionText;
-                    if (instr) {
-                    chatContent += this.createMessageBubble('user', instr);
-                    }
-            }
-
-            // 2. Assistant Action (Search Query / Reformulation)
-            if (trial.search_query) {
-                let queryHtml = '';
-                
-                // Extract reasoning from <think> tags if present
-                let searchReasoning = '';
-                const fullResp = trial.query_full_response || '';
-                const thinkMatch = fullResp.match(/<think>([\s\S]*?)<\/think>/i);
-                if (thinkMatch) {
-                    searchReasoning = thinkMatch[1].trim();
-                } else if (fullResp && fullResp !== trial.search_query) {
-                    searchReasoning = fullResp;
-                }
-
-                if (searchReasoning) {
-                        const qId = `q-reason-${trial.id}`;
-                        queryHtml += `
-                        <div class="mb-3">
-                                <button class="btn btn-sm btn-light border d-flex align-items-center fw-bold text-secondary shadow-sm px-3 py-2 rounded-3 mb-2" type="button" data-bs-toggle="collapse" data-bs-target="#${qId}">
-                                <i class="bi bi-lightbulb-fill text-warning me-2"></i>
-                                <span>Show Search Reasoning</span>
-                                <i class="bi bi-chevron-down ms-3 small"></i>
-                                </button>
-                                <div class="collapse" id="${qId}">
-                                <div class="p-3 bg-light border-start border-3 border-warning rounded-3 small text-secondary font-monospace mb-2" style="white-space: pre-wrap;">${searchReasoning}</div>
-                                </div>
-                        </div>
-                        `;
-                }
-
-                queryHtml += `
-                    <div class="d-flex flex-column">
-                        <div class="d-flex align-items-center mb-2">
-                            <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 text-uppercase" style="font-size: 0.65rem; letter-spacing: 0.5px;">
-                                <i class="bi bi-search me-1"></i> Search Query Reformulation
-                            </span>
-                        </div>
-                        <div class="p-3 bg-white border rounded-3 shadow-sm d-flex align-items-center">
-                            <i class="bi bi-quote fs-4 text-primary opacity-25 me-3"></i>
-                            <span class="fs-6 fw-medium text-primary">${trial.search_query}</span>
-                        </div>
-                    </div>
-                `;
-                chatContent += this.createMessageBubble('assistant', queryHtml, '', 'bi-search');
-            }
-            
-            // 3. Observation (Search Results)
-            if (trial.search_query) {
-                const resultsCount = trial.search_results ? trial.search_results.length : 0;
-
-                if (resultsCount > 0) {
-                    const resultsJson = trial.search_results ? encodeURIComponent(JSON.stringify(trial.search_results)) : '';
-
-                    const resultsHtml = `
-                        <div class="d-flex align-items-center justify-content-between">
-                            <div class="d-flex align-items-center">
-                                <div class="rounded-circle bg-success bg-opacity-10 p-2 me-3">
-                                    <i class="bi bi-globe text-success"></i>
-                                </div>
-                                <div>
-                                    <div class="fw-bold text-dark" style="font-size: 0.9rem;">Web Search Results</div>
-                                    <div class="small text-muted">${resultsCount} relevant documents found</div>
-                                </div>
-                            </div>
-                            <button class="btn btn-sm btn-outline-success rounded-pill ms-3 px-3 view-search-results-btn" data-results="${resultsJson}">
-                                <i class="bi bi-eye me-1"></i> View Detail
-                            </button>
-                        </div>
-                        `;
-
-                    chatContent += `
-                        <div class="d-flex justify-content-center mb-4">
-                            <div class="bg-white border-top border-bottom border-start border-end rounded-4 shadow-sm p-3 w-100" style="max-width: 650px; border-left: 4px solid #198754 !important;">
-                                ${resultsHtml}
-                            </div>
-                        </div>
-                        `;
-                } else {
-                    chatContent += `
-                        <div class="d-flex justify-content-center mb-4">
-                            <div class="badge bg-light text-secondary border p-2 rounded-pill"><i class="bi bi-search me-2"></i>No results found</div>
-                        </div>
-                        `;
-                }
-
-                if (trial.final_answer_instruction) {
-                    let faInstr = trial.final_answer_instruction;
-
-                    const escapeHtml = (text) => {
-                        return text
-                            .replace(/&/g, "&amp;")
-                            .replace(/</g, "&lt;")
-                            .replace(/>/g, "&gt;")
-                            .replace(/"/g, "&quot;")
-                            .replace(/'/g, "&#039;");
-                    };
-
-                    const sourceRegex = /<source (\d+)>([\s\S]*?)<\/source \1>/gi;
-                    let parts = [];
-                    let lastIndex = 0;
-                    let match;
-                    let sourcesFound = false;
-
-                    while ((match = sourceRegex.exec(faInstr)) !== null) {
-                        sourcesFound = true;
-                        const textBefore = faInstr.substring(lastIndex, match.index);
-                        if (textBefore.trim()) {
-                            parts.push(`<div class="mb-2">${escapeHtml(textBefore).replace(/\n/g, '<br>')}</div>`);
-                        }
-
-                        const id = match[1];
-                        const content = match[2].trim();
-                        const lines = content.split('\n');
-                        const title = lines[0].length < 100 ? lines[0] : `Source ${id}`;
-                        const body = lines.length > 1 ? content.substring(lines[0].length).trim() : content;
-
-                        const sId = `source-${trial.id}-${id}`;
-                        parts.push(`
-                            <div class="card mb-2 border-0 bg-light shadow-sm">
-                                <div class="card-header bg-white border py-1 px-2 d-flex justify-content-between align-items-center">
-                                    <button class="btn btn-link btn-sm text-decoration-none text-start text-truncate w-100 collapsed text-dark fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-${sId}">
-                                        <span class="badge bg-secondary me-2">Source ${id}</span> <span class="small">${escapeHtml(title)}</span>
-                                    </button>
-                                </div>
-                                <div id="collapse-${sId}" class="collapse">
-                                    <div class="card-body p-2 small text-muted font-monospace border-start border-end border-bottom bg-white" style="max-height: 200px; overflow-y: auto;">
-                                        ${escapeHtml(body)}
-                                    </div>
-                                </div>
-                            </div>
-                        `);
-
-                        lastIndex = sourceRegex.lastIndex;
-                    }
-
-                    const textAfter = faInstr.substring(lastIndex);
-                    if (textAfter.trim()) {
-                        parts.push(`<div>${escapeHtml(textAfter).replace(/\n/g, '<br>')}</div>`);
-                    }
-
-                    if (sourcesFound) {
-                        chatContent += this.createMessageBubble('user', `
-                            <div class="fw-bold mb-2 text-primary d-flex align-items-center"><i class="bi bi-info-circle me-2"></i>Generation Context</div>
-                            ${parts.join('')}
-                        `);
-                    } else if (faInstr.trim()) {
-                        chatContent += this.createMessageBubble('user', faInstr);
-                    }
-                }
-            }
-                        
-            // 4. Final Answer
-            let answerBody = '';
-
-            if (trial.status === 'processing') {
-                answerBody = `<div class="d-flex align-items-center py-2"><span class="spinner-border spinner-border-sm text-primary me-3"></span><span class="text-muted fw-medium">Synthesizing final response...</span></div>`;
-            } else if (trial.status === 'error') {
-                answerBody = `<div class="text-danger fw-bold d-flex align-items-center"><i class="bi bi-exclamation-triangle-fill me-2"></i>Error during synthesis.</div>`;
-            } else {
-                // Extract reasoning from <think> tags if present
-                let answerReasoning = '';
-                const fullAnsResp = trial.full_response || '';
-                const ansThinkMatch = fullAnsResp.match(/<think>([\s\S]*?)<\/think>/i);
-                if (ansThinkMatch) {
-                    answerReasoning = ansThinkMatch[1].trim();
-                } else if (fullAnsResp && fullAnsResp !== trial.answer) {
-                    answerReasoning = fullAnsResp;
-                }
-
-                if (answerReasoning) {
-                    const rId = `resp-reason-${trial.id}`;
-                    answerBody += `
-                        <div class="mb-3">
-                                <button class="btn btn-sm btn-light border d-flex align-items-center fw-bold text-secondary shadow-sm px-3 py-2 rounded-3 mb-2" type="button" data-bs-toggle="collapse" data-bs-target="#${rId}">
-                                <i class="bi bi-journal-text me-2"></i>
-                                <span>Show Reasoning Path</span>
-                                <i class="bi bi-chevron-down ms-3 small"></i>
-                                </button>
-                                <div class="collapse" id="${rId}">
-                                <div class="p-3 bg-light border-start border-3 border-secondary rounded-3 small text-muted font-monospace mb-2" style="white-space: pre-wrap;">${answerReasoning}</div>
-                                </div>
-                        </div>
-                    `;
-                }
-
-                answerBody += `
-                    <div class="position-relative">
-                        <div class="text-uppercase text-muted fw-bold mb-2" style="font-size: 0.65rem; letter-spacing: 0.5px;">Response</div>
-                        <div class="fs-6 text-dark" style="line-height: 1.6;">${trial.answer || ''}</div>
-                    </div>
-                    `;
-            }
-
-            chatContent += this.createMessageBubble('assistant', answerBody, '', 'bi-chat-left-dots');
-         }
+            // --- LEGACY FALLBACK: Empty container if no trace found ---
+            chatContent += this.createMessageBubble('system', 'No execution trace available for this trial.', 'bg-light border-secondary border-opacity-10 shadow-none');
+        }
 
         // --- 5. Verdict (Common) ---
-        if (trial.status === 'completed' && trial.feedback) {
-            const isCorrect = trial.is_correct;
-            const verdictColor = isCorrect ? 'success' : 'danger';
-            const verdictIcon = isCorrect ? 'bi-check-circle-fill' : 'bi-x-circle-fill';
-
-            chatContent += `
-                <div class="d-flex justify-content-center mt-2 mb-2 fade-in trial-verdict-container">
+        if (trial.status === 'completed' && (trial.feedback || trial.is_correct_rule !== undefined)) {
+            const isCorrectLLM = trial.is_correct_llm !== undefined ? trial.is_correct_llm : trial.is_correct;
+            const isCorrectRule = trial.is_correct_rule;
+            
+            let verdictHtml = '<div class="d-flex flex-row justify-content-center flex-wrap gap-3 mt-2 mb-2 fade-in trial-verdict-container">';
+            
+            // LLM Verdict
+            if (isCorrectLLM !== undefined && isCorrectLLM !== null) {
+                const llmColor = isCorrectLLM ? 'success' : 'danger';
+                const llmIcon = isCorrectLLM ? 'bi-check-circle-fill' : 'bi-x-circle-fill';
+                verdictHtml += `
                     <div class="card border-0 shadow-sm rounded-pill px-2" style="background-color: #f8f9fa;">
                         <div class="card-body py-2 px-4 d-flex align-items-center">
-                            <i class="bi ${verdictIcon} text-${verdictColor} fs-5 me-2"></i>
-                            <div class="fw-bold text-${verdictColor} text-uppercase small" style="letter-spacing: 1px;">Verdict: ${trial.feedback}</div>
+                            <i class="bi ${llmIcon} text-${llmColor} fs-5 me-2"></i>
+                            <div class="fw-bold text-${llmColor} text-uppercase small verdict-text">Verdict (LLM): ${isCorrectLLM ? 'Correct' : 'Incorrect'}</div>
                         </div>
-                    </div>
-                </div>
-            `;
+                    </div>`;
+            }
+
+            // Rule Verdict
+            if (isCorrectRule !== undefined && isCorrectRule !== null) {
+                const ruleColor = isCorrectRule ? 'success' : 'danger';
+                const ruleIcon = isCorrectRule ? 'bi-check-circle-fill' : 'bi-x-circle-fill';
+                verdictHtml += `
+                    <div class="card border-0 shadow-sm rounded-pill px-2" style="background-color: #f8f9fa;">
+                        <div class="card-body py-2 px-4 d-flex align-items-center">
+                            <i class="bi ${ruleIcon} text-${ruleColor} fs-5 me-2"></i>
+                            <div class="fw-bold text-${ruleColor} text-uppercase small verdict-text">Verdict (Rule): ${isCorrectRule ? 'Correct' : 'Incorrect'}</div>
+                        </div>
+                    </div>`;
+            }
+            
+            verdictHtml += '</div>';
+            chatContent += verdictHtml;
         }
         
         const turnSeparator = trial.trial_number > 1 ? `
             <div class="d-flex align-items-center my-5 turn-divider">
-                <div class="flex-grow-1 border-top" style="border-top-style: dashed !important; border-top-width: 2px !important;"></div>
-                <div class="mx-4 text-uppercase text-muted fw-bold small" style="letter-spacing: 2px; font-size: 0.7rem;">End of Turn ${trial.trial_number - 1}</div>
-                <div class="flex-grow-1 border-top" style="border-top-style: dashed !important; border-top-width: 2px !important;"></div>
+                <div class="flex-grow-1 border-top turn-divider-line"></div>
+                <div class="mx-4 text-uppercase text-muted fw-bold small turn-divider-text">End of Turn ${trial.trial_number - 1}</div>
+                <div class="flex-grow-1 border-top turn-divider-line"></div>
             </div>
         ` : '';
 
@@ -926,7 +727,7 @@ window.BenchmarkUtils.BenchmarkRenderer = {
             ${turnSeparator}
             <div class="trial-wrapper position-relative pb-2">
                 <div class="d-flex align-items-center justify-content-center mb-4">
-                    <div class="bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 rounded-pill px-4 py-1 small fw-bold" style="letter-spacing: 1px;">TURN ${trial.trial_number}</div>
+                    <div class="bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 rounded-pill px-4 py-1 small fw-bold turn-label">TURN ${trial.trial_number}</div>
                 </div>
                 ${chatContent}
             </div>
@@ -962,9 +763,7 @@ window.BenchmarkUtils.BenchmarkRenderer = {
             divOverflow.className = 'overflow-hidden';
 
             const divLabel = document.createElement('div');
-            divLabel.className = 'text-muted text-uppercase';
-            divLabel.style.fontSize = '0.65rem';
-            divLabel.style.letterSpacing = '0.5px';
+            divLabel.className = 'text-muted text-uppercase config-detail-label';
             divLabel.textContent = label;
             divOverflow.appendChild(divLabel);
 

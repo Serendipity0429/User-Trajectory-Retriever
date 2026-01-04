@@ -178,16 +178,11 @@ class MultiTurnTrial(models.Model):
     answer = models.TextField(blank=True, null=True)
     full_response = models.TextField(blank=True, null=True) # Full CoT
     feedback = models.TextField(blank=True, null=True)
-    is_correct = models.BooleanField(null=True, blank=True)
+    is_correct_llm = models.BooleanField(null=True, blank=True, help_text="Result of LLM-as-a-judge evaluation")
+    is_correct_rule = models.BooleanField(null=True, blank=True, help_text="Result of rule-based evaluation")
     created_at = models.DateTimeField(auto_now_add=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='processing')
-    query_instruction = models.TextField(blank=True, null=True, help_text="Prompt for query generation (Step 1)")
-    query_full_response = models.TextField(blank=True, null=True, help_text="Full CoT for query generation")
-    final_answer_instruction = models.TextField(blank=True, null=True, help_text="Prompt for final answer generation (Step 2)")
-    
-    # RAG specific fields (nullable)
-    search_query = models.TextField(blank=True, null=True)
-    search_results = models.JSONField(default=list, blank=True, null=True)
+    log = models.JSONField(default=dict, blank=True, help_text="Structured log of the execution (e.g. prompts, search queries, results).")
 
     class Meta:
         unique_together = ('session', 'trial_number')

@@ -145,10 +145,10 @@ class MultiTurnSession(models.Model):
     Unified model for both Vanilla LLM and RAG.
     """
     PIPELINE_TYPE_CHOICES = [
-        ('vanilla', 'Vanilla LLM'),
-        ('rag', 'RAG'),
+        ('vanilla_llm_multi_turn', 'Vanilla LLM'),
+        ('rag_multi_turn', 'RAG'),
         ('vanilla_agent', 'Vanilla Agent'),
-        ('browser_agent', 'Browser Agent'), # New pipeline type
+        ('browser_agent', 'Browser Agent'),
     ]
 
     run = models.ForeignKey(MultiTurnRun, related_name='sessions', on_delete=models.CASCADE)
@@ -158,7 +158,7 @@ class MultiTurnSession(models.Model):
     is_completed = models.BooleanField(default=False)
     run_tag = models.CharField(max_length=255, blank=True, null=True, db_index=True)
     
-    pipeline_type = models.CharField(max_length=20, choices=PIPELINE_TYPE_CHOICES, default='vanilla')
+    pipeline_type = models.CharField(max_length=50, choices=PIPELINE_TYPE_CHOICES, default='vanilla_llm_multi_turn')
 
     def __str__(self):
         return f"Session ({self.pipeline_type}) for: {self.question[:50]}..."
@@ -195,50 +195,3 @@ class MultiTurnTrial(models.Model):
 
     def __str__(self):
         return f"Trial {self.trial_number} for Session {self.session.id}"
-
-class AdhocRun(models.Model):
-    """
-    Represents a single, complete run of an ad-hoc QA pipeline.
-    Unified model for both Vanilla LLM and RAG.
-    """
-    RUN_TYPE_CHOICES = [
-        ('vanilla', 'Vanilla LLM'),
-        ('rag', 'RAG'),
-    ]
-    name = models.CharField(max_length=255, unique=True, help_text="A unique name for this benchmark run.")
-    created_at = models.DateTimeField(auto_now_add=True)
-    settings_snapshot = models.JSONField(default=dict, blank=True, help_text="Snapshot of settings used for this run.")
-    
-    run_type = models.CharField(max_length=20, choices=RUN_TYPE_CHOICES, default='vanilla')
-
-    # Aggregate statistics
-    total_questions = models.IntegerField(default=0)
-    correct_answers = models.IntegerField(default=0)
-    accuracy = models.FloatField(default=0.0)
-
-    class Meta:
-        ordering = ['-created_at']
-
-    def __str__(self):
-        return f"{self.name} ({self.run_type})"
-
-class AdhocResult(models.Model):
-    """
-    Stores the result of a single question-answer session within a AdhocRun.
-    Unified model for both Vanilla LLM and RAG.
-    """
-    run = models.ForeignKey(AdhocRun, related_name='results', on_delete=models.CASCADE)
-    question = models.TextField()
-    ground_truths = models.JSONField(default=list)
-    answer = models.TextField() # Parsed Answer
-    full_response = models.TextField(blank=True, null=True) # Full CoT
-    is_correct_rule = models.BooleanField(default=False)
-    is_correct_llm = models.BooleanField(null=True, default=None) # Allow null for errors/uncertainty
-    
-    # RAG specific fields
-    search_query = models.TextField(blank=True, null=True)
-    num_docs_used = models.IntegerField(default=0)
-    search_results = models.JSONField(default=list, blank=True, null=True)
-
-    def __str__(self):
-        return f"Result for '{self.question[:50]}...' in run {self.run.name}"

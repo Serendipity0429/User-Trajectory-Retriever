@@ -9,8 +9,6 @@ urlpatterns = [
     # ==========================================
     path("", views.home, name="home"),
     path("vanilla_llm_multi_turn/", views.vanilla_llm_multi_turn, name="vanilla_llm_multi_turn"),
-    path("vanilla_llm_adhoc/", views.vanilla_llm_adhoc, name="vanilla_llm_adhoc"),
-    path("rag_adhoc/", views.rag_adhoc, name="rag_adhoc"),
     path("rag_multi_turn/", views.rag_multi_turn, name="rag_multi_turn"),
     path("vanilla_agent/", views.vanilla_agent, name="vanilla_agent"),
     path("browser_agent/", views.browser_agent, name="browser_agent"),
@@ -64,22 +62,6 @@ urlpatterns = [
     path('api/multi_turn/load_agent_run/<int:group_id>/', views.load_agent_multi_turn_run, name='load_agent_multi_turn_run'),
 
     # ==========================================
-    # 6. API - Ad-hoc Runs (Vanilla)
-    # ==========================================
-    path('api/vanilla_llm_adhoc/list_runs/', views.list_vanilla_llm_adhoc_runs, name='list_vanilla_llm_adhoc_runs'),
-    path('api/vanilla_llm_adhoc/get_run/<int:run_id>/', views.get_vanilla_llm_adhoc_run, name='get_vanilla_llm_adhoc_run'),
-    path('api/vanilla_llm_adhoc/delete_run/<int:run_id>/', views.delete_vanilla_llm_adhoc_run, name='delete_vanilla_llm_adhoc_run'),
-    path('api/vanilla_llm_adhoc/batch_delete_runs/', views.batch_delete_vanilla_llm_adhoc_runs, name='batch_delete_vanilla_llm_adhoc_runs'),
-
-    # ==========================================
-    # 7. API - Ad-hoc Runs (RAG)
-    # ==========================================
-    path('api/rag_adhoc/list_runs/', views.list_rag_adhoc_runs, name='list_rag_adhoc_runs'),
-    path('api/rag_adhoc/get_run/<int:run_id>/', views.get_rag_adhoc_run, name='get_rag_adhoc_run'),
-    path('api/rag_adhoc/delete_run/<int:run_id>/', views.delete_rag_adhoc_run, name='delete_rag_adhoc_run'),
-    path('api/rag_adhoc/batch_delete_runs/', views.batch_delete_rag_adhoc_runs, name='batch_delete_rag_adhoc_runs'),
-
-    # ==========================================
     # 8. API - Pipelines (Streaming)
     # ==========================================
     # Vanilla LLM Multi-turn
@@ -97,12 +79,4 @@ urlpatterns = [
     # Browser Agent
     path('api/run_browser_agent_pipeline/', views.run_browser_agent_pipeline, name='run_browser_agent_pipeline'),
     path('api/stop_browser_agent_pipeline/', views.stop_browser_agent_pipeline, name='stop_browser_agent_pipeline'),
-
-    # Vanilla LLM Ad-hoc
-    path('api/run_vanilla_llm_adhoc_pipeline/', views.run_vanilla_llm_adhoc_pipeline, name='run_vanilla_llm_adhoc_pipeline'),
-    path('api/stop_vanilla_llm_adhoc_pipeline/', views.stop_vanilla_llm_adhoc_pipeline, name='stop_vanilla_llm_adhoc_pipeline'),
-    
-    # RAG Ad-hoc
-    path('api/run_rag_adhoc_pipeline/', views.run_rag_adhoc_pipeline, name='run_rag_adhoc_pipeline'),
-    path('api/stop_rag_adhoc_pipeline/', views.stop_rag_adhoc_pipeline, name='stop_rag_adhoc_pipeline'),
 ]

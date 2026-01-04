@@ -58,60 +58,42 @@ class VanillaAgentPipeline(BaseAgentPipeline):
         )
 
     async def _run_single_turn_async(self, session, trial):
-        completed_trials = await sync_to_async(list)(
-            session.trials.filter(trial_number__lt=trial.trial_number, status='completed').order_by('trial_number')
-        )
-        
-        history_msgs = []
-        if trial.trial_number > 1:
-            history_msgs.append(Msg(name="User", role="user", content=f"Please answer the question: {session.question}"))
-            for pt in completed_trials:
-                if pt.answer:
-                    history_msgs.append(Msg(name="Assistant", role="assistant", content=pt.full_response))
-                history_msgs.append(Msg(name="User", role="user", content=f"Incorrect."))
+        # 1. Determine Message to Send
+        # IMPORTANT: Memory must be fresh for the first trial of a new session (new question)
+        if trial.trial_number == 1:
+            if hasattr(self, 'active_agent'):
+                self.active_agent = None # Clear legacy agent from previous question
             
-            last_pt = completed_trials[-1]
-            current_msg = Msg(name="User", role="user", content=f"Your previous attempt was incorrect. Please try again to find the correct answer.")
-        else:
-            current_msg = Msg(name="User", role="user", content=f"Please answer the question: {session.question}")
-
-        initial_history_len = len(history_msgs)
-
-        def on_memory_update(msgs):
+            current_msg = Msg(name="User", role="user", content=PROMPTS["agent_user_question"].format(question=session.question))
+            turn_start_index = 0
+        
+        elif hasattr(self, 'active_agent') and self.active_agent:
+            # Fetch feedback for retry
+            last_trial = await sync_to_async(lambda: session.trials.filter(status='completed').last())()
+            feedback = last_trial.feedback if last_trial else "Incorrect"
+            current_msg = Msg(name="User", role="user", content=PROMPTS["vanilla_agent_retry_request"].format(feedback=feedback))
+            
             try:
-                relevant_msgs = msgs[initial_history_len:] if len(msgs) > initial_history_len else []
-                trace_data, _ = self._serialize_trace(relevant_msgs)
-                
-                # Prepend System Prompt
-                system_prompt_step = {
-                    "role": "system",
-                    "content": PROMPTS["vanilla_agent_react_system"],
-                    "step_type": "text"
-                }
-                trace_data = [system_prompt_step] + trace_data
+                current_mem = await self.active_agent.memory.get_memory()
+                turn_start_index = len(current_mem) if current_mem else 0
+            except:
+                turn_start_index = 0
+        else:
+            # Fallback for trial > 1 if agent was lost (e.g. server restart)
+            current_msg = Msg(name="User", role="user", content=PROMPTS["agent_user_question"].format(question=session.question))
+            turn_start_index = 0
 
-                key = f"trial_trace:{trial.id}"
-                
-                try:
-                    loop = asyncio.get_running_loop()
-                    loop.create_task(asyncio.to_thread(redis_client.set, key, json.dumps(trace_data), ex=3600))
-                except RuntimeError:
-                     threading.Thread(target=redis_client.set, args=(key, json.dumps(trace_data)), kwargs={'ex': 3600}).start()
-            except Exception as e:
-                print_debug(f"Redis update failed: {e}")
-
-        # Create Agent
-        agent = await sync_to_async(VanillaAgentFactory.create_agent)(self.agent_model, update_callback=on_memory_update)
+        # 2. Create or Update Agent (No callback needed)
+        if not hasattr(self, 'active_agent') or not self.active_agent:
+            self.active_agent = await sync_to_async(VanillaAgentFactory.create_agent)(
+                self.agent_model
+            )
         
-        # Inject History
-        if history_msgs:
-            await agent.memory.add(history_msgs)
-
-        # Run Agent
-        response_msg = await agent(current_msg)
+        # 3. Run Agent
+        response_msg = await self.active_agent(current_msg)
         
-        # Process Response
-        trace_msgs = await agent.memory.get_memory()
+        # 4. Process Response
+        trace_msgs = await self.active_agent.memory.get_memory()
         
         raw_content = response_msg.content
         if isinstance(raw_content, list):
@@ -128,20 +110,18 @@ class VanillaAgentPipeline(BaseAgentPipeline):
         else:
             answer = str(raw_content) if raw_content is not None else ""
 
-        relevant_trace_msgs = trace_msgs[initial_history_len:] if len(trace_msgs) > initial_history_len else []
+        relevant_trace_msgs = trace_msgs[turn_start_index:] if len(trace_msgs) > turn_start_index else []
         trace_data, real_answer_found = self._serialize_trace(relevant_trace_msgs)
         
         if real_answer_found:
             answer = real_answer_found
             
-        # Prepend System Prompt
         system_prompt_step = {
             "role": "system",
-            "content": PROMPTS["vanilla_agent_react_system"],
+            "content": PROMPTS["vanilla_agent_system_prompt"],
             "step_type": "text"
         }
         trace_data = [system_prompt_step] + trace_data
-
         full_response = json.dumps(trace_data)
         
         if not trace_data:
@@ -151,7 +131,7 @@ class VanillaAgentPipeline(BaseAgentPipeline):
                  "content": answer
              }])
 
-        # Save Result
+        # 5. Save Result
         answer, is_correct = await sync_to_async(self.save_trial_result)(session, trial, answer, full_response)
         
         return answer, is_correct, []
@@ -229,23 +209,6 @@ class BrowserAgentPipeline(BaseAgentPipeline):
             trial_number=trial_number,
             status='processing'
         )
-        
-    def _construct_messages(self, session, trial, completed_trials):
-        print_debug(f"Constructing messages for BrowserAgentPipeline, trial number: {trial.trial_number}")
-        # The browser agent's initial prompt is self-contained.
-        # History will be managed by the agentscope agent itself.
-        messages = []
-        # If it's the first trial, the question is the primary message
-        if trial.trial_number == 1:
-            messages.append(Msg(name="User", role="user", content=f"Please answer the question: {session.question}"))
-        else:
-            # For subsequent trials (retries), we'll provide feedback
-            # This mimics the ReAct agent's feedback mechanism
-            last_trial = completed_trials[-1]
-            feedback_message = f"Your previous attempt was incorrect. Feedback: {last_trial.feedback}. Please re-evaluate the task and try again."
-            messages.append(Msg(name="User", role="user", content=feedback_message))
-        
-        return messages
 
     async def _process_single_session_async(self, group, question_text, ground_truths):
         try:
@@ -419,99 +382,75 @@ class BrowserAgentPipeline(BaseAgentPipeline):
             await sync_to_async(self.stop_token)()
 
     async def run_single_turn_async(self, session, trial, auto_cleanup=False):
-        # Ensure model and toolkit are initialized (needed for adhoc runs)
-        # If we are reconnecting (mcp_client is None), we MUST recreate the toolkit
-        # to avoid "tool already registered" errors from the previous connection.
+        # Ensure model and toolkit are initialized
         if not self.agent_model or not self.agent_toolkit or not self.mcp_client:
              self.agent_model, self.agent_toolkit = await sync_to_async(BrowserAgentFactory.init_agentscope, thread_sensitive=False)(self.temp_settings)
 
-        # Lazy init for MCP client (handle loop changes or delayed init)
+        # Lazy init for MCP client
         if not self.mcp_client:
              self.mcp_client = await self.mcp_manager.connect(self.agent_toolkit)
-        
-        # NOTE: self.mcp_client might still be None if connection failed.
-        # But we proceed, as the agent might still work with basic tools.
 
-        # The agent_model, toolkit are already initialized in __init__
-        
-        # Async DB access for history
-        def get_history():
-            prev_trials = session.trials.filter(trial_number__lt=trial.trial_number).order_by('trial_number')
-            return list(prev_trials)
+        # 1. Determine Message to Send
+        # IMPORTANT: Memory must be fresh for the first trial of a new session (new question)
+        if trial.trial_number == 1:
+            if hasattr(self, 'active_agent'):
+                self.active_agent = None
             
-        trials_list = await sync_to_async(get_history)()
-        
-        history_msgs = []
-        if trial.trial_number > 1:
-            # Reconstruct history for the browser agent for retries
-            history_msgs.append(Msg(name="User", role="user", content=f"Please answer the question: {session.question}"))
-            for i, pt in enumerate(trials_list):
-                if pt.answer:
-                    history_msgs.append(Msg(name="Assistant", role="assistant", content=pt.full_response))
-                if i < len(trials_list) - 1:
-                    history_msgs.append(Msg(name="User", role="user", content=f"Incorrect."))
+            current_msg = Msg(name="User", role="user", content=PROMPTS["agent_user_question"].format(question=session.question))
+            turn_start_index = 0
             
-            last_pt = trials_list[-1]
-            current_msg = Msg(name="User", role="user", content=f"Your previous attempt was incorrect. Please try again to find the correct answer.")
-        else:
-            current_msg = Msg(name="User", role="user", content=f"Please answer the question: {session.question}")
-
-        initial_history_len = len(history_msgs)
-
-        def on_memory_update(msgs):
+        elif hasattr(self, 'active_agent') and self.active_agent:
+            # Re-fetch the last completed trial to get specific feedback (if available)
+            last_trial = await sync_to_async(lambda: session.trials.filter(status='completed').last())()
+            feedback = last_trial.feedback if last_trial else "Incorrect"
+            
+            # Simplified Feedback Message for existing agent
+            current_msg = Msg(name="User", role="user", content=PROMPTS["browser_agent_retry_request"].format(feedback=feedback))
+            
+            # Approximate start of new trace by current memory length
             try:
-                relevant_msgs = msgs[initial_history_len:] if len(msgs) > initial_history_len else []
-                trace_data, _ = self._serialize_trace(relevant_msgs)
-                
-                # Prepend System Prompt
-                system_prompt_step = {
-                    "role": "system",
-                    "content": PROMPTS["browser_agent_system"],
-                    "step_type": "text"
-                }
-                trace_data = [system_prompt_step] + trace_data
+                current_mem = await self.active_agent.memory.get_memory()
+                turn_start_index = len(current_mem) if current_mem else 0
+            except:
+                turn_start_index = 0
 
-                key = f"trial_trace:{trial.id}"
-                
-                # Use the running loop to schedule the Redis write in a thread pool
-                # This avoids spawning a new thread for every update and doesn't block the loop
-                try:
-                    loop = asyncio.get_running_loop()
-                    loop.create_task(
-                        asyncio.to_thread(redis_client.set, key, json.dumps(trace_data), ex=3600)
-                    )
-                except RuntimeError:
-                     # Fallback if no loop is running (unlikely here)
-                     threading.Thread(
-                        target=redis_client.set, 
-                        args=(key, json.dumps(trace_data)), 
-                        kwargs={'ex': 3600},
-                        daemon=True
-                    ).start()
-                
-            except Exception as e:
-                print_debug(f"Redis update failed in BrowserAgentPipeline: {e}")
+        else:
+            # Fallback for trial > 1
+            current_msg = Msg(name="User", role="user", content=PROMPTS["agent_user_question"].format(question=session.question))
+            turn_start_index = 0
 
+        # 2. Execution Wrapper
         async def run_agent_task():
-            agent = await BrowserAgentFactory.create_agent(self.agent_model, self.agent_toolkit, self.mcp_client, update_callback=on_memory_update)
+            # Create Agent if needed
+            if not hasattr(self, 'active_agent') or not self.active_agent:
+                self.active_agent = await BrowserAgentFactory.create_agent(
+                    self.agent_model, 
+                    self.agent_toolkit, 
+                    self.mcp_client
+                )
+                
+                # If this is somehow a "fresh" agent but we are in trial > 1 (e.g. server restart),
+                # we technically should reconstruct history here. 
+                # But for this optimization, we assume the session is continuous in memory.
+                # If persistent state is lost, the agent starts fresh with just the question.
+
             try:
                 import inspect
-                if history_msgs:
-                    await agent.memory.add(history_msgs)
-                response = await agent(current_msg)
+                response = await self.active_agent(current_msg)
+                
                 if inspect.isasyncgen(response):
                     final_res = None
                     async for x in response:
                         final_res = x
                     response = final_res
-                trace = await agent.memory.get_memory()
+                
+                trace = await self.active_agent.memory.get_memory()
                 return response, trace
             except Exception as e:
                 print_debug(f"Error in run_agent_task: {e}")
                 raise e
 
         try:
-            # Direct await instead of asyncio.run
             response_msg, trace_msgs = await run_agent_task()
         except Exception as e:
             print_debug(f"Browser agent execution failed: {e}")
@@ -520,6 +459,7 @@ class BrowserAgentPipeline(BaseAgentPipeline):
             if auto_cleanup:
                 await self.cleanup()
         
+        # 3. Result Parsing
         raw_content = response_msg.content
         if isinstance(raw_content, list):
             try:
@@ -535,20 +475,18 @@ class BrowserAgentPipeline(BaseAgentPipeline):
         else:
             answer = str(raw_content) if raw_content is not None else ""
         
-        relevant_trace_msgs = trace_msgs[initial_history_len:] if len(trace_msgs) > initial_history_len else []
+        relevant_trace_msgs = trace_msgs[turn_start_index:] if len(trace_msgs) > turn_start_index else []
         trace_data, real_answer_found = self._serialize_trace(relevant_trace_msgs)
         
         if real_answer_found:
             answer = real_answer_found
         
-        # Prepend System Prompt
         system_prompt_step = {
             "role": "system",
-            "content": PROMPTS["browser_agent_system"],
+            "content": PROMPTS["browser_agent_system_prompt"],
             "step_type": "text"
         }
         trace_data = [system_prompt_step] + trace_data
-
         full_response = json.dumps(trace_data)
         
         if not trace_data:
@@ -558,9 +496,8 @@ class BrowserAgentPipeline(BaseAgentPipeline):
                  "content": answer
              }])
 
-        # Async DB access for saving result using BaseAgentPipeline helper
+        # 4. Save
         def save_result():
-            # self.save_trial_result is inherited from BaseAgentPipeline
             return self.save_trial_result(session, trial, answer, full_response)
 
         answer, is_correct = await sync_to_async(save_result)()

@@ -24,8 +24,6 @@ from .models import (
     MultiTurnRun,
     MultiTurnSession,
     MultiTurnTrial,
-    AdhocRun,
-    AdhocResult,
     BenchmarkDataset,
     AgentSettings,
 )
@@ -40,11 +38,9 @@ from .pipelines.base import (
     serialize_events_async,
 )
 from .pipelines.vanilla import (
-    VanillaLLMAdhocPipeline,
     VanillaLLMMultiTurnPipeline,
 )
 from .pipelines.rag import (
-    RagAdhocPipeline,
     RagMultiTurnPipeline,
 )
 from .pipelines.agent import (
@@ -271,73 +267,6 @@ def sync_datasets(request):
 
 
 @admin_required
-def vanilla_llm_adhoc(request):
-    # GET request logic
-    runs = AdhocRun.objects.filter(run_type='vanilla')
-    selected_run = None
-    run_results = []
-    run_id = request.GET.get("run_id")
-
-    if run_id:
-        try:
-            selected_run = get_object_or_404(AdhocRun, pk=run_id, run_type='vanilla')
-            # Serialize the results to pass as JSON to the template
-            run_results = list(
-                selected_run.results.values(
-                    "question",
-                    "answer",
-                    "ground_truths",
-                    "is_correct_rule",
-                    "is_correct_llm",
-                    "full_response",
-                )
-            )
-        except (ValueError, TypeError):
-            pass  # Ignore invalid run_id
-
-    settings_obj = LLMSettings.get_effective_settings()
-
-    # Load questions from the file
-    questions = []
-    # Default fallback if no dataset is selected or found
-    try:
-        file_path = os.path.join(
-            os.path.dirname(__file__), "..", "data", "hard_questions_refined.jsonl"
-        )
-        with open(file_path, "r") as f:
-            for line in f:
-                data = json.loads(line)
-                # Normalize ground truths
-                if "answer" in data and "ground_truths" not in data:
-                    data["ground_truths"] = data["answer"]
-                questions.append(data)
-    except FileNotFoundError:
-        pass
-
-    datasets = BenchmarkDataset.objects.all().order_by("-created_at")
-
-    context = {
-        "runs": runs,
-        "selected_run": selected_run,
-        "run_results_json": json.dumps(run_results),
-        "llm_settings": settings_obj,
-        "agent_settings": AgentSettings.get_effective_settings(),
-        "agent_memory_choices": AgentSettings.MEMORY_TYPE_CHOICES,
-        "search_provider_choices": SearchSettings.PROVIDER_CHOICES,
-        "questions": questions,
-        "total_questions": len(questions),
-        "datasets": datasets,
-    }
-    return render(request, "vanilla_llm_adhoc.html", context)
-
-
-
-
-
-
-
-
-@admin_required
 def get_default_settings(request):
     try:
         # LLM Defaults
@@ -514,12 +443,12 @@ def vanilla_llm_multi_turn(request):
 
     # Load sessions and group them
     groups = (
-        MultiTurnRun.objects.filter(sessions__pipeline_type='vanilla')
+        MultiTurnRun.objects.filter(sessions__pipeline_type='vanilla_llm_multi_turn')
         .exclude(name__startswith="Ad-hoc Session")
         .prefetch_related(
             models.Prefetch(
                 "sessions",
-                queryset=MultiTurnSession.objects.filter(pipeline_type='vanilla').order_by("-created_at"),
+                queryset=MultiTurnSession.objects.filter(pipeline_type='vanilla_llm_multi_turn').order_by("-created_at"),
             )
         )
         .order_by("-created_at")
@@ -528,7 +457,7 @@ def vanilla_llm_multi_turn(request):
 
     individual_sessions = MultiTurnSession.objects.filter(
         run__name__startswith="Ad-hoc Session",
-        pipeline_type='vanilla'
+        pipeline_type='vanilla_llm_multi_turn'
     ).order_by("-created_at")
 
     datasets = BenchmarkDataset.objects.all().order_by("-created_at")
@@ -562,12 +491,12 @@ def rag_multi_turn(request):
 
     # Load sessions and group them
     groups = (
-        MultiTurnRun.objects.filter(sessions__pipeline_type='rag')
+        MultiTurnRun.objects.filter(sessions__pipeline_type='rag_multi_turn')
         .exclude(name__startswith="Ad-hoc Session")
         .prefetch_related(
             models.Prefetch(
                 "sessions",
-                queryset=MultiTurnSession.objects.filter(pipeline_type='rag').order_by("-created_at"),
+                queryset=MultiTurnSession.objects.filter(pipeline_type='rag_multi_turn').order_by("-created_at"),
             )
         )
         .order_by("-created_at")
@@ -576,7 +505,7 @@ def rag_multi_turn(request):
 
     individual_sessions = MultiTurnSession.objects.filter(
         run__name__startswith="Ad-hoc Session",
-        pipeline_type='rag'
+        pipeline_type='rag_multi_turn'
     ).order_by("-created_at")
 
     datasets = BenchmarkDataset.objects.all().order_by("-created_at")
@@ -644,35 +573,7 @@ def vanilla_agent(request):
     return render(request, "vanilla_agent.html", context)
 
 
-@admin_required
-def rag_adhoc(request):
-    # Load questions from the file
-    questions = []
-    try:
-        file_path = os.path.join(
-            os.path.dirname(__file__), "..", "data", "hard_questions_refined.jsonl"
-        )
-        with open(file_path, "r") as f:
-            for line in f:
-                data = json.loads(line)
-                if "answer" in data and "ground_truths" not in data:
-                    data["ground_truths"] = data["answer"]
-                questions.append(data)
-    except FileNotFoundError:
-        pass
-    datasets = BenchmarkDataset.objects.all().order_by("-created_at")
-    context = {
-        "questions": questions,
-        "total_questions": len(questions),
-        "llm_settings": LLMSettings.get_effective_settings(),
-        "search_settings": SearchSettings.get_effective_settings(),
-        "agent_settings": AgentSettings.get_effective_settings(),
-        "agent_memory_choices": AgentSettings.MEMORY_TYPE_CHOICES,
-        "search_provider_choices": SearchSettings.PROVIDER_CHOICES,
-        "datasets": datasets,
-    }
 
-    return render(request, "rag_adhoc.html", context)
 
 
 
@@ -708,107 +609,10 @@ def save_agent_settings(request):
         return JsonResponse({"status": "error", "message": str(e)}, status=400)
 
 
-@admin_required
-def list_rag_adhoc_runs(request):
-    try:
-        runs = AdhocRun.objects.filter(run_type='rag').values(
-            "id", "name", "created_at", "accuracy"
-        ).order_by("-created_at")
-        return JsonResponse({"runs": list(runs)})
-    except Exception as e:
-        return JsonResponse({"error": str(e)}, status=500)
 
 
-@admin_required
-def get_rag_adhoc_run(request, run_id):
-    try:
-        run = get_object_or_404(AdhocRun, pk=run_id, run_type='rag')
-        results = list(
-            run.results.values(
-                "question",
-                "answer",
-                "full_response",
-                "ground_truths",
-                "is_correct_rule",
-                "is_correct_llm",
-                "num_docs_used",
-                "search_results",
-            )
-        )
-
-        # Prefer snapshot settings, fallback to empty dict
-        settings_data = {}
-        if run.settings_snapshot:
-            settings_data = run.settings_snapshot
-        run_data = {
-            "id": run.id,
-            "name": run.name,
-            "created_at": run.created_at,
-            "accuracy": run.accuracy,
-            "total_questions": run.total_questions,
-            "correct_answers": run.correct_answers,
-            "settings": settings_data,
-            "results": results,
-        }
-
-        return JsonResponse(run_data)
-    except Exception as e:
-        return JsonResponse({"error": str(e)}, status=500)
 
 
-@admin_required
-@require_http_methods(["DELETE"])
-def delete_rag_adhoc_run(request, run_id):
-    try:
-        run = get_object_or_404(AdhocRun, pk=run_id, run_type='rag')
-        run.delete()
-        return JsonResponse({"status": "ok"})
-    except Exception as e:
-        return JsonResponse({"status": "error", "message": str(e)}, status=500)
-
-
-@admin_required
-@require_POST
-def batch_delete_rag_adhoc_runs(request):
-    try:
-        data = json.loads(request.body)
-        run_ids = data.get("run_ids", [])
-        if not run_ids:
-            return JsonResponse(
-                {"status": "error", "message": "No run IDs provided."}, status=400
-            )
-
-        runs = AdhocRun.objects.filter(id__in=run_ids, run_type='rag')
-        deleted_count = runs.count()
-        runs.delete()
-
-        return JsonResponse(
-            {"status": "ok", "message": f"{deleted_count} runs deleted."}
-        )
-    except Exception as e:
-        return JsonResponse({"status": "error", "message": str(e)}, status=500)
-
-
-@admin_required
-@require_POST
-def batch_delete_vanilla_llm_adhoc_runs(request):
-    try:
-        data = json.loads(request.body)
-        run_ids = data.get("run_ids", [])
-        if not run_ids:
-            return JsonResponse(
-                {"status": "error", "message": "No run IDs provided."}, status=400
-            )
-
-        runs = AdhocRun.objects.filter(id__in=run_ids, run_type='vanilla')
-        deleted_count = runs.count()
-        runs.delete()
-
-        return JsonResponse(
-            {"status": "ok", "message": f"{deleted_count} runs deleted."}
-        )
-    except Exception as e:
-        return JsonResponse({"status": "error", "message": str(e)}, status=500)
 
 
 @require_POST
@@ -831,21 +635,12 @@ def create_session(request):
     question_text = data.get("question")
     ground_truths = data.get("ground_truths")
     group_id = data.get("group_id")
-    raw_pipeline_type = data.get("pipeline_type", "vanilla_llm_multi_turn")
+    pipeline_type = data.get("pipeline_type", "vanilla_llm_multi_turn")
 
     if not question_text or not ground_truths:
         return JsonResponse(
             {"error": "Question and ground truths are required."}, status=400
         )
-
-    # Normalize pipeline type string
-    pipeline_type = 'vanilla'
-    if "rag" in raw_pipeline_type and "agent" not in raw_pipeline_type:
-        pipeline_type = 'rag'
-    elif "browser_agent" in raw_pipeline_type:
-        pipeline_type = 'browser_agent'
-    elif "vanilla_agent" in raw_pipeline_type:
-        pipeline_type = 'vanilla_agent'
     
     # Determine settings for snapshot
     llm_settings = LLMSettings.get_effective_settings()
@@ -861,7 +656,7 @@ def create_session(request):
         }
     }
 
-    if pipeline_type != 'vanilla':
+    if pipeline_type != 'vanilla_llm_multi_turn':
          search_settings = SearchSettings.get_effective_settings()
          snapshot["search_settings"] = {
             "search_provider": search_settings.search_provider,
@@ -904,14 +699,7 @@ def get_session(request, session_id):
     except MultiTurnSession.DoesNotExist:
         return JsonResponse({"error": "Session not found"}, status=404)
     
-    if session.pipeline_type == 'vanilla':
-        pipeline_type = "vanilla_llm_multi_turn"
-    elif session.pipeline_type == 'vanilla_agent':
-        pipeline_type = "vanilla_agent"
-    elif session.pipeline_type == 'browser_agent': # New pipeline type
-        pipeline_type = "browser_agent"
-    else:
-        pipeline_type = "rag_multi_turn"
+    pipeline_type = session.pipeline_type
 
     # Resolve settings snapshot from run
     snapshot = session.run.settings_snapshot if session.run else {}
@@ -920,7 +708,7 @@ def get_session(request, session_id):
     if snapshot and "llm_settings" in snapshot:
         max_retries = snapshot["llm_settings"].get("max_retries", 3)
 
-    if session.pipeline_type == 'rag':
+    if pipeline_type == 'rag_multi_turn':
         trials = list(
             session.trials.values(
                 "id",
@@ -942,9 +730,9 @@ def get_session(request, session_id):
         snapshot = session.run.settings_snapshot if session.run else {}
         allow_reasoning = snapshot.get('llm_settings', {}).get('allow_reasoning', False)
         
-        sys_p = PROMPTS["rag_system"]
+        sys_p = PROMPTS["rag_system_prompt"]
         if allow_reasoning:
-            sys_p += PROMPTS["reasoning_instruction"]
+            sys_p += PROMPTS["shared_reasoning_instruction"]
 
         for t in trials:
             t['allow_reasoning'] = allow_reasoning # Inject setting for frontend debugging
@@ -952,24 +740,24 @@ def get_session(request, session_id):
             if not t.get("query_instruction"):
                 if t["trial_number"] == 1:
                     if allow_reasoning:
-                        user_p = PROMPTS["rag_query_generation_cot"].format(question=session.question)
+                        user_p = PROMPTS["rag_query_gen_cot_prompt"].format(question=session.question)
                     else:
-                        user_p = PROMPTS["rag_query_generation"].format(question=session.question)
+                        user_p = PROMPTS["rag_query_gen_prompt"].format(question=session.question)
                 else:
                     if allow_reasoning:
-                        user_p = PROMPTS["rag_reformulation_cot"]
+                        user_p = PROMPTS["rag_query_reform_cot_prompt"]
                     else:
-                        user_p = PROMPTS["rag_reformulation"]
+                        user_p = PROMPTS["rag_query_reform_prompt"]
                 t["query_instruction"] = f"*** SYSTEM PROMPT ***\n{sys_p}\n\n*** USER INPUT ***\n{user_p}"
             
             if not t.get("final_answer_instruction"):
                 # Use default formatting or search results formatting
                 # Note: search_results formatting is usually too large, we just show the prompt template part
-                base_instr = PROMPTS["rag_answer_instruction"].format(formatted_results="[Retrieved Webpages Content]")
+                base_instr = PROMPTS["rag_context_wrapper"].format(formatted_results="[Retrieved Webpages Content]")
                 if allow_reasoning:
-                    t["final_answer_instruction"] = base_instr + PROMPTS["reasoning_reminder"]
+                    t["final_answer_instruction"] = base_instr + PROMPTS["shared_reasoning_format"]
                 else:
-                    t["final_answer_instruction"] = base_instr + PROMPTS["simple_answer_instruction"]
+                    t["final_answer_instruction"] = base_instr + PROMPTS["shared_answer_request"]
 
     else:
         trials = list(
@@ -987,26 +775,26 @@ def get_session(request, session_id):
         )
         
         # Post-process for Vanilla to reconstruct instructions if missing
-        if session.pipeline_type == 'vanilla':
+        if pipeline_type == 'vanilla_llm_multi_turn':
             snapshot = session.run.settings_snapshot if session.run else {}
             allow_reasoning = snapshot.get('llm_settings', {}).get('allow_reasoning', False)
             
-            sys_p = PROMPTS["vanilla_system"]
+            sys_p = PROMPTS["vanilla_system_prompt"]
             if allow_reasoning:
-                sys_p += PROMPTS["reasoning_instruction"]
+                sys_p += PROMPTS["shared_reasoning_instruction"]
                 
             for t in trials:
                 t['allow_reasoning'] = allow_reasoning
                 
                 if not t.get("query_instruction"):
                     if t["trial_number"] == 1:
-                        user_p = PROMPTS["adhoc_user_question"].format(question=session.question)
+                        user_p = PROMPTS["shared_user_question"].format(question=session.question)
                         t["query_instruction"] = f"*** SYSTEM PROMPT ***\n{sys_p}\n\n*** USER INPUT ***\n{user_p}"
                     else:
                         if allow_reasoning:
-                            t["query_instruction"] = PROMPTS["multi_turn_reasoning_followup"]
+                            t["query_instruction"] = PROMPTS["vanilla_followup_reasoning_prompt"]
                         else:
-                            t["query_instruction"] = PROMPTS["multi_turn_followup"]
+                            t["query_instruction"] = PROMPTS["vanilla_followup_prompt"]
 
     return JsonResponse(
         {
@@ -1301,34 +1089,7 @@ def stop_vanilla_llm_multi_turn_pipeline(request):
 
 @admin_required
 @require_POST
-def run_vanilla_llm_adhoc_pipeline(request):
-    return _run_pipeline_generic(
-        request, 
-        VanillaLLMAdhocPipeline, 
-        "vanilla_llm_adhoc_pipeline_active"
-    )
 
-
-@admin_required
-@require_POST
-def stop_vanilla_llm_adhoc_pipeline(request):
-    return _stop_pipeline_generic(request, "vanilla_llm_adhoc_pipeline_active")
-
-
-@admin_required
-@require_POST
-def run_rag_adhoc_pipeline(request):
-    return _run_pipeline_generic(
-        request, 
-        RagAdhocPipeline, 
-        "rag_adhoc_pipeline_active"
-    )
-
-
-@admin_required
-@require_POST
-def stop_rag_adhoc_pipeline(request):
-    return _stop_pipeline_generic(request, "rag_adhoc_pipeline_active")
 
 
 @admin_required
@@ -1381,14 +1142,7 @@ def export_session(request, session_id):
     except MultiTurnSession.DoesNotExist:
         return HttpResponse("Session not found", status=404)
     
-    if session.pipeline_type == 'vanilla':
-        pipeline_type = "vanilla_llm_multi_turn"
-    elif session.pipeline_type == 'vanilla_agent':
-        pipeline_type = "vanilla_agent"
-    elif session.pipeline_type == 'browser_agent':
-        pipeline_type = "browser_agent"
-    else:
-        pipeline_type = "rag_multi_turn"
+    pipeline_type = session.pipeline_type
 
     snapshot = session.run.settings_snapshot if session.run else {}
     # remove api key from snapshot if present
@@ -1399,7 +1153,7 @@ def export_session(request, session_id):
     if snapshot and "llm_settings" in snapshot:
         max_retries = snapshot["llm_settings"].get("max_retries", 3)
 
-    if session.pipeline_type == 'rag':
+    if pipeline_type == 'rag_multi_turn':
         trials = list(
             session.trials.values(
                 "trial_number",
@@ -1411,7 +1165,7 @@ def export_session(request, session_id):
                 "search_results",
             )
         )
-    elif session.pipeline_type == 'vanilla_agent' or session.pipeline_type == 'browser_agent':
+    elif pipeline_type == 'vanilla_agent' or pipeline_type == 'browser_agent':
          trials = list(
             session.trials.values(
                 "trial_number", "answer", "feedback", "is_correct", "created_at", "full_response"
@@ -1451,7 +1205,7 @@ def export_session(request, session_id):
             "Is Correct",
             "Trial Created At",
         ]
-        if session.pipeline_type == 'rag':
+        if pipeline_type == 'rag_multi_turn':
             headers.extend(["Search Query", "Search Results"])
 
         writer.writerow(headers)
@@ -1469,7 +1223,7 @@ def export_session(request, session_id):
                 trial.get("is_correct"),
                 trial.get("created_at"),  # Already converted to string
             ]
-            if session.pipeline_type == 'rag':
+            if pipeline_type == 'rag_multi_turn':
                 row.extend([trial.get("search_query"), trial.get("search_results")])
 
             writer.writerow(row)
@@ -1508,7 +1262,7 @@ from difflib import SequenceMatcher
 def load_vanilla_llm_multi_turn_run(request, group_id):
     group = get_object_or_404(MultiTurnRun, pk=group_id)
     # Filter sessions by type
-    sessions = group.sessions.filter(pipeline_type='vanilla').prefetch_related("trials")
+    sessions = group.sessions.filter(pipeline_type='vanilla_llm_multi_turn').prefetch_related("trials")
     results = []
     snapshot = group.settings_snapshot
     max_retries = 3
@@ -1540,7 +1294,7 @@ def load_vanilla_llm_multi_turn_run(request, group_id):
 def load_rag_multi_turn_run(request, group_id):
     group = get_object_or_404(MultiTurnRun, pk=group_id)
     # Filter sessions by type
-    sessions = group.sessions.filter(pipeline_type='rag').prefetch_related("trials")
+    sessions = group.sessions.filter(pipeline_type='rag_multi_turn').prefetch_related("trials")
     results = []
     snapshot = group.settings_snapshot
     max_retries = 3
@@ -1618,41 +1372,7 @@ def load_agent_multi_turn_run(request, group_id):
     )
 
 
-@admin_required
-def list_vanilla_llm_adhoc_runs(request):
-    try:
-        runs = AdhocRun.objects.filter(run_type='vanilla').values(
-            "id", "name", "created_at", "accuracy"
-        ).order_by("-created_at")
-        return JsonResponse({"runs": list(runs)})
-    except Exception as e:
-        return JsonResponse({"error": str(e)}, status=500)
 
-
-@admin_required
-def get_vanilla_llm_adhoc_run(request, run_id):
-    try:
-        run = get_object_or_404(AdhocRun, pk=run_id, run_type='vanilla')
-        results = list(run.results.values("question", "answer", "full_response", "ground_truths", "is_correct_rule", "is_correct_llm"))
-        
-        settings_data = {}
-        if run.settings_snapshot:
-            settings_data = run.settings_snapshot
-            
-        run_data = {
-            "id": run.id,
-            "name": run.name,
-            "created_at": run.created_at,
-            "accuracy": run.accuracy,
-            "total_questions": run.total_questions,
-            "correct_answers": run.correct_answers,
-            "settings": settings_data,
-            "results": results,
-        }
-
-        return JsonResponse(run_data)
-    except Exception as e:
-        return JsonResponse({"error": str(e)}, status=500)
 
 
 @admin_required
@@ -1757,12 +1477,11 @@ def _run_pipeline_generic_async_wrapper(request, pipeline_class, redis_prefix_te
             redis_key = f"{redis_prefix_template}:{pipeline_id}"
             redis_client.set(redis_key, "1", ex=3600)
 
-    # Use a thread-safe async runner to create the pipeline
-    def create_pipeline_sync():
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
+    # Use a wrapper to ensure creation and execution happen in the same loop
+    async def pipeline_lifecycle_wrapper():
         try:
-            return loop.run_until_complete(pipeline_class.create(
+            # Creation phase
+            pipeline = await pipeline_class.create(
                 base_url=base_url,
                 api_key=api_key,
                 model=model,
@@ -1770,16 +1489,17 @@ def _run_pipeline_generic_async_wrapper(request, pipeline_class, redis_prefix_te
                 pipeline_id=pipeline_id,
                 dataset_id=dataset_id,
                 **kwargs
-            ))
-        finally:
-            loop.close()
-
-    pipeline = create_pipeline_sync()
+            )
+            
+            # Execution phase
+            async for event in pipeline.run():
+                yield event
+        except Exception as e:
+            yield {'error': str(e)}
 
     # Stream the response using the sync iterator bridge
-    # We serialize events synchronously as they come out of the bridge
     def serialize_events_sync_bridge():
-        for event in sync_iterator_from_async(pipeline.run()):
+        for event in sync_iterator_from_async(pipeline_lifecycle_wrapper()):
             yield json.dumps(event) + "\n"
 
     return StreamingHttpResponse(serialize_events_sync_bridge(), content_type="application/json")
@@ -1809,14 +1529,6 @@ def web_search(request):
         return JsonResponse({"error": str(e)}, status=500)
 
 
-@admin_required
-@require_http_methods(["DELETE"])
-def delete_vanilla_llm_adhoc_run(request, run_id):
-    try:
-        run = get_object_or_404(AdhocRun, pk=run_id, run_type='vanilla')
-        run.delete()
-        return JsonResponse({"status": "ok"})
-    except Exception as e:
-        return JsonResponse({"status": "error", "message": str(e)}, status=500)
+
 
 

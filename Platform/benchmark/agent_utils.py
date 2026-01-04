@@ -67,19 +67,7 @@ def answer_question(answer: str):
     """
     return ToolResponse(content="Answer submitted successfully.")
 
-class StreamingMemory(InMemoryMemory):
-    def __init__(self, update_callback=None, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.update_callback = update_callback
-
-    async def add(self, memories, **kwargs):
-        await super().add(memories, **kwargs)
-        if self.update_callback:
-            # Pass a copy of content to avoid concurrent modification issues
-            # self.content is a list, accessing it is sync
-            self.update_callback(list(self.content))
-
-def create_memory(memory_type, user_id, update_callback=None, model=None, llm_settings=None):
+def create_memory(memory_type, user_id, model=None, llm_settings=None):
     """Helper to initialize agent memory based on settings."""
     print_debug(f"Initializing memory with type: {memory_type}")
     
@@ -109,36 +97,13 @@ def create_memory(memory_type, user_id, update_callback=None, model=None, llm_se
             print_debug(f"Failed to init ReMe: {e}")
             
     if memory is None:
-        # Default fallback to StreamingMemory which handles callback internally
-        return StreamingMemory(update_callback=update_callback) if update_callback else InMemoryMemory()
-
-    # If we initialized a third-party memory AND have a callback, wrap the add method
-    if update_callback:
-        original_add = memory.add
-        
-        async def wrapped_add(memories, **kwargs):
-            # Call original
-            await original_add(memories, **kwargs)
-            
-            # Trigger callback
-            try:
-                # Try standard get_memory interface
-                msgs = await memory.get_memory()
-                if msgs is not None:
-                     update_callback(msgs)
-            except Exception as e:
-                print_debug(f"Error in memory callback wrapper: {e}")
-                # Fallback: try accessing content directly if available
-                if hasattr(memory, 'content'):
-                    update_callback(list(memory.content))
-
-        memory.add = wrapped_add
+        return InMemoryMemory()
         
     return memory
 
 class VanillaAgentFactory:
     @staticmethod
-    def create_agent(model, verbose: bool = False, update_callback=None):
+    def create_agent(model, verbose: bool = False):
         # Create Toolkit and register tool
         toolkit = Toolkit()
         toolkit.register_tool_function(web_search_tool)
@@ -146,11 +111,11 @@ class VanillaAgentFactory:
         
         agent_settings = AgentSettings.get_effective_settings()
         llm_settings = LLMSettings.get_effective_settings()
-        memory = create_memory(agent_settings.memory_type, "vanilla_agent_user", update_callback, model=model, llm_settings=llm_settings)
+        memory = create_memory(agent_settings.memory_type, "vanilla_agent_user", model=model, llm_settings=llm_settings)
 
         return ReActAgent(
             name="Assistant",
-            sys_prompt=PROMPTS["vanilla_agent_react_system"],
+            sys_prompt=PROMPTS["vanilla_agent_system_prompt"],
             model=model,
             toolkit=toolkit,
             memory=memory,
@@ -181,17 +146,17 @@ class VanillaAgentFactory:
         return model
 class BrowserAgentFactory:
     @staticmethod
-    async def create_agent(model, toolkit: Toolkit, mcp_client: StdIOStatefulClient, verbose: bool = False, update_callback=None):
+    async def create_agent(model, toolkit: Toolkit, mcp_client: StdIOStatefulClient, verbose: bool = False):
         # DEBUG: Print all registered tools
         print_debug(f"BrowserAgent Toolkit Tools: {list(toolkit.tools.keys())}")
         
         agent_settings = await sync_to_async(AgentSettings.get_effective_settings)()
         llm_settings = await sync_to_async(LLMSettings.get_effective_settings)()
-        memory = create_memory(agent_settings.memory_type, "browser_agent_user", update_callback, model=model, llm_settings=llm_settings)
+        memory = create_memory(agent_settings.memory_type, "browser_agent_user", model=model, llm_settings=llm_settings)
 
         agent = ReActAgent(
             name="BrowserAgent",
-            sys_prompt=PROMPTS["browser_agent_system"],
+            sys_prompt=PROMPTS["browser_agent_system_prompt"],
             model=model,
             toolkit=toolkit,
             memory=memory,

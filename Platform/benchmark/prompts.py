@@ -13,52 +13,44 @@ Incorrect Answers:
 """
 
 PROMPTS = {
-    # --- System Prompts (Personas + Rules) ---
+    # =========================================================================
+    # 1. SHARED COMPONENTS
+    # =========================================================================
     
-    "vanilla_system": f"""You are an expert answering engine capable of answering open-domain questions accurately and concisely.
-Your goal is to provide the exact correct answer to the user's question.
+    "shared_reasoning_instruction": """Please think step-by-step to arrive at the answer. 
+Wrap your thinking process inside <think>...</think> tags, then provide the final answer starting with 'Final Answer: '. """,
 
-{_RULES}""",
-
-    "rag_system": f"""You are an expert Question Answering system capable of answering open-domain questions using retrieved information.
-Your goal is to answer the user's question accurately using the provided search results.
-
-{_RULES}""",
-
-    # --- Instruction Components ---
-    
-    "reasoning_instruction": """Please think step-by-step to arrive at the answer. 
-Wrap your thinking process inside <think>...</think> tags, then provide the final answer starting with 'Final Answer: '.""",
-
-    "reasoning_reminder": """Format your response exactly as follows:
+    "shared_reasoning_format": """Format your response exactly as follows:
 <think>
 <step-by-step reasoning>
 </think>
 
 Final Answer:
-<final answer only>""",
+<final answer only>
 
-    # --- User Prompts (Pure Task Data) ---
+Start your response with 'Reasoning:'.""",
 
-    "adhoc_user_question": "Question: {question}",
-    
-    "rag_user_context_question": """Context:
-{search_results}
+    "shared_user_question": "Question: {question}",
+    "shared_answer_request": "\nPlease provide the final answer.",
 
-Question: {question}""",
+    # =========================================================================
+    # 2. VANILLA BASELINE
+    # =========================================================================
 
-    "rag_answer_instruction": """Here are the search results you can use to answer the question. Each result is wrapped in <source i> ... </source i> tags, where i is the result number.
-{formatted_results}""",
+    "vanilla_system_prompt": f"""You are an expert answering engine capable of answering open-domain questions accurately and concisely.
+Your goal is to provide the exact correct answer to the user's question.
 
-    "simple_answer_instruction": "\nPlease provide the final answer.",
-    
-    "multi_turn_followup": """Your previous answer was incorrect.
+{_RULES}""",
+
+    "vanilla_retry_request": "Your previous answer was incorrect. Please re-examine the question and try again.",
+
+    "vanilla_followup_prompt": """Your previous answer was incorrect.
 Answer the question again, potentially correcting yourself.
 Follow the rules established in the system prompt strictly.
 
 Answer:""",
 
-    "multi_turn_reasoning_followup": """Your previous answer was incorrect.
+    "vanilla_followup_reasoning_prompt": """Your previous answer was incorrect.
 Answer the question again.
 1. Wrap your thinking in <think>...</think> tags.
 2. Final Answer: Output 'Final Answer: <exact_answer>'.
@@ -66,15 +58,22 @@ Answer the question again.
 Let's think step by step.
 """,
 
-    # --- Other Helper Prompts ---
+    # =========================================================================
+    # 3. RAG BASELINE
+    # =========================================================================
 
-    "rag_query_generation": """Generate a search query to answer the following question.
+    "rag_system_prompt": f"""You are an expert Question Answering system capable of answering open-domain questions using retrieved information.
+Your goal is to answer the user's question accurately using the provided search results.
+
+{_RULES}""",
+
+    "rag_query_gen_prompt": """Generate a search query to answer the following question.
 Output ONLY the query.
 
 Question: {question}
 Query:""",
 
-    "rag_query_generation_cot": """Generate a search query to answer the following question.
+    "rag_query_gen_cot_prompt": """Generate a search query to answer the following question.
 Format your response as follows:
 <think>
 <step-by-step thinking>
@@ -83,13 +82,13 @@ Query: <search query only>
 
 Question: {question}""",
 
-    "rag_reformulation": """You are a search query optimizer.
+    "rag_query_reform_prompt": """You are a search query optimizer.
 The previous search did not have yielded the correct answer.
 Based on the conversation history, formulate a better search query.
 Output ONLY the new query string.
 """,
 
-    "rag_reformulation_cot": """You are a search query optimizer.
+    "rag_query_reform_cot_prompt": """You are a search query optimizer.
 The previous search did not have yielded the correct answer.
 Based on the conversation history, formulate a better search query.
 Format your response as follows:
@@ -99,13 +98,27 @@ Format your response as follows:
 Query: <search query only>
 """,
 
-    "rag_context_initial": """Context from search results (Query: {query}):
+    "rag_context_wrapper": """Here are the search results you can use to answer the question. Each result is wrapped in <source i> ... </source i> tags, where i is the result number.
+{formatted_results}""",
+
+    "rag_context_debug_wrapper": """Context from search results (Query: {query}):
 {results}
 
 Question: {question}
 """,
 
-    "vanilla_agent_react_system": f"""You are a ReAct (Reasoning and Acting) Agent expert in open-domain QA.
+    "rag_retry_prefix": "Your previous answer was incorrect.",
+    "rag_debug_format": "*** SYSTEM PROMPT ***\n{system_prompt}\n\n*** USER INPUT ***\n{instruction}",
+
+
+    # =========================================================================
+    # 4. AGENT BASELINES (Shared & Specific)
+    # =========================================================================
+
+    "agent_user_question": "Please answer the question: {question}",
+
+    # --- Vanilla Agent (ReAct) ---
+    "vanilla_agent_system_prompt": f"""You are a ReAct (Reasoning and Acting) Agent expert in open-domain QA.
 Your goal is to answer the user's question by interacting with the environment.
 
 {_RULES}
@@ -122,17 +135,21 @@ Action Input: tool arguments
 Example:
 Thought: I'll search for the capital of France.
 Action: web_search_tool
-Action Input: {{"query": "capital of France"}}
+Action Input: {{'query': 'capital of France'}}
 Observation: ...
 Thought: The answer is Paris.
 Action: answer_question
-Action Input: {{"answer": "Paris"}}
+Action Input: {{'answer': 'Paris'}}
 
 Constraints:
 1. You must use `answer_question` to finish.
 2. Always start with a Thought.""",
 
-    "browser_agent_system": f"""You are an autonomous Browser Agent expert in open-domain QA.
+    "vanilla_agent_retry_request": "Your previous answer was incorrect. Feedback: {feedback}. Please re-examine the question and try again.",
+
+
+    # --- Browser Agent (Autonomous) ---
+    "browser_agent_system_prompt": f"""You are an autonomous Browser Agent expert in open-domain QA.
 Your goal is to answer the user's question by browsing the web.
 
 CRITICAL: You must VERIFY everything by visiting pages. Do not guess.
@@ -146,5 +163,7 @@ Instructions:
 4. **Reason**: detailed step-by-step thinking.
 5. **Answer**: Call `answer_question(answer: str)` with the EXACT answer.
 
-Always output "Thought: ..." before using a tool.""",
+Always output \"Thought: ...\" before using a tool.""",
+
+    "browser_agent_retry_request": "Your previous answer was incorrect. Feedback: {feedback}. Please re-evaluate the task and try again."
 }

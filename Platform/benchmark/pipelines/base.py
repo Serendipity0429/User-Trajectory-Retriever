@@ -10,13 +10,12 @@ from task_manager.utils import redis_client
 from ..utils import print_debug, extract_final_answer, count_questions_in_file
 from ..models import (
     LLMSettings, BenchmarkDataset, 
-    AdhocRun, AdhocResult,
     MultiTurnRun, MultiTurnSession, MultiTurnTrial
 )
+from ..trace_formatter import TraceFormatter
+
 
 REDIS_PREFIX_ACTIVE = "pipeline_active"
-REDIS_PREFIX_VANILLA_ADHOC = "vanilla_llm_adhoc_pipeline_active"
-REDIS_PREFIX_RAG_ADHOC = "rag_adhoc_pipeline_active"
 REDIS_PREFIX_MULTI_TURN = "multi_turn_pipeline_active"
 REDIS_PREFIX_VANILLA_MULTI_TURN = "vanilla_llm_multi_turn_pipeline_active"
 REDIS_PREFIX_BROWSER_AGENT = "browser_agent_pipeline_active"
@@ -169,72 +168,6 @@ class BasePipeline:
         }
 
 
-class BaseAdhocPipeline(BasePipeline):
-    """
-    Base class for Ad-hoc pipelines (Vanilla and RAG) to reduce duplication.
-    """
-    def create_run_object(self):
-        raise NotImplementedError
-
-    def process_question(self, run_object, question, ground_truths):
-        raise NotImplementedError
-
-    def run(self):
-        run_object = self.create_run_object()
-        yield {'is_meta': True, 'type': 'run_created', 'run_id': run_object.id, 'name': run_object.name}
-        
-        total_questions = 0
-        questions_iterator = None
-        
-        try:
-            total_questions = self.get_total_questions()
-            questions_iterator = self.load_questions() # This now uses the file_path logic from get_questions_file_path
-        except (ValueError, FileNotFoundError, BenchmarkDataset.DoesNotExist) as e:
-            yield {'error': str(e)}
-            self.stop_token() # Ensure stop token is cleared on error
-            return # Terminate pipeline on error
-
-        yield {'is_meta': True, 'type': 'total_count', 'count': total_questions}
-
-        total_count = 0
-        correct_count = 0
-
-        for data in questions_iterator:
-            if not self.check_active():
-                break
-
-            question = data['question']
-            ground_truths = data.get('ground_truths', [])
-
-            # Notify frontend that we are starting this question
-            yield {
-                'is_meta': True, 
-                'type': 'processing_start', 
-                'question': {
-                    'question': question
-                    # We can send more data if needed for display
-                }
-            }
-
-            try:
-                result_data, is_correct = self.process_question(run_object, question, ground_truths)
-                
-                if is_correct:
-                    correct_count += 1
-                total_count += 1
-
-                yield result_data
-
-            except Exception as e:
-                yield {'error': str(e), 'question': question}
-
-        run_object.total_questions = total_count
-        run_object.correct_answers = correct_count
-        run_object.accuracy = (correct_count / total_count * 100) if total_count > 0 else 0
-        run_object.save()
-        self.stop_token()
-
-
 class BaseMultiTurnPipeline(BasePipeline):
     def __init__(self, base_url, api_key, model, max_retries, pipeline_id=None, dataset_id=None):
         super().__init__(base_url, api_key, model, pipeline_id, dataset_id)
@@ -342,29 +275,31 @@ class BaseMultiTurnPipeline(BasePipeline):
 
         group = MultiTurnRun.objects.create(name=group_name, settings_snapshot=snapshot)
         
-        total_questions = 0
-        questions_iterator = None
-        
         try:
-            total_questions = self.get_total_questions()
-            questions_iterator = self.load_questions()
-        except (ValueError, FileNotFoundError, BenchmarkDataset.DoesNotExist) as e:
-            yield {'error': str(e)}
-            self.stop_token()
-            return
-
-        yield {'is_meta': True, 'type': 'total_count', 'count': total_questions}
-
-        for data in questions_iterator:
-            if not self.check_active():
-                break
-
-            question_text = data['question']
-            ground_truths = data.get('ground_truths', [])
+            total_questions = 0
+            questions_iterator = None
             
-            yield from self._process_single_session(group, question_text, ground_truths)
-        
-        self.stop_token()
+            try:
+                total_questions = self.get_total_questions()
+                questions_iterator = self.load_questions()
+            except (ValueError, FileNotFoundError, BenchmarkDataset.DoesNotExist) as e:
+                yield {'error': str(e)}
+                return
+
+            yield {'is_meta': True, 'type': 'total_count', 'count': total_questions}
+
+            for data in questions_iterator:
+                if not self.check_active():
+                    break
+
+                question_text = data['question']
+                ground_truths = data.get('ground_truths', [])
+                
+                yield from self._process_single_session(group, question_text, ground_truths)
+        except Exception as e:
+            yield {'error': str(e)}
+        finally:
+            self.stop_token()
 
     def run_single_turn(self, session, trial):
         """
@@ -419,13 +354,26 @@ class BaseMultiTurnPipeline(BasePipeline):
                 "query_instruction": trial.query_instruction
             }
             redis_client.set(f"trial_status:{trial.id}", json.dumps(status_data), ex=3600) # Expire in 1 hour
+            
+            # Cache Trace for UI (Vanilla/Base pipelines)
+            trace_data = []
+            for msg in messages:
+                trace_data.append({
+                    "role": msg.get('role', 'unknown'),
+                    "content": msg.get('content', ''),
+                    "step_type": "text"
+                })
+            trace_data.append({
+                "role": "assistant",
+                "content": full_response,
+                "step_type": "text"
+            })
+            redis_client.set(f"trial_trace:{trial.id}", json.dumps(trace_data), ex=3600)
+
         except Exception as e:
-            print_debug(f"Failed to cache trial status: {e}")
+            print_debug(f"Failed to cache trial status/trace: {e}")
         
         return answer, is_correct, getattr(trial, 'search_results', [])
-
-from ..trace_formatter import TraceFormatter
-
 class BaseAgentPipeline(BaseMultiTurnPipeline):
     """
     Base class for Agent pipelines (Vanilla and Browser) to share trace serialization

@@ -4,100 +4,10 @@ from task_manager.utils import check_answer_rule, check_answer_llm, redis_client
 from ..search_utils import get_search_engine
 from ..prompts import PROMPTS
 from ..models import (
-    SearchSettings, AdhocRun, AdhocResult, MultiTurnSession, MultiTurnTrial
+    SearchSettings, MultiTurnSession, MultiTurnTrial
 )
 from ..utils import print_debug
-from .base import BaseAdhocPipeline, BaseMultiTurnPipeline, REDIS_PREFIX_RAG_ADHOC
-
-class RagAdhocPipeline(BaseAdhocPipeline):
-    def __init__(self, base_url, api_key, model, pipeline_id=None, dataset_id=None):
-        super().__init__(base_url, api_key, model, pipeline_id, dataset_id)
-        self.search_engine = get_search_engine()
-        self.redis_prefix = REDIS_PREFIX_RAG_ADHOC
-        self.search_settings = SearchSettings.get_effective_settings()
-
-    def __str__(self):
-        return "RAG Ad-hoc Pipeline"
-
-    def get_settings_snapshot(self):
-        snapshot = super().get_settings_snapshot()
-        snapshot['search_settings'] = {
-            'search_provider': self.search_settings.search_provider,
-            'search_limit': self.search_settings.search_limit,
-            'serper_fetch_full_content': self.search_settings.fetch_full_content
-        }
-        return snapshot
-
-    def create_run_object(self):
-        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        return AdhocRun.objects.create(
-            name=f"RAG Ad-hoc Run {timestamp}",
-            settings_snapshot=self.get_settings_snapshot(),
-            total_questions=0,
-            correct_answers=0,
-            run_type='rag'
-        )
-
-    def process_question(self, run, question, ground_truths):
-        # 1. Generate Search Query (Step 1 of dialogue)
-        query_instruction = PROMPTS["rag_query_generation"].format(question=question)
-        search_query, _ = self.get_llm_response(
-            [{"role": "user", "content": query_instruction}],
-            temperature=0.0,
-            allow_reasoning=False
-        )
-        search_query = search_query.strip().strip('"').strip("'")
-
-        # 2. Perform Search
-        search_results = self.search_engine.search(search_query)
-        formatted_results = self.search_engine.format_results(search_results)
-
-        # 3. Construct Full Conversational Prompt (Step 2 of dialogue)
-        system_prompt = PROMPTS["rag_system"]
-        if self.llm_settings.allow_reasoning:
-            system_prompt += PROMPTS["reasoning_instruction"]
-
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": query_instruction},
-            {"role": "assistant", "content": f"Search Query: {search_query}"},
-            {"role": "user", "content": f"Search Results:\n{formatted_results}Please provide the final answer."}
-        ]
-
-        # 4. Get Final Answer
-        answer, full_response = self.get_llm_response(messages)
-        is_correct_rule = check_answer_rule(question, ground_truths, answer)
-        is_correct_llm = check_answer_llm(
-            question, ground_truths, answer, 
-            client=self.client, 
-            model=self.model
-        )
-
-        # 5. Save Result
-        AdhocResult.objects.create(
-            run=run,
-            question=question,
-            ground_truths=ground_truths,
-            answer=answer,
-            full_response=full_response,
-            is_correct_rule=is_correct_rule,
-            is_correct_llm=is_correct_llm,
-            search_query=search_query,
-            num_docs_used=len(search_results),
-            search_results=search_results
-        )
-
-        return {
-            'question': question,
-            'answer': answer,
-            'full_response': full_response,
-            'ground_truths': ground_truths,
-            'rule_result': is_correct_rule,
-            'llm_result': is_correct_llm,
-            'search_query': search_query,
-            'num_docs_used': len(search_results),
-            'search_results': search_results
-        }, is_correct_llm
+from .base import BaseMultiTurnPipeline
 
 class RagMultiTurnPipeline(BaseMultiTurnPipeline):
     def __init__(self, base_url, api_key, model, max_retries, pipeline_id=None, dataset_id=None):
@@ -124,7 +34,7 @@ class RagMultiTurnPipeline(BaseMultiTurnPipeline):
             ground_truths=ground_truths,
             run=group,
             run_tag=self.pipeline_id,
-            pipeline_type='rag'
+            pipeline_type='rag_multi_turn'
         )
 
     def create_trial(self, session, trial_number):
@@ -158,14 +68,14 @@ class RagMultiTurnPipeline(BaseMultiTurnPipeline):
             
             if trial.trial_number == 1:
                 if allow_reasoning:
-                    instruction = PROMPTS["rag_query_generation_cot"].format(question=session.question)
+                    instruction = PROMPTS["rag_query_gen_cot_prompt"].format(question=session.question)
                 else:
-                    instruction = PROMPTS["rag_query_generation"].format(question=session.question)
+                    instruction = PROMPTS["rag_query_gen_prompt"].format(question=session.question)
             else:
                 if allow_reasoning:
-                    instruction = PROMPTS["rag_reformulation_cot"]
+                    instruction = PROMPTS["rag_query_reform_cot_prompt"]
                 else:
-                    instruction = PROMPTS["rag_reformulation"]
+                    instruction = PROMPTS["rag_query_reform_prompt"]
             
             formatted_results = self.search_engine.format_results(trial.search_results or [])
             
@@ -174,14 +84,13 @@ class RagMultiTurnPipeline(BaseMultiTurnPipeline):
             final_messages.append({"role": "assistant", "content": f"Search Query: {trial.search_query}"})
             
             # Add the result providing "exchange"
-            final_instr = PROMPTS["rag_answer_instruction"].format(formatted_results=formatted_results)
+            final_instr = PROMPTS["rag_context_wrapper"].format(formatted_results=formatted_results)
             
             # Re-inject reasoning instruction if enabled (as models tend to forget distant system prompts)
             if allow_reasoning:
-                final_instr += PROMPTS["reasoning_reminder"]
-                final_instr += "\n\nStart your response with 'Reasoning:'."
+                final_instr += PROMPTS["shared_reasoning_format"]
             else:
-                final_instr += PROMPTS["simple_answer_instruction"]
+                final_instr += PROMPTS["shared_answer_request"]
 
             final_messages.append({
                 "role": "user", 
@@ -201,9 +110,9 @@ class RagMultiTurnPipeline(BaseMultiTurnPipeline):
         messages = []
         allow_reasoning = session.run.settings_snapshot.get('llm_settings', {}).get('allow_reasoning', False)
         
-        system_prompt = PROMPTS["rag_system"]
+        system_prompt = PROMPTS["rag_system_prompt"]
         if allow_reasoning:
-            system_prompt += PROMPTS["reasoning_instruction"]
+            system_prompt += PROMPTS["shared_reasoning_instruction"]
             
         messages.append({"role": "system", "content": system_prompt})
         
@@ -211,14 +120,14 @@ class RagMultiTurnPipeline(BaseMultiTurnPipeline):
             # 1. Query Instruction
             if past_trial.trial_number == 1:
                 if allow_reasoning:
-                    instruction = PROMPTS["rag_query_generation_cot"].format(question=session.question)
+                    instruction = PROMPTS["rag_query_gen_cot_prompt"].format(question=session.question)
                 else:
-                    instruction = PROMPTS["rag_query_generation"].format(question=session.question)
+                    instruction = PROMPTS["rag_query_gen_prompt"].format(question=session.question)
             else:
                 if allow_reasoning:
-                    instruction = PROMPTS["rag_reformulation_cot"]
+                    instruction = PROMPTS["rag_query_reform_cot_prompt"]
                 else:
-                    instruction = PROMPTS["rag_reformulation"]
+                    instruction = PROMPTS["rag_query_reform_prompt"]
             
             # 2. Assistant's Query
             messages.append({"role": "user", "content": instruction})
@@ -227,12 +136,11 @@ class RagMultiTurnPipeline(BaseMultiTurnPipeline):
             # 3. Search Results and Answer Instruction
             formatted_results = self.search_engine.format_results(past_trial.search_results or [])
             
-            final_instr = PROMPTS["rag_answer_instruction"].format(formatted_results=formatted_results)
+            final_instr = PROMPTS["rag_context_wrapper"].format(formatted_results=formatted_results)
             if allow_reasoning:
-                final_instr += PROMPTS["reasoning_reminder"]
-                final_instr += "\n\nStart your response with 'Reasoning:'."
+                final_instr += PROMPTS["shared_reasoning_format"]
             else:
-                final_instr += PROMPTS["simple_answer_instruction"]
+                final_instr += PROMPTS["shared_answer_request"]
             
             messages.append({
                 "role": "user", 
@@ -257,26 +165,26 @@ class RagMultiTurnPipeline(BaseMultiTurnPipeline):
             history = self._reconstruct_history(session, completed_trials)
 
         # 1. Query Reformulation / Generation
-        system_prompt = PROMPTS["rag_system"]
+        system_prompt = PROMPTS["rag_system_prompt"]
         if allow_reasoning:
-            system_prompt += PROMPTS["reasoning_instruction"]
+            system_prompt += PROMPTS["shared_reasoning_instruction"]
 
         if trial.trial_number == 1:
             if allow_reasoning:
-                instruction = PROMPTS["rag_query_generation_cot"].format(question=session.question)
+                instruction = PROMPTS["rag_query_gen_cot_prompt"].format(question=session.question)
             else:
-                instruction = PROMPTS["rag_query_generation"].format(question=session.question)
+                instruction = PROMPTS["rag_query_gen_prompt"].format(question=session.question)
         else:
             # Add a "correction" context if it's a retry
-            history.append({"role": "user", "content": "Your previous answer was incorrect."})
+            history.append({"role": "user", "content": PROMPTS["rag_retry_prefix"]})
             if allow_reasoning:
-                 instruction = PROMPTS["rag_reformulation_cot"]
+                 instruction = PROMPTS["rag_query_reform_cot_prompt"]
             else:
-                 instruction = PROMPTS["rag_reformulation"]
+                 instruction = PROMPTS["rag_query_reform_prompt"]
 
         # Save instruction (System + User) if not already saved
         if not trial.query_instruction:
-            full_instr = f"*** SYSTEM PROMPT ***\n{system_prompt}\n\n*** USER INPUT ***\n{instruction}"
+            full_instr = PROMPTS["rag_debug_format"].format(system_prompt=system_prompt, instruction=instruction)
             trial.query_instruction = full_instr
             trial.save()
             print(f"DEBUG: Saved instruction for trial {trial.id}: {full_instr[:50]}...")
@@ -341,5 +249,36 @@ class RagMultiTurnPipeline(BaseMultiTurnPipeline):
         # We save the full turn sequence (Query Instruction -> Assistant Query -> Results -> Assistant Answer)
         new_history = messages + [{"role": "assistant", "content": full_response or answer}]
         redis_client.set(history_key, json.dumps(new_history), ex=3600)
+
+        # 5. Cache Trace & Status for UI (RAG Pipeline)
+        try:
+            # Status
+            status_data = {
+                "id": trial.id,
+                "status": "completed",
+                "answer": trial.answer,
+                "feedback": trial.feedback,
+                "is_correct": trial.is_correct,
+                "full_response": trial.full_response,
+                "query_instruction": trial.query_instruction
+            }
+            redis_client.set(f"trial_status:{trial.id}", json.dumps(status_data), ex=3600)
+
+            # Trace
+            trace_data = []
+            for msg in messages:
+                trace_data.append({
+                    "role": msg.get('role', 'unknown'),
+                    "content": msg.get('content', ''),
+                    "step_type": "text"
+                })
+            trace_data.append({
+                "role": "assistant",
+                "content": full_response or answer,
+                "step_type": "text"
+            })
+            redis_client.set(f"trial_trace:{trial.id}", json.dumps(trace_data), ex=3600)
+        except Exception as e:
+            print_debug(f"Failed to cache RAG trace/status: {e}")
 
         return answer, is_correct, trial.search_results

@@ -20,7 +20,7 @@ This project is a comprehensive platform for recording, replaying, and annotatin
 -   **Bulletin Notifications:** Automatic notifications are sent to all users via the private messaging system whenever a new bulletin is posted, ensuring timely communication.
 -   **Discussion Forum:** A platform for users to ask questions, share insights, and engage in discussions related to their research and tasks, fostering a collaborative community.
 -   **LLM Benchmarking & RAG Evaluation:** A comprehensive module for evaluating Large Language Models (LLMs) and Retrieval-Augmented Generation (RAG) systems. Includes features for:
-    -   **Adhoc & Multi-turn Evaluation:** evaluating both single-turn and multi-turn interactions.
+    -   **Multi-turn Evaluation:** evaluating multi-turn interactions.
     -   **Vanilla LLM & RAG Pipelines:** supporting both direct LLM generation and RAG-based approaches.
     -   **LLM-as-a-Judge:** Automated evaluation using a stronger LLM to judge the quality of answers.
 -   **Extension Version Management:** Administrators can manage different versions of the browser extension, view version history, and control which version is active.

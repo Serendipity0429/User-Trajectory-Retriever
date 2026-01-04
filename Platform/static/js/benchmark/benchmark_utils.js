@@ -20,26 +20,6 @@ const BenchmarkUrls = {
         activate: (id) => `${API_PREFIX}/datasets/activate/${id}/`
     },
 
-    // Ad-hoc: Vanilla LLM
-    vanillaLlmAdhoc: {
-        listRuns: `${API_PREFIX}/vanilla_llm_adhoc/list_runs/`,
-        getRun: (id) => `${API_PREFIX}/vanilla_llm_adhoc/get_run/${id}/`,
-        deleteRun: (id) => `${API_PREFIX}/vanilla_llm_adhoc/delete_run/${id}/`,
-        batchDeleteRuns: `${API_PREFIX}/vanilla_llm_adhoc/batch_delete_runs/`,
-        runPipeline: `${API_PREFIX}/run_vanilla_llm_adhoc_pipeline/`,
-        stopPipeline: `${API_PREFIX}/stop_vanilla_llm_adhoc_pipeline/`
-    },
-
-    // Ad-hoc: RAG
-    ragAdhoc: {
-        listRuns: `${API_PREFIX}/rag_adhoc/list_runs/`,
-        getRun: (id) => `${API_PREFIX}/rag_adhoc/get_run/${id}/`,
-        deleteRun: (id) => `${API_PREFIX}/rag_adhoc/delete_run/${id}/`,
-        batchDeleteRuns: `${API_PREFIX}/rag_adhoc/batch_delete_runs/`,
-        runPipeline: `${API_PREFIX}/run_rag_adhoc_pipeline/`,
-        stopPipeline: `${API_PREFIX}/stop_rag_adhoc_pipeline/`
-    },
-
     // Multi-turn Common
     multiTurn: {
         createSession: `${API_PREFIX}/multi_turn/create_session/`,
@@ -92,7 +72,7 @@ const BenchmarkState = {
     },
     activeRun: {
         id: null,
-        type: null, // 'vanilla_adhoc', 'rag_adhoc', 'multi_turn'
+        type: null, // 'multi_turn'
         data: null
     },
     ui: {}
@@ -1041,109 +1021,7 @@ window.BenchmarkUtils = {
         push();
     },
 
-    /**
-     * Update standard Adhoc pipeline statistics UI.
-     * @param {object} stats - Stats object { total, ruleCorrect, llmCorrect, llmErrors, agreements, totalDocsUsed }.
-     */
-    updateAdhocStatsUI: function(stats) {
-        if (document.getElementById('rule-correct-count')) {
-            document.getElementById('rule-correct-count').textContent = stats.ruleCorrect;
-        }
-        if (document.getElementById('rule-incorrect-count')) {
-            const ruleIncorrect = stats.total - stats.ruleCorrect;
-            document.getElementById('rule-incorrect-count').textContent = ruleIncorrect;
-        }
-        if (document.getElementById('rule-accuracy-rate')) {
-            const ruleAccuracy = stats.total > 0 ? (stats.ruleCorrect / stats.total) * 100 : 0;
-            document.getElementById('rule-accuracy-rate').textContent = `${ruleAccuracy.toFixed(2)}%`;
-        }
 
-        if (document.getElementById('llm-correct-count')) {
-            document.getElementById('llm-correct-count').textContent = stats.llmCorrect;
-        }
-        if (document.getElementById('llm-incorrect-count')) {
-            const llmIncorrect = stats.total - stats.llmCorrect - stats.llmErrors;
-            document.getElementById('llm-incorrect-count').textContent = llmIncorrect;
-        }
-        if (document.getElementById('llm-accuracy-rate')) {
-            const llmAccuracy = stats.total > 0 ? (stats.llmCorrect / stats.total) * 100 : 0;
-            document.getElementById('llm-accuracy-rate').textContent = `${llmAccuracy.toFixed(2)}%`;
-        }
-
-        if (document.getElementById('processed-count')) {
-            document.getElementById('processed-count').textContent = stats.total;
-        }
-        
-        if (document.getElementById('agreement-rate')) {
-            const agreementRate = stats.total > 0 ? (stats.agreements / stats.total) * 100 : 0;
-            document.getElementById('agreement-rate').textContent = `${agreementRate.toFixed(2)}%`;
-        }
-
-        if (document.getElementById('total-searches-count')) {
-            document.getElementById('total-searches-count').textContent = stats.total; 
-        }
-        if (document.getElementById('avg-docs-count')) {
-            const avgDocs = stats.total > 0 ? (stats.totalDocsUsed / stats.total) : 0;
-            document.getElementById('avg-docs-count').textContent = avgDocs.toFixed(1);
-        }
-    },
-
-    /**
-     * Display the results of a run.
-     * @param {object} runData - The run data object { name, results: [] }.
-     * @param {function} updateSummaryFunc - Function to update the summary statistics UI.
-     * @param {string} pipelineType - The type of pipeline (e.g., 'vanilla_adhoc', 'rag_adhoc').
-     */
-    displayRunResults: function(runData, updateSummaryFunc, pipelineType = 'vanilla_adhoc') {
-        const resultsContainer = document.getElementById('pipeline-results-container');
-        const progressContainer = document.getElementById('progress-container');
-        const saveRunBtn = document.getElementById('save-run-btn');
-        const resultsHeader = document.getElementById('results-header-text');
-        const resultsBody = document.getElementById('pipeline-results-body');
-
-        if (resultsContainer) resultsContainer.style.display = 'block';
-        if (progressContainer) progressContainer.style.display = 'none';
-        
-        if (resultsHeader) resultsHeader.textContent = `Results for: ${runData.name}`;
-        if (resultsBody) resultsBody.innerHTML = '';
-        
-        // Ensure status and processing rows are cleared
-        const statusDiv = document.getElementById('pipeline-status');
-        if (statusDiv) statusDiv.style.display = 'none';
-        const processingRow = document.getElementById('processing-row');
-        if (processingRow) processingRow.remove();
-
-        let stats = {
-            total: runData.results.length,
-            ruleCorrect: 0,
-            llmCorrect: 0,
-            llmErrors: 0,
-            agreements: 0,
-            totalDocsUsed: 0
-        };
-
-        if (runData.results) {
-            runData.results.forEach((result, index) => {
-                const summary = BenchmarkUtils.BenchmarkRenderer.renderResultRow(result, resultsBody, index + 1, pipelineType);
-                result.rowId = summary.rowId; 
-                
-                if (summary.ruleCorrect) stats.ruleCorrect++;
-                if (summary.llmCorrect) stats.llmCorrect++;
-                if (summary.llmCorrect === null) stats.llmErrors++;
-                if (summary.llmCorrect !== null && summary.ruleCorrect === summary.llmCorrect) {
-                    stats.agreements++;
-                }
-                stats.totalDocsUsed += (result.num_docs_used || 0);
-            });
-        }
-
-        if (updateSummaryFunc) {
-            updateSummaryFunc(stats);
-        }
-
-        const retryBtn = document.getElementById('retry-btn');
-        if (retryBtn) retryBtn.style.display = 'none';
-    },
 
     MultiTurnUtils: {
         /**

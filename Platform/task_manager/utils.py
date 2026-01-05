@@ -354,6 +354,9 @@ def wait_until_data_stored(func):
 
 
 def _normalize(text):
+    if text is None:
+        return ""
+    text = str(text)
     try:
         if not text.isdigit() and len(text) > 3:
             dt = parse_date(text, fuzzy=False)  # Strict Parsing
@@ -374,9 +377,14 @@ def _normalize(text):
 
 
 def check_answer_rule(question, authentic_answers, user_answer):
-    print_debug("Question:", question)
-    print_debug("User Answer:", user_answer)
-    print_debug("Correct Answer List:", authentic_answers)
+    if user_answer is None:
+        return False
+    if not authentic_answers or not isinstance(authentic_answers, (list, tuple)):
+        return False
+
+    # print_debug("Question:", question)
+    # print_debug("User Answer:", user_answer)
+    # print_debug("Correct Answer List:", authentic_answers)
 
     # Fallback to original normalization logic
     normalized_user_answer = _normalize(user_answer)

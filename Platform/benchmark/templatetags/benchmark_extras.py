@@ -35,10 +35,6 @@ def pipeline_badge(pipeline_type):
         }
     }
     
-    # Normalize aliases
-    if pipeline_type == 'vanilla': pipeline_type = 'vanilla_llm_multi_turn'
-    if pipeline_type == 'rag': pipeline_type = 'rag_multi_turn'
-
     style = config.get(pipeline_type, {
         'icon': 'bi-question-circle', 
         'color': 'text-secondary', 

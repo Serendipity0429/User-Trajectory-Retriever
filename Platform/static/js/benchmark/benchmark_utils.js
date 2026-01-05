@@ -1296,6 +1296,10 @@ window.BenchmarkUtils = {
                      const totalStub = stubbornSessions.reduce((sum, r) => sum + Number(r.stubborn_score), 0);
                      const avgStub = totalStub / stubbornSessions.length;
                      
+                     if (document.getElementById('stats-stubbornness-score')) {
+                         document.getElementById('stats-stubbornness-score').textContent = `${(avgStub * 100).toFixed(2)}%`;
+                     }
+
                      const col = document.createElement('div');
                      col.className = 'col-lg-3 col-md-6';
                      col.innerHTML = `

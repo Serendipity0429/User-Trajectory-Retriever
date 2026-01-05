@@ -258,13 +258,21 @@ class BaseMultiTurnPipeline(BasePipeline):
             yield {
                 'question': question_text,
                 'correct': final_is_correct,
+                'is_correct_llm': final_is_correct, # For consistency
+                'is_correct_rule': trial.is_correct_rule,
                 'trials': trial_number if final_is_correct else (trial_number - 1),
                 'session_id': session.id,
                 'final_answer': final_answer,
                 'ground_truths': ground_truths,
                 'max_retries': self.max_retries,
                 'group_name': group.name,
-                'group_id': group.id
+                'group_id': group.id,
+                'initial_correct': session.trials.order_by('trial_number').first().is_correct_llm,
+                'initial_correct_rule': session.trials.order_by('trial_number').first().is_correct_rule,
+                'coherence': (
+                    sum(1 for t in session.trials.all() if t.is_correct_llm == t.is_correct_rule) / session.trials.count()
+                    if session.trials.count() > 0 else 0
+                )
             }
 
         except Exception as e:

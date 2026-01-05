@@ -53,8 +53,8 @@ from .services import TrialService
 from benchmark.prompts import PROMPTS
 
 PIPELINE_CLASS_MAP = {
-    'vanilla': VanillaLLMMultiTurnPipeline,
-    'rag': RagMultiTurnPipeline,
+    'vanilla_llm_multi_turn': VanillaLLMMultiTurnPipeline,
+    'rag_multi_turn': RagMultiTurnPipeline,
     'vanilla_agent': VanillaAgentPipeline,
     'browser_agent': BrowserAgentPipeline,
 }
@@ -133,83 +133,49 @@ def _get_run_results(group_id, pipeline_types):
         max_retries = snapshot["llm_settings"].get("max_retries", 3)
 
     for session in sessions:
-        trials = session.trials.all().order_by('trial_number')
-        last_trial = trials.last()
-        first_trial = trials.first()
-        
-        if last_trial:
-            # Calculate Coherence for this session (average over its trials)
-            session_coherence = 0.0
-            if trials.count() > 0:
-                matches = 0
-                for t in trials:
-                    if t.is_correct_llm == t.is_correct_rule:
-                        matches += 1
-                session_coherence = matches / trials.count()
-
-            result_entry = {
-                "question": session.question,
-                "correct": last_trial.is_correct_llm,
-                "is_correct_llm": last_trial.is_correct_llm,
-                "is_correct_rule": last_trial.is_correct_rule,
-                "coherence": session_coherence,
-                "trials": session.trials.count(),
-                "session_id": session.id,
-                "final_answer": last_trial.answer,
-                "ground_truths": session.ground_truths,
-                "max_retries": max_retries,
-                "initial_correct": first_trial.is_correct_llm if first_trial else None,
-                "initial_correct_rule": first_trial.is_correct_rule if first_trial else None,
-                "pipeline_type": session.pipeline_type
-            }
+        trials = list(session.trials.all().order_by('trial_number'))
+        trial_count = len(trials)
+        if trial_count == 0:
+            continue
             
-            # Special logic for RAG & Agents: Calculate Query Shift and Search Count
-            is_agent = any(t in pipeline_types for t in ['vanilla_agent', 'browser_agent'])
-            if 'rag_multi_turn' in pipeline_types or is_agent:
-                query_shift = 0.0
-                search_count = 0
-                
-                trial_list = list(trials)
-                all_queries = []
-                
-                for t in trial_list:
-                    t_log = t.log or {}
-                    
-                    if is_agent:
-                        # Extract from agent log metrics
-                        t_queries = t_log.get("search_queries", [])
-                        all_queries.extend(t_queries)
-                        search_count += t_log.get("query_count", len(t_queries))
-                    else:
-                        # Extract from RAG trace/log
-                        trace = t_log.get("trace", [])
-                        q = None
-                        for msg in trace:
-                            content = msg.get("content", "")
-                            if msg.get("role") == "assistant" and "Search Query:" in content:
-                                q = content.replace("Search Query:", "").strip()
-                                break
-                        q = q or t_log.get("search_query")
-                        if q:
-                            all_queries.append(q)
-                            search_count += 1
-                
-                if len(all_queries) > 1:
-                    total_shift = 0.0
-                    shift_count = 0
-                    for i in range(len(all_queries) - 1):
-                        q1, q2 = all_queries[i], all_queries[i+1]
-                        if q1 and q2:
-                            similarity = SequenceMatcher(None, q1, q2).ratio()
-                            total_shift += (1.0 - similarity)
-                            shift_count += 1
-                    if shift_count > 0:
-                        query_shift = total_shift / shift_count
-                
-                result_entry['query_shift'] = query_shift
-                result_entry['search_count'] = search_count
+        first_trial = trials[0]
+        last_trial = trials[-1]
+        
+        # Calculate Coherence for this session (average over its trials)
+        session_coherence = 0.0
+        matches = 0
+        evaluated_trials = 0
+        for t in trials:
+            if t.is_correct_llm is not None and t.is_correct_rule is not None:
+                evaluated_trials += 1
+                if t.is_correct_llm == t.is_correct_rule:
+                    matches += 1
+        if evaluated_trials > 0:
+            session_coherence = matches / evaluated_trials
 
-            results.append(result_entry)
+        is_agent = any(t in pipeline_types for t in ['vanilla_agent', 'browser_agent'])
+        stubborn_score, query_shift, search_count = _calculate_session_metrics(trials, is_rag=not is_agent, is_agent=is_agent)
+
+        result_entry = {
+            "question": session.question,
+            "correct": last_trial.is_correct_llm,
+            "is_correct_llm": last_trial.is_correct_llm,
+            "is_correct_rule": last_trial.is_correct_rule,
+            "coherence": session_coherence,
+            "trials": trial_count,
+            "session_id": session.id,
+            "final_answer": last_trial.answer,
+            "ground_truths": session.ground_truths,
+            "max_retries": max_retries,
+            "initial_correct": first_trial.is_correct_llm if first_trial else None,
+            "initial_correct_rule": first_trial.is_correct_rule if first_trial else None,
+            "pipeline_type": session.pipeline_type,
+            "stubborn_score": stubborn_score,
+            "query_shift": query_shift,
+            "search_count": search_count
+        }
+
+        results.append(result_entry)
 
     return JsonResponse(
         {"results": results, "group_name": group.name, "settings": snapshot}
@@ -242,7 +208,7 @@ def get_trial_prompt(request, trial_id):
     session = trial.session
     pipeline_type = session.pipeline_type
     
-    if pipeline_type not in ['vanilla', 'rag']:
+    if pipeline_type not in ['vanilla_llm_multi_turn', 'rag_multi_turn']:
         return JsonResponse({"error": "Prompt reconstruction only supported for Vanilla and RAG baselines."}, status=400)
     
     try:
@@ -707,7 +673,7 @@ def get_session(request, session_id):
     if snapshot and "llm_settings" in snapshot:
         max_retries = snapshot["llm_settings"].get("max_retries", 3)
 
-    if pipeline_type == 'rag_multi_turn':
+    if 'rag' in pipeline_type:
         trials = list(
             session.trials.values(
                 "id", "trial_number", "answer", "feedback", "is_correct_llm", "is_correct_rule",
@@ -1126,7 +1092,8 @@ def export_session(request, session_id):
             "Is Correct (Rule)",
             "Trial Created At",
         ]
-        if pipeline_type == 'rag_multi_turn':
+        is_rag = 'rag' in pipeline_type
+        if is_rag:
             headers.extend(["Search Query", "Search Results"])
 
         writer.writerow(headers)
@@ -1145,7 +1112,7 @@ def export_session(request, session_id):
                 trial.get("is_correct_rule"),
                 trial.get("created_at"),  # Already converted to string
             ]
-            if pipeline_type == 'rag_multi_turn':
+            if is_rag:
                 row.extend([trial.get("search_query"), trial.get("search_results")])
 
             writer.writerow(row)
@@ -1174,33 +1141,57 @@ def export_session(request, session_id):
 
         return response
 
-def _calculate_session_metrics(trials, is_rag=False):
+def _calculate_session_metrics(trial_list, is_rag=False, is_agent=False):
     """
     Computes stubbornness and query shift metrics for a session trajectory.
     """
     stubborn_score = 0.0
     query_shift = 0.0
+    search_count = 0
     
-    if trials.count() <= 1:
-        return stubborn_score, (query_shift if is_rag else None)
+    if not isinstance(trial_list, list):
+        trial_list = list(trial_list)
+
+    if len(trial_list) == 0:
+        return stubborn_score, None, 0
 
     total_stubbornness = 0.0
     incorrect_transitions = 0
     total_query_shift = 0.0
     shift_count = 0
     
-    trial_list = list(trials)
+    all_queries = []
+    for t in trial_list:
+        t_log = t.log or {}
+        if is_agent:
+            t_queries = t_log.get("search_queries", [])
+            all_queries.extend(t_queries)
+            search_count += t_log.get("query_count", len(t_queries))
+        elif is_rag:
+            q = t_log.get("search_query")
+            if not q:
+                # Try to extract from trace
+                for msg in t_log.get("trace", []):
+                     if msg.get("role") == "assistant" and "Search Query:" in msg.get("content", ""):
+                        q = msg.get("content").replace("Search Query:", "").strip()
+                        break
+            if q:
+                all_queries.append(q)
+                search_count += 1
+
+    if len(all_queries) > 1:
+        for i in range(len(all_queries) - 1):
+            q1, q2 = all_queries[i], all_queries[i+1]
+            if q1 and q2:
+                similarity = SequenceMatcher(None, q1, q2).ratio()
+                total_query_shift += (1.0 - similarity)
+                shift_count += 1
+        if shift_count > 0:
+            query_shift = total_query_shift / shift_count
+
+    # Stubbornness
     for i in range(len(trial_list) - 1):
-        # Query Shift (RAG only)
-        if is_rag:
-            q1 = trial_list[i].search_query or ""
-            q2 = trial_list[i+1].search_query or ""
-            similarity_q = SequenceMatcher(None, q1, q2).ratio()
-            total_query_shift += (1.0 - similarity_q)
-            shift_count += 1
-        
-        # Stubbornness (Similarity of answers after incorrect feedback)
-        if trial_list[i].is_correct is False:
+        if trial_list[i].is_correct_llm is False:
             ans1 = trial_list[i].answer or ""
             ans2 = trial_list[i+1].answer or ""
             similarity_a = SequenceMatcher(None, ans1, ans2).ratio()
@@ -1209,12 +1200,8 @@ def _calculate_session_metrics(trials, is_rag=False):
 
     if incorrect_transitions > 0:
         stubborn_score = total_stubbornness / incorrect_transitions
-    
-    if is_rag and shift_count > 0:
-        query_shift = total_query_shift / shift_count
-        return stubborn_score, query_shift
         
-    return stubborn_score, None
+    return stubborn_score, (query_shift if (is_rag or is_agent) else None), search_count
 
 def _get_multi_turn_run_results(group_id, pipeline_type):
     """
@@ -1232,32 +1219,49 @@ def _get_multi_turn_run_results(group_id, pipeline_type):
     else:
         max_retries = LLMSettings.load().max_retries
 
-    is_rag = (pipeline_type == 'rag')
+    is_rag = 'rag' in pipeline_type
 
     for session in sessions:
-        trials = session.trials.all().order_by('trial_number')
-        first_trial = trials.first()
-        last_trial = trials.last()
-        
-        if not last_trial:
+        trials = list(session.trials.all().order_by('trial_number'))
+        trial_count = len(trials)
+        if trial_count == 0:
             continue
             
-        stubborn_score, query_shift = _calculate_session_metrics(trials, is_rag=is_rag)
+        first_trial = trials[0]
+        last_trial = trials[-1]
+        
+        stubborn_score, query_shift, search_count = _calculate_session_metrics(trials, is_rag=is_rag, is_agent=False)
+
+        # Calculate Coherence for this session (average over its trials)
+        session_coherence = 0.0
+        matches = 0
+        evaluated_trials = 0
+        for t in trials:
+            if t.is_correct_llm is not None and t.is_correct_rule is not None:
+                evaluated_trials += 1
+                if t.is_correct_llm == t.is_correct_rule:
+                    matches += 1
+        if evaluated_trials > 0:
+            session_coherence = matches / evaluated_trials
 
         result_entry = {
             "question": session.question,
-            "correct": last_trial.is_correct,
-            "trials": trials.count(),
+            "correct": last_trial.is_correct_llm,
+            "is_correct_llm": last_trial.is_correct_llm,
+            "is_correct_rule": last_trial.is_correct_rule,
+            "coherence": session_coherence,
+            "trials": trial_count,
             "session_id": session.id,
             "final_answer": last_trial.answer,
             "ground_truths": session.ground_truths,
             "max_retries": max_retries,
-            "initial_correct": first_trial.is_correct if first_trial else None,
-            "stubborn_score": stubborn_score
+            "initial_correct": first_trial.is_correct_llm if first_trial else None,
+            "initial_correct_rule": first_trial.is_correct_rule if first_trial else None,
+            "stubborn_score": stubborn_score,
+            "query_shift": query_shift,
+            "search_count": search_count,
+            "pipeline_type": session.pipeline_type
         }
-        
-        if is_rag:
-            result_entry["query_shift"] = query_shift
             
         results.append(result_entry)
 
@@ -1267,11 +1271,11 @@ def _get_multi_turn_run_results(group_id, pipeline_type):
 
 @admin_required
 def load_vanilla_llm_multi_turn_run(request, group_id):
-    return _get_multi_turn_run_results(group_id, 'vanilla')
+    return _get_multi_turn_run_results(group_id, 'vanilla_llm_multi_turn')
 
 @admin_required
 def load_rag_multi_turn_run(request, group_id):
-    return _get_multi_turn_run_results(group_id, 'rag')
+    return _get_multi_turn_run_results(group_id, 'rag_multi_turn')
 
 @admin_required
 def load_agent_multi_turn_run(request, group_id):
@@ -1366,21 +1370,6 @@ def run_browser_agent_pipeline(request):
         BrowserAgentPipeline, 
         "browser_agent_pipeline_active"
     )
-
-@admin_required
-@require_POST
-def stop_rag_multi_turn_pipeline(request):
-    try:
-        data = json.loads(request.body)
-        pipeline_id = data.get("pipeline_id")
-        reformulation_strategy = data.get("reformulation_strategy", "no_reform")
-        if pipeline_id:
-            redis_client.delete(
-                f"rag_multi_turn_{reformulation_strategy}_pipeline_active:{pipeline_id}"
-            )
-        return JsonResponse({"status": "ok"})
-    except Exception as e:
-        return JsonResponse({"status": "error", "message": str(e)}, status=400)
 
 @require_POST
 def web_search(request):

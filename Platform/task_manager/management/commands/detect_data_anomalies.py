@@ -36,6 +36,7 @@ class Command(BaseCommand):
         parser.add_argument('--max-inactivity', type=int, default=180, help='Maximum allowed inactivity gap in seconds (default: 180)')
         parser.add_argument('--min-activity-ratio', type=float, default=0.4, help='Minimum ratio of dwell time to total duration for long tasks (default: 0.4)')
         parser.add_argument('--delete', action='store_true', help='Delete all tasks detected as anomalies.')
+        parser.add_argument('--max-cancel-rate', type=float, default=0.1, help='Maximum allowed cancellation rate per user (default: 0.1)')
 
     def handle(self, *args, **options):
         self.stdout.write(self.style.MIGRATE_HEADING("Starting Data Anomaly Detection (Efficient Single-Pass)..."))
@@ -86,7 +87,7 @@ class Command(BaseCommand):
         self.scan_annotations_efficiently(options['min_annotation_time'], inc_tut)
 
         # Global Analysis
-        self.analyze_global_performance(options['min_completion_rate'])
+        self.analyze_global_performance(options['min_completion_rate'], options['max_cancel_rate'])
         self.analyze_task_goals()
 
         # Sequential Reporting
@@ -458,7 +459,7 @@ class Command(BaseCommand):
                     self.user_issues[uname].append(msg)
                     self.task_issues[tid].append(msg)
 
-    def analyze_global_performance(self, min_comp_rate):
+    def analyze_global_performance(self, min_comp_rate, max_cancel_rate=0.1):
         for uname, counts in self.user_task_counts.items():
             total = counts['total']
             completed = counts['completed']
@@ -471,7 +472,7 @@ class Command(BaseCommand):
                     self.user_issues[uname].append(msg)
             if completed > 0:
                 c_rate = cancelled / completed
-                if c_rate > 0.3:
+                if c_rate > max_cancel_rate:
                     msg = f"GLOBAL: High Cancellation Rate ({cancelled}/{completed}, {c_rate:.1%})."
                     self.test_findings[18].append(f"User {uname}: {msg}")
                     self.user_issues[uname].append(msg)

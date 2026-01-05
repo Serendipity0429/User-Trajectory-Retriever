@@ -240,19 +240,13 @@ window.BenchmarkUtils.MultiTurnPage = {
                     sessionAbortController = new AbortController();
                     const signal = sessionAbortController.signal;
                     
-                    let singleSessionPipelineType = pipelineType;
-                    // Only allow RAG mode override if we are on a RAG multi-turn page
-                    if (document.getElementById('rag_mode_select') && pipelineType.startsWith('rag_multi_turn')) {
-                        singleSessionPipelineType = document.getElementById('rag_mode_select').value;
-                    }
-
                     fetch(BenchmarkUrls.multiTurn.createSession, {
                         method: 'POST',
                         headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
                         body: JSON.stringify({
                             question: qData.question,
                             ground_truths: qData.answer,
-                            pipeline_type: singleSessionPipelineType
+                            pipeline_type: pipelineType
                         }),
                         signal: signal
                     }).then(res => res.json()).then(data => {

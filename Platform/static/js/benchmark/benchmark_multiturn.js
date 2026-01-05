@@ -332,10 +332,7 @@ window.BenchmarkUtils.MultiTurnPage = (function() {
             
             // --- Helper: Load Group/Run ---
             function loadRun(groupId) {
-                 let loadRunUrl = BenchmarkUrls.vanillaLlmMultiTurn.loadRun(groupId);
-                 if (pipelineType === 'browser_agent') loadRunUrl = BenchmarkUrls.browserAgent.loadRun(groupId);
-                 else if (pipelineType === 'vanilla_agent') loadRunUrl = BenchmarkUrls.vanillaAgent.loadRun(groupId);
-                 else if (pipelineType.includes('rag')) loadRunUrl = BenchmarkUrls.ragMultiTurn.loadRun(groupId);
+                 const loadRunUrl = BenchmarkUrls.pipeline.loadRun(pipelineType, groupId);
 
                  fetch(loadRunUrl).then(res => res.json()).then(data => {
                      if (data.error) { alert(data.error); return; }
@@ -471,10 +468,7 @@ window.BenchmarkUtils.MultiTurnPage = (function() {
                 
                 if (buildFormData) buildFormData(formData);
                 
-                let runUrl = BenchmarkUrls.vanillaLlmMultiTurn.runPipeline;
-                if (pipelineType === 'browser_agent') runUrl = BenchmarkUrls.browserAgent.runPipeline;
-                else if (pipelineType === 'vanilla_agent') runUrl = BenchmarkUrls.vanillaAgent.runPipeline;
-                else if (pipelineType.includes('rag')) runUrl = BenchmarkUrls.ragMultiTurn.runPipeline;
+                const runUrl = BenchmarkUrls.pipeline.start(pipelineType);
 
                 pipelineController = BenchmarkUtils.PipelineRunner.start({
                     url: runUrl,
@@ -511,10 +505,7 @@ window.BenchmarkUtils.MultiTurnPage = (function() {
                 if (pipelineController && pipelineController.pipelineId) {
                     let strategyData = { pipeline_id: pipelineController.pipelineId };
 
-                     let stopUrl = BenchmarkUrls.vanillaLlmMultiTurn.stopPipeline;
-                     if (pipelineType === 'browser_agent') stopUrl = BenchmarkUrls.browserAgent.stopPipeline;
-                     else if (pipelineType === 'vanilla_agent') stopUrl = BenchmarkUrls.vanillaAgent.stopPipeline;
-                     else if (pipelineType.includes('rag')) stopUrl = BenchmarkUrls.ragMultiTurn.stopPipeline;
+                    const stopUrl = BenchmarkUrls.pipeline.stop(pipelineType);
 
                     fetch(stopUrl, {
                         method: 'POST',
@@ -639,4 +630,3 @@ window.BenchmarkUtils.MultiTurnPage = (function() {
         PIPELINE_CONFIGS: PIPELINE_CONFIGS
     };
 })();
-

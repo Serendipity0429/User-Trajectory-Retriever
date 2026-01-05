@@ -3,7 +3,7 @@ import json
 import asyncio
 import agentscope
 from .search_utils import get_search_engine, WebCrawler
-from .models import LLMSettings, AgentSettings
+from .models import BenchmarkSettings
 from .prompts import PROMPTS
 from agentscope.agent import ReActAgent
 from agentscope.tool import Toolkit, ToolResponse
@@ -158,9 +158,8 @@ class VanillaAgentFactory:
         toolkit.register_tool_function(visit_page)
         toolkit.register_tool_function(answer_question)
         
-        agent_settings = AgentSettings.get_effective_settings()
-        llm_settings = LLMSettings.get_effective_settings()
-        memory = create_memory(agent_settings.memory_type, "vanilla_agent_user", model=model, llm_settings=llm_settings)
+        settings = BenchmarkSettings.get_effective_settings()
+        memory = create_memory(settings.memory_type, "vanilla_agent_user", model=model, llm_settings=settings)
 
         return ReActAgent(
             name="Assistant",
@@ -173,7 +172,7 @@ class VanillaAgentFactory:
         )
 
     @staticmethod
-    def init_agentscope(llm_settings: LLMSettings):
+    def init_agentscope(llm_settings: BenchmarkSettings):
         """
         Initialize AgentScope with the project's LLM settings.
         """
@@ -199,9 +198,8 @@ class BrowserAgentFactory:
         # DEBUG: Print all registered tools
         print_debug(f"BrowserAgent Toolkit Tools: {list(toolkit.tools.keys())}")
         
-        agent_settings = await sync_to_async(AgentSettings.get_effective_settings)()
-        llm_settings = await sync_to_async(LLMSettings.get_effective_settings)()
-        memory = create_memory(agent_settings.memory_type, "browser_agent_user", model=model, llm_settings=llm_settings)
+        settings = await sync_to_async(BenchmarkSettings.get_effective_settings)()
+        memory = create_memory(settings.memory_type, "browser_agent_user", model=model, llm_settings=settings)
 
         agent = ReActAgent(
             name="BrowserAgent",
@@ -220,7 +218,7 @@ class BrowserAgentFactory:
         return agent
 
     @staticmethod
-    def init_agentscope(llm_settings: LLMSettings):
+    def init_agentscope(llm_settings: BenchmarkSettings):
         """
         Initialize AgentScope with the project's LLM settings.
         Returns model and toolkit. MCP connection is handled externally.

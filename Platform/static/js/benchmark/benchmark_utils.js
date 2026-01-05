@@ -3,13 +3,11 @@ const API_PREFIX = '/benchmark/api';
 
 const BenchmarkUrls = {
     // LLM & Settings
-    saveLlmSettings: `${API_PREFIX}/save_llm_settings/`,
+    saveSettings: `${API_PREFIX}/settings/save/`,
     getDefaultSettings: `${API_PREFIX}/get_default_settings/`,
     testLlmConnection: `${API_PREFIX}/test_llm_connection/`,
     
-    // RAG & Search Settings
-    saveSearchSettings: `${API_PREFIX}/save_search_settings/`,
-    saveAgentSettings: `${API_PREFIX}/save_agent_settings/`,
+    // API - Common / General
     webSearch: `${API_PREFIX}/web_search/`,
 
     // Datasets
@@ -35,32 +33,41 @@ const BenchmarkUrls = {
         getTrialPrompt: (id) => `${API_PREFIX}/multi_turn/get_trial_prompt/${id}/`,
     },
 
-    // Multi-turn: Vanilla LLM
-    vanillaLlmMultiTurn: {
-        loadRun: (id) => `${API_PREFIX}/multi_turn/load_run/${id}/`,
-        runPipeline: `${API_PREFIX}/run_vanilla_llm_multi_turn_pipeline/`,
-        stopPipeline: `${API_PREFIX}/stop_vanilla_llm_multi_turn_pipeline/`
+    // Pipelines (Unified)
+    pipeline: {
+        start: (type) => `${API_PREFIX}/pipeline/start/${type}/`,
+        stop: (type) => `${API_PREFIX}/pipeline/stop/${type}/`,
+        loadRun: (type, id) => {
+            const map = {
+                'vanilla_llm_multi_turn': 'load_run',
+                'rag_multi_turn': 'load_rag_run',
+                'vanilla_agent': 'load_agent_run',
+                'browser_agent': 'load_agent_run'
+            };
+            return `${API_PREFIX}/multi_turn/${map[type] || 'load_run'}/${id}/`;
+        }
     },
 
-    // Multi-turn: RAG
+    // Compatibility (Mapping to unified)
+    vanillaLlmMultiTurn: {
+        loadRun: (id) => `${API_PREFIX}/multi_turn/load_run/${id}/`,
+        runPipeline: `${API_PREFIX}/pipeline/start/vanilla_llm_multi_turn/`,
+        stopPipeline: `${API_PREFIX}/pipeline/stop/vanilla_llm_multi_turn/`
+    },
     ragMultiTurn: {
         loadRun: (id) => `${API_PREFIX}/multi_turn/load_rag_run/${id}/`,
-        runPipeline: `${API_PREFIX}/run_rag_multi_turn_pipeline/`,
-        stopPipeline: `${API_PREFIX}/stop_rag_multi_turn_pipeline/`
+        runPipeline: `${API_PREFIX}/pipeline/start/rag_multi_turn/`,
+        stopPipeline: `${API_PREFIX}/pipeline/stop/rag_multi_turn/`
     },
-    
-    // Multi-turn: Vanilla Agent
     vanillaAgent: {
         loadRun: (id) => `${API_PREFIX}/multi_turn/load_agent_run/${id}/`,
-        runPipeline: `${API_PREFIX}/run_vanilla_agent_pipeline/`,
-        stopPipeline: `${API_PREFIX}/stop_vanilla_agent_pipeline/`
+        runPipeline: `${API_PREFIX}/pipeline/start/vanilla_agent/`,
+        stopPipeline: `${API_PREFIX}/pipeline/stop/vanilla_agent/`
     },
-    
-    // Multi-turn: Browser Agent
     browserAgent: {
-        loadRun: (id) => `${API_PREFIX}/multi_turn/load_agent_run/${id}/`, // Share loadRun for now as structure is same
-        runPipeline: `${API_PREFIX}/run_browser_agent_pipeline/`,
-        stopPipeline: `${API_PREFIX}/stop_browser_agent_pipeline/`
+        loadRun: (id) => `${API_PREFIX}/multi_turn/load_agent_run/${id}/`,
+        runPipeline: `${API_PREFIX}/pipeline/start/browser_agent/`,
+        stopPipeline: `${API_PREFIX}/pipeline/stop/browser_agent/`
     }
 };
 
@@ -504,10 +511,9 @@ window.BenchmarkUtils = {
                 btn.disabled = true;
                 btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Saving...';
 
-                const promises = [];
-
-                // LLM
-                const llmData = {
+                // Unified settings object
+                const settingsData = {
+                    // LLM
                     llm_base_url: document.getElementById('llm_base_url').value,
                     llm_api_key: document.getElementById('llm_api_key').value,
                     llm_model: document.getElementById('llm_model').value,
@@ -515,43 +521,26 @@ window.BenchmarkUtils = {
                     allow_reasoning: document.getElementById('allow_reasoning') ? document.getElementById('allow_reasoning').checked : false,
                     temperature: document.getElementById('temperature') ? document.getElementById('temperature').value : 0.0,
                     top_p: document.getElementById('top_p') ? document.getElementById('top_p').value : 1.0,
-                    max_tokens: document.getElementById('max_tokens') ? document.getElementById('max_tokens').value : null
+                    max_tokens: document.getElementById('max_tokens') ? document.getElementById('max_tokens').value : null,
+                    
+                    // Search
+                    search_provider: document.getElementById('search_provider') ? document.getElementById('search_provider').value : 'serper',
+                    search_limit: document.getElementById('search_limit') ? document.getElementById('search_limit').value : 5,
+                    serper_api_key: document.getElementById('serper_api_key') ? document.getElementById('serper_api_key').value : '',
+                    serper_fetch_full_content: document.getElementById('serper_fetch_full_content') ? document.getElementById('serper_fetch_full_content').checked : false,
+                    
+                    // Agent
+                    agent_memory_type: document.getElementById('agent_memory_type') ? document.getElementById('agent_memory_type').value : 'naive'
                 };
-                promises.push(fetch(BenchmarkUrls.saveLlmSettings, {
-                    method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
-                    body: JSON.stringify(llmData)
-                }).then(r => r.json()));
 
-                // Search
-                if (document.getElementById('search_provider')) {
-                    let searchProvider = document.getElementById('search_provider').value;
-                    const searchData = {
-                        search_provider: searchProvider,
-                        search_limit: document.getElementById('search_limit') ? document.getElementById('search_limit').value : 5,
-                        serper_api_key: document.getElementById('serper_api_key').value,
-                        serper_fetch_full_content: document.getElementById('serper_fetch_full_content') ? document.getElementById('serper_fetch_full_content').checked : false
-                    };
-                    promises.push(fetch(BenchmarkUrls.saveSearchSettings, {
-                        method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
-                        body: JSON.stringify(searchData)
-                    }).then(r => r.json()));
-                }
-
-                // Agent
-                if (document.getElementById('agent_memory_type')) {
-                    const agentData = {
-                        memory_type: document.getElementById('agent_memory_type').value
-                    };
-                    promises.push(fetch(BenchmarkUrls.saveAgentSettings, {
-                        method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
-                        body: JSON.stringify(agentData)
-                    }).then(r => r.json()));
-                }
-
-
-                Promise.all(promises).then(results => {
-                    const allOk = results.every(r => r.status === 'ok');
-                    if (allOk) {
+                fetch(BenchmarkUrls.saveSettings, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
+                    body: JSON.stringify(settingsData)
+                })
+                .then(r => r.json())
+                .then(resData => {
+                    if (resData.status === 'ok') {
                         btn.innerHTML = '<i class="bi bi-check-lg me-1"></i> Saved!';
                         btn.classList.remove('btn-primary');
                         btn.classList.add('btn-success');
@@ -567,13 +556,13 @@ window.BenchmarkUtils = {
                         }, 1500);
                         
                         // Re-test connection if base URL changed
-                        if (llmData.llm_base_url !== BenchmarkState.config.lastSavedBaseUrl) {
+                        if (settingsData.llm_base_url !== BenchmarkState.config.lastSavedBaseUrl) {
                             testConnection();
-                            BenchmarkState.config.lastSavedBaseUrl = llmData.llm_base_url;
+                            BenchmarkState.config.lastSavedBaseUrl = settingsData.llm_base_url;
                         }
 
                     } else {
-                        alert('Some settings failed to save.');
+                        alert('Error saving settings: ' + (resData.message || 'Unknown error'));
                         btn.disabled = false;
                         btn.innerHTML = originalText;
                     }
@@ -638,7 +627,7 @@ window.BenchmarkUtils = {
      * @param {string} pipelineId - The ID of the pipeline to stop.
      */
     stopPipeline: function(url, csrfToken, pipelineId) {
-        if (!pipelineId) return;
+        if (!pipelineId) return; 
         
         const data = JSON.stringify({ pipeline_id: pipelineId });
 

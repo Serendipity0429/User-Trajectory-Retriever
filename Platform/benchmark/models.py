@@ -53,10 +53,23 @@ class BenchmarkDataset(models.Model):
                 os.remove(self.file.path)
         super(BenchmarkDataset, self).delete(*args, **kwargs)
 
-class SearchSettings(SingletonModel):
+class BenchmarkSettings(SingletonModel):
     """
-    A singleton model to store Search-specific settings.
+    Unified settings model for LLM, Search, and Agent configurations.
     """
+    # LLM Settings
+    llm_base_url = models.CharField(max_length=255, blank=True, help_text="Optional: e.g., http://localhost:11434/v1")
+    llm_model = models.CharField(max_length=100, blank=True, help_text="e.g., gpt-4o")
+    llm_api_key = models.CharField(max_length=255, blank=True, help_text="Your API Key")
+    max_retries = models.PositiveIntegerField(default=3, help_text="Maximum number of retries allowed for the LLM.")
+    allow_reasoning = models.BooleanField(default=True, help_text="Allow the LLM to output its chain of thought reasoning before the final answer.")
+    
+    # LLM Advanced Parameters
+    temperature = models.FloatField(default=0.0, help_text="Sampling temperature (0.0 to 2.0).")
+    top_p = models.FloatField(default=1.0, help_text="Nucleus sampling probability (0.0 to 1.0).")
+    max_tokens = models.PositiveIntegerField(null=True, blank=True, help_text="Maximum number of tokens to generate.")
+
+    # Search Settings
     PROVIDER_CHOICES = [
         ('mcp', 'MCP Server'),
         ('serper', 'Serper API'),
@@ -66,34 +79,16 @@ class SearchSettings(SingletonModel):
     search_limit = models.IntegerField(default=5, validators=[MinValueValidator(1), MaxValueValidator(10)], help_text="Number of search results to retrieve (Top-K).")
     fetch_full_content = models.BooleanField(default=True, help_text="If enabled, fetches full page content for search results (Serper & MCP).")
 
-    def __str__(self):
-        return "Search Settings"
-
-    @classmethod
-    def get_effective_settings(cls):
-        settings = cls.load()
-        if not settings.serper_api_key:
-            settings.serper_api_key = config("SERPER_API_KEY", default="")
-        return settings
-
-class LLMSettings(SingletonModel):
-    """
-    A singleton model to store LLM settings for the benchmark tool.
-    This allows users to persist their LLM configuration in the database.
-    """
-    llm_base_url = models.CharField(max_length=255, blank=True, help_text="Optional: e.g., http://localhost:11434/v1")
-    llm_model = models.CharField(max_length=100, blank=True, help_text="e.g., gpt-4o")
-    llm_api_key = models.CharField(max_length=255, blank=True, help_text="Your API Key")
-    max_retries = models.PositiveIntegerField(default=3, help_text="Maximum number of retries allowed for the LLM.")
-    allow_reasoning = models.BooleanField(default=True, help_text="Allow the LLM to output its chain of thought reasoning before the final answer.")
-    
-    # Advanced Parameters
-    temperature = models.FloatField(default=0.0, help_text="Sampling temperature (0.0 to 2.0).")
-    top_p = models.FloatField(default=1.0, help_text="Nucleus sampling probability (0.0 to 1.0).")
-    max_tokens = models.PositiveIntegerField(null=True, blank=True, help_text="Maximum number of tokens to generate.")
+    # Agent Settings
+    MEMORY_TYPE_CHOICES = [
+        ('naive', 'Naive Memory'),
+        ('mem0', 'Mem0 Memory'),
+        ('reme', 'ReMe Memory'),
+    ]
+    memory_type = models.CharField(max_length=50, choices=MEMORY_TYPE_CHOICES, default='naive', help_text="Select the long-term memory mechanism.")
 
     def __str__(self):
-        return "LLM Settings"
+        return "Benchmark Settings"
 
     @classmethod
     def get_effective_settings(cls):
@@ -104,26 +99,9 @@ class LLMSettings(SingletonModel):
             settings.llm_model = config("LLM_MODEL", default="")
         if not settings.llm_base_url:
             settings.llm_base_url = config("LLM_BASE_URL", default="")
+        if not settings.serper_api_key:
+            settings.serper_api_key = config("SERPER_API_KEY", default="")
         return settings
-
-class AgentSettings(SingletonModel):
-    """
-    A singleton model to store Agent-specific settings.
-    """
-    MEMORY_TYPE_CHOICES = [
-        ('naive', 'Naive Memory'),
-        ('mem0', 'Mem0 Memory'),
-        ('reme', 'ReMe Memory'),
-    ]
-    
-    memory_type = models.CharField(max_length=50, choices=MEMORY_TYPE_CHOICES, default='naive', help_text="Select the long-term memory mechanism.")
-    
-    def __str__(self):
-        return "Agent Settings"
-
-    @classmethod
-    def get_effective_settings(cls):
-        return cls.load()
 
 class MultiTurnRun(models.Model):
     """

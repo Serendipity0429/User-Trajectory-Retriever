@@ -19,13 +19,11 @@ from task_manager.utils import check_answer_rule, check_answer_llm
 from .search_utils import get_search_engine
 from .utils import count_questions_in_file, handle_api_error, handle_async_api_error, print_debug
 from .models import (
-    LLMSettings,
-    SearchSettings,
+    BenchmarkSettings,
     MultiTurnRun,
     MultiTurnSession,
     MultiTurnTrial,
     BenchmarkDataset,
-    AgentSettings,
 )
 from .forms import BenchmarkDatasetForm
 
@@ -104,16 +102,19 @@ def _render_benchmark_view(request, pipeline_type, template_name):
 
     datasets = BenchmarkDataset.objects.all().order_by("-created_at")
 
+    settings = BenchmarkSettings.get_effective_settings()
+
     context = {
         "questions": questions,
         "groups": groups,
         "individual_sessions": individual_sessions,
-        "llm_settings": LLMSettings.get_effective_settings(),
-        "search_settings": SearchSettings.get_effective_settings(),
-        "agent_settings": AgentSettings.get_effective_settings(),
-        "agent_memory_choices": AgentSettings.MEMORY_TYPE_CHOICES,
-        "search_provider_choices": SearchSettings.PROVIDER_CHOICES,
+        "llm_settings": settings,
+        "search_settings": settings,
+        "agent_settings": settings,
+        "agent_memory_choices": BenchmarkSettings.MEMORY_TYPE_CHOICES,
+        "search_provider_choices": BenchmarkSettings.PROVIDER_CHOICES,
         "datasets": datasets,
+        "settings": settings,
     }
     return render(request, template_name, context)
 
@@ -232,18 +233,17 @@ def get_trial_prompt(request, trial_id):
 
 @admin_required
 def home(request):
-    settings = LLMSettings.get_effective_settings()
-    search_settings = SearchSettings.get_effective_settings()
-    agent_settings = AgentSettings.get_effective_settings()
+    settings = BenchmarkSettings.get_effective_settings()
     datasets = BenchmarkDataset.objects.all().order_by("-created_at")
 
     context = {
         "llm_settings": settings,
-        "search_settings": search_settings,
-        "agent_settings": agent_settings,
-        "agent_memory_choices": AgentSettings.MEMORY_TYPE_CHOICES,
-        "search_provider_choices": SearchSettings.PROVIDER_CHOICES,
+        "search_settings": settings,
+        "agent_settings": settings,
+        "agent_memory_choices": BenchmarkSettings.MEMORY_TYPE_CHOICES,
+        "search_provider_choices": BenchmarkSettings.PROVIDER_CHOICES,
         "datasets": datasets,
+        "settings": settings,
     }
     return render(request, "home.html", context)
 
@@ -383,29 +383,28 @@ def sync_datasets(request):
 @admin_required
 def get_default_settings(request):
     try:
-        # LLM Defaults
-        llm_settings = LLMSettings.get_effective_settings()
-        
-        # Search Defaults
-        search_settings = SearchSettings.get_effective_settings()
-
-        # Agent Defaults
-        agent_settings = AgentSettings.get_effective_settings()
+        # Unified Defaults
+        settings = BenchmarkSettings.get_effective_settings()
 
         config_data = {
             # LLM
-            "llm_base_url": config("LLM_BASE_URL", default=llm_settings.llm_base_url),
-            "llm_api_key": config("LLM_API_KEY", default=llm_settings.llm_api_key),
-            "llm_model": config("LLM_MODEL", default=llm_settings.llm_model),
+            "llm_base_url": config("LLM_BASE_URL", default=settings.llm_base_url),
+            "llm_api_key": config("LLM_API_KEY", default=settings.llm_api_key),
+            "llm_model": config("LLM_MODEL", default=settings.llm_model),
+            "max_retries": settings.max_retries,
+            "allow_reasoning": settings.allow_reasoning,
+            "temperature": settings.temperature,
+            "top_p": settings.top_p,
+            "max_tokens": settings.max_tokens,
             
             # Search
-            "search_provider": SearchSettings._meta.get_field("search_provider").get_default(),
-            "serper_api_key": config("SERPER_API_KEY", default=search_settings.serper_api_key),
-            "search_limit": SearchSettings._meta.get_field("search_limit").get_default(),
-            "serper_fetch_full_content": SearchSettings._meta.get_field("fetch_full_content").get_default(),
+            "search_provider": settings.search_provider,
+            "serper_api_key": config("SERPER_API_KEY", default=settings.serper_api_key),
+            "search_limit": settings.search_limit,
+            "serper_fetch_full_content": settings.fetch_full_content,
 
             # Agent
-            "agent_memory_type": agent_settings.memory_type,
+            "agent_memory_type": settings.memory_type,
         }
         return JsonResponse(config_data)
     except OperationalError:
@@ -457,35 +456,38 @@ def batch_delete_sessions(request):
 
 @admin_required
 @require_POST
-def save_llm_settings(request):
+def save_settings(request):
     try:
         data = json.loads(request.body)
-        settings_obj = LLMSettings.load()
-        settings_obj.llm_base_url = data.get("llm_base_url", "")
-        settings_obj.llm_model = data.get("llm_model", "")
-        settings_obj.llm_api_key = data.get("llm_api_key", "")
-        settings_obj.max_retries = data.get("max_retries", 3)
-        settings_obj.allow_reasoning = data.get("allow_reasoning", False)
+        settings = BenchmarkSettings.load()
         
-        # Advanced params
-        settings_obj.temperature = float(data.get("temperature", 0.0))
-        settings_obj.top_p = float(data.get("top_p", 1.0))
+        # LLM Settings
+        if "llm_base_url" in data: settings.llm_base_url = data.get("llm_base_url", "")
+        if "llm_model" in data: settings.llm_model = data.get("llm_model", "")
+        if "llm_api_key" in data: settings.llm_api_key = data.get("llm_api_key", "")
+        if "max_retries" in data: settings.max_retries = int(data.get("max_retries", 3))
+        if "allow_reasoning" in data: settings.allow_reasoning = data.get("allow_reasoning", True)
+        if "temperature" in data: settings.temperature = float(data.get("temperature", 0.0))
+        if "top_p" in data: settings.top_p = float(data.get("top_p", 1.0))
+        
         max_tokens_val = data.get("max_tokens")
         if max_tokens_val is not None and max_tokens_val != "":
-            settings_obj.max_tokens = int(max_tokens_val)
-        else:
-            settings_obj.max_tokens = None
+            settings.max_tokens = int(max_tokens_val)
+        elif "max_tokens" in data:
+            settings.max_tokens = None
             
-        settings_obj.save()
+        # Search Settings
+        if "search_provider" in data: settings.search_provider = data.get("search_provider", settings.search_provider)
+        if "serper_api_key" in data: settings.serper_api_key = data.get("serper_api_key", settings.serper_api_key)
+        if "search_limit" in data: settings.search_limit = int(data.get("search_limit", settings.search_limit))
+        if "serper_fetch_full_content" in data: settings.fetch_full_content = data.get("serper_fetch_full_content", settings.fetch_full_content)
+        
+        # Agent Settings
+        if "memory_type" in data: settings.memory_type = data.get("memory_type", settings.memory_type)
+        if "agent_memory_type" in data: settings.memory_type = data.get("agent_memory_type", settings.memory_type)
+
+        settings.save()
         return JsonResponse({"status": "ok"})
-    except OperationalError:
-        return JsonResponse(
-            {
-                "status": "error",
-                "message": "Database not migrated. Please run migrations for the 'benchmark' app to save settings.",
-            },
-            status=400,
-        )
     except Exception as e:
         return JsonResponse({"status": "error", "message": str(e)}, status=400)
 
@@ -553,35 +555,6 @@ def vanilla_agent(request):
 def browser_agent(request):
     return _render_benchmark_view(request, 'browser_agent', "browser_agent.html")
 
-@admin_required
-@require_POST
-def save_search_settings(request):
-    try:
-        data = json.loads(request.body)
-        settings = SearchSettings.load()
-        settings.search_provider = data.get("search_provider", settings.search_provider)
-        settings.serper_api_key = data.get("serper_api_key", settings.serper_api_key)
-        settings.search_limit = int(data.get("search_limit", settings.search_limit))
-        settings.fetch_full_content = data.get(
-            "serper_fetch_full_content", settings.fetch_full_content
-        )
-        settings.save()
-        return JsonResponse({"status": "ok"})
-    except Exception as e:
-        return JsonResponse({"status": "error", "message": str(e)}, status=400)
-
-@admin_required
-@require_POST
-def save_agent_settings(request):
-    try:
-        data = json.loads(request.body)
-        settings = AgentSettings.load()
-        settings.memory_type = data.get("memory_type", settings.memory_type)
-        settings.save()
-        return JsonResponse({"status": "ok"})
-    except Exception as e:
-        return JsonResponse({"status": "error", "message": str(e)}, status=400)
-
 @require_POST
 def create_session_group(request):
     try:
@@ -609,26 +582,26 @@ def create_session(request):
         )
     
     # Determine settings for snapshot
-    llm_settings = LLMSettings.get_effective_settings()
+    settings = BenchmarkSettings.get_effective_settings()
     snapshot = {
         "llm_settings": {
-            "llm_base_url": llm_settings.llm_base_url,
-            "llm_model": llm_settings.llm_model,
-            "max_retries": llm_settings.max_retries,
-            "allow_reasoning": getattr(llm_settings, "allow_reasoning", False),
-            "temperature": getattr(llm_settings, "temperature", 0.0),
-            "top_p": getattr(llm_settings, "top_p", 1.0),
-            "max_tokens": getattr(llm_settings, "max_tokens", None),
+            "llm_base_url": settings.llm_base_url,
+            "llm_model": settings.llm_model,
+            "max_retries": settings.max_retries,
+            "allow_reasoning": settings.allow_reasoning,
+            "temperature": settings.temperature,
+            "top_p": settings.top_p,
+            "max_tokens": settings.max_tokens,
+        },
+        "search_settings": {
+            "search_provider": settings.search_provider,
+            "search_limit": settings.search_limit,
+            "serper_fetch_full_content": settings.fetch_full_content,
+        },
+        "agent_config": {
+            "memory_type": settings.memory_type
         }
     }
-
-    if pipeline_type != 'vanilla_llm_multi_turn':
-         search_settings = SearchSettings.get_effective_settings()
-         snapshot["search_settings"] = {
-            "search_provider": search_settings.search_provider,
-            "search_limit": search_settings.search_limit,
-            "serper_fetch_full_content": search_settings.fetch_full_content,
-         }
 
     # Ensure Group exists
     if group_id:
@@ -789,7 +762,7 @@ def run_trial(request, trial_id):
 
     # Fallback to DB defaults if missing
     if not api_key or not model:
-        db_settings = LLMSettings.get_effective_settings()
+        db_settings = BenchmarkSettings.get_effective_settings()
         if not api_key:
             api_key = config("LLM_API_KEY", default=db_settings.llm_api_key)
         if not base_url:
@@ -907,7 +880,7 @@ def _get_common_llm_settings(request):
     """
     Helper to extract LLM settings from request or DB defaults.
     """
-    db_settings = LLMSettings.get_effective_settings()
+    db_settings = BenchmarkSettings.get_effective_settings()
     base_url = request.POST.get("llm_base_url") or db_settings.llm_base_url
     api_key = request.POST.get("llm_api_key") or db_settings.llm_api_key
     model = request.POST.get("llm_model") or db_settings.llm_model or "gpt-3.5-turbo"
@@ -981,53 +954,118 @@ def _stop_pipeline_generic(request, redis_prefix_template):
 
 @admin_required
 @require_POST
-def run_vanilla_llm_multi_turn_pipeline(request):
-    return _run_pipeline_generic(
-        request, 
-        VanillaLLMMultiTurnPipeline, 
-        "vanilla_llm_multi_turn_pipeline_active"
-    )
+def pipeline_start(request, pipeline_type):
+    """
+    Unified entry point for starting any pipeline.
+    """
+    if pipeline_type == 'vanilla_llm_multi_turn':
+        return _run_pipeline_generic(request, VanillaLLMMultiTurnPipeline, "vanilla_llm_multi_turn_pipeline_active")
+    elif pipeline_type == 'rag_multi_turn':
+        return _run_pipeline_generic(request, RagMultiTurnPipeline, "rag_multi_turn_pipeline_active")
+    elif pipeline_type == 'vanilla_agent':
+        return _run_pipeline_generic(request, VanillaAgentPipeline, "vanilla_agent_pipeline_active")
+    elif pipeline_type == 'browser_agent':
+        return _run_pipeline_generic_async_wrapper(request, BrowserAgentPipeline, "browser_agent_pipeline_active")
+    else:
+        return JsonResponse({"status": "error", "message": f"Unknown pipeline type: {pipeline_type}"}, status=400)
 
 @admin_required
 @require_POST
-def stop_vanilla_llm_multi_turn_pipeline(request):
-    return _stop_pipeline_generic(request, "vanilla_llm_multi_turn_pipeline_active")
+def pipeline_stop(request, pipeline_type):
+    """
+    Unified entry point for stopping any pipeline.
+    """
+    redis_prefix_map = {
+        'vanilla_llm_multi_turn': "vanilla_llm_multi_turn_pipeline_active",
+        'rag_multi_turn': "rag_multi_turn_pipeline_active",
+        'vanilla_agent': "vanilla_agent_pipeline_active",
+        'browser_agent': "browser_agent_pipeline_active",
+    }
+    prefix = redis_prefix_map.get(pipeline_type)
+    if prefix:
+        return _stop_pipeline_generic(request, prefix)
+    return JsonResponse({"status": "error", "message": f"Unknown pipeline type: {pipeline_type}"}, status=400)
 
-@admin_required
-@require_POST
-def run_rag_multi_turn_pipeline(request):
-    return _run_pipeline_generic(
-        request, 
-        RagMultiTurnPipeline, 
-        "rag_multi_turn_pipeline_active",
-    )
+def sync_iterator_from_async(async_gen):
+    """
+    Bridge an async generator to a sync iterator for WSGI compatibility.
+    Runs the async generator in a new event loop.
+    """
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        iter_ = async_gen.__aiter__()
+        while True:
+            try:
+                # Run the next step of the async generator in the loop
+                item = loop.run_until_complete(iter_.__anext__())
+                yield item
+            except StopAsyncIteration:
+                break
+    finally:
+        try:
+            # Cancel all running tasks
+            pending = asyncio.all_tasks(loop)
+            for task in pending:
+                task.cancel()
+            # Run the loop until all tasks are cancelled
+            if pending:
+                loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+        except Exception:
+            pass
+        loop.close()
 
-@admin_required
-@require_POST
-def stop_rag_multi_turn_pipeline(request):
-    return _stop_pipeline_generic(
-        request, 
-        "rag_multi_turn_pipeline_active"
-    )
+@handle_api_error
+def _run_pipeline_generic_async_wrapper(request, pipeline_class, redis_prefix_template, **kwargs):
+    """
+    Synchronous wrapper for running asynchronous pipelines (like Browser Agent) in WSGI.
+    """
+    # Sync settings retrieval
+    db_settings = BenchmarkSettings.get_effective_settings()
+    
+    base_url = request.POST.get("llm_base_url") or db_settings.llm_base_url
+    api_key = request.POST.get("llm_api_key") or db_settings.llm_api_key
+    model = request.POST.get("llm_model") or db_settings.llm_model or "gpt-3.5-turbo"
+    max_retries = int(request.POST.get("max_retries", 3))
 
-@admin_required
-@require_POST
-def run_vanilla_agent_pipeline(request):
-    return _run_pipeline_generic(
-        request, 
-        VanillaAgentPipeline, 
-        "vanilla_agent_pipeline_active"
-    )
+    pipeline_id = request.POST.get("pipeline_id")
+    dataset_id = request.POST.get("dataset_id")
+    
+    if not api_key:
+            return JsonResponse(
+            {"error": "An API Key is required to run the benchmark."}, status=400
+        )
 
-@admin_required
-@require_POST
-def stop_vanilla_agent_pipeline(request):
-    return _stop_pipeline_generic(request, "vanilla_agent_pipeline_active")
+    if pipeline_id:
+            redis_key = f"{redis_prefix_template}:{pipeline_id}"
+            redis_client.set(redis_key, "1", ex=3600)
 
-@admin_required
-@require_POST
-def stop_browser_agent_pipeline(request):
-    return _stop_pipeline_generic(request, "browser_agent_pipeline_active")
+    # Use a wrapper to ensure creation and execution happen in the same loop
+    async def pipeline_lifecycle_wrapper():
+        try:
+            # Creation phase
+            pipeline = await pipeline_class.create(
+                base_url=base_url,
+                api_key=api_key,
+                model=model,
+                max_retries=max_retries,
+                pipeline_id=pipeline_id,
+                dataset_id=dataset_id,
+                **kwargs
+            )
+            
+            # Execution phase
+            async for event in pipeline.run():
+                yield event
+        except Exception as e:
+            yield {'error': str(e)}
+
+    # Stream the response using the sync iterator bridge
+    def serialize_events_sync_bridge():
+        for event in sync_iterator_from_async(pipeline_lifecycle_wrapper()):
+            yield json.dumps(event) + "\n"
+
+    return StreamingHttpResponse(serialize_events_sync_bridge(), content_type="application/json")
 
 @admin_required
 def export_session(request, session_id):
@@ -1132,7 +1170,8 @@ def export_session(request, session_id):
             "trials": trials,
         }
         response = HttpResponse(
-            json.dumps(export_data, indent=2), content_type="application/json"
+            json.dumps(export_data, indent=2),
+            content_type="application/json"
         )
 
         response["Content-Disposition"] = (
@@ -1217,7 +1256,7 @@ def _get_multi_turn_run_results(group_id, pipeline_type):
     if "llm_settings" in snapshot:
         max_retries = snapshot["llm_settings"].get("max_retries", 3)
     else:
-        max_retries = LLMSettings.load().max_retries
+        max_retries = BenchmarkSettings.load().max_retries
 
     is_rag = 'rag' in pipeline_type
 
@@ -1281,95 +1320,157 @@ def load_rag_multi_turn_run(request, group_id):
 def load_agent_multi_turn_run(request, group_id):
     return _get_run_results(group_id, ['vanilla_agent', 'browser_agent'])
 
-def sync_iterator_from_async(async_gen):
-    """
-    Bridge an async generator to a sync iterator for WSGI compatibility.
-    Runs the async generator in a new event loop.
-    """
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    try:
-        iter_ = async_gen.__aiter__()
-        while True:
-            try:
-                # Run the next step of the async generator in the loop
-                item = loop.run_until_complete(iter_.__anext__())
-                yield item
-            except StopAsyncIteration:
-                break
-    finally:
-        try:
-            # Cancel all running tasks
-            pending = asyncio.all_tasks(loop)
-            for task in pending:
-                task.cancel()
-            # Run the loop until all tasks are cancelled
-            if pending:
-                loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
-        except Exception:
-            pass
-        loop.close()
+@admin_required
+@require_POST
+def run_vanilla_llm_multi_turn_pipeline(request):
+    return pipeline_start(request, 'vanilla_llm_multi_turn')
 
-@handle_api_error
-def _run_pipeline_generic_async_wrapper(request, pipeline_class, redis_prefix_template, **kwargs):
-    """
-    Synchronous wrapper for running asynchronous pipelines (like Browser Agent) in WSGI.
-    """
-    # Sync settings retrieval
-    db_settings = LLMSettings.get_effective_settings()
-    
-    base_url = request.POST.get("llm_base_url") or db_settings.llm_base_url
-    api_key = request.POST.get("llm_api_key") or db_settings.llm_api_key
-    model = request.POST.get("llm_model") or db_settings.llm_model or "gpt-3.5-turbo"
-    max_retries = int(request.POST.get("max_retries", 3))
+@admin_required
+@require_POST
+def stop_vanilla_llm_multi_turn_pipeline(request):
+    return pipeline_stop(request, 'vanilla_llm_multi_turn')
 
-    pipeline_id = request.POST.get("pipeline_id")
-    dataset_id = request.POST.get("dataset_id")
-    
-    if not api_key:
-            return JsonResponse(
-            {"error": "An API Key is required to run the benchmark."}, status=400
-        )
+@admin_required
+@require_POST
+def run_rag_multi_turn_pipeline(request):
+    return pipeline_start(request, 'rag_multi_turn')
 
-    if pipeline_id:
-            redis_key = f"{redis_prefix_template}:{pipeline_id}"
-            redis_client.set(redis_key, "1", ex=3600)
+@admin_required
+@require_POST
+def stop_rag_multi_turn_pipeline(request):
+    return pipeline_stop(request, 'rag_multi_turn')
 
-    # Use a wrapper to ensure creation and execution happen in the same loop
-    async def pipeline_lifecycle_wrapper():
-        try:
-            # Creation phase
-            pipeline = await pipeline_class.create(
-                base_url=base_url,
-                api_key=api_key,
-                model=model,
-                max_retries=max_retries,
-                pipeline_id=pipeline_id,
-                dataset_id=dataset_id,
-                **kwargs
-            )
-            
-            # Execution phase
-            async for event in pipeline.run():
-                yield event
-        except Exception as e:
-            yield {'error': str(e)}
+@admin_required
+@require_POST
+def run_vanilla_agent_pipeline(request):
+    return pipeline_start(request, 'vanilla_agent')
 
-    # Stream the response using the sync iterator bridge
-    def serialize_events_sync_bridge():
-        for event in sync_iterator_from_async(pipeline_lifecycle_wrapper()):
-            yield json.dumps(event) + "\n"
-
-    return StreamingHttpResponse(serialize_events_sync_bridge(), content_type="application/json")
+@admin_required
+@require_POST
+def stop_vanilla_agent_pipeline(request):
+    return pipeline_stop(request, 'vanilla_agent')
 
 @admin_required
 @require_POST
 def run_browser_agent_pipeline(request):
-    return _run_pipeline_generic_async_wrapper(
-        request, 
-        BrowserAgentPipeline, 
-        "browser_agent_pipeline_active"
+    return pipeline_start(request, 'browser_agent')
+
+@admin_required
+@require_POST
+def stop_browser_agent_pipeline(request):
+    return pipeline_stop(request, 'browser_agent')
+@admin_required
+def export_session(request, session_id):
+    try:
+        session = MultiTurnSession.objects.select_related("run").get(
+            pk=session_id
+        )
+    except MultiTurnSession.DoesNotExist:
+        return HttpResponse("Session not found", status=404)
+    
+    pipeline_type = session.pipeline_type
+
+    snapshot = session.run.settings_snapshot if session.run else {}
+    # remove api key from snapshot if present
+    if snapshot and "llm_settings" in snapshot:
+        snapshot["llm_settings"].pop("llm_api_key", None)
+
+    max_retries = 3
+    if snapshot and "llm_settings" in snapshot:
+        max_retries = snapshot["llm_settings"].get("max_retries", 3)
+
+    trials = list(
+        session.trials.values(
+            "trial_number", "answer", "feedback", "is_correct_llm", "is_correct_rule", 
+            "created_at", "full_response", "log"
+        )
     )
+
+    # Fix datetime serialization and unpack log
+    for trial in trials:
+        trial["is_correct"] = trial["is_correct_llm"] # Compatibility
+        if trial.get("created_at"):
+            trial["created_at"] = trial["created_at"].isoformat()
+            
+        log = trial.get("log") or {}
+        trial["trace"] = log.get("trace", [])
+        trial["search_results"] = log.get("search_results", [])
+        
+        # Unpack metadata for CSV if available
+        trial["search_query"] = log.get("search_query")
+
+    export_format = request.GET.get("format", "json")
+
+    if export_format == "csv":
+        response = HttpResponse(content_type="text/csv")
+        response["Content-Disposition"] = (
+            f'attachment; filename="benchmark_session_{session_id}.csv"'
+        )
+
+        writer = csv.writer(response)
+        # Define headers
+        headers = [
+            "Session ID",
+            "Question",
+            "Ground Truths",
+            "Pipeline Type",
+            "Session Created At",
+            "Trial Number",
+            "Answer",
+            "Feedback",
+            "Is Correct (LLM)",
+            "Is Correct (Rule)",
+            "Trial Created At",
+        ]
+        is_rag = 'rag' in pipeline_type
+        if is_rag:
+            headers.extend(["Search Query", "Search Results"])
+
+        writer.writerow(headers)
+
+        for trial in trials:
+            row = [
+                session.id,
+                session.question,
+                session.ground_truths,
+                pipeline_type,
+                session.created_at.isoformat(),
+                trial.get("trial_number"),
+                trial.get("answer"),
+                trial.get("feedback"),
+                trial.get("is_correct_llm"),
+                trial.get("is_correct_rule"),
+                trial.get("created_at"),  # Already converted to string
+            ]
+            if is_rag:
+                row.extend([trial.get("search_query"), trial.get("search_results")])
+
+            writer.writerow(row)
+
+        return response
+
+    else:
+        export_data = {
+            "session_id": session.id,
+            "question": session.question,
+            "ground_truths": session.ground_truths,
+            "is_completed": session.is_completed,
+            "pipeline_type": pipeline_type,
+            "created_at": session.created_at.isoformat(),
+            "max_retries": max_retries,
+            "settings": snapshot,
+            "trials": trials,
+        }
+        response = HttpResponse(
+            json.dumps(export_data, indent=2),
+            content_type="application/json"
+        )
+
+        response["Content-Disposition"] = (
+            f'attachment; filename="benchmark_session_{session_id}.json"'
+        )
+
+        return response
 
 @require_POST
 def web_search(request):

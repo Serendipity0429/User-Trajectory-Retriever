@@ -9,7 +9,7 @@ from concurrent import futures
 from task_manager.utils import redis_client, check_answer_rule, check_answer_llm
 from ..utils import print_debug, extract_final_answer, count_questions_in_file
 from ..models import (
-    LLMSettings, BenchmarkDataset, 
+    BenchmarkSettings, BenchmarkDataset, 
     MultiTurnRun, MultiTurnSession, MultiTurnTrial
 )
 from ..trace_formatter import TraceFormatter
@@ -43,7 +43,7 @@ class BasePipeline:
         self.pipeline_id = pipeline_id
         self.dataset_id = dataset_id
         self.redis_prefix = REDIS_PREFIX_ACTIVE
-        self.llm_settings = LLMSettings.get_effective_settings()
+        self.llm_settings = BenchmarkSettings.get_effective_settings()
 
     def check_active(self):
         if not self.pipeline_id:

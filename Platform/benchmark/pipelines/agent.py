@@ -5,7 +5,7 @@ from concurrent import futures
 from datetime import datetime
 from asgiref.sync import sync_to_async
 from agentscope.message import Msg
-from ..models import LLMSettings, SearchSettings, MultiTurnRun, MultiTurnSession, MultiTurnTrial, AgentSettings
+from ..models import BenchmarkSettings, MultiTurnRun, MultiTurnSession, MultiTurnTrial
 from ..utils import print_debug, count_questions_in_file
 from ..prompts import PROMPTS
 from ..agent_utils import VanillaAgentFactory, BrowserAgentFactory
@@ -18,7 +18,7 @@ class VanillaAgentPipeline(BaseAgentPipeline):
     def __init__(self, base_url, api_key, model, max_retries, pipeline_id=None, dataset_id=None):
         super().__init__(base_url, api_key, model, max_retries, pipeline_id, dataset_id)
         # Initialize AgentScope
-        self.temp_settings = LLMSettings(
+        self.temp_settings = BenchmarkSettings(
             llm_base_url=base_url,
             llm_api_key=api_key,
             llm_model=model,
@@ -31,12 +31,12 @@ class VanillaAgentPipeline(BaseAgentPipeline):
         return "Vanilla Agent Pipeline"
 
     def get_settings_snapshot(self):
-        agent_settings = AgentSettings.get_effective_settings()
+        settings = BenchmarkSettings.get_effective_settings()
         snapshot = super().get_settings_snapshot()
         snapshot['pipeline_type'] = 'vanilla_agent'
         snapshot['agent_config'] = {
             'model_name': self.agent_model.model_name if hasattr(self.agent_model, 'model_name') else 'unknown',
-            'memory_type': agent_settings.memory_type
+            'memory_type': settings.memory_type
         }
         return snapshot
 
@@ -202,7 +202,7 @@ def question_file_iterator(file_path):
 class BrowserAgentPipeline(BaseAgentPipeline):
     def __init__(self, base_url, api_key, model, max_retries, pipeline_id=None, dataset_id=None):
         super().__init__(base_url, api_key, model, max_retries, pipeline_id, dataset_id)
-        self.temp_settings = LLMSettings(
+        self.temp_settings = BenchmarkSettings(
             llm_base_url=base_url,
             llm_api_key=api_key,
             llm_model=model,
@@ -228,12 +228,12 @@ class BrowserAgentPipeline(BaseAgentPipeline):
         return "Browser Agent Pipeline"
 
     def get_settings_snapshot(self):
-        agent_settings = AgentSettings.get_effective_settings()
+        settings = BenchmarkSettings.get_effective_settings()
         snapshot = super().get_settings_snapshot()
         snapshot['pipeline_type'] = 'browser_agent'
         snapshot['agent_config'] = {
             'model_name': self.agent_model.model_name if hasattr(self, 'agent_model') and self.agent_model and hasattr(self.agent_model, 'model_name') else 'unknown',
-            'memory_type': agent_settings.memory_type
+            'memory_type': settings.memory_type
         }
         return snapshot
 

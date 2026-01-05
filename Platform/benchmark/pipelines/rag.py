@@ -4,7 +4,7 @@ from task_manager.utils import check_answer_rule, check_answer_llm, redis_client
 from ..search_utils import get_search_engine
 from ..prompts import PROMPTS
 from ..models import (
-    SearchSettings, MultiTurnSession, MultiTurnTrial
+    BenchmarkSettings, MultiTurnSession, MultiTurnTrial
 )
 from ..utils import print_debug
 from ..trace_formatter import TraceFormatter
@@ -20,12 +20,12 @@ class RagMultiTurnPipeline(BaseMultiTurnPipeline):
         return "RAG Multi-Turn Pipeline"
 
     def get_settings_snapshot(self):
-        search_settings = SearchSettings.get_effective_settings()
+        settings = BenchmarkSettings.get_effective_settings()
         snapshot = super().get_settings_snapshot()
         snapshot['search_settings'] = {
-            'search_provider': search_settings.search_provider,
-            'search_limit': search_settings.search_limit,
-            'serper_fetch_full_content': search_settings.fetch_full_content
+            'search_provider': settings.search_provider,
+            'search_limit': settings.search_limit,
+            'serper_fetch_full_content': settings.fetch_full_content
         }
         return snapshot
 

@@ -22,10 +22,8 @@ urlpatterns = [
     # 3. API - Global Settings
     # ==========================================
     path("api/get_default_settings/", views.get_default_settings, name="get_default_settings"),
-    path("api/save_llm_settings/", views.save_llm_settings, name="save_llm_settings"),
+    path("api/settings/save/", views.save_settings, name="save_settings"),
     path("api/test_llm_connection/", views.test_llm_connection, name="test_llm_connection"),
-    path('api/save_search_settings/', views.save_search_settings, name='save_search_settings'),
-    path('api/save_agent_settings/', views.save_agent_settings, name='save_agent_settings'),
 
     # ==========================================
     # 4. API - Datasets
@@ -56,7 +54,7 @@ urlpatterns = [
     path("api/multi_turn/get_trial_trace/<int:trial_id>/", views.get_trial_trace, name="get_trial_trace"),
     path("api/multi_turn/get_trial_prompt/<int:trial_id>/", views.get_trial_prompt, name="get_trial_prompt"),
 
-    # Run Loading (Specific Types)
+    # Run Loading
     path('api/multi_turn/load_run/<int:group_id>/', views.load_vanilla_llm_multi_turn_run, name='load_vanilla_llm_multi_turn_run'),
     path('api/multi_turn/load_rag_run/<int:group_id>/', views.load_rag_multi_turn_run, name='load_rag_multi_turn_run'),
     path('api/multi_turn/load_agent_run/<int:group_id>/', views.load_agent_multi_turn_run, name='load_agent_multi_turn_run'),
@@ -64,19 +62,6 @@ urlpatterns = [
     # ==========================================
     # 8. API - Pipelines (Streaming)
     # ==========================================
-    # Vanilla LLM Multi-turn
-    path('api/run_vanilla_llm_multi_turn_pipeline/', views.run_vanilla_llm_multi_turn_pipeline, name='run_vanilla_llm_multi_turn_pipeline'),
-    path('api/stop_vanilla_llm_multi_turn_pipeline/', views.stop_vanilla_llm_multi_turn_pipeline, name='stop_vanilla_llm_multi_turn_pipeline'),
-    
-    # RAG Multi-turn
-    path('api/run_rag_multi_turn_pipeline/', views.run_rag_multi_turn_pipeline, name='run_rag_multi_turn_pipeline'),
-    path('api/stop_rag_multi_turn_pipeline/', views.stop_rag_multi_turn_pipeline, name='stop_rag_multi_turn_pipeline'),
-
-    # Vanilla Agent
-    path('api/run_vanilla_agent_pipeline/', views.run_vanilla_agent_pipeline, name='run_vanilla_agent_pipeline'),
-    path('api/stop_vanilla_agent_pipeline/', views.stop_vanilla_agent_pipeline, name='stop_vanilla_agent_pipeline'),
-
-    # Browser Agent
-    path('api/run_browser_agent_pipeline/', views.run_browser_agent_pipeline, name='run_browser_agent_pipeline'),
-    path('api/stop_browser_agent_pipeline/', views.stop_browser_agent_pipeline, name='stop_browser_agent_pipeline'),
+    path('api/pipeline/start/<str:pipeline_type>/', views.pipeline_start, name='pipeline_start'),
+    path('api/pipeline/stop/<str:pipeline_type>/', views.pipeline_stop, name='pipeline_stop'),
 ]

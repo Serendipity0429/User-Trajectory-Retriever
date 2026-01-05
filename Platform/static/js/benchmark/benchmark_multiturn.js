@@ -1,4 +1,153 @@
-window.BenchmarkUtils.MultiTurnPage = {
+window.BenchmarkUtils.MultiTurnPage = (function() {
+    const activePolls = {};
+    const trialState = {};
+
+    const PIPELINE_CONFIGS = {
+        'vanilla_llm_multi_turn': {
+            loadingText: 'Thinking...',
+            icon: 'bi-robot'
+        },
+        'rag_multi_turn': {
+            loadingText: 'Thinking...',
+            icon: 'bi-globe'
+        },
+        'vanilla_agent': {
+            loadingText: 'Thinking...',
+            icon: 'bi-robot'
+        },
+        'browser_agent': {
+            loadingText: 'Thinking...',
+            icon: 'bi-browser-chrome'
+        }
+    };
+
+    function startPolling(trialId, pipelineType) {
+        if (activePolls[trialId]) return;
+
+        const config = PIPELINE_CONFIGS[pipelineType] || PIPELINE_CONFIGS['vanilla_llm_multi_turn'];
+
+        // Initialize state
+        if (!trialState[trialId]) {
+            trialState[trialId] = { renderedCount: 0, backoffDelay: 2000, lastStepWasStreaming: false };
+        }
+
+        const poll = () => {
+            const trialDiv = document.getElementById(`trial-${trialId}`);
+            if (!trialDiv) {
+                delete activePolls[trialId];
+                delete trialState[trialId];
+                return;
+            }
+
+            let currentCount = trialState[trialId].renderedCount;
+            // If the last step was streaming (partial), we need to re-fetch it to get updates
+            if (trialState[trialId].lastStepWasStreaming) {
+                currentCount = Math.max(0, currentCount - 1);
+            }
+            
+            fetch(`/benchmark/api/multi_turn/get_trial_trace/${trialId}/?cursor=${currentCount}`)
+                .then(res => res.json())
+                .then(data => {
+                    const newSteps = data.trace || [];
+                    const trialInfo = data.trial; 
+
+                    if (newSteps.length > 0) {
+                        trialState[trialId].backoffDelay = 2000; // Reset backoff
+
+                        const wrapper = trialDiv.querySelector('.trial-wrapper');
+                        if (wrapper) {
+                            // Safety: If starting fresh (cursor=0), clear existing bubbles to prevent duplication
+                            if (currentCount === 0) {
+                                const existing = wrapper.querySelectorAll('.message-bubble');
+                                existing.forEach(el => el.remove());
+                            }
+
+                            // If we are replacing a streaming step, remove the last bubble
+                            if (trialState[trialId].lastStepWasStreaming) {
+                                const bubbles = wrapper.querySelectorAll('.message-bubble');
+                                if (bubbles.length > 0) {
+                                    bubbles[bubbles.length - 1].remove();
+                                }
+                                trialState[trialId].renderedCount--;
+                            }
+
+                            // Check for processing indicator
+                            const processingIndicator = wrapper.querySelector('.trial-processing-indicator');
+                            let indicatorParent = null;
+                            if (processingIndicator) {
+                                indicatorParent = processingIndicator.closest('.message-bubble');
+                                if (indicatorParent) indicatorParent.remove();
+                            }
+
+                            let newStepsHtml = '';
+                            newSteps.forEach((step, idx) => {
+                                newStepsHtml += BenchmarkUtils.BenchmarkRenderer.renderAgentStep(step, currentCount + idx, trialId);
+                            });
+                            
+                            wrapper.insertAdjacentHTML('beforeend', newStepsHtml);
+                            
+                            // Re-append processing indicator if still processing
+                            if (trialInfo && trialInfo.status === 'processing') {
+                                const indicatorHtml = BenchmarkUtils.BenchmarkRenderer.createMessageBubble('assistant', `<div class="d-flex align-items-center trial-processing-indicator"><span class="spinner-border spinner-border-sm text-primary me-2"></span>${config.loadingText}</div>`, '', config.icon);
+                                wrapper.insertAdjacentHTML('beforeend', indicatorHtml);
+                            }
+                        }
+                        
+                        trialState[trialId].renderedCount += newSteps.length;
+
+                        const lastStep = newSteps[newSteps.length - 1];
+                        if (lastStep && lastStep.is_streaming) {
+                            trialState[trialId].lastStepWasStreaming = true;
+                            trialState[trialId].backoffDelay = 500;
+                        } else {
+                            trialState[trialId].lastStepWasStreaming = false;
+                        }
+                    } else {
+                        trialState[trialId].backoffDelay = Math.min(trialState[trialId].backoffDelay * 1.5, 10000);
+                    }
+
+                    if (trialInfo && (trialInfo.status === 'completed' || trialInfo.status === 'error')) {
+                        clearTimeout(activePolls[trialId]);
+                        delete activePolls[trialId];
+                        delete trialState[trialId];
+
+                        const wrapper = trialDiv.querySelector('.trial-wrapper');
+                        if (wrapper) {
+                             const processingIndicator = wrapper.querySelector('.trial-processing-indicator');
+                             if (processingIndicator) {
+                                 const indicatorParent = processingIndicator.closest('.message-bubble');
+                                 if (indicatorParent) indicatorParent.remove();
+                             }
+                             
+                             // Final check for verdict (if not already there)
+                             if (trialInfo.status === 'completed' && !wrapper.querySelector('.trial-verdict-container')) {
+                                const verdictContainer = BenchmarkUtils.BenchmarkRenderer.renderTrialVerdict(trialInfo);
+                                if (verdictContainer) wrapper.appendChild(verdictContainer);
+                             }
+                        }
+                        return;
+                    }
+                })
+                .catch(err => {
+                    console.error("Polling error:", err);
+                    trialState[trialId].backoffDelay = 10000;
+                })
+                .finally(() => {
+                    if (activePolls[trialId]) {
+                         if (document.getElementById(`trial-${trialId}`)) {
+                            activePolls[trialId] = setTimeout(poll, trialState[trialId].backoffDelay);
+                        } else {
+                            delete activePolls[trialId];
+                            delete trialState[trialId];
+                        }
+                    }
+                });
+        };
+
+        activePolls[trialId] = setTimeout(poll, 1000);
+    }
+
+    return {
         init: function(config) {
             const { 
                 pipelineType, 
@@ -113,8 +262,6 @@ window.BenchmarkUtils.MultiTurnPage = {
             // --- Helper: Load Session ---
             function loadSession(sessionId, initialTrialId = null) {
                 activeSessionId = sessionId;
-                // If we are currently running a session and loading a DIFFERENT session, do not abort unless logic dictates.
-                // But typically loadSession is called to refresh current session.
                 
                 fetch(BenchmarkUrls.multiTurn.getSession(sessionId))
                     .then(res => res.json())
@@ -141,11 +288,9 @@ window.BenchmarkUtils.MultiTurnPage = {
                         if (initialTrialId) {
                             executeTrial(initialTrialId, sessionId);
                         } else {
-                            // Only check for retry if we are NOT starting a new trial explicitly
                             const lastTrial = data.trials[data.trials.length - 1];
                             if (lastTrial && lastTrial.status === 'completed' && lastTrial.is_correct === false && !data.session.is_completed) {
                                 if (data.trials.length < data.session.max_retries) {
-                                    // Check if we should auto-retry (if session is running)
                                     if (sessionAbortController && !sessionAbortController.signal.aborted) {
                                          sessionRetryTimeout = setTimeout(() => {
                                              if (sessionAbortController && !sessionAbortController.signal.aborted) {
@@ -154,11 +299,9 @@ window.BenchmarkUtils.MultiTurnPage = {
                                          }, 1500);
                                     }
                                 } else {
-                                    // Max retries reached, session done
                                     if (sessionAbortController) resetSessionUI();
                                 }
                             } else if (data.session.is_completed) {
-                                // Session completed
                                 if (sessionAbortController) resetSessionUI();
                             }
                         }
@@ -198,7 +341,6 @@ window.BenchmarkUtils.MultiTurnPage = {
                      if (data.error) { alert(data.error); return; }
                      currentPipelineResults = data.results;
                      
-                     // Show stats container first so updateStatsUI can find elements if they depend on visibility
                      const statsContainer = document.getElementById('statistics-container');
                      if (statsContainer) statsContainer.style.display = 'block';
 
@@ -232,9 +374,8 @@ window.BenchmarkUtils.MultiTurnPage = {
                     
                     if (!qData) { alert('Could not load question data.'); return; }
                     
-                    // UI Lock
                     startSessionBtn.style.display = 'none';
-                    if (stopSessionBtn) stopSessionBtn.style.display = 'inline-block'; // Or block
+                    if (stopSessionBtn) stopSessionBtn.style.display = 'inline-block';
                     BenchmarkUtils.toggleConfigurationInputs(true);
                     
                     sessionAbortController = new AbortController();
@@ -274,7 +415,7 @@ window.BenchmarkUtils.MultiTurnPage = {
                         sessionAbortController.abort();
                     }
                     if (activeSessionId) {
-                         const currentSessionId = activeSessionId; // Capture ID
+                         const currentSessionId = activeSessionId;
                          fetch(BenchmarkUrls.multiTurn.stopSession, {
                              method: 'POST',
                              headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
@@ -283,7 +424,6 @@ window.BenchmarkUtils.MultiTurnPage = {
                          .then(res => res.json())
                          .then(data => {
                              if (data.status === 'ok') {
-                                 // Reload session to update UI (remove spinner, show error)
                                  loadSession(currentSessionId);
                              }
                          })
@@ -340,7 +480,7 @@ window.BenchmarkUtils.MultiTurnPage = {
                     url: runUrl,
                     formData: formData,
                     ui: ui,
-                    totalItems: 0, // Dynamic total items
+                    totalItems: 0,
                     callbacks: {
                         onMeta: (data) => {
                              if (data.type === 'info') ui.statusDiv.textContent = data.message;
@@ -389,7 +529,6 @@ window.BenchmarkUtils.MultiTurnPage = {
 
             // --- List Click Handlers ---
             document.getElementById('session-list').addEventListener('click', function(e) {
-                // Handle Delete Group Button
                 const deleteGrp = e.target.closest('.delete-group-btn');
                 if (deleteGrp) {
                     e.preventDefault(); 
@@ -403,12 +542,10 @@ window.BenchmarkUtils.MultiTurnPage = {
                     return;
                 }
 
-                // Handle Checkboxes
                 if (e.target.closest('input[type="checkbox"]')) {
                     return; 
                 }
 
-                // Handle Session Click
                 const target = e.target.closest('.session-details');
                 if (target) { 
                     e.preventDefault();
@@ -416,10 +553,8 @@ window.BenchmarkUtils.MultiTurnPage = {
                     return;
                 }
                 
-                // Handle Group Summary Click
                 const groupSummary = e.target.closest('.group-summary');
                 if (groupSummary) { 
-                    // Do NOT preventDefault() to allow <details> toggle behavior
                     if (groupSummary.dataset && groupSummary.dataset.groupId) {
                         try {
                             loadRun(groupSummary.dataset.groupId); 
@@ -498,5 +633,10 @@ window.BenchmarkUtils.MultiTurnPage = {
                 };
                 BenchmarkUtils.exportToCSV(currentPipelineResults, csvPrefix, headers, rowMapper);
             });
-        }
+        },
+        
+        startPolling: startPolling,
+        PIPELINE_CONFIGS: PIPELINE_CONFIGS
     };
+})();
+

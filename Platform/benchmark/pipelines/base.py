@@ -146,6 +146,40 @@ class BasePipeline:
                     time.sleep(sleep_time)
                 else:
                     raise last_exception
+
+    def get_llm_response_stream(self, messages, temperature=None):
+        """
+        Sends messages to LLM and yields the full response as it grows.
+        """
+        if temperature is None:
+            temperature = getattr(self.llm_settings, 'temperature', 0.0)
+            
+        top_p = getattr(self.llm_settings, 'top_p', 1.0)
+        max_tokens = getattr(self.llm_settings, 'max_tokens', None)
+        
+        kwargs = {
+            "model": self.model,
+            "messages": messages,
+            "temperature": temperature,
+            "top_p": top_p,
+            "stream": True
+        }
+        if max_tokens:
+            kwargs['max_tokens'] = max_tokens
+
+        full_response = ""
+        try:
+            response = self.client.chat.completions.create(**kwargs)
+            for chunk in response:
+                if not chunk.choices:
+                    continue
+                content = chunk.choices[0].delta.content
+                if content:
+                    full_response += content
+                    yield full_response
+        except Exception as e:
+            print_debug(f"LLM API stream failed: {e}")
+            raise e
     
     async def run(self):
         raise NotImplementedError("Subclasses must implement the 'run' method.")
@@ -333,8 +367,45 @@ class BaseMultiTurnPipeline(BasePipeline):
         settings_snapshot = session.run.settings_snapshot
         allow_reasoning = settings_snapshot.get('llm_settings', {}).get('allow_reasoning', False)
         
+        # Prepare trace components using TraceFormatter
+        class SimpleMsg:
+            def __init__(self, role, content):
+                self.role = role
+                self.content = content
+                self.name = None
+            def to_dict(self):
+                return {"role": self.role, "content": self.content}
+
+        static_trace_msgs = []
+        if messages:
+            if messages[0].get('role') == 'system':
+                static_trace_msgs.append(SimpleMsg('system', messages[0].get('content')))
+        static_trace_msgs.append(SimpleMsg("user", instruction))
+
+        def update_redis_trace(current_full_response):
+            temp_trace_msgs = static_trace_msgs + [SimpleMsg("assistant", current_full_response)]
+            trace_data, _ = TraceFormatter.serialize(temp_trace_msgs)
+            redis_client.set(f"trial_trace:{trial.id}", json.dumps(trace_data), ex=3600)
+
+        full_response = ""
         try:
-            answer, full_response = self.get_llm_response(messages, allow_reasoning=allow_reasoning)
+            # 1. Stream the response and update Redis periodically
+            chunk_count = 0
+            for partial_response in self.get_llm_response_stream(messages):
+                full_response = partial_response
+                chunk_count += 1
+                if chunk_count % 5 == 0: # Update every 5 chunks to reduce overhead
+                    update_redis_trace(full_response)
+            
+            # Final update
+            update_redis_trace(full_response)
+            
+            # Extract final answer
+            if allow_reasoning:
+                answer = extract_final_answer(full_response)
+            else:
+                answer = full_response
+
         except Exception as e:
             trial.status = 'error'
             trial.save()
@@ -344,19 +415,8 @@ class BaseMultiTurnPipeline(BasePipeline):
         is_correct_llm = check_answer_llm(session.question, session.ground_truths, answer, client=self.client, model=self.model)
         is_correct_rule = check_answer_rule(session.question, session.ground_truths, answer)
 
-        # Prepare trace (all messages sent + assistant response)
-        trace = []
-        for msg in messages:
-            trace.append({
-                "role": msg.get('role', 'unknown'),
-                "content": msg.get('content', ''),
-                "step_type": "text"
-            })
-        trace.append({
-            "role": "assistant",
-            "content": full_response,
-            "step_type": "text"
-        })
+        # Final Trace
+        trace, _ = TraceFormatter.serialize(static_trace_msgs + [SimpleMsg("assistant", full_response)])
 
         trial.answer = answer
         trial.full_response = full_response

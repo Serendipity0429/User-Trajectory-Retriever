@@ -1,43 +1,115 @@
 import json
 from .utils import print_debug
 
-def parse_react_content(content):
+def parse_think_tags(content):
     """
-    Parses a ReAct-style text content into blocks of Thought, Action, Observation.
+    Splits content into blocks of Thought and Text based on <think> tags.
+    Case-insensitive and handles multiple blocks.
     """
     if not isinstance(content, str):
         return [{"type": "text", "content": content}]
-        
-    blocks = []
-    current_type = "text"
-    current_lines = []
     
-    lines = content.split('\n')
-    for line in lines:
-        stripped = line.strip()
-        if stripped.startswith("Thought:") or stripped.startswith("Reasoning:"):
-            if current_lines:
-                blocks.append({"type": current_type, "content": "\n".join(current_lines).strip()})
-            current_type = "thought"
-            current_lines = [stripped.split(":", 1)[1].strip() if ":" in stripped else stripped]
-        elif stripped.startswith("Action:") or stripped.startswith("Tool Call:"):
-            if current_lines:
-                blocks.append({"type": current_type, "content": "\n".join(current_lines).strip()})
-            current_type = "action"
-            current_lines = [stripped.split(":", 1)[1].strip() if ":" in stripped else stripped]
-        elif stripped.startswith("Observation:") or stripped.startswith("Execution Result:"):
-            if current_lines:
-                blocks.append({"type": current_type, "content": "\n".join(current_lines).strip()})
-            current_type = "observation"
-            current_lines = [stripped.split(":", 1)[1].strip() if ":" in stripped else stripped]
-        else:
-            current_lines.append(line)
-            
-    if current_lines:
-        blocks.append({"type": current_type, "content": "\n".join(current_lines).strip()})
+    import re
+    blocks = []
+    
+    # Pattern to find <think>...</think> blocks, case-insensitive
+    pattern = r"(?si)<think>(.*?)</think>"
+    
+    last_idx = 0
+    for match in re.finditer(pattern, content):
+        # Text before the think tag
+        before_text = content[last_idx:match.start()].strip()
+        if before_text:
+            blocks.append({"type": "text", "content": before_text})
         
+        # Thinking content
+        think_content = match.group(1).strip()
+        if think_content:
+            blocks.append({"type": "thought", "content": think_content})
+        
+        last_idx = match.end()
+    
+    # Remaining text after the last think tag
+    after_text = content[last_idx:].strip()
+    if after_text:
+        # Check if the remaining text IS a think tag itself (incomplete)
+        if "<think" in after_text.lower() and "</think" not in after_text.lower():
+             # Handle trailing open think tag
+             parts = re.split(r"(?i)<think>", after_text, maxsplit=1)
+             if parts[0].strip():
+                 blocks.append({"type": "text", "content": parts[0].strip()})
+             if len(parts) > 1:
+                 blocks.append({"type": "thought", "content": parts[1].strip()})
+        else:
+            blocks.append({"type": "text", "content": after_text})
+        
+    return blocks
+
+def parse_react_content(content):
+    """
+    Parses a ReAct-style text content into blocks of Thought, Action, Observation.
+    Also handles <think> tags.
+    """
+    if not isinstance(content, str):
+        return [{"type": "text", "content": content}]
+    
+    # 1. First, split by <think> tags if they exist
+    lower_content = content.lower()
+    if "<think>" in lower_content or "<think" in lower_content:
+        initial_blocks = parse_think_tags(content)
+    else:
+        initial_blocks = [{"type": "text", "content": content}]
+        
+    # 2. For each 'text' block from initial split, further split by ReAct headers
+    final_blocks = []
+    
+    for block in initial_blocks:
+        if block['type'] != 'text':
+            final_blocks.append(block)
+            continue
+            
+        # Split this text block by headers
+        text_content = block['content']
+        current_type = "text"
+        current_lines = []
+        
+        def flush_current():
+            if current_lines:
+                text = "\n".join(current_lines).strip()
+                if text:
+                    final_blocks.append({"type": current_type, "content": text})
+                current_lines.clear()
+
+        lines = text_content.split('\n')
+        for line in lines:
+            stripped = line.strip()
+            # Detect headers
+            if stripped.startswith("Thought:") or stripped.startswith("Reasoning:"):
+                flush_current()
+                current_type = "thought"
+                # Keep the header text if it contains content after the colon
+                parts = stripped.split(":", 1)
+                if len(parts) > 1 and parts[1].strip():
+                    current_lines.append(parts[1].strip())
+            elif stripped.startswith("Action:") or stripped.startswith("Tool Call:") or stripped.startswith("Search Query:"):
+                flush_current()
+                current_type = "action"
+                current_lines.append(line) # Keep header for Action/Query
+            elif stripped.startswith("Observation:") or stripped.startswith("Execution Result:") or stripped.startswith("Search Results:"):
+                flush_current()
+                current_type = "observation"
+                current_lines.append(line) # Keep header for Observation/Results
+            elif stripped.startswith("Final Answer:") or stripped.startswith("Answer:"):
+                flush_current()
+                current_type = "text" # Final answer is standard text
+                current_lines.append(line)
+            else:
+                current_lines.append(line)
+                
+        flush_current()
+            
     # Filter out empty blocks
-    return [b for b in blocks if b['content']]
+    return [b for b in final_blocks if b['content']]
 
 class TraceFormatter:
     """
@@ -257,37 +329,50 @@ class TraceFormatter:
             
             # 3. Handle Text Content (Thoughts/Standard messages)
             if isinstance(content, str):
-                # Fallback: Check for JSON answer in text (robustness)
-                import re
-                json_match = re.search(r'\{\s*"answer"\s*:\s*"(.*?)"\s*\}', content)
-                if json_match:
-                     real_answer_found = json_match.group(1)
-                     # Treat this block as an action to trigger final answer bubble
-                     trace_data.append({
-                         "role": m.role,
-                         "name": m.name,
-                         "step_type": "action",
-                         "content": f'{{"name": "answer_question", "input": {{"answer": "{real_answer_found}"}}}}',
-                         "timestamp": getattr(m, 'timestamp', None)
-                     })
-                     # Simulate observation
-                     trace_data.append({
-                         "role": m.role,
-                         "name": m.name,
-                         "step_type": "observation",
-                         "content": "Answer submitted successfully.",
-                         "timestamp": getattr(m, 'timestamp', None)
-                     })
-                     should_stop = True
-                     continue
+                role = getattr(m, 'role', 'assistant')
+                
+                # ONLY parse assistant messages for thinking tags or ReAct headers
+                if role == 'assistant':
+                    # Fallback: Check for JSON answer in text (robustness)
+                    import re
+                    json_match = re.search(r'\{\s*"answer"\s*:\s*"(.*?)"\s*\}', content)
+                    if json_match:
+                         real_answer_found = json_match.group(1)
+                         # Treat this block as an action to trigger final answer bubble
+                         trace_data.append({
+                             "role": m.role,
+                             "name": m.name,
+                             "step_type": "action",
+                             "content": f'{{"name": "answer_question", "input": {{"answer": "{real_answer_found}"}}}}',
+                             "timestamp": getattr(m, 'timestamp', None)
+                         })
+                         # Simulate observation
+                         trace_data.append({
+                             "role": m.role,
+                             "name": m.name,
+                             "step_type": "observation",
+                             "content": "Answer submitted successfully.",
+                             "timestamp": getattr(m, 'timestamp', None)
+                         })
+                         should_stop = True
+                         continue
 
-                blocks = parse_react_content(content)
-                for b in blocks:
+                    blocks = parse_react_content(content)
+                    for b in blocks:
+                        trace_data.append({
+                            "role": m.role,
+                            "name": m.name,
+                            "step_type": b['type'],
+                            "content": b['content'],
+                            "timestamp": getattr(m, 'timestamp', None)
+                        })
+                else:
+                    # System or User message: treat as plain text (do NOT parse tags)
                     trace_data.append({
                         "role": m.role,
                         "name": m.name,
-                        "step_type": b['type'],
-                        "content": b['content'],
+                        "step_type": "text",
+                        "content": content,
                         "timestamp": getattr(m, 'timestamp', None)
                     })
             else:

@@ -536,6 +536,7 @@ window.BenchmarkUtils.BenchmarkRenderer = {
             let parsedData = parseContent(content);
             let isSearch = false;
             let isFinalAnswer = false;
+            let displayContent = content;
             
             // Heuristic to detect search results
             if (parsedData && Array.isArray(parsedData) && parsedData.length > 0) {
@@ -544,6 +545,14 @@ window.BenchmarkUtils.BenchmarkRenderer = {
                 }
             }
             if (name === 'web_search_tool') isSearch = true;
+
+            // Handle RAG simulated search results (string starting with "Search Results:")
+            if (typeof content === 'string' && content.startsWith('Search Results:')) {
+                isSearch = true;
+                displayContent = content.replace('Search Results:', '').trim();
+                // For simulated results, we don't have parsed JSON data easily
+                // but we can still render the text block.
+            }
             
             // Check for Final Answer
             if (parsedData && parsedData.name === 'answer_question') {
@@ -552,34 +561,40 @@ window.BenchmarkUtils.BenchmarkRenderer = {
                 isFinalAnswer = true;
             }
 
-            if (isSearch && parsedData) {
-                // Render Search Results (Integrated into Observation)
-                const resultsCount = parsedData.length;
-                const resultsJson = encodeURIComponent(JSON.stringify(parsedData));
-                
-                const resultsHtml = `
-                    <div class="d-flex align-items-center justify-content-between p-2 bg-white border rounded mb-2">
-                        <div class="d-flex align-items-center">
-                            <div class="rounded-circle bg-success bg-opacity-10 p-2 me-3">
-                                <i class="bi bi-globe text-success"></i>
+            if (isSearch) {
+                let resultsHtml = '';
+                if (parsedData && Array.isArray(parsedData)) {
+                    // Render Search Results (Integrated into Observation)
+                    const resultsCount = parsedData.length;
+                    const resultsJson = encodeURIComponent(JSON.stringify(parsedData));
+                    
+                    resultsHtml = `
+                        <div class="d-flex align-items-center justify-content-between p-2 bg-white border rounded mb-2">
+                            <div class="d-flex align-items-center">
+                                <div class="rounded-circle bg-success bg-opacity-10 p-2 me-3">
+                                    <i class="bi bi-globe text-success"></i>
+                                </div>
+                                <div>
+                                    <div class="fw-bold text-dark search-results-title">Web Search Results</div>
+                                    <div class="small text-muted">${resultsCount} relevant documents found</div>
+                                </div>
                             </div>
-                            <div>
-                                <div class="fw-bold text-dark search-results-title">Web Search Results</div>
-                                <div class="small text-muted">${resultsCount} relevant documents found</div>
-                            </div>
+                            <button class="btn btn-sm btn-outline-success rounded-pill px-3 ms-3 view-search-results-btn" data-results="${resultsJson}" onclick="
+                                const data = JSON.parse(decodeURIComponent(this.dataset.results));
+                                const container = document.getElementById('modal-generic-content-container'); 
+                                if(window.BenchmarkUtils && window.BenchmarkUtils.BenchmarkRenderer) {
+                                    window.BenchmarkUtils.BenchmarkRenderer.renderModalSearchResults(data, container);
+                                    new bootstrap.Modal(document.getElementById('benchmarkGenericModal')).show();
+                                }
+                            ">
+                                <i class="bi bi-eye me-1"></i> View Detail
+                            </button>
                         </div>
-                        <button class="btn btn-sm btn-outline-success rounded-pill px-3 ms-3 view-search-results-btn" data-results="${resultsJson}" onclick="
-                            const data = JSON.parse(decodeURIComponent(this.dataset.results));
-                            const container = document.getElementById('modal-generic-content-container'); 
-                            if(window.BenchmarkUtils && window.BenchmarkUtils.BenchmarkRenderer) {
-                                window.BenchmarkUtils.BenchmarkRenderer.renderModalSearchResults(data, container);
-                                new bootstrap.Modal(document.getElementById('benchmarkGenericModal')).show();
-                            }
-                        ">
-                            <i class="bi bi-eye me-1"></i> View Detail
-                        </button>
-                    </div>
-                `;
+                    `;
+                } else {
+                    // Fallback for string-based search results
+                    resultsHtml = `<div class="p-2 bg-white border rounded mb-2 font-monospace small" style="white-space: pre-wrap;">${displayContent}</div>`;
+                }
                 
                 const obsHtml = `
                     <div class="d-flex flex-column">
@@ -651,68 +666,46 @@ window.BenchmarkUtils.BenchmarkRenderer = {
 
         let chatContent = '';
         
-        // 1. Prioritize Trace (Unified for all baselines)
         let trace = trial.trace || [];
         if (typeof trace === 'string') {
             try { trace = JSON.parse(trace); } catch(e) { trace = []; }
         }
         
-        // Fallback for Agent full_response if trace is missing
         if (trace.length === 0 && trial.full_response && pipelineType.includes('agent')) {
             try { trace = JSON.parse(trial.full_response); } catch(e) {}
+        }
+
+        let indicatorHtml = '';
+        if (trial.status === 'processing') {
+             const config = (window.BenchmarkUtils && window.BenchmarkUtils.MultiTurnPage && window.BenchmarkUtils.MultiTurnPage.PIPELINE_CONFIGS) 
+                ? window.BenchmarkUtils.MultiTurnPage.PIPELINE_CONFIGS[pipelineType] || {}
+                : {};
+             const text = config.loadingText || 'Thinking...';
+             const icon = config.icon || 'bi-robot';
+             indicatorHtml = this.createMessageBubble('assistant', `<div class="d-flex align-items-center trial-processing-indicator"><span class="spinner-border spinner-border-sm text-primary me-2"></span>${text}</div>`, '', icon);
+             
+             // Trigger Polling automatically if supported
+             if (window.BenchmarkUtils && window.BenchmarkUtils.MultiTurnPage && window.BenchmarkUtils.MultiTurnPage.startPolling) {
+                setTimeout(() => window.BenchmarkUtils.MultiTurnPage.startPolling(trial.id, pipelineType), 100);
+             }
         }
 
         if (trace && trace.length > 0) {
             trace.forEach((step, idx) => {
                 chatContent += this.renderAgentStep(step, idx, trial.id, trial.answer);
             });
-            
-            // If processing
-            if (trial.status === 'processing') {
-                 const text = pipelineType.includes('agent') ? 'Agent is thinking...' : 'Synthesizing response...';
-                 chatContent += this.createMessageBubble('assistant', `<div class="d-flex align-items-center trial-processing-indicator"><span class="spinner-border spinner-border-sm text-primary me-2"></span>${text}</div>`, '', 'bi-robot');
-            }
-
+            chatContent += indicatorHtml;
         } else {
-            // --- LEGACY FALLBACK: Empty container if no trace found ---
-            chatContent += this.createMessageBubble('system', 'No execution trace available for this trial.', 'bg-light border-secondary border-opacity-10 shadow-none');
+            if (indicatorHtml) {
+                chatContent += indicatorHtml;
+            } else {
+                chatContent += this.createMessageBubble('system', 'No execution trace available for this trial.', 'bg-light border-secondary border-opacity-10 shadow-none');
+            }
         }
 
-        // --- 5. Verdict (Common) ---
         if (trial.status === 'completed' && (trial.feedback || trial.is_correct_rule !== undefined)) {
-            const isCorrectLLM = trial.is_correct_llm !== undefined ? trial.is_correct_llm : trial.is_correct;
-            const isCorrectRule = trial.is_correct_rule;
-            
-            let verdictHtml = '<div class="d-flex flex-row justify-content-center flex-wrap gap-3 mt-2 mb-2 fade-in trial-verdict-container">';
-            
-            // LLM Verdict
-            if (isCorrectLLM !== undefined && isCorrectLLM !== null) {
-                const llmColor = isCorrectLLM ? 'success' : 'danger';
-                const llmIcon = isCorrectLLM ? 'bi-check-circle-fill' : 'bi-x-circle-fill';
-                verdictHtml += `
-                    <div class="card border-0 shadow-sm rounded-pill px-2" style="background-color: #f8f9fa;">
-                        <div class="card-body py-2 px-4 d-flex align-items-center">
-                            <i class="bi ${llmIcon} text-${llmColor} fs-5 me-2"></i>
-                            <div class="fw-bold text-${llmColor} text-uppercase small verdict-text">Verdict (LLM): ${isCorrectLLM ? 'Correct' : 'Incorrect'}</div>
-                        </div>
-                    </div>`;
-            }
-
-            // Rule Verdict
-            if (isCorrectRule !== undefined && isCorrectRule !== null) {
-                const ruleColor = isCorrectRule ? 'success' : 'danger';
-                const ruleIcon = isCorrectRule ? 'bi-check-circle-fill' : 'bi-x-circle-fill';
-                verdictHtml += `
-                    <div class="card border-0 shadow-sm rounded-pill px-2" style="background-color: #f8f9fa;">
-                        <div class="card-body py-2 px-4 d-flex align-items-center">
-                            <i class="bi ${ruleIcon} text-${ruleColor} fs-5 me-2"></i>
-                            <div class="fw-bold text-${ruleColor} text-uppercase small verdict-text">Verdict (Rule): ${isCorrectRule ? 'Correct' : 'Incorrect'}</div>
-                        </div>
-                    </div>`;
-            }
-            
-            verdictHtml += '</div>';
-            chatContent += verdictHtml;
+            const verdictHtml = this.renderTrialVerdict(trial);
+            if (verdictHtml) chatContent += verdictHtml.outerHTML;
         }
         
         const turnSeparator = trial.trial_number > 1 ? `
@@ -736,6 +729,43 @@ window.BenchmarkUtils.BenchmarkRenderer = {
         return trialDiv;
     },       
      
+    renderTrialVerdict: function(trial) {
+        const isCorrectLLM = trial.is_correct_llm !== undefined ? trial.is_correct_llm : trial.is_correct;
+        const isCorrectRule = trial.is_correct_rule;
+        
+        if (isCorrectLLM === undefined && isCorrectRule === undefined) return null;
+
+        const container = document.createElement('div');
+        container.className = 'd-flex flex-row justify-content-center flex-wrap gap-3 mt-2 mb-2 fade-in trial-verdict-container';
+        
+        // LLM Verdict
+        if (isCorrectLLM !== undefined && isCorrectLLM !== null) {
+            const llmColor = isCorrectLLM ? 'success' : 'danger';
+            const llmIcon = isCorrectLLM ? 'bi-check-circle-fill' : 'bi-x-circle-fill';
+            container.innerHTML += `
+                <div class="card border-0 shadow-sm rounded-pill px-2" style="background-color: #f8f9fa;">
+                    <div class="card-body py-2 px-4 d-flex align-items-center">
+                        <i class="bi ${llmIcon} text-${llmColor} fs-5 me-2"></i>
+                        <div class="fw-bold text-${llmColor} text-uppercase small verdict-text">Verdict (LLM): ${isCorrectLLM ? 'Correct' : 'Incorrect'}</div>
+                    </div>
+                </div>`;
+        }
+
+        // Rule Verdict
+        if (isCorrectRule !== undefined && isCorrectRule !== null) {
+            const ruleColor = isCorrectRule ? 'success' : 'danger';
+            const ruleIcon = isCorrectRule ? 'bi-check-circle-fill' : 'bi-x-circle-fill';
+            container.innerHTML += `
+                <div class="card border-0 shadow-sm rounded-pill px-2" style="background-color: #f8f9fa;">
+                    <div class="card-body py-2 px-4 d-flex align-items-center">
+                        <i class="bi ${ruleIcon} text-${ruleColor} fs-5 me-2"></i>
+                        <div class="fw-bold text-${ruleColor} text-uppercase small verdict-text">Verdict (Rule): ${isCorrectRule ? 'Correct' : 'Incorrect'}</div>
+                    </div>
+                </div>`;
+        }
+        
+        return container;
+    },
 
 
     renderRunConfiguration: function(snapshot, whitelist = null) {

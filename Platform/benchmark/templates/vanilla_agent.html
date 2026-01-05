@@ -373,10 +373,12 @@
 {% endblock %}
 
 {% block benchmark_extra_js %}
-<script src="{% static 'js/benchmark/agent_common.js' %}"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    window.AgentBenchmark.initWithType('vanilla_agent');
+    BenchmarkUtils.MultiTurnPage.init({
+        pipelineType: 'vanilla_agent',
+        csvPrefix: 'vanilla-agent'
+    });
 });
 </script>
 {% endblock %}

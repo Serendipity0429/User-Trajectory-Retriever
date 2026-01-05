@@ -7,6 +7,7 @@ from ..models import (
     SearchSettings, MultiTurnSession, MultiTurnTrial
 )
 from ..utils import print_debug
+from ..trace_formatter import TraceFormatter
 from .base import BaseMultiTurnPipeline
 
 class RagMultiTurnPipeline(BaseMultiTurnPipeline):
@@ -81,7 +82,7 @@ class RagMultiTurnPipeline(BaseMultiTurnPipeline):
             final_messages.append({"role": "assistant", "content": f"Search Query: {search_query}"})
             
             # Add the result providing "exchange"
-            final_instr = PROMPTS["rag_context_wrapper"].format(formatted_results=formatted_results)
+            final_instr = "Search Results:\n" + PROMPTS["rag_context_wrapper"].format(formatted_results=formatted_results)
             final_instr += PROMPTS["shared_reasoning_format" if allow_reasoning else "shared_answer_request"]
 
             final_messages.append({"role": "user", "content": final_instr})
@@ -121,7 +122,7 @@ class RagMultiTurnPipeline(BaseMultiTurnPipeline):
             
             # 3. Search Results and Answer Instruction
             formatted_results = self.search_engine.format_results(search_results)
-            final_instr = PROMPTS["rag_context_wrapper"].format(formatted_results=formatted_results)
+            final_instr = "Search Results:\n" + PROMPTS["rag_context_wrapper"].format(formatted_results=formatted_results)
             final_instr += PROMPTS["shared_reasoning_format" if allow_reasoning else "shared_answer_request"]
             
             messages.append({"role": "user", "content": final_instr})
@@ -148,6 +149,19 @@ class RagMultiTurnPipeline(BaseMultiTurnPipeline):
             history.append({"role": "user", "content": PROMPTS["rag_retry_prefix"]})
             instruction = PROMPTS["rag_query_reform_cot_prompt" if allow_reasoning else "rag_query_reform_prompt"]
 
+        # Prepare trace using TraceFormatter
+        class SimpleMsg:
+            def __init__(self, role, content):
+                self.role = role
+                self.content = content
+                self.name = None
+            def to_dict(self):
+                return {"role": self.role, "content": self.content}
+
+        def update_redis_trace(messages_to_serialize):
+            trace_data, _ = TraceFormatter.serialize(messages_to_serialize)
+            redis_client.set(f"trial_trace:{trial.id}", json.dumps(trace_data), ex=3600)
+
         if not trial.log.get("search_query"):
             reformulation_messages = history + [{"role": "user", "content": instruction}]
             raw_query_response, _ = self.get_llm_response(reformulation_messages, temperature=0.0, allow_reasoning=False)
@@ -161,16 +175,47 @@ class RagMultiTurnPipeline(BaseMultiTurnPipeline):
             
             trial.log["search_results"] = self.search_engine.search(trial.log["search_query"])
             trial.save()
+            
+            # Initial Trace update after search
+            initial_msgs = self._construct_messages(session, trial, completed_trials)
+            update_redis_trace([SimpleMsg(m.get('role'), m.get('content')) for m in initial_msgs])
 
-        # 2. Answer Question
+        # 2. Answer Question (Synthesize with Streaming)
         messages = self._construct_messages(session, trial, completed_trials)
-        answer, full_response = self.get_llm_response(messages, allow_reasoning=allow_reasoning)
         
-        # 3. Build Trace (Full dialogue for this trial)
-        trace = []
-        for msg in messages:
-            trace.append({"role": msg.get('role'), "content": msg.get('content'), "step_type": "text"})
-        trace.append({"role": "assistant", "content": full_response or answer, "step_type": "text"})
+        # Identify current turn's core messages for TRACE ONLY
+        # 1. System Prompt (first msg)
+        # 2. Last User Prompt (includes context/search results)
+        current_turn_static_msgs = []
+        if messages:
+            if messages[0].get('role') == 'system':
+                current_turn_static_msgs.append(SimpleMsg('system', messages[0].get('content')))
+            if messages[-1].get('role') == 'user':
+                current_turn_static_msgs.append(SimpleMsg('user', messages[-1].get('content')))
+
+        full_response = ""
+        try:
+            chunk_count = 0
+            for partial_response in self.get_llm_response_stream(messages):
+                full_response = partial_response
+                chunk_count += 1
+                if chunk_count % 5 == 0:
+                    update_redis_trace(current_turn_static_msgs + [SimpleMsg("assistant", full_response)])
+            
+            # Final trace update for synthesising phase
+            update_redis_trace(current_turn_static_msgs + [SimpleMsg("assistant", full_response)])
+            
+            if allow_reasoning:
+                answer = extract_final_answer(full_response)
+            else:
+                answer = full_response
+        except Exception as e:
+            trial.status = 'error'
+            trial.save()
+            raise e
+        
+        # 3. Finalize
+        trace, _ = TraceFormatter.serialize(current_turn_static_msgs + [SimpleMsg("assistant", full_response)])
         
         is_correct_llm = check_answer_llm(session.question, session.ground_truths, answer, client=self.client, model=self.model)
         is_correct_rule = check_answer_rule(session.question, session.ground_truths, answer)

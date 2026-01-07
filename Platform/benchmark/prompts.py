@@ -42,7 +42,7 @@ Your goal is to provide the exact correct answer to the user's question.
 
 {_RULES}""",
 
-    "vanilla_retry_request": "Your previous answer was incorrect. Please re-examine the question and try again.",
+    "vanilla_retry_request": "Your previous answer was incorrect. Please reflect on the trajectory, re-examine the question, and try again.",
 
     "vanilla_followup_prompt": """Your previous answer was incorrect.
 Answer the question again, potentially correcting yourself.
@@ -144,7 +144,7 @@ Example:
 6. Call `answer_question(answer="...")`
 """,
 
-    "vanilla_agent_retry_request": "Your previous answer was incorrect. Please re-examine the question and try again.",
+    "vanilla_agent_retry_request": "Your previous answer was incorrect. Please reflect on the trajectory, re-examine the question, and try again.",
 
 
     # --- Browser Agent (Autonomous) ---
@@ -164,5 +164,5 @@ Instructions:
 
 IMPORTANT: Always output a "Thought: ..." text block before using any tool. This is required for your reasoning to be tracked.""",
 
-    "browser_agent_retry_request": "Your previous answer was incorrect. Please re-examine the question and try again."
+    "browser_agent_retry_request": "Your previous answer was incorrect. Please reflect on the trajectory, re-examine the question, and try again."
 }

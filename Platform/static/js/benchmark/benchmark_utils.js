@@ -20,17 +20,17 @@ const BenchmarkUrls = {
 
     // Multi-turn Common
     multiTurn: {
-        createSession: `${API_PREFIX}/multi_turn/create_session/`,
-        createSessionGroup: `${API_PREFIX}/multi_turn/create_session_group/`,
-        batchDeleteSessions: `${API_PREFIX}/multi_turn/batch_delete_sessions/`,
-        deleteSessionGroup: (id) => `${API_PREFIX}/multi_turn/delete_session_group/${id}/`,
-        getSession: (id) => `${API_PREFIX}/multi_turn/get_session/${id}/`,
-        runTrial: (id) => `${API_PREFIX}/multi_turn/run_trial/${id}/`,
-        retrySession: (id) => `${API_PREFIX}/multi_turn/retry_session/${id}/`,
-        deleteSession: (id) => `${API_PREFIX}/multi_turn/delete_session/${id}/`,
-        stopSession: `${API_PREFIX}/multi_turn/stop_session/`,
-        exportSession: (id) => `${API_PREFIX}/multi_turn/export_session/${id}/`,
-        getTrialPrompt: (id) => `${API_PREFIX}/multi_turn/get_trial_prompt/${id}/`,
+        createSession: `${API_PREFIX}/sessions/create_session/`,
+        createSessionGroup: `${API_PREFIX}/sessions/create_session_group/`,
+        batchDeleteSessions: `${API_PREFIX}/sessions/batch_delete_sessions/`,
+        deleteSessionGroup: (id) => `${API_PREFIX}/sessions/delete_session_group/${id}/`,
+        getSession: (id) => `${API_PREFIX}/sessions/get_session/${id}/`,
+        runTrial: (id) => `${API_PREFIX}/sessions/run_trial/${id}/`,
+        retrySession: (id) => `${API_PREFIX}/sessions/retry_session/${id}/`,
+        deleteSession: (id) => `${API_PREFIX}/sessions/delete_session/${id}/`,
+        stopSession: `${API_PREFIX}/sessions/stop_session/`,
+        exportSession: (id) => `${API_PREFIX}/sessions/export_session/${id}/`,
+        getTrialPrompt: (id) => `${API_PREFIX}/sessions/get_trial_prompt/${id}/`,
     },
 
     // Pipelines (Unified)
@@ -39,33 +39,33 @@ const BenchmarkUrls = {
         stop: (type) => `${API_PREFIX}/pipeline/stop/${type}/`,
         loadRun: (type, id) => {
             const map = {
-                'vanilla_llm_multi_turn': 'load_run',
-                'rag_multi_turn': 'load_rag_run',
+                'vanilla_llm': 'load_vanilla_run',
+                'rag': 'load_rag_run',
                 'vanilla_agent': 'load_agent_run',
                 'browser_agent': 'load_agent_run'
             };
-            return `${API_PREFIX}/multi_turn/${map[type] || 'load_run'}/${id}/`;
+            return `${API_PREFIX}/sessions/${map[type] || 'load_vanilla_run'}/${id}/`;
         }
     },
 
     // Compatibility (Mapping to unified)
     vanillaLlmMultiTurn: {
-        loadRun: (id) => `${API_PREFIX}/multi_turn/load_run/${id}/`,
-        runPipeline: `${API_PREFIX}/pipeline/start/vanilla_llm_multi_turn/`,
-        stopPipeline: `${API_PREFIX}/pipeline/stop/vanilla_llm_multi_turn/`
+        loadRun: (id) => `${API_PREFIX}/sessions/load_vanilla_run/${id}/`,
+        runPipeline: `${API_PREFIX}/pipeline/start/vanilla_llm/`,
+        stopPipeline: `${API_PREFIX}/pipeline/stop/vanilla_llm/`
     },
     ragMultiTurn: {
-        loadRun: (id) => `${API_PREFIX}/multi_turn/load_rag_run/${id}/`,
-        runPipeline: `${API_PREFIX}/pipeline/start/rag_multi_turn/`,
-        stopPipeline: `${API_PREFIX}/pipeline/stop/rag_multi_turn/`
+        loadRun: (id) => `${API_PREFIX}/sessions/load_rag_run/${id}/`,
+        runPipeline: `${API_PREFIX}/pipeline/start/rag/`,
+        stopPipeline: `${API_PREFIX}/pipeline/stop/rag/`
     },
     vanillaAgent: {
-        loadRun: (id) => `${API_PREFIX}/multi_turn/load_agent_run/${id}/`,
+        loadRun: (id) => `${API_PREFIX}/sessions/load_agent_run/${id}/`,
         runPipeline: `${API_PREFIX}/pipeline/start/vanilla_agent/`,
         stopPipeline: `${API_PREFIX}/pipeline/stop/vanilla_agent/`
     },
     browserAgent: {
-        loadRun: (id) => `${API_PREFIX}/multi_turn/load_agent_run/${id}/`,
+        loadRun: (id) => `${API_PREFIX}/sessions/load_agent_run/${id}/`,
         runPipeline: `${API_PREFIX}/pipeline/start/browser_agent/`,
         stopPipeline: `${API_PREFIX}/pipeline/stop/browser_agent/`
     }
@@ -1027,7 +1027,7 @@ window.BenchmarkUtils = {
                 sessionTrials, // Assuming this is defined in the script that calls this
                 sessionContainerId = 'session-container',
                 noSessionSelectedId = 'no-session-selected',
-                pipelineType = 'vanilla_llm_multi_turn'
+                pipelineType = 'vanilla_llm'
             } = options;
 
             // Update external sessionTrials reference if provided
@@ -1069,8 +1069,10 @@ window.BenchmarkUtils = {
 
             // Check if session already exists
             const existingCheckbox = document.querySelector(`.session-checkbox[value="${sessionId}"]`);
-            if (existingCheckbox) {
-                const sessionDetails = document.querySelector(`.session-details[data-session-id="${sessionId}"]`);
+            const existingDetails = document.querySelector(`.session-details[data-session-id="${sessionId}"]`);
+            
+            if (existingCheckbox || existingDetails) {
+                const sessionDetails = existingDetails || document.querySelector(`.session-details[data-session-id="${sessionId}"]`);
                 if (sessionDetails) {
                         const timeEl = sessionDetails.querySelector('small.text-muted');
                         if (timeEl) {
@@ -1101,9 +1103,19 @@ window.BenchmarkUtils = {
 
             const newSessionItem = document.createElement('div');
             newSessionItem.className = 'list-group-item d-flex align-items-center session-item-container';
+            
+            let checkboxHtml = '';
+            let detailsMargin = 'ms-3';
+            
+            if (!groupId) {
+                checkboxHtml = `<input class="form-check-input session-checkbox" type="checkbox" value="${sessionId}" data-session-id="${sessionId}">`;
+            } else {
+                detailsMargin = '';
+            }
+
             newSessionItem.innerHTML = `
-                <input class="form-check-input session-checkbox" type="checkbox" value="${sessionId}" data-session-id="${sessionId}">
-                <div class="ms-3 flex-grow-1 session-details" data-session-id="${sessionId}" style="cursor: pointer;">
+                ${checkboxHtml}
+                <div class="${detailsMargin} flex-grow-1 session-details" data-session-id="${sessionId}" style="cursor: pointer;">
                     <div class="d-flex w-100 justify-content-between">
                         <h6 class="mb-1">Session #${sessionId}</h6>
                         <small class="text-muted">${statusText}</small>
@@ -1319,7 +1331,7 @@ window.BenchmarkUtils = {
          * @returns {AbortController} - The controller to abort the request.
          */
         start: function(options) {
-            let { totalItems } = options;
+            let { totalItems, initialProcessedCount = 0 } = options;
             const { url, formData, ui, callbacks, itemsData } = options;
             
             // UI Reset
@@ -1332,8 +1344,10 @@ window.BenchmarkUtils = {
             
             if (ui.progressContainer) ui.progressContainer.style.display = 'block';
             if (ui.progressBar) {
-                ui.progressBar.style.width = '0%';
-                ui.progressBar.textContent = '0%';
+                // Initialize progress bar based on initial count if total is known, else 0
+                const initialProgress = (totalItems > 0) ? Math.round((initialProcessedCount / totalItems) * 100) : 0;
+                ui.progressBar.style.width = `${initialProgress}%`;
+                ui.progressBar.textContent = `${initialProgress}%`;
             }
             
             if (ui.resultsContainer) ui.resultsContainer.style.display = 'block';
@@ -1348,7 +1362,7 @@ window.BenchmarkUtils = {
             const signal = controller.signal;
             controller.pipelineId = formData.get('pipeline_id'); 
 
-            let processedCount = 0;
+            let processedCount = initialProcessedCount;
 
             const updateStatus = () => {
                 if (ui.statusDiv) {

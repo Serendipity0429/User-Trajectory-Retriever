@@ -78,11 +78,23 @@ async def visit_page(url: str):
     except Exception as e:
         return ToolResponse(content=f"Error visiting page: {str(e)}")
 
+def mark_justification(evidence_content: str, source_url: str, reasoning: str):
+    """
+    Mark a specific piece of text from a webpage as evidence for your final answer.
+    You MUST use this tool before providing the final answer to ground your response in the retrieved data.
+    
+    Args:
+        evidence_content (str): The exact text found on the page.
+        source_url (str): The URL where this text was found.
+        reasoning (str): Briefly explain why this evidence is relevant.
+    """
+    return ToolResponse(content="Justification marked.")
+
 def answer_question(answer: str):
     """
     Finalize the task by submitting the answer to the user.
     You MUST use this tool to provide the final response after you have gathered sufficient information.
-    Do not just output text; call this tool with your answer.
+    Ensure you have used `mark_justification` to highlight your evidence before calling this.
     
     Args:
         answer (str): The comprehensive answer to the user's question, citing sources if available.

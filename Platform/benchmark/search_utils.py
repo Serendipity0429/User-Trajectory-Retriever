@@ -593,8 +593,8 @@ class SerperSearch(WebSearch):
 
 # For easy swapping of search implementations
 def get_search_engine(fetch_full_content=None) -> WebSearch:
-    from .models import SearchSettings
-    settings = SearchSettings.load()
+    from .models import BenchmarkSettings
+    settings = BenchmarkSettings.load()
     limit = getattr(settings, 'search_limit', 5)
     
     should_fetch = fetch_full_content if fetch_full_content is not None else settings.fetch_full_content

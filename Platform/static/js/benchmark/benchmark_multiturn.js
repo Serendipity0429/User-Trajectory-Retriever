@@ -3,11 +3,11 @@ window.BenchmarkUtils.MultiTurnPage = (function() {
     const trialState = {};
 
     const PIPELINE_CONFIGS = {
-        'vanilla_llm_multi_turn': {
+        'vanilla_llm': {
             loadingText: 'Thinking...',
             icon: 'bi-robot'
         },
-        'rag_multi_turn': {
+        'rag': {
             loadingText: 'Thinking...',
             icon: 'bi-globe'
         },
@@ -24,7 +24,7 @@ window.BenchmarkUtils.MultiTurnPage = (function() {
     function startPolling(trialId, pipelineType) {
         if (activePolls[trialId]) return;
 
-        const config = PIPELINE_CONFIGS[pipelineType] || PIPELINE_CONFIGS['vanilla_llm_multi_turn'];
+        const config = PIPELINE_CONFIGS[pipelineType] || PIPELINE_CONFIGS['vanilla_llm'];
 
         // Initialize state
         if (!trialState[trialId]) {
@@ -45,7 +45,7 @@ window.BenchmarkUtils.MultiTurnPage = (function() {
                 currentCount = Math.max(0, currentCount - 1);
             }
             
-            fetch(`/benchmark/api/multi_turn/get_trial_trace/${trialId}/?cursor=${currentCount}`)
+            fetch(`/benchmark/api/sessions/get_trial_trace/${trialId}/?cursor=${currentCount}`)
                 .then(res => res.json())
                 .then(data => {
                     const newSteps = data.trace || [];
@@ -71,25 +71,36 @@ window.BenchmarkUtils.MultiTurnPage = (function() {
                                 trialState[trialId].renderedCount--;
                             }
 
-                            // Check for processing indicator
-                            const processingIndicator = wrapper.querySelector('.trial-processing-indicator');
-                            let indicatorParent = null;
-                            if (processingIndicator) {
-                                indicatorParent = processingIndicator.closest('.message-bubble');
+                            // Check for processing indicator - Remove ALL instances
+                            const processingIndicators = wrapper.querySelectorAll('.trial-processing-indicator');
+                            processingIndicators.forEach(indicator => {
+                                const indicatorParent = indicator.closest('.message-bubble');
                                 if (indicatorParent) indicatorParent.remove();
-                            }
+                            });
 
                             let newStepsHtml = '';
                             newSteps.forEach((step, idx) => {
                                 newStepsHtml += BenchmarkUtils.BenchmarkRenderer.renderAgentStep(step, currentCount + idx, trialId);
                             });
                             
-                            wrapper.insertAdjacentHTML('beforeend', newStepsHtml);
+                            // Insert new steps correctly (before verdict if it exists)
+                            const verdictContainer = wrapper.querySelector('.trial-verdict-container');
+                            if (verdictContainer) {
+                                verdictContainer.insertAdjacentHTML('beforebegin', newStepsHtml);
+                            } else {
+                                wrapper.insertAdjacentHTML('beforeend', newStepsHtml);
+                            }
                             
                             // Re-append processing indicator if still processing
                             if (trialInfo && trialInfo.status === 'processing') {
                                 const indicatorHtml = BenchmarkUtils.BenchmarkRenderer.createMessageBubble('assistant', `<div class="d-flex align-items-center trial-processing-indicator"><span class="spinner-border spinner-border-sm text-primary me-2"></span>${config.loadingText}</div>`, '', config.icon);
-                                wrapper.insertAdjacentHTML('beforeend', indicatorHtml);
+                                
+                                // Insert indicator before verdict if exists, else append
+                                if (verdictContainer) {
+                                    verdictContainer.insertAdjacentHTML('beforebegin', indicatorHtml);
+                                } else {
+                                    wrapper.insertAdjacentHTML('beforeend', indicatorHtml);
+                                }
                             }
                         }
                         
@@ -113,11 +124,11 @@ window.BenchmarkUtils.MultiTurnPage = (function() {
 
                         const wrapper = trialDiv.querySelector('.trial-wrapper');
                         if (wrapper) {
-                             const processingIndicator = wrapper.querySelector('.trial-processing-indicator');
-                             if (processingIndicator) {
-                                 const indicatorParent = processingIndicator.closest('.message-bubble');
+                             const processingIndicators = wrapper.querySelectorAll('.trial-processing-indicator');
+                             processingIndicators.forEach(indicator => {
+                                 const indicatorParent = indicator.closest('.message-bubble');
                                  if (indicatorParent) indicatorParent.remove();
-                             }
+                             });
                              
                              // Final check for verdict (if not already there)
                              if (trialInfo.status === 'completed' && !wrapper.querySelector('.trial-verdict-container')) {
@@ -161,24 +172,7 @@ window.BenchmarkUtils.MultiTurnPage = (function() {
             BenchmarkUtils.setupConfigurationHandlers();
             BenchmarkUtils.setupConfigurationActionHandlers(csrfToken, true, true);
             
-            // --- Search Results Modal Listener ---
-            if (config.pipelineType.includes('rag')) {
-                document.addEventListener('click', function(e) {
-                    if (e.target && e.target.closest('.view-search-results-btn')) {
-                        const btn = e.target.closest('.view-search-results-btn');
-                        try {
-                            const results = JSON.parse(decodeURIComponent(btn.dataset.results));
-                            const container = document.getElementById('modal-generic-content-container');
-                            BenchmarkUtils.BenchmarkRenderer.renderModalSearchResults(results, container, 'benchmarkGenericModal');
-                            const modal = new bootstrap.Modal(document.getElementById('benchmarkGenericModal'));
-                            modal.show();
-                        } catch (err) {
-                            console.error("Error opening results modal:", err);
-                            alert("Failed to load results details.");
-                        }
-                    }
-                });
-            }
+            // Search Results Modal Listener removed - handled by inline onclick in renderer to prevent duplicates
 
             // --- Prompt Viewing Listener ---
             document.addEventListener('click', function(e) {
@@ -216,6 +210,7 @@ window.BenchmarkUtils.MultiTurnPage = (function() {
             let activeSessionId = null;
             let currentPipelineResults = [];
             let pipelineController = null;
+            let currentRunPipelineType = pipelineType;
 
             // Session Control Variables
             let sessionAbortController = null;
@@ -266,14 +261,15 @@ window.BenchmarkUtils.MultiTurnPage = (function() {
                 fetch(BenchmarkUrls.multiTurn.getSession(sessionId))
                     .then(res => res.json())
                     .then(data => {
-                        BenchmarkUtils.MultiTurnUtils.renderSession(data.session, data.trials, { sessionTrials: [], pipelineType: pipelineType }); 
+                        const sessionPipelineType = (data.session && data.session.pipeline_type) ? data.session.pipeline_type : pipelineType;
+                        BenchmarkUtils.MultiTurnUtils.renderSession(data.session, data.trials, { sessionTrials: [], pipelineType: sessionPipelineType }); 
                         window.sessionTrials = data.trials; 
                         
                         const settingsWhitelist = ['llm_model', 'llm_base_url', 'max_retries', 'allow_reasoning'];
-                         if (pipelineType.includes('rag')) {
+                         if (sessionPipelineType.includes('rag')) {
                             settingsWhitelist.push('rag_settings', 'search_settings');
                         }
-                        if (pipelineType.includes('agent')) {
+                        if (sessionPipelineType.includes('agent')) {
                             settingsWhitelist.push('agent_config');
                         }
                         BenchmarkUtils.BenchmarkRenderer.renderRunConfiguration(data.session.settings_snapshot, settingsWhitelist);
@@ -331,8 +327,9 @@ window.BenchmarkUtils.MultiTurnPage = (function() {
             }
             
             // --- Helper: Load Group/Run ---
-            function loadRun(groupId) {
-                 const loadRunUrl = BenchmarkUrls.pipeline.loadRun(pipelineType, groupId);
+            function loadRun(groupId, overridePipelineType = null) {
+                 const runPipelineType = overridePipelineType || pipelineType;
+                 const loadRunUrl = BenchmarkUrls.pipeline.loadRun(runPipelineType, groupId);
 
                  fetch(loadRunUrl).then(res => res.json()).then(data => {
                      if (data.error) { alert(data.error); return; }
@@ -347,8 +344,8 @@ window.BenchmarkUtils.MultiTurnPage = (function() {
                      });
                      
                      const settingsWhitelist = ['llm_model', 'llm_base_url', 'max_retries', 'allow_reasoning'];
-                     if (pipelineType.includes('rag')) settingsWhitelist.push('rag_settings', 'search_settings');
-                     if (pipelineType.includes('agent')) settingsWhitelist.push('agent_config');
+                     if (runPipelineType.includes('rag')) settingsWhitelist.push('rag_settings', 'search_settings');
+                     if (runPipelineType.includes('agent')) settingsWhitelist.push('agent_config');
                      BenchmarkUtils.BenchmarkRenderer.renderRunConfiguration(data.settings, settingsWhitelist);
                      if (statsContainer) statsContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                  });
@@ -430,11 +427,13 @@ window.BenchmarkUtils.MultiTurnPage = (function() {
                 });
             }
 
-            // --- Pipeline Run ---
-            document.getElementById('run-pipeline-btn').addEventListener('click', function() {
+            // --- Pipeline Run Helper ---
+            function initiatePipelineRun(groupId = null, overridePipelineType = null) {
+                currentRunPipelineType = overridePipelineType || pipelineType;
+                console.log(`initiatePipelineRun called with groupId: ${groupId} (type: ${typeof groupId})`);
                 const currentPipelineId = BenchmarkUtils.generateUUID();
                 const ui = {
-                    runBtn: this,
+                    runBtn: document.getElementById('run-pipeline-btn'), // Always reference main run button for state
                     stopBtn: document.getElementById('stop-pipeline-btn'),
                     progressBar: document.getElementById('pipeline-progress-bar'),
                     statusDiv: document.getElementById('pipeline-status'),
@@ -443,10 +442,16 @@ window.BenchmarkUtils.MultiTurnPage = (function() {
                 };
                 
                 document.getElementById('statistics-container').style.display = 'block';
+                
+                // Clear table and results initially - we will repopulate if resuming
                 document.getElementById('stats-details-tbody').innerHTML = '';
+                currentPipelineResults = [];
+                
                 document.getElementById('pipeline-progress').style.display = 'block';
-                document.getElementById('results-header-text').textContent = 'Live Pipeline Results';
+                document.getElementById('results-header-text').textContent = groupId ? 'Resuming Pipeline Run...' : 'Live Pipeline Results';
+                if (ui.statusDiv) ui.statusDiv.textContent = groupId ? 'Initializing resume...' : 'Initializing...';
 
+                // Ensure settings are synced
                 const currentLlmSettings = {
                     llm_base_url: document.getElementById('llm_base_url').value,
                     llm_api_key: document.getElementById('llm_api_key').value,
@@ -455,48 +460,100 @@ window.BenchmarkUtils.MultiTurnPage = (function() {
                 };
                 BenchmarkUtils.BenchmarkRenderer.renderRunConfiguration({ llm_settings: currentLlmSettings });
                 
-                currentPipelineResults = [];
-                
-                const formData = new FormData();
-                formData.append('csrfmiddlewaretoken', csrfToken);
-                formData.append('dataset_id', document.getElementById('dataset-selector').value);
-                formData.append('pipeline_id', currentPipelineId);
-                formData.append('llm_base_url', currentLlmSettings.llm_base_url);
-                formData.append('llm_api_key', currentLlmSettings.llm_api_key);
-                formData.append('llm_model', currentLlmSettings.llm_model);
-                if (currentLlmSettings.max_retries) formData.append('max_retries', currentLlmSettings.max_retries);
-                
-                if (buildFormData) buildFormData(formData);
-                
-                const runUrl = BenchmarkUrls.pipeline.start(pipelineType);
+                let preloadedCount = 0;
+                let preloadPromise = Promise.resolve();
 
-                pipelineController = BenchmarkUtils.PipelineRunner.start({
-                    url: runUrl,
-                    formData: formData,
-                    ui: ui,
-                    totalItems: 0,
-                    callbacks: {
-                        onMeta: (data) => {
-                             if (data.type === 'info') ui.statusDiv.textContent = data.message;
-                             if (data.type === 'session_created') {
-                                 BenchmarkUtils.MultiTurnUtils.addNewSessionToList('session-list', data.session_id, { question: data.question }, null, data.group_id, data.group_name, 'Processing...');
-                                 loadSession(data.session_id);
-                             }
-                             if (data.type === 'trial_started' || data.type === 'trial_completed') {
-                                 if (activeSessionId && String(activeSessionId) === String(data.session_id)) loadSession(data.session_id);
-                             }
-                        },
-                        onData: (data) => {
-                             if (data.error) { ui.statusDiv.textContent = `Error: ${data.error}`; return; }
-                             currentPipelineResults.push(data);
-                             BenchmarkUtils.MultiTurnUtils.updateStatsUI(currentPipelineResults, data.group_name || "Current Run", (sid) => {
-                                 document.getElementById('session-container').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                                 loadSession(sid);
-                             });
-                             BenchmarkUtils.MultiTurnUtils.addNewSessionToList('session-list', data.session_id, { question: data.question }, null, data.group_id, data.group_name, 'Finished');
-                        }
+                if (groupId && groupId !== 'null' && groupId !== 'undefined') {
+                    ui.statusDiv.textContent = 'Fetching existing results...';
+                    const loadUrl = BenchmarkUrls.pipeline.loadRun(currentRunPipelineType, groupId);
+                    
+                    preloadPromise = fetch(loadUrl)
+                        .then(res => res.json())
+                        .then(data => {
+                            if (data.results) {
+                                currentPipelineResults = data.results;
+                                preloadedCount = data.results.length;
+                                
+                                // Render existing results
+                                BenchmarkUtils.MultiTurnUtils.updateStatsUI(currentPipelineResults, data.group_name || "Current Run", (sid) => {
+                                     document.getElementById('session-container').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                                     loadSession(sid);
+                                });
+                                
+                                ui.statusDiv.textContent = `Resuming... Loaded ${preloadedCount} existing results.`;
+                            }
+                        })
+                        .catch(err => {
+                            console.error("Error pre-loading run data:", err);
+                            ui.statusDiv.textContent = "Error loading existing results. Starting pipeline...";
+                        });
+                }
+                
+                preloadPromise.then(() => {
+                    const formData = new FormData();
+                    formData.append('csrfmiddlewaretoken', csrfToken);
+                    formData.append('dataset_id', document.getElementById('dataset-selector').value);
+                    formData.append('pipeline_id', currentPipelineId);
+                    formData.append('llm_base_url', currentLlmSettings.llm_base_url);
+                    formData.append('llm_api_key', currentLlmSettings.llm_api_key);
+                    formData.append('llm_model', currentLlmSettings.llm_model);
+                    if (currentLlmSettings.max_retries) formData.append('max_retries', currentLlmSettings.max_retries);
+                    
+                    if (groupId && groupId !== 'null' && groupId !== 'undefined') {
+                        formData.append('group_id', groupId);
                     }
+                    
+                    if (buildFormData) buildFormData(formData);
+                    
+                    const runUrl = BenchmarkUrls.pipeline.start(currentRunPipelineType);
+
+                    pipelineController = BenchmarkUtils.PipelineRunner.start({
+                        url: runUrl,
+                        formData: formData,
+                        ui: ui,
+                        totalItems: 0, // Will be updated by stream
+                        initialProcessedCount: preloadedCount, // Pass the count of preloaded items
+                        callbacks: {
+                            onMeta: (data) => {
+                                 if (data.type === 'info') ui.statusDiv.textContent = data.message;
+                                 if (data.type === 'session_created') {
+                                     BenchmarkUtils.MultiTurnUtils.addNewSessionToList('session-list', data.session_id, { question: data.question }, null, data.group_id, data.group_name, 'Processing...');
+                                     loadSession(data.session_id);
+                                 }
+                                 if (data.type === 'trial_started' || data.type === 'trial_completed') {
+                                     if (activeSessionId && String(activeSessionId) === String(data.session_id)) loadSession(data.session_id);
+                                 }
+                            },
+                                                    onData: (data) => {
+                                                         if (data.error) { 
+                                                             ui.statusDiv.textContent = `Error: ${data.error}`; 
+                                                             if (data.session_id) {
+                                                                 BenchmarkUtils.MultiTurnUtils.addNewSessionToList('session-list', data.session_id, { question: data.question }, null, null, null, 'Error');
+                                                                 if (activeSessionId && String(activeSessionId) === String(data.session_id)) loadSession(data.session_id);
+                                                             }
+                                                             return; 
+                                                         }
+                                                         
+                                                         const existingIdx = currentPipelineResults.findIndex(r => r.session_id === data.session_id);
+                                                         if (existingIdx !== -1) {
+                                                             currentPipelineResults[existingIdx] = data;
+                                                         } else {
+                                                             currentPipelineResults.push(data);
+                                                         }
+                            
+                                                         BenchmarkUtils.MultiTurnUtils.updateStatsUI(currentPipelineResults, data.group_name || "Current Run", (sid) => {
+                                                             document.getElementById('session-container').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                                                             loadSession(sid);
+                                                         });
+                                                         BenchmarkUtils.MultiTurnUtils.addNewSessionToList('session-list', data.session_id, { question: data.question }, null, data.group_id, data.group_name, 'Finished');
+                                                    }                        }
+                    });
                 });
+            }
+
+            // --- Pipeline Run Button ---
+            document.getElementById('run-pipeline-btn').addEventListener('click', function() {
+                initiatePipelineRun(null, pipelineType);
             });
 
             // --- Stop Pipeline ---
@@ -505,7 +562,7 @@ window.BenchmarkUtils.MultiTurnPage = (function() {
                 if (pipelineController && pipelineController.pipelineId) {
                     let strategyData = { pipeline_id: pipelineController.pipelineId };
 
-                    const stopUrl = BenchmarkUrls.pipeline.stop(pipelineType);
+                    const stopUrl = BenchmarkUrls.pipeline.stop(currentRunPipelineType || pipelineType);
 
                     fetch(stopUrl, {
                         method: 'POST',
@@ -520,6 +577,20 @@ window.BenchmarkUtils.MultiTurnPage = (function() {
 
             // --- List Click Handlers ---
             document.getElementById('session-list').addEventListener('click', function(e) {
+                // Continue Group
+                const continueBtn = e.target.closest('.continue-group-btn');
+                if (continueBtn) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const groupId = continueBtn.dataset.groupId;
+                    const groupPipelineType = continueBtn.dataset.pipelineType || pipelineType;
+                    console.log(`Continue button clicked. Extracted groupId: ${groupId}`);
+                    if (confirm('Resume this pipeline run?')) {
+                        initiatePipelineRun(groupId, groupPipelineType);
+                    }
+                    return;
+                }
+
                 const deleteGrp = e.target.closest('.delete-group-btn');
                 if (deleteGrp) {
                     e.preventDefault(); 
@@ -548,7 +619,8 @@ window.BenchmarkUtils.MultiTurnPage = (function() {
                 if (groupSummary) { 
                     if (groupSummary.dataset && groupSummary.dataset.groupId) {
                         try {
-                            loadRun(groupSummary.dataset.groupId); 
+                            const groupPipelineType = groupSummary.dataset.pipelineType || pipelineType;
+                            loadRun(groupSummary.dataset.groupId, groupPipelineType); 
                         } catch (err) {
                             console.error("loadRun error:", err);
                         }

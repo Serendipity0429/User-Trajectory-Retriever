@@ -339,7 +339,7 @@ window.BenchmarkUtils.BenchmarkRenderer = {
         pre.textContent = promptContent;
         container.appendChild(pre);
 
-        const modal = new bootstrap.Modal(document.getElementById(modalId));
+        const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById(modalId));
         modal.show();
     },
 
@@ -518,11 +518,21 @@ window.BenchmarkUtils.BenchmarkRenderer = {
 
         // --- 2. Assistant: Action (Tool Call) ---
         if (type === 'action') {
+            let title = 'Tool Execution';
+            let icon = 'bi-tools';
+            let badgeClass = 'bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25';
+            
+            if (typeof content === 'string' && content.trim().startsWith('Search Query:')) {
+                title = 'Search Query';
+                icon = 'bi-search';
+                badgeClass = 'bg-info bg-opacity-10 text-info border-info border-opacity-25';
+            }
+
             const toolHtml = `
                 <div class="d-flex flex-column">
                     <div class="d-flex align-items-center mb-2">
-                        <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 text-uppercase agent-badge-text">
-                            <i class="bi bi-tools me-1"></i> Tool Execution
+                        <span class="badge ${badgeClass} text-uppercase agent-badge-text">
+                            <i class="bi ${icon} me-1"></i> ${title}
                         </span>
                     </div>
                     <div class="p-3 bg-white border rounded-3 shadow-sm font-monospace small text-dark tool-execution-content">${content}</div>
@@ -550,8 +560,39 @@ window.BenchmarkUtils.BenchmarkRenderer = {
             if (typeof content === 'string' && content.startsWith('Search Results:')) {
                 isSearch = true;
                 displayContent = content.replace('Search Results:', '').trim();
-                // For simulated results, we don't have parsed JSON data easily
-                // but we can still render the text block.
+                
+                // 1. Try to parse if it's JSON injected (Legacy/Hidden)
+                try {
+                    // Check for hidden JSON block
+                    const jsonMatch = displayContent.match(/<!-- JSON_DATA_FOR_UI: (.*?) -->/s);
+                    if (jsonMatch && jsonMatch[1]) {
+                        parsedData = JSON.parse(jsonMatch[1]);
+                    } else {
+                        // Try direct JSON
+                        const extractedJson = JSON.parse(displayContent);
+                        if (Array.isArray(extractedJson)) {
+                            parsedData = extractedJson;
+                        }
+                    }
+                } catch(e) {
+                    // 2. Fallback: Parse <source> tags from text
+                    // Format: <source 1> Title\nContent</source 1>
+                    const sourceRegex = /<source (\d+)>\s*(.*?)\n([\s\S]*?)<\/source \1>/g;
+                    let match;
+                    const extractedResults = [];
+                    while ((match = sourceRegex.exec(displayContent)) !== null) {
+                        extractedResults.push({
+                            title: match[2].trim(),
+                            snippet: match[3].trim().substring(0, 300) + (match[3].length > 300 ? '...' : ''),
+                            content: match[3].trim(),
+                            link: '', // URL is not present in standard RAG prompt text
+                            url: ''
+                        });
+                    }
+                    if (extractedResults.length > 0) {
+                        parsedData = extractedResults;
+                    }
+                }
             }
             
             // Check for Final Answer
@@ -584,7 +625,9 @@ window.BenchmarkUtils.BenchmarkRenderer = {
                                 const container = document.getElementById('modal-generic-content-container'); 
                                 if(window.BenchmarkUtils && window.BenchmarkUtils.BenchmarkRenderer) {
                                     window.BenchmarkUtils.BenchmarkRenderer.renderModalSearchResults(data, container);
-                                    new bootstrap.Modal(document.getElementById('benchmarkGenericModal')).show();
+                                    const modalEl = document.getElementById('benchmarkGenericModal');
+                                    const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+                                    modal.show();
                                 }
                             ">
                                 <i class="bi bi-eye me-1"></i> View Detail
@@ -643,7 +686,7 @@ window.BenchmarkUtils.BenchmarkRenderer = {
             const systemHtml = `
                 <div class="d-flex align-items-center mb-2 pb-2 border-bottom border-secondary border-opacity-25">
                     <i class="bi bi-cpu-fill text-secondary me-2"></i> 
-                    <span class="text-uppercase fw-bold text-secondary small system-config-header">System Configuration</span>
+                    <span class="text-uppercase fw-bold text-secondary small system-config-header">System Prompt</span>
                 </div>
                 <div class="font-monospace text-muted small system-config-content">${content}</div>
             `;
@@ -652,14 +695,113 @@ window.BenchmarkUtils.BenchmarkRenderer = {
 
         // --- 5. User Input ---
         if (role === 'user') {
+            // Check for RAG source tags to render rich search results within user bubble
+            if (typeof content === 'string' && content.includes('<source')) {
+                const sourceRegex = /<source (\d+)>\s*(.*?)\n([\s\S]*?)<\/source \1>/g;
+                let match;
+                const extractedResults = [];
+                
+                // Parse results from original (unescaped) content
+                while ((match = sourceRegex.exec(content)) !== null) {
+                    extractedResults.push({
+                        title: match[2].trim(),
+                        snippet: match[3].trim().substring(0, 300) + (match[3].length > 300 ? '...' : ''),
+                        content: match[3].trim(),
+                        link: '', 
+                        url: ''
+                    });
+                }
+
+                if (extractedResults.length > 0) {
+                    const resultsCount = extractedResults.length;
+                    const resultsJson = encodeURIComponent(JSON.stringify(extractedResults));
+                    
+                    const resultsHtml = `
+                        <div class="d-flex align-items-center justify-content-between p-2 bg-light border rounded mb-2 mt-2">
+                            <div class="d-flex align-items-center">
+                                <div class="rounded-circle bg-white p-2 me-3 shadow-sm">
+                                    <i class="bi bi-globe text-primary"></i>
+                                </div>
+                                <div>
+                                    <div class="fw-bold text-dark search-results-title">Web Search Results</div>
+                                    <div class="small text-muted">${resultsCount} documents provided in context</div>
+                                </div>
+                            </div>
+                            <button class="btn btn-sm btn-outline-primary rounded-pill px-3 ms-3 view-search-results-btn" data-results="${resultsJson}" onclick="
+                                const data = JSON.parse(decodeURIComponent(this.dataset.results));
+                                const container = document.getElementById('modal-generic-content-container'); 
+                                if(window.BenchmarkUtils && window.BenchmarkUtils.BenchmarkRenderer) {
+                                    window.BenchmarkUtils.BenchmarkRenderer.renderModalSearchResults(data, container);
+                                    const modalEl = document.getElementById('benchmarkGenericModal');
+                                    const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+                                    modal.show();
+                                }
+                            ">
+                                <i class="bi bi-eye me-1"></i> View Detail
+                            </button>
+                        </div>
+                    `;
+                    
+                    // Escape EVERYTHING for display first (this makes <source> tags visible in the intro text)
+                    let displayContent = content.replace(/&/g, "&amp;")
+                                                .replace(/</g, "&lt;")
+                                                .replace(/>/g, "&gt;")
+                                                .replace(/"/g, "&quot;")
+                                                .replace(/'/g, "&#039;");
+
+                    // Placeholder for the rich card to protect it from newline conversion
+                    const placeholder = "<!--___RESULTS_CARD_PLACEHOLDER___-->";
+                    let rawSourceBlock = "";
+                    
+                    // Regex to find the ESCAPED source block
+                    const escapedSourceBlockRegex = /(?:&lt;source \d+&gt;[\s\S]*?&lt;\/source \d+&gt;\s*)+/;
+                    
+                    // 1. Extract and replace the block with placeholder
+                    const blockMatch = displayContent.match(escapedSourceBlockRegex);
+                    if (blockMatch) {
+                        rawSourceBlock = blockMatch[0];
+                        displayContent = displayContent.replace(escapedSourceBlockRegex, placeholder);
+                    } else {
+                        // Fallback if regex fails (shouldn't happen if extraction worked)
+                        return this.createMessageBubble('user', displayContent.replace(/\n/g, '<br>'));
+                    }
+
+                    // 2. Convert newlines to <br> in the text (Intro/Instruction)
+                    displayContent = displayContent.replace(/\n/g, '<br>');
+
+                    // 3. Construct the HTML to insert
+                    const injectionHtml = `
+                        ${resultsHtml}
+                        <div class="mt-2">
+                            <button class="btn btn-sm btn-link text-decoration-none p-0 text-muted small collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#raw-source-${resultsCount}" aria-expanded="false">
+                                <i class="bi bi-code-slash me-1"></i>Show Raw Source Tags
+                            </button>
+                            <div class="collapse mt-1" id="raw-source-${resultsCount}">
+                                <pre class="bg-light p-2 border rounded mb-0 text-secondary" style="max-height: 200px; overflow-y: auto; font-size: 0.75rem; white-space: pre-wrap;">${rawSourceBlock}</pre>
+                            </div>
+                        </div>
+                    `;
+
+                    // 4. Replace placeholder with final HTML
+                    displayContent = displayContent.replace(placeholder, injectionHtml);
+                    
+                    return this.createMessageBubble('user', displayContent);
+                }
+            }
             return this.createMessageBubble('user', content);
         }
 
         // --- 6. Fallback (Text / Assistant Message) ---
+        // Explicitly escape content to prevent hallucinated HTML (e.g. nested bubbles) from breaking layout
+        if (typeof content === 'string') {
+             content = content.replace(/&/g, "&amp;")
+                              .replace(/</g, "&lt;")
+                              .replace(/>/g, "&gt;");
+        }
         return this.createMessageBubble('assistant', content, '', 'bi-chat-left-dots');
     },
 
-    renderTrial: function(trial, isCompleted, trialCount, maxRetries, questionText, pipelineType = 'vanilla_llm_multi_turn') {
+    renderTrial: function(trial, isCompleted, trialCount, maxRetries, questionText, pipelineType = 'vanilla_llm') {
         const trialDiv = document.createElement('div');
         trialDiv.className = 'trial-container position-relative'; 
         trialDiv.id = `trial-${trial.id}`;
@@ -708,22 +850,22 @@ window.BenchmarkUtils.BenchmarkRenderer = {
             if (verdictHtml) chatContent += verdictHtml.outerHTML;
         }
         
-        const turnSeparator = trial.trial_number > 1 ? `
+        const endOfTurnSeparator = trial.trial_number < trialCount ? `
             <div class="d-flex align-items-center my-5 turn-divider">
                 <div class="flex-grow-1 border-top turn-divider-line"></div>
-                <div class="mx-4 text-uppercase text-muted fw-bold small turn-divider-text">End of Turn ${trial.trial_number - 1}</div>
+                <div class="mx-4 text-uppercase text-muted fw-bold small turn-divider-text">End of Turn ${trial.trial_number}</div>
                 <div class="flex-grow-1 border-top turn-divider-line"></div>
             </div>
         ` : '';
 
         trialDiv.innerHTML = `
-            ${turnSeparator}
             <div class="trial-wrapper position-relative pb-2">
                 <div class="d-flex align-items-center justify-content-center mb-4">
                     <div class="bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 rounded-pill px-4 py-1 small fw-bold turn-label">TURN ${trial.trial_number}</div>
                 </div>
                 ${chatContent}
             </div>
+            ${endOfTurnSeparator}
         `;
         
         return trialDiv;

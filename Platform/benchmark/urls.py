@@ -8,8 +8,8 @@ urlpatterns = [
     # 1. Views (HTML Pages)
     # ==========================================
     path("", views.home, name="home"),
-    path("vanilla_llm_multi_turn/", views.vanilla_llm_multi_turn, name="vanilla_llm_multi_turn"),
-    path("rag_multi_turn/", views.rag_multi_turn, name="rag_multi_turn"),
+    path("vanilla_llm/", views.vanilla_llm, name="vanilla_llm"),
+    path("rag/", views.rag, name="rag"),
     path("vanilla_agent/", views.vanilla_agent, name="vanilla_agent"),
     path("browser_agent/", views.browser_agent, name="browser_agent"),
 
@@ -39,28 +39,28 @@ urlpatterns = [
     # 5. API - Multi-Turn Sessions
     # ==========================================
     # Session Management
-    path("api/multi_turn/create_session_group/", views.create_session_group, name="create_session_group"),
-    path("api/multi_turn/create_session/", views.create_session, name="create_session"),
-    path("api/multi_turn/get_session/<int:session_id>/", views.get_session, name="get_session"),
-    path("api/multi_turn/delete_session/<int:session_id>/", views.delete_session, name="delete_session"),
-    path('api/multi_turn/batch_delete_sessions/', views.batch_delete_sessions, name='batch_delete_sessions'),
-    path('api/multi_turn/delete_session_group/<int:group_id>/', views.delete_session_group, name='delete_session_group'),
-    path('api/multi_turn/export_session/<int:session_id>/', views.export_session, name='export_session'),
+    path("api/sessions/create_session_group/", views.create_session_group, name="create_session_group"),
+    path("api/sessions/create_session/", views.create_session, name="create_session"),
+    path("api/sessions/get_session/<int:session_id>/", views.get_session, name="get_session"),
+    path("api/sessions/delete_session/<int:session_id>/", views.delete_session, name="delete_session"),
+    path('api/sessions/batch_delete_sessions/', views.batch_delete_sessions, name='batch_delete_sessions'),
+    path('api/sessions/delete_session_group/<int:group_id>/', views.delete_session_group, name='delete_session_group'),
+    path('api/sessions/export_session/<int:session_id>/', views.export_session, name='export_session'),
     
     # Trial Execution
-    path("api/multi_turn/run_trial/<int:trial_id>/", views.run_trial, name="run_trial"),
-    path("api/multi_turn/retry_session/<int:trial_id>/", views.retry_session, name="retry_session"),
-    path("api/multi_turn/stop_session/", views.stop_session, name="stop_session"),
-    path("api/multi_turn/get_trial_trace/<int:trial_id>/", views.get_trial_trace, name="get_trial_trace"),
-    path("api/multi_turn/get_trial_prompt/<int:trial_id>/", views.get_trial_prompt, name="get_trial_prompt"),
+    path("api/sessions/run_trial/<int:trial_id>/", views.run_trial, name="run_trial"),
+    path("api/sessions/retry_session/<int:trial_id>/", views.retry_session, name="retry_session"),
+    path("api/sessions/stop_session/", views.stop_session, name="stop_session"),
+    path("api/sessions/get_trial_trace/<int:trial_id>/", views.get_trial_trace, name="get_trial_trace"),
+    path("api/sessions/get_trial_prompt/<int:trial_id>/", views.get_trial_prompt, name="get_trial_prompt"),
 
     # Run Loading
-    path('api/multi_turn/load_run/<int:group_id>/', views.load_vanilla_llm_multi_turn_run, name='load_vanilla_llm_multi_turn_run'),
-    path('api/multi_turn/load_rag_run/<int:group_id>/', views.load_rag_multi_turn_run, name='load_rag_multi_turn_run'),
-    path('api/multi_turn/load_agent_run/<int:group_id>/', views.load_agent_multi_turn_run, name='load_agent_multi_turn_run'),
+    path('api/sessions/load_vanilla_run/<int:group_id>/', views.load_benchmark_run, {'pipeline_category': 'vanilla_llm'}, name='load_vanilla_llm_run'),
+    path('api/sessions/load_rag_run/<int:group_id>/', views.load_benchmark_run, {'pipeline_category': 'rag'}, name='load_rag_run'),
+    path('api/sessions/load_agent_run/<int:group_id>/', views.load_benchmark_run, {'pipeline_category': 'agent_multi_turn'}, name='load_agent_multi_turn_run'),
 
     # ==========================================
-    # 8. API - Pipelines (Streaming)
+    # 6. API - Pipelines (Streaming)
     # ==========================================
     path('api/pipeline/start/<str:pipeline_type>/', views.pipeline_start, name='pipeline_start'),
     path('api/pipeline/stop/<str:pipeline_type>/', views.pipeline_stop, name='pipeline_stop'),

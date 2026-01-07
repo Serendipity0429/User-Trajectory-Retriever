@@ -367,7 +367,8 @@ class TraceFormatter:
                             "timestamp": getattr(m, 'timestamp', None)
                         })
                 else:
-                    # System or User message: treat as plain text (do NOT parse tags)
+                    # System or User message
+                    # Default: treat as plain text (do NOT parse tags)
                     trace_data.append({
                         "role": m.role,
                         "name": m.name,

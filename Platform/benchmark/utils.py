@@ -105,3 +105,93 @@ def extract_query(text):
         # If no "Query" marker found but there was a think block,
         # the remaining text IS likely the query.
         return text.strip().strip('"').strip("'")
+
+import json
+from asgiref.sync import sync_to_async
+import asyncio
+
+class TrialGuard:
+    """
+    Context manager to handle trial errors and update Redis status (Sync).
+    """
+    def __init__(self, trial):
+        self.trial = trial
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if exc_type:
+            # 1. Fetch Partial Trace from Redis
+            partial_trace = []
+            try:
+                from task_manager.utils import redis_client
+                trace_json = redis_client.get(f"trial_trace:{self.trial.id}")
+                if trace_json:
+                    partial_trace = json.loads(trace_json)
+            except Exception:
+                pass
+
+            # 2. Update DB Status and Log
+            self.trial.status = 'error'
+            self.trial.log = self.trial.log or {}
+            if partial_trace:
+                self.trial.log["trace"] = partial_trace
+            self.trial.save()
+            
+            # 3. Update Redis Status
+            try:
+                from task_manager.utils import redis_client
+                redis_client.set(
+                    f"trial_status:{self.trial.id}", 
+                    json.dumps({"status": "error", "error": str(exc_val)}), 
+                    ex=3600
+                )
+            except Exception as e:
+                print_debug(f"TrialGuard Error: {e}")
+            # Propagate exception
+            return False
+
+class AsyncTrialGuard:
+    """
+    Context manager to handle trial errors and update Redis status (Async).
+    """
+    def __init__(self, trial):
+        self.trial = trial
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        if exc_type:
+            # 1. Fetch Partial Trace from Redis
+            partial_trace = []
+            try:
+                from task_manager.utils import redis_client
+                import asyncio
+                trace_json = await asyncio.to_thread(redis_client.get, f"trial_trace:{self.trial.id}")
+                if trace_json:
+                    partial_trace = json.loads(trace_json)
+            except Exception:
+                pass
+
+            # 2. Update DB Status and Log
+            self.trial.status = 'error'
+            if not self.trial.log:
+                self.trial.log = {}
+            if partial_trace:
+                self.trial.log["trace"] = partial_trace
+            await sync_to_async(self.trial.save)()
+            
+            # 3. Update Redis Status
+            try:
+                from task_manager.utils import redis_client
+                await asyncio.to_thread(
+                    redis_client.set,
+                    f"trial_status:{self.trial.id}", 
+                    json.dumps({"status": "error", "error": str(exc_val)}), 
+                    ex=3600
+                )
+            except Exception as e:
+                print_debug(f"AsyncTrialGuard Error: {e}")
+            return False

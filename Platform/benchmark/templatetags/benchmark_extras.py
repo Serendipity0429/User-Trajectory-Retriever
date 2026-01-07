@@ -9,13 +9,13 @@ def pipeline_badge(pipeline_type):
     Returns a styled HTML badge for the pipeline type.
     """
     config = {
-        'vanilla_llm_multi_turn': {
+        'vanilla_llm': {
             'icon': 'bi-chat-square-text',
             'color': 'text-primary',
             'bg': 'bg-primary',
             'label': 'Vanilla'
         },
-        'rag_multi_turn': {
+        'rag': {
             'icon': 'bi-database-gear',
             'color': 'text-warning',
             'bg': 'bg-warning',

@@ -61,7 +61,7 @@ class BenchmarkSettings(SingletonModel):
     llm_base_url = models.CharField(max_length=255, blank=True, help_text="Optional: e.g., http://localhost:11434/v1")
     llm_model = models.CharField(max_length=100, blank=True, help_text="e.g., gpt-4o")
     llm_api_key = models.CharField(max_length=255, blank=True, help_text="Your API Key")
-    max_retries = models.PositiveIntegerField(default=3, help_text="Maximum number of retries allowed for the LLM.")
+    max_retries = models.PositiveIntegerField(default=5, help_text="Maximum number of retries allowed for the LLM.")
     allow_reasoning = models.BooleanField(default=True, help_text="Allow the LLM to output its chain of thought reasoning before the final answer.")
     
     # LLM Advanced Parameters
@@ -123,8 +123,8 @@ class MultiTurnSession(models.Model):
     Unified model for both Vanilla LLM and RAG.
     """
     PIPELINE_TYPE_CHOICES = [
-        ('vanilla_llm_multi_turn', 'Vanilla LLM'),
-        ('rag_multi_turn', 'RAG'),
+        ('vanilla_llm', 'Vanilla LLM'),
+        ('rag', 'RAG'),
         ('vanilla_agent', 'Vanilla Agent'),
         ('browser_agent', 'Browser Agent'),
     ]
@@ -136,7 +136,7 @@ class MultiTurnSession(models.Model):
     is_completed = models.BooleanField(default=False)
     run_tag = models.CharField(max_length=255, blank=True, null=True, db_index=True)
     
-    pipeline_type = models.CharField(max_length=50, choices=PIPELINE_TYPE_CHOICES, default='vanilla_llm_multi_turn')
+    pipeline_type = models.CharField(max_length=50, choices=PIPELINE_TYPE_CHOICES, default='vanilla_llm')
 
     def __str__(self):
         return f"Session ({self.pipeline_type}) for: {self.question[:50]}..."
@@ -168,3 +168,7 @@ class MultiTurnTrial(models.Model):
 
     def __str__(self):
         return f"Trial {self.trial_number} for Session {self.session.id}"
+
+
+# Backwards-compatible alias for older imports.
+SearchSettings = BenchmarkSettings

@@ -8,8 +8,8 @@ from .base import (
 )
 
 class VanillaLLMMultiTurnPipeline(BaseMultiTurnPipeline):
-    def __init__(self, base_url, api_key, model, max_retries, pipeline_id=None, dataset_id=None):
-        super().__init__(base_url, api_key, model, max_retries, pipeline_id, dataset_id)
+    def __init__(self, base_url, api_key, model, max_retries, pipeline_id=None, dataset_id=None, group_id=None):
+        super().__init__(base_url, api_key, model, max_retries, pipeline_id, dataset_id, group_id)
         self.redis_prefix = REDIS_PREFIX_VANILLA_MULTI_TURN
         
     def __str__(self):
@@ -21,7 +21,7 @@ class VanillaLLMMultiTurnPipeline(BaseMultiTurnPipeline):
             ground_truths=ground_truths,
             run=group, 
             run_tag=self.pipeline_id,
-            pipeline_type='vanilla_llm_multi_turn'
+            pipeline_type='vanilla_llm'
         )
 
     def create_trial(self, session, trial_number):

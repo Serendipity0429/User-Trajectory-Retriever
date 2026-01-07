@@ -2,29 +2,19 @@ window.BenchmarkUtils.BenchmarkRenderer = {
     ...BenchmarkComponents,
     
     renderProcessingRow: function(item, resultsBody, colSpan = 7) {
-        const rowId = `processing-row`; // Fixed ID for easier finding
-        const tr = document.createElement('tr');
-        tr.id = rowId;
-        tr.className = 'table-light border-bottom-0 processing-row';
+        const rowId = `processing-row`; 
         
-        const td = document.createElement('td');
-        td.colSpan = colSpan;
-        td.className = 'text-center py-4 text-muted';
+        // Remove existing if any
+        const existing = document.getElementById(rowId);
+        if (existing) existing.remove();
+
+        const tr = BenchmarkUtils.renderTemplate('tpl-processing-row', {
+            'root': { attrs: { id: rowId } },
+            '.processing-col': { attrs: { colspan: colSpan } },
+            '.processing-question-text': { text: item.question || 'Unknown' }
+        });
         
-        td.innerHTML = `
-            <div class="d-flex flex-column align-items-center justify-content-center">
-                <div class="spinner-border text-primary mb-2" role="status">
-                    <span class="visually-hidden">Loading...</span>
-                </div>
-                <div class="fw-medium">Processing Question:</div>
-                <div class="small text-dark fw-bold mt-1 processing-question-text">
-                    ${item.question || 'Unknown'}
-                </div>
-            </div>
-        `;
-        
-        tr.appendChild(td);
-        resultsBody.insertAdjacentElement('afterbegin', tr); // Add to top
+        resultsBody.insertAdjacentElement('afterbegin', tr); 
         return tr;
     },
     
@@ -36,53 +26,44 @@ window.BenchmarkUtils.BenchmarkRenderer = {
         const visibleItems = groundTruthsArray.slice(0, displayLimit);
         const hiddenItems = groundTruthsArray.slice(displayLimit);
 
-        const createItem = (text) => {
-            const li = document.createElement('li');
-            li.className = 'text-secondary small ground-truth-item';
-            li.appendChild(this.createIcon('bi bi-dot me-1 text-muted'));
-            li.appendChild(document.createTextNode(text));
-            return li;
-        };
-
-        visibleItems.forEach(gt => ul.appendChild(createItem(gt)));
+        visibleItems.forEach(gt => {
+            const li = BenchmarkUtils.renderTemplate('tpl-ground-truth-item', {
+                '.gt-text': { text: gt }
+            });
+            ul.appendChild(li);
+        });
 
         if (hiddenItems.length > 0) {
             const hiddenContainer = document.createElement('div');
             hiddenContainer.style.display = 'none';
-            hiddenItems.forEach(gt => hiddenContainer.appendChild(createItem(gt)));
+            hiddenItems.forEach(gt => {
+                const li = BenchmarkUtils.renderTemplate('tpl-ground-truth-item', {
+                    '.gt-text': { text: gt }
+                });
+                hiddenContainer.appendChild(li);
+            });
             ul.appendChild(hiddenContainer);
 
-            const liBtn = document.createElement('li');
-            liBtn.className = 'show-more-item';
-            
-            const showMoreBtn = document.createElement('button');
-            showMoreBtn.className = 'btn btn-link btn-sm p-0 text-decoration-none small toggle-answers-link';
-            showMoreBtn.textContent = `... Show ${hiddenItems.length} more`;
-            showMoreBtn.type = 'button';
-            
-            const showLessBtn = document.createElement('button');
-            showLessBtn.className = 'btn btn-link btn-sm p-0 text-decoration-none small toggle-answers-link';
-            showLessBtn.textContent = 'Show less';
-            showLessBtn.type = 'button';
-            showLessBtn.style.display = 'none';
-
-            showMoreBtn.onclick = (e) => {
-                e.stopPropagation();
-                hiddenContainer.style.display = 'block';
-                showMoreBtn.style.display = 'none';
-                showLessBtn.style.display = 'inline-block';
-            };
-
-            showLessBtn.onclick = (e) => {
-                e.stopPropagation();
-                hiddenContainer.style.display = 'none';
-                showMoreBtn.style.display = 'inline-block';
-                showLessBtn.style.display = 'none';
-            };
-
-            liBtn.appendChild(showMoreBtn);
-            liBtn.appendChild(showLessBtn);
-            ul.appendChild(liBtn);
+            const toggleLi = BenchmarkUtils.renderTemplate('tpl-ground-truth-toggle', {
+                '.show-more-btn': {
+                    text: `... Show ${hiddenItems.length} more`,
+                    onclick: (e) => {
+                        e.stopPropagation();
+                        hiddenContainer.style.display = 'block';
+                        toggleLi.querySelector('.show-more-btn').style.display = 'none';
+                        toggleLi.querySelector('.show-less-btn').style.display = 'inline-block';
+                    }
+                },
+                '.show-less-btn': {
+                    onclick: (e) => {
+                        e.stopPropagation();
+                        hiddenContainer.style.display = 'none';
+                        toggleLi.querySelector('.show-more-btn').style.display = 'inline-block';
+                        toggleLi.querySelector('.show-less-btn').style.display = 'none';
+                    }
+                }
+            });
+            ul.appendChild(toggleLi);
         }
         return ul;
     },
@@ -141,36 +122,16 @@ window.BenchmarkUtils.BenchmarkRenderer = {
         return container;
     },
 
-
-
     renderSearchResults: function(results, resultsListElement) {
-        resultsListElement.innerHTML = ''; // Clear previous results
+        resultsListElement.innerHTML = ''; 
         if (results && results.length > 0) {
             results.forEach((res, index) => {
-                const item = document.createElement('a');
-                item.href = res.link || '#';
-                item.target = "_blank";
-                item.className = "list-group-item list-group-item-action";
-
-                const divFlex = document.createElement('div');
-                divFlex.className = "d-flex w-100 justify-content-between";
-
-                const h6Title = document.createElement('h6');
-                h6Title.className = "mb-1 text-primary";
-                h6Title.textContent = `${index + 1}. ${res.title || 'No Title'}`;
-                divFlex.appendChild(h6Title);
-                item.appendChild(divFlex);
-
-                const pSnippet = document.createElement('p');
-                pSnippet.className = "mb-1 small text-muted";
-                pSnippet.textContent = res.snippet || 'No snippet available.';
-                item.appendChild(pSnippet);
-
-                const smallLink = document.createElement('small');
-                smallLink.className = "text-truncate d-block text-secondary";
-                smallLink.textContent = res.link || '';
-                item.appendChild(smallLink);
-                
+                const item = BenchmarkUtils.renderTemplate('tpl-search-result-item', {
+                    '.search-result-link': { href: res.link || '#' },
+                    '.search-result-title': { text: `${index + 1}. ${res.title || 'No Title'}` },
+                    '.search-result-snippet': { text: res.snippet || 'No snippet available.' },
+                    '.search-result-url': { text: res.link || '' }
+                });
                 resultsListElement.appendChild(item);
             });
         } else {
@@ -179,7 +140,7 @@ window.BenchmarkUtils.BenchmarkRenderer = {
     },
 
     renderNoSearchResults: function(resultsListElement) {
-        resultsListElement.innerHTML = ''; // Clear previous results
+        resultsListElement.innerHTML = '';
         const alertDiv = document.createElement('div');
         alertDiv.className = 'alert alert-info';
         alertDiv.textContent = 'No results found.';
@@ -187,7 +148,7 @@ window.BenchmarkUtils.BenchmarkRenderer = {
     },
 
     renderSearchError: function(resultsListElement, errorMessage) {
-        resultsListElement.innerHTML = ''; // Clear previous results
+        resultsListElement.innerHTML = '';
         const alertDiv = document.createElement('div');
         alertDiv.className = 'alert alert-danger';
         alertDiv.textContent = errorMessage;
@@ -197,7 +158,7 @@ window.BenchmarkUtils.BenchmarkRenderer = {
     renderModalSearchResults: function(results, container, modalId = 'benchmarkGenericModal') {
         const modalTitle = document.getElementById(modalId + 'Label');
         if (modalTitle) modalTitle.textContent = 'Search Results';
-        container.innerHTML = ''; // Clear existing content
+        container.innerHTML = ''; 
 
         if (results && results.length > 0) {
             results.forEach((res, idx) => {
@@ -213,98 +174,47 @@ window.BenchmarkUtils.BenchmarkRenderer = {
                         domain = urlObj.hostname.replace('www.', '');
                     }
                 } catch(err) {}
+                
+                // Base setup for the item
+                const itemData = {
+                    '.result-idx': { text: idx + 1 },
+                    '.result-link': { href: linkUrl, text: linkTitle },
+                    '.domain-badge': { text: domain },
+                    '.result-snippet': { text: snippet },
+                    '.url-content': { text: linkUrl }
+                };
+                
+                const itemElement = BenchmarkUtils.renderTemplate('tpl-modal-search-result-item', itemData);
 
-                const item = document.createElement('div');
-                item.className = 'list-group-item p-3 border rounded mb-3 shadow-sm bg-white';
-
-                // Title and Link
-                const header = document.createElement('div');
-                header.className = 'd-flex w-100 justify-content-between align-items-center mb-2';
-                
-                const titleWrapper = document.createElement('h6');
-                titleWrapper.className = 'mb-0 text-primary fw-bold d-flex align-items-center';
-                
-                const idxBadge = document.createElement('span');
-                idxBadge.className = 'badge bg-light text-muted border me-2';
-                idxBadge.textContent = idx + 1;
-                titleWrapper.appendChild(idxBadge);
-                
-                const aTitle = document.createElement('a');
-                aTitle.href = linkUrl;
-                aTitle.target = '_blank';
-                aTitle.className = 'text-decoration-none';
-                aTitle.textContent = linkTitle;
-                titleWrapper.appendChild(aTitle);
-                
-                header.appendChild(titleWrapper);
-                
-                if (domain) {
-                    const domainBadge = document.createElement('span');
-                    domainBadge.className = 'badge bg-light text-secondary border-0';
-                    domainBadge.style.fontSize = '0.75rem';
-                    domainBadge.textContent = domain;
-                    header.appendChild(domainBadge);
-                }
-                
-                item.appendChild(header);
-
-                // Snippet
-                const pSnippet = document.createElement('p');
-                pSnippet.className = 'mb-2 text-dark small';
-                pSnippet.style.lineHeight = '1.5';
-                pSnippet.textContent = snippet;
-                item.appendChild(pSnippet);
-
-                // Link URL
-                const smallLink = document.createElement('div');
-                smallLink.className = 'text-muted mb-2 text-truncate font-monospace';
-                smallLink.style.fontSize = '0.7rem';
-                smallLink.innerHTML = `<i class="bi bi-link-45deg"></i> ${linkUrl}`;
-                item.appendChild(smallLink);
-
-                // Full Content (Collapsible)
+                // Handle Full Content Collapse
                 if (fullContent && fullContent !== snippet) {
                     const collapseId = `content-collapse-${idx}-${Math.random().toString(36).substr(2, 9)}`;
-                    
-                    const contentContainer = document.createElement('div');
-                    contentContainer.className = 'mt-3 pt-2 border-top';
-                    
-                    const toggleBtn = document.createElement('button');
-                    toggleBtn.className = 'btn btn-sm btn-outline-secondary d-flex align-items-center collapsed';
-                    toggleBtn.type = 'button';
-                    toggleBtn.dataset.bsToggle = 'collapse';
-                    toggleBtn.dataset.bsTarget = `#${collapseId}`;
-                    toggleBtn.innerHTML = `
-                        <i class="bi bi-file-text me-1"></i> 
-                        <span>Show Full Content</span>
-                        <i class="bi bi-chevron-down ms-auto ps-3"></i>
-                    `;
-                    
-                    // Sync text on toggle
-                    toggleBtn.addEventListener('click', function() {
-                        const isExpanded = this.getAttribute('aria-expanded') === 'true';
-                        this.querySelector('span').textContent = isExpanded ? 'Hide Full Content' : 'Show Full Content';
-                        this.querySelector('.bi-chevron-down').className = isExpanded ? 'bi bi-chevron-up ms-auto ps-3' : 'bi bi-chevron-down ms-auto ps-3';
-                    });
+                    const contentContainer = itemElement.querySelector('.content-container');
+                    const toggleBtn = itemElement.querySelector('.toggle-content-btn');
+                    const collapseDiv = itemElement.querySelector('.content-collapse');
+                    const contentBody = itemElement.querySelector('.full-content-body');
+                    const btnText = itemElement.querySelector('.btn-text');
+                    const icon = itemElement.querySelector('.icon-chevron');
 
-                    const collapseDiv = document.createElement('div');
-                    collapseDiv.className = 'collapse';
-                    collapseDiv.id = collapseId;
-                    
-                    const contentBody = document.createElement('div');
-                    contentBody.className = 'card card-body bg-light border-0 mt-2 small text-secondary';
-                    contentBody.style.maxHeight = '300px';
-                    contentBody.style.overflowY = 'auto';
-                    contentBody.style.whiteSpace = 'pre-wrap';
-                    contentBody.textContent = fullContent;
-                    
-                    collapseDiv.appendChild(contentBody);
-                    contentContainer.appendChild(toggleBtn);
-                    contentContainer.appendChild(collapseDiv);
-                    item.appendChild(contentContainer);
+                    if (contentContainer) contentContainer.style.display = 'block';
+                    if (toggleBtn) toggleBtn.setAttribute('data-bs-target', `#${collapseId}`);
+                    if (collapseDiv) collapseDiv.id = collapseId;
+                    if (contentBody) contentBody.textContent = fullContent;
+
+                    if (toggleBtn) {
+                        toggleBtn.addEventListener('click', function() {
+                            const isExpanded = this.getAttribute('aria-expanded') === 'true';
+                            // Wait for BS collapse event or just toggle immediately for text
+                             setTimeout(() => {
+                                 const actuallyExpanded = collapseDiv.classList.contains('show');
+                                 if (btnText) btnText.textContent = actuallyExpanded ? 'Hide Full Content' : 'Show Full Content';
+                                 if (icon) icon.className = actuallyExpanded ? 'bi bi-chevron-up ms-auto ps-3 icon-chevron' : 'bi bi-chevron-down ms-auto ps-3 icon-chevron';
+                             }, 350); // Slight delay to sync with BS animation
+                        });
+                    }
                 }
-                
-                container.appendChild(item);
+
+                container.appendChild(itemElement);
             });
         } else {
             const noResultsDiv = document.createElement('div');
@@ -344,76 +254,46 @@ window.BenchmarkUtils.BenchmarkRenderer = {
     },
 
     renderMultiTurnResultRow: function(result, index, loadSessionCallback) {
-        const row = document.createElement('tr');
-        row.style.cursor = "pointer";
-        if (loadSessionCallback) {
-            row.onclick = () => loadSessionCallback(result.session_id);
-        }
-
-        // Cell 1: Index
-        const td1 = document.createElement('td');
-        td1.className = 'px-4 fw-bold text-muted small';
-        td1.textContent = index + 1;
-        row.appendChild(td1);
-
-        // Cell 2: Question
-        const td2 = document.createElement('td');
-        td2.className = 'px-4';
-        td2.textContent = result.question;
-        row.appendChild(td2);
-
-        // Cell 3: Answer
-        const td3 = document.createElement('td');
-        td3.className = 'px-4';
-        const em = document.createElement('em');
-        em.textContent = `“${result.final_answer || 'N/A'}”`;
-        td3.appendChild(em);
-        row.appendChild(td3);
+        const tr = BenchmarkUtils.renderTemplate('tpl-multiturn-result-row', {
+            '.result-row': {
+                onclick: loadSessionCallback ? () => loadSessionCallback(result.session_id) : null
+            },
+            '.idx-col': { text: index + 1 },
+            '.question-col': { text: result.question },
+            '.answer-col': { html: `<em>“${result.final_answer || 'N/A'}”</em>` },
+            '.trials-col': { text: result.trials }
+        });
 
         // Cell 4: Ground Truths
-        const td4 = document.createElement('td');
-        td4.className = 'px-4';
-        td4.appendChild(this.renderGroundTruthsList(result.ground_truths));
-        row.appendChild(td4);
+        tr.querySelector('.gt-col').appendChild(this.renderGroundTruthsList(result.ground_truths));
 
-        // Cell 5: Status Badge (LLM & Rule)
-        const td5 = document.createElement('td');
-        td5.className = 'px-4 text-center';
-        
-        const llmBadge = document.createElement('div');
-        llmBadge.className = 'mb-1';
+        // Cell 5: Status Badge
+        const statusCol = tr.querySelector('.status-col');
+        const llmVerdictDiv = statusCol.querySelector('.llm-verdict');
+        const ruleVerdictDiv = statusCol.querySelector('.rule-verdict');
+
         if (result.correct === true) {
-            llmBadge.appendChild(this.createBadge('LLM: Correct', true));
+            llmVerdictDiv.appendChild(this.createBadge('LLM: Correct', true));
         } else if (result.correct === false) {
-            llmBadge.appendChild(this.createBadge('LLM: Incorrect', false));
+            llmVerdictDiv.appendChild(this.createBadge('LLM: Incorrect', false));
         } else {
             const span = document.createElement('span');
             span.className = 'badge bg-warning text-dark';
             span.textContent = 'LLM: Error';
-            llmBadge.appendChild(span);
+            llmVerdictDiv.appendChild(span);
         }
-        td5.appendChild(llmBadge);
 
         if (result.is_correct_rule !== undefined && result.is_correct_rule !== null) {
-            const ruleBadge = document.createElement('div');
-            ruleBadge.appendChild(this.createBadge(result.is_correct_rule ? 'Rule: Correct' : 'Rule: Incorrect', result.is_correct_rule));
-            td5.appendChild(ruleBadge);
+            ruleVerdictDiv.appendChild(this.createBadge(result.is_correct_rule ? 'Rule: Correct' : 'Rule: Incorrect', result.is_correct_rule));
         }
         
-        row.appendChild(td5);
-
-        // Cell 6: Trials
-        const td6 = document.createElement('td');
-        td6.className = 'px-4 text-center';
-        td6.textContent = result.trials;
-        row.appendChild(td6);
-        
-        return row;
+        return tr;
     },
 
     createMessageBubble: function(role, content, extraClass = '', iconClass = '') {
         const isUser = role === 'user';
         const isSystem = role === 'system';
+        const isAssistant = !isUser && !isSystem;
         
         const alignment = isUser ? 'justify-content-end' : 'justify-content-start';
         
@@ -424,75 +304,75 @@ window.BenchmarkUtils.BenchmarkRenderer = {
             else icon = 'bi-robot';
         }
 
-        let bubbleClass = 'p-3 rounded-4 shadow-sm position-relative bg-white border';
-        let textClass = 'text-dark';
         let borderAccent = '';
-        
+        let bubbleClass = 'bg-white';
+        let textClass = 'text-dark';
+
         if (isUser) {
-            borderAccent = 'border-right: 4px solid #0d6efd;'; 
+            borderAccent = '4px solid #0d6efd';
         } else if (isSystem) {
-            bubbleClass = 'p-3 rounded-4 shadow-sm position-relative bg-light border';
+            bubbleClass = 'bg-light';
             textClass = 'text-muted small';
+            borderAccent = 'none';
         } else {
-            borderAccent = 'border-left: 4px solid #6c757d;'; 
+            borderAccent = '4px solid #6c757d';
+        }
+
+        // Logic to strip container styles if transparent (for tool outputs)
+        let removeClasses = '';
+        if (extraClass && extraClass.includes('bg-transparent')) {
+            removeClasses = 'bg-white shadow-sm border p-3';
+            // Also ensure we don't re-add bg-white from bubbleClass
+            if (bubbleClass === 'bg-white') bubbleClass = '';
         }
 
         const avatarColor = isUser ? '#f0f7ff' : (isSystem ? '#f8f9fa' : '#ffffff');
         const avatarIconColor = isUser ? 'text-primary' : 'text-secondary';
         const avatarBorder = '1px solid #dee2e6';
 
-        const avatar = `
-            <div class="flex-shrink-0 ${isUser ? 'ms-3' : 'me-3'} d-none d-md-block avatar-container">
-                <div class="rounded-circle d-flex align-items-center justify-content-center shadow-sm" 
-                        style="width: 36px; height: 36px; background-color: ${avatarColor}; border: ${avatarBorder};">
-                    <i class="bi ${icon} ${avatarIconColor}"></i>
-                </div>
-            </div>
-        `;                
-        const abbreviateText = (text, maxLength = 800) => {
-            if (!text || text.length <= maxLength) return text;
-            const id = 'collapse-' + Math.random().toString(36).substr(2, 9);
-            const visiblePart = text.substring(0, maxLength);
-            const hiddenPart = text.substring(maxLength);
-            return `
-                ${visiblePart}<span id="${id}" class="collapse">${hiddenPart}</span>
-                <a href="javascript:void(0);" class="text-primary text-decoration-none small ms-1" onclick="
-                    const el = document.getElementById('${id}');
-                    if (el.classList.contains('show')) {
-                        el.classList.remove('show');
-                        this.innerText = '...Show More';
-                    } else {
-                        el.classList.add('show');
-                        this.innerText = ' Show Less';
-                    }
-                ">...Show More</a>
-            `;
-        };
+        const bubble = BenchmarkUtils.renderTemplate('tpl-message-bubble', {
+            'root': { addClass: `${alignment}` },
+            '.message-bubble-content': { 
+                html: content,
+                addClass: `${bubbleClass} ${textClass} ${extraClass}`,
+                removeClass: removeClasses,
+                style: { borderLeft: !isUser && !isSystem ? borderAccent : 'none', borderRight: isUser ? borderAccent : 'none' }
+            },
+            // Left avatar for Assistant/System
+            '.avatar-left': { 
+                style: { backgroundColor: avatarColor },
+                addClass: isUser ? 'd-none' : 'd-md-block', 
+                removeClass: isUser ? 'd-md-block' : 'd-none'
+            },
+            '.avatar-left .avatar-circle': {
+                style: { backgroundColor: avatarColor, border: avatarBorder }
+            },
+            '.avatar-left .avatar-icon': {
+                addClass: `${icon} ${avatarIconColor}`
+            },
+            // Right avatar for User
+            '.avatar-right': { 
+                style: { backgroundColor: avatarColor },
+                addClass: isUser ? 'd-md-block' : 'd-none',
+                removeClass: isUser ? 'd-none' : 'd-md-block'
+            },
+            '.avatar-right .avatar-circle': {
+                style: { backgroundColor: avatarColor, border: avatarBorder }
+            },
+            '.avatar-right .avatar-icon': {
+                addClass: `${icon} ${avatarIconColor}`
+            }
+        });
 
-        if (!content.includes('<div') && !content.includes('<span') && !content.includes('<p') && !content.includes('<code')) {
-                content = content.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                content = abbreviateText(content);
-                content = content.replace(/\n/g, '<br>');
-        }
-
-        return `
-            <div class="d-flex ${alignment} mb-3 message-bubble">
-                ${!isUser ? avatar : ''}
-                <div class="${bubbleClass} ${extraClass} ${textClass} message-bubble-content" style="${borderAccent}">
-                    ${content}
-                </div>
-                ${isUser ? avatar : ''}
-            </div>
-        `;
+        return bubble;
     },
 
     renderAgentStep: function(step, idx, trialId, finalAnswerText) {
         const role = step.role || 'assistant';
         const type = step.step_type || 'text'; // thought, action, observation, text
         let content = step.content || '';
-        const name = step.name || ''; // Tool name often appears here for observations
+        const name = step.name || ''; 
 
-        // Helper to parse JSON content safely
         const parseContent = (str) => {
             if (typeof str !== 'string') return str;
             try { return JSON.parse(str); } catch (e) { return null; }
@@ -501,19 +381,12 @@ window.BenchmarkUtils.BenchmarkRenderer = {
         // --- 1. Assistant: Thought ---
         if (type === 'thought') {
             const tId = `thought-${trialId}-${idx}`;
-            const thoughtHtml = `
-                <div class="mb-2">
-                     <button class="btn btn-sm btn-light border d-flex align-items-center fw-bold text-secondary shadow-sm px-3 py-2 rounded-3" type="button" data-bs-toggle="collapse" data-bs-target="#${tId}">
-                        <i class="bi bi-lightbulb text-warning me-2"></i>
-                        <span>Thinking Process</span>
-                        <i class="bi bi-chevron-down ms-3 small"></i>
-                     </button>
-                     <div class="collapse show mt-2" id="${tId}">
-                        <div class="p-3 bg-light border-start border-3 border-warning rounded-3 small text-secondary font-monospace thinking-process-content">${content}</div>
-                     </div>
-                </div>
-            `;
-            return this.createMessageBubble('assistant', thoughtHtml, 'bg-transparent border-0 shadow-none p-0', 'bi-robot');
+            const thoughtElement = BenchmarkUtils.renderTemplate('tpl-agent-thought', {
+                '.collapse-btn': { attrs: { 'data-bs-target': `#${tId}` } },
+                '.collapse-target': { attrs: { id: tId } },
+                '.thinking-content': { text: content }
+            });
+            return this.createMessageBubble('assistant', thoughtElement.outerHTML, 'bg-transparent border-0 shadow-none p-0', 'bi-robot');
         }
 
         // --- 2. Assistant: Action (Tool Call) ---
@@ -522,29 +395,23 @@ window.BenchmarkUtils.BenchmarkRenderer = {
             let icon = 'bi-tools';
             let badgeClass = 'bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25';
             
-            // Check for specific search query pattern first (legacy/special case)
             if (typeof content === 'string' && content.trim().startsWith('Search Query:')) {
                 title = 'Search Query';
                 icon = 'bi-search';
                 badgeClass = 'bg-info bg-opacity-10 text-info border-info border-opacity-25';
-                 const toolHtml = `
-                    <div class="d-flex flex-column">
-                        <div class="d-flex align-items-center mb-2">
-                            <span class="badge ${badgeClass} text-uppercase agent-badge-text">
-                                <i class="bi ${icon} me-1"></i> ${title}
-                            </span>
-                        </div>
-                        <div class="p-3 bg-white border rounded-3 shadow-sm font-monospace small text-dark tool-execution-content" style="white-space: pre-wrap;">${content}</div>
-                    </div>
-                `;
-                return this.createMessageBubble('assistant', toolHtml, '', 'bi-gear');
+                
+                const actionElement = BenchmarkUtils.renderTemplate('tpl-agent-action', {
+                    '.agent-badge-text': { addClass: badgeClass },
+                    '.badge-icon': { addClass: icon },
+                    '.badge-label': { text: title },
+                    '.tool-content': { text: content }
+                });
+                return this.createMessageBubble('assistant', actionElement.outerHTML, 'bg-transparent border-0 shadow-none p-0', 'bi-gear');
             }
 
             // General Tool Parsing
             let toolName = null;
             let toolInput = null;
-            let rawContent = content;
-
             try {
                 const toolData = (typeof content === 'string') ? JSON.parse(content) : content;
                 if (toolData && toolData.name && toolData.input) {
@@ -553,42 +420,39 @@ window.BenchmarkUtils.BenchmarkRenderer = {
                 }
             } catch(e) {}
 
-            let innerHtml = '';
-
             if (toolName) {
-                innerHtml = `
-                    <div class="d-flex flex-column">
-                        <div class="d-flex align-items-center mb-2">
-                            <span class="badge ${badgeClass} text-uppercase agent-badge-text">
-                                <i class="bi ${icon} me-1"></i> ${title}
-                            </span>
-                        </div>
-                        <div class="card border border-light shadow-sm">
-                             <div class="card-header bg-light bg-gradient border-bottom py-2 px-3 d-flex align-items-center">
-                                <i class="bi bi-terminal-fill text-secondary me-2"></i>
-                                <span class="fw-bold font-monospace text-primary">${toolName}</span>
-                             </div>
-                             <div class="card-body p-3 bg-white">
-                                <div class="text-muted small text-uppercase fw-bold mb-2" style="font-size: 0.7rem; letter-spacing: 0.5px;">Input Parameters</div>
-                                <div class="p-3 bg-light border rounded font-monospace small text-dark" style="white-space: pre-wrap;">${toolInput}</div>
-                             </div>
-                        </div>
+                const innerHtml = `
+                    <div class="card border border-light shadow-sm">
+                         <div class="card-header bg-light bg-gradient border-bottom py-2 px-3 d-flex align-items-center">
+                            <i class="bi bi-terminal-fill text-secondary me-2"></i>
+                            <span class="fw-bold font-monospace text-primary">${toolName}</span>
+                         </div>
+                         <div class="card-body p-2 bg-white">
+                            <div class="text-muted small text-uppercase fw-bold mb-2" style="font-size: 0.7rem; letter-spacing: 0.5px;">Input Parameters</div>
+                            <div class="p-2 bg-light border rounded font-monospace small text-dark" style="white-space: pre-wrap;">${toolInput}</div>
+                         </div>
                     </div>
                 `;
+                const actionElement = BenchmarkUtils.renderTemplate('tpl-agent-action', {
+                    '.agent-badge-text': { addClass: badgeClass },
+                    '.badge-icon': { addClass: icon },
+                    '.badge-label': { text: title },
+                    '.tool-content': { 
+                        html: innerHtml, 
+                        removeClass: 'p-3 bg-white border rounded-3 shadow-sm font-monospace small text-dark',
+                        style: { 'white-space': 'normal' } 
+                    }
+                });
+                return this.createMessageBubble('assistant', actionElement.outerHTML, 'bg-transparent border-0 shadow-none p-0', 'bi-gear');
             } else {
-                 innerHtml = `
-                    <div class="d-flex flex-column">
-                        <div class="d-flex align-items-center mb-2">
-                            <span class="badge ${badgeClass} text-uppercase agent-badge-text">
-                                <i class="bi ${icon} me-1"></i> ${title}
-                            </span>
-                        </div>
-                        <div class="p-3 bg-white border rounded-3 shadow-sm font-monospace small text-dark tool-execution-content" style="white-space: pre-wrap;">${rawContent}</div>
-                    </div>
-                `;
+                 const actionElement = BenchmarkUtils.renderTemplate('tpl-agent-action', {
+                    '.agent-badge-text': { addClass: badgeClass },
+                    '.badge-icon': { addClass: icon },
+                    '.badge-label': { text: title },
+                    '.tool-content': { text: content }
+                });
+                return this.createMessageBubble('assistant', actionElement.outerHTML, 'bg-transparent border-0 shadow-none p-0', 'bi-gear');
             }
-
-            return this.createMessageBubble('assistant', innerHtml, '', 'bi-gear');
         }
 
         // --- 3. Assistant: Observation (Tool Output) ---
@@ -598,35 +462,21 @@ window.BenchmarkUtils.BenchmarkRenderer = {
             let isFinalAnswer = false;
             let displayContent = content;
             
-            // Heuristic to detect search results
-            if (parsedData && Array.isArray(parsedData) && parsedData.length > 0) {
-                if (parsedData[0].title && (parsedData[0].link || parsedData[0].url)) {
-                    isSearch = true;
-                }
+            if (name === 'web_search_tool' || (parsedData && Array.isArray(parsedData) && parsedData.length > 0 && parsedData[0].title)) {
+                isSearch = true;
             }
-            if (name === 'web_search_tool') isSearch = true;
 
-            // Handle RAG simulated search results (string starting with "Search Results:")
             if (typeof content === 'string' && content.startsWith('Search Results:')) {
                 isSearch = true;
                 displayContent = content.replace('Search Results:', '').trim();
-                
-                // 1. Try to parse if it's JSON injected (Legacy/Hidden)
                 try {
-                    // Check for hidden JSON block
                     const jsonMatch = displayContent.match(/<!-- JSON_DATA_FOR_UI: (.*?) -->/s);
-                    if (jsonMatch && jsonMatch[1]) {
-                        parsedData = JSON.parse(jsonMatch[1]);
-                    } else {
-                        // Try direct JSON
+                    if (jsonMatch && jsonMatch[1]) parsedData = JSON.parse(jsonMatch[1]);
+                    else {
                         const extractedJson = JSON.parse(displayContent);
-                        if (Array.isArray(extractedJson)) {
-                            parsedData = extractedJson;
-                        }
+                        if (Array.isArray(extractedJson)) parsedData = extractedJson;
                     }
                 } catch(e) {
-                    // 2. Fallback: Parse <source> tags from text
-                    // Format: <source 1> Title\nContent</source 1>
                     const sourceRegex = /<source (\d+)>\s*(.*?)\n([\s\S]*?)<\/source \1>/g;
                     let match;
                     const extractedResults = [];
@@ -634,229 +484,126 @@ window.BenchmarkUtils.BenchmarkRenderer = {
                         extractedResults.push({
                             title: match[2].trim(),
                             snippet: match[3].trim().substring(0, 300) + (match[3].length > 300 ? '...' : ''),
-                            content: match[3].trim(),
-                            link: '', // URL is not present in standard RAG prompt text
-                            url: ''
+                            content: match[3].trim()
                         });
                     }
-                    if (extractedResults.length > 0) {
-                        parsedData = extractedResults;
-                    }
+                    if (extractedResults.length > 0) parsedData = extractedResults;
                 }
             }
             
-            // Check for Final Answer
-            if (parsedData && parsedData.name === 'answer_question') {
-                isFinalAnswer = true;
-            } else if (typeof content === 'string' && content.includes('Answer submitted successfully')) {
+            if ((parsedData && parsedData.name === 'answer_question') || (typeof content === 'string' && content.includes('Answer submitted successfully'))) {
                 isFinalAnswer = true;
             }
 
             if (isSearch) {
-                let resultsHtml = '';
                 if (parsedData && Array.isArray(parsedData)) {
-                    // Render Search Results (Integrated into Observation)
-                    const resultsCount = parsedData.length;
                     const resultsJson = encodeURIComponent(JSON.stringify(parsedData));
-                    
-                    resultsHtml = `
-                        <div class="d-flex align-items-center justify-content-between p-2 bg-white border rounded mb-2">
-                            <div class="d-flex align-items-center">
-                                <div class="rounded-circle bg-success bg-opacity-10 p-2 me-3">
-                                    <i class="bi bi-globe text-success"></i>
-                                </div>
-                                <div>
-                                    <div class="fw-bold text-dark search-results-title">Web Search Results</div>
-                                    <div class="small text-muted">${resultsCount} relevant documents found</div>
-                                </div>
-                            </div>
-                            <button class="btn btn-sm btn-outline-success rounded-pill px-3 ms-3 view-search-results-btn" data-results="${resultsJson}" onclick="
+                    const obsSearch = BenchmarkUtils.renderTemplate('tpl-agent-obs-search', {
+                        '.search-count': { text: `${parsedData.length} relevant documents found` },
+                        '.view-details-btn': {
+                            attrs: { 'data-results': resultsJson },
+                            onclick: function() {
                                 const data = JSON.parse(decodeURIComponent(this.dataset.results));
                                 const container = document.getElementById('modal-generic-content-container'); 
-                                if(window.BenchmarkUtils && window.BenchmarkUtils.BenchmarkRenderer) {
-                                    window.BenchmarkUtils.BenchmarkRenderer.renderModalSearchResults(data, container);
-                                    const modalEl = document.getElementById('benchmarkGenericModal');
-                                    const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
-                                    modal.show();
-                                }
-                            ">
-                                <i class="bi bi-eye me-1"></i> View Detail
-                            </button>
-                        </div>
-                    `;
+                                window.BenchmarkUtils.BenchmarkRenderer.renderModalSearchResults(data, container);
+                                bootstrap.Modal.getOrCreateInstance(document.getElementById('benchmarkGenericModal')).show();
+                            }
+                        }
+                    });
+                    return this.createMessageBubble('assistant', obsSearch.outerHTML, 'bg-transparent border-0 shadow-none p-0', 'bi-eye');
                 } else {
-                    // Fallback for string-based search results
-                    resultsHtml = `<div class="p-2 bg-white border rounded mb-2 font-monospace small" style="white-space: pre-wrap;">${displayContent}</div>`;
+                    const obsGeneric = BenchmarkUtils.renderTemplate('tpl-agent-obs-generic', {
+                         '.obs-content': { text: displayContent }
+                    });
+                    return this.createMessageBubble('assistant', obsGeneric.outerHTML, 'bg-transparent border-0 shadow-none p-0', 'bi-eye');
                 }
-                
-                const obsHtml = `
-                    <div class="d-flex flex-column">
-                         <div class="d-flex align-items-center mb-2">
-                            <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 text-uppercase agent-badge-text">
-                                <i class="bi bi-eye me-1"></i> Observation
-                            </span>
-                        </div>
-                        <div class="p-3 bg-light border rounded-3 shadow-sm font-monospace small text-muted">
-                             ${resultsHtml}
-                             <div class="text-secondary small mt-1"><i>Search completed successfully.</i></div>
-                        </div>
-                    </div>
-                `;
-                return this.createMessageBubble('assistant', obsHtml, '', 'bi-eye');
-                
             } else if (isFinalAnswer) {
-                // Render ONLY Final Answer Bubble for answer_question observation
-                let answerBody = `
-                   <div class="position-relative">
-                       <div class="text-uppercase text-muted fw-bold mb-2 response-label">Response</div>
-                       <div class="fs-6 text-dark response-text">${finalAnswerText || ''}</div>
-                   </div>
-                   `;
-                
-                return this.createMessageBubble('assistant', answerBody, '', 'bi-chat-left-dots');
-
+                const finalAnswer = BenchmarkUtils.renderTemplate('tpl-agent-final-answer', {
+                    '.response-text': { text: finalAnswerText || '' }
+                });
+                return this.createMessageBubble('assistant', finalAnswer.outerHTML, '', 'bi-chat-left-dots');
             } else {
-                // Generic Observation
-                const obsHtml = `
-                    <div class="d-flex flex-column">
-                         <div class="d-flex align-items-center mb-2">
-                            <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 text-uppercase agent-badge-text">
-                                <i class="bi bi-eye me-1"></i> Observation
-                            </span>
-                        </div>
-                        <div class="p-3 bg-light border rounded-3 shadow-sm font-monospace small text-muted generic-observation-content">${content}</div>
-                    </div>
-                `;
-                return this.createMessageBubble('assistant', obsHtml, '', 'bi-eye');
+                const obsGeneric = BenchmarkUtils.renderTemplate('tpl-agent-obs-generic', {
+                    '.obs-content': { text: content }
+                });
+                return this.createMessageBubble('assistant', obsGeneric.outerHTML, 'bg-transparent border-0 shadow-none p-0', 'bi-eye');
             }
         }
 
         // --- 4. System Prompt ---
         if (role === 'system') {
-            const systemHtml = `
-                <div class="d-flex align-items-center mb-2 pb-2 border-bottom border-secondary border-opacity-25">
-                    <i class="bi bi-cpu-fill text-secondary me-2"></i> 
-                    <span class="text-uppercase fw-bold text-secondary small system-config-header">System Prompt</span>
-                </div>
-                <div class="font-monospace text-muted small system-config-content">${content}</div>
-            `;
-            return this.createMessageBubble('system', systemHtml, 'bg-light border-secondary border-opacity-10 shadow-none');
+            const systemPrompt = BenchmarkUtils.renderTemplate('tpl-system-prompt', {
+                '.system-config-content': { text: content }
+            });
+            return this.createMessageBubble('system', systemPrompt.outerHTML, 'bg-light border-secondary border-opacity-10 shadow-none');
         }
 
         // --- 5. User Input ---
         if (role === 'user') {
-            // Check for RAG source tags to render rich search results within user bubble
             if (typeof content === 'string' && content.includes('<source')) {
                 const sourceRegex = /<source (\d+)>\s*(.*?)\n([\s\S]*?)<\/source \1>/g;
                 let match;
                 const extractedResults = [];
-                
-                // Parse results from original (unescaped) content
                 while ((match = sourceRegex.exec(content)) !== null) {
                     extractedResults.push({
                         title: match[2].trim(),
                         snippet: match[3].trim().substring(0, 300) + (match[3].length > 300 ? '...' : ''),
-                        content: match[3].trim(),
-                        link: '', 
-                        url: ''
+                        content: match[3].trim()
                     });
                 }
 
                 if (extractedResults.length > 0) {
-                    const resultsCount = extractedResults.length;
                     const resultsJson = encodeURIComponent(JSON.stringify(extractedResults));
-                    
-                    const resultsHtml = `
-                        <div class="d-flex align-items-center justify-content-between p-2 bg-light border rounded mb-2 mt-2">
-                            <div class="d-flex align-items-center">
-                                <div class="rounded-circle bg-white p-2 me-3 shadow-sm">
-                                    <i class="bi bi-globe text-primary"></i>
-                                </div>
-                                <div>
-                                    <div class="fw-bold text-dark search-results-title">Web Search Results</div>
-                                    <div class="small text-muted">${resultsCount} documents provided in context</div>
-                                </div>
-                            </div>
-                            <button class="btn btn-sm btn-outline-primary rounded-pill px-3 ms-3 view-search-results-btn" data-results="${resultsJson}" onclick="
+                    const injection = BenchmarkUtils.renderTemplate('tpl-user-search-injection', {
+                        '.docs-count-text': { text: `${extractedResults.length} documents provided in context` },
+                        '.view-search-results-btn': {
+                            attrs: { 'data-results': resultsJson },
+                            onclick: function() {
                                 const data = JSON.parse(decodeURIComponent(this.dataset.results));
                                 const container = document.getElementById('modal-generic-content-container'); 
-                                if(window.BenchmarkUtils && window.BenchmarkUtils.BenchmarkRenderer) {
-                                    window.BenchmarkUtils.BenchmarkRenderer.renderModalSearchResults(data, container);
-                                    const modalEl = document.getElementById('benchmarkGenericModal');
-                                    const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
-                                    modal.show();
-                                }
-                            ">
-                                <i class="bi bi-eye me-1"></i> View Detail
-                            </button>
-                        </div>
-                    `;
+                                window.BenchmarkUtils.BenchmarkRenderer.renderModalSearchResults(data, container);
+                                bootstrap.Modal.getOrCreateInstance(document.getElementById('benchmarkGenericModal')).show();
+                            }
+                        }
+                    });
                     
-                    // Escape EVERYTHING for display first (this makes <source> tags visible in the intro text)
-                    let displayContent = content.replace(/&/g, "&amp;")
-                                                .replace(/</g, "&lt;")
-                                                .replace(/>/g, "&gt;")
-                                                .replace(/"/g, "&quot;")
-                                                .replace(/'/g, "&#039;");
-
-                    // Placeholder for the rich card to protect it from newline conversion
+                    let displayContent = content.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
                     const placeholder = "<!--___RESULTS_CARD_PLACEHOLDER___-->";
-                    let rawSourceBlock = "";
-                    
-                    // Regex to find the ESCAPED source block
                     const escapedSourceBlockRegex = /(?:&lt;source \d+&gt;[\s\S]*?&lt;\/source \d+&gt;\s*)+/;
-                    
-                    // 1. Extract and replace the block with placeholder
                     const blockMatch = displayContent.match(escapedSourceBlockRegex);
-                    if (blockMatch) {
-                        rawSourceBlock = blockMatch[0];
-                        displayContent = displayContent.replace(escapedSourceBlockRegex, placeholder);
-                    } else {
-                        // Fallback if regex fails (shouldn't happen if extraction worked)
-                        return this.createMessageBubble('user', displayContent.replace(/\n/g, '<br>'));
-                    }
-
-                    // 2. Convert newlines to <br> in the text (Intro/Instruction)
-                    displayContent = displayContent.replace(/\n/g, '<br>');
-
-                    // 3. Construct the HTML to insert
-                    const injectionHtml = `
-                        ${resultsHtml}
-                        <div class="mt-2">
-                            <button class="btn btn-sm btn-link text-decoration-none p-0 text-muted small collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#raw-source-${resultsCount}" aria-expanded="false">
-                                <i class="bi bi-code-slash me-1"></i>Show Raw Source Tags
-                            </button>
-                            <div class="collapse mt-1" id="raw-source-${resultsCount}">
-                                <pre class="bg-light p-2 border rounded mb-0 text-secondary" style="max-height: 200px; overflow-y: auto; font-size: 0.75rem; white-space: pre-wrap;">${rawSourceBlock}</pre>
-                            </div>
-                        </div>
-                    `;
-
-                    // 4. Replace placeholder with final HTML
-                    displayContent = displayContent.replace(placeholder, injectionHtml);
                     
-                    return this.createMessageBubble('user', displayContent);
+                    if (blockMatch) {
+                        const rawSourceBlock = blockMatch[0];
+                        displayContent = displayContent.replace(escapedSourceBlockRegex, placeholder);
+                        displayContent = displayContent.replace(/\n/g, '<br>');
+                        
+                        const collapseId = `raw-source-${extractedResults.length}-${Math.random().toString(36).substr(2, 5)}`;
+                        injection.querySelector('.raw-source-toggle').setAttribute('data-bs-target', `#${collapseId}`);
+                        injection.querySelector('.raw-source-collapse').id = collapseId;
+                        injection.querySelector('.raw-source-pre').textContent = rawSourceBlock;
+
+                        displayContent = displayContent.replace(placeholder, injection.outerHTML);
+                        return this.createMessageBubble('user', displayContent);
+                    }
                 }
             }
-            return this.createMessageBubble('user', content);
+            return this.createMessageBubble('user', content.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, '<br>'));
         }
 
-        // --- 6. Fallback (Text / Assistant Message) ---
-        // Explicitly escape content to prevent hallucinated HTML (e.g. nested bubbles) from breaking layout
+        // --- 6. Fallback ---
         if (typeof content === 'string') {
-             content = content.replace(/&/g, "&amp;")
-                              .replace(/</g, "&lt;")
-                              .replace(/>/g, "&gt;");
+             content = content.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, '<br>');
         }
         return this.createMessageBubble('assistant', content, '', 'bi-chat-left-dots');
     },
 
     renderTrial: function(trial, isCompleted, trialCount, maxRetries, questionText, pipelineType = 'vanilla_llm') {
-        const trialDiv = document.createElement('div');
-        trialDiv.className = 'trial-container position-relative'; 
-        trialDiv.id = `trial-${trial.id}`;
+        const trialDiv = BenchmarkUtils.renderTemplate('tpl-trial-wrapper', {
+            'root': { attrs: { id: `trial-${trial.id}` } },
+            '.turn-label': { text: `TURN ${trial.trial_number}` }
+        });
 
-        let chatContent = '';
+        const wrapper = trialDiv.querySelector('.trial-wrapper');
         
         let trace = trial.trace || [];
         if (typeof trace === 'string') {
@@ -876,7 +623,6 @@ window.BenchmarkUtils.BenchmarkRenderer = {
              const icon = config.icon || 'bi-robot';
              indicatorHtml = this.createMessageBubble('assistant', `<div class="d-flex align-items-center trial-processing-indicator"><span class="spinner-border spinner-border-sm text-primary me-2"></span>${text}</div>`, '', icon);
              
-             // Trigger Polling automatically if supported
              if (window.BenchmarkUtils && window.BenchmarkUtils.MultiTurnPage && window.BenchmarkUtils.MultiTurnPage.startPolling) {
                 setTimeout(() => window.BenchmarkUtils.MultiTurnPage.startPolling(trial.id, pipelineType), 100);
              }
@@ -884,41 +630,48 @@ window.BenchmarkUtils.BenchmarkRenderer = {
 
         if (trace && trace.length > 0) {
             trace.forEach((step, idx) => {
-                chatContent += this.renderAgentStep(step, idx, trial.id, trial.answer);
+                const stepEl = this.renderAgentStep(step, idx, trial.id, trial.answer);
+                if (typeof stepEl === 'string') {
+                    wrapper.insertAdjacentHTML('beforeend', stepEl);
+                } else {
+                    wrapper.appendChild(stepEl);
+                }
             });
-            chatContent += indicatorHtml;
+            if (indicatorHtml) {
+                if (typeof indicatorHtml === 'string') {
+                    wrapper.insertAdjacentHTML('beforeend', indicatorHtml);
+                } else {
+                    wrapper.appendChild(indicatorHtml);
+                }
+            }
         } else {
             if (indicatorHtml) {
-                chatContent += indicatorHtml;
+                if (typeof indicatorHtml === 'string') {
+                    wrapper.insertAdjacentHTML('beforeend', indicatorHtml);
+                } else {
+                    wrapper.appendChild(indicatorHtml);
+                }
             } else {
-                chatContent += this.createMessageBubble('system', 'No execution trace available for this trial.', 'bg-light border-secondary border-opacity-10 shadow-none');
+                wrapper.appendChild(this.createMessageBubble('system', 'No execution trace available for this trial.', 'bg-light border-secondary border-opacity-10 shadow-none'));
             }
         }
 
         if (trial.status === 'completed' && (trial.feedback || trial.is_correct_rule !== undefined)) {
             const verdictHtml = this.renderTrialVerdict(trial);
-            if (verdictHtml) chatContent += verdictHtml.outerHTML;
+            if (verdictHtml) wrapper.appendChild(verdictHtml);
         }
         
-        const endOfTurnSeparator = trial.trial_number < trialCount ? `
-            <div class="d-flex align-items-center my-5 turn-divider">
-                <div class="flex-grow-1 border-top turn-divider-line"></div>
-                <div class="mx-4 text-uppercase text-muted fw-bold small turn-divider-text">End of Turn ${trial.trial_number}</div>
-                <div class="flex-grow-1 border-top turn-divider-line"></div>
-            </div>
-        ` : '';
+        const container = document.createElement('div');
+        container.appendChild(trialDiv);
 
-        trialDiv.innerHTML = `
-            <div class="trial-wrapper position-relative pb-2">
-                <div class="d-flex align-items-center justify-content-center mb-4">
-                    <div class="bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 rounded-pill px-4 py-1 small fw-bold turn-label">TURN ${trial.trial_number}</div>
-                </div>
-                ${chatContent}
-            </div>
-            ${endOfTurnSeparator}
-        `;
+        if (trial.trial_number < trialCount) {
+            const divider = BenchmarkUtils.renderTemplate('tpl-turn-divider', {
+                '.turn-divider-text': { text: `End of Turn ${trial.trial_number}` }
+            });
+            container.appendChild(divider);
+        }
         
-        return trialDiv;
+        return container.children.length > 1 ? container : trialDiv;
     },       
      
     renderTrialVerdict: function(trial) {
@@ -927,33 +680,28 @@ window.BenchmarkUtils.BenchmarkRenderer = {
         
         if (isCorrectLLM === undefined && isCorrectRule === undefined) return null;
 
-        const container = document.createElement('div');
-        container.className = 'd-flex flex-row justify-content-center flex-wrap gap-3 mt-2 mb-2 fade-in trial-verdict-container';
+        const container = BenchmarkUtils.renderTemplate('tpl-trial-verdict-container');
         
         // LLM Verdict
         if (isCorrectLLM !== undefined && isCorrectLLM !== null) {
             const llmColor = isCorrectLLM ? 'success' : 'danger';
             const llmIcon = isCorrectLLM ? 'bi-check-circle-fill' : 'bi-x-circle-fill';
-            container.innerHTML += `
-                <div class="card border-0 shadow-sm rounded-pill px-2" style="background-color: #f8f9fa;">
-                    <div class="card-body py-2 px-4 d-flex align-items-center">
-                        <i class="bi ${llmIcon} text-${llmColor} fs-5 me-2"></i>
-                        <div class="fw-bold text-${llmColor} text-uppercase small verdict-text">Verdict (LLM): ${isCorrectLLM ? 'Correct' : 'Incorrect'}</div>
-                    </div>
-                </div>`;
+            const card = BenchmarkUtils.renderTemplate('tpl-trial-verdict-card', {
+                '.verdict-icon': { addClass: `${llmIcon} text-${llmColor}` },
+                '.verdict-text': { addClass: `text-${llmColor}`, text: `Verdict (LLM): ${isCorrectLLM ? 'Correct' : 'Incorrect'}` }
+            });
+            container.appendChild(card);
         }
 
         // Rule Verdict
         if (isCorrectRule !== undefined && isCorrectRule !== null) {
             const ruleColor = isCorrectRule ? 'success' : 'danger';
             const ruleIcon = isCorrectRule ? 'bi-check-circle-fill' : 'bi-x-circle-fill';
-            container.innerHTML += `
-                <div class="card border-0 shadow-sm rounded-pill px-2" style="background-color: #f8f9fa;">
-                    <div class="card-body py-2 px-4 d-flex align-items-center">
-                        <i class="bi ${ruleIcon} text-${ruleColor} fs-5 me-2"></i>
-                        <div class="fw-bold text-${ruleColor} text-uppercase small verdict-text">Verdict (Rule): ${isCorrectRule ? 'Correct' : 'Incorrect'}</div>
-                    </div>
-                </div>`;
+            const card = BenchmarkUtils.renderTemplate('tpl-trial-verdict-card', {
+                '.verdict-icon': { addClass: `${ruleIcon} text-${ruleColor}` },
+                '.verdict-text': { addClass: `text-${ruleColor}`, text: `Verdict (Rule): ${isCorrectRule ? 'Correct' : 'Incorrect'}` }
+            });
+            container.appendChild(card);
         }
         
         return container;
@@ -971,33 +719,12 @@ window.BenchmarkUtils.BenchmarkRenderer = {
         configDetails.innerHTML = '';
         
         const addItem = (label, value, icon) => {
-            const col = document.createElement('div');
-            col.className = 'col-md-4 col-sm-6';
-
-            const divFlex = document.createElement('div');
-            divFlex.className = 'd-flex align-items-center bg-white p-2 rounded border';
-
-            const iconElement = document.createElement('i');
-            iconElement.className = `bi ${icon} text-secondary me-2 fs-5`;
-            divFlex.appendChild(iconElement);
-
-            const divOverflow = document.createElement('div');
-            divOverflow.className = 'overflow-hidden';
-
-            const divLabel = document.createElement('div');
-            divLabel.className = 'text-muted text-uppercase config-detail-label';
-            divLabel.textContent = label;
-            divOverflow.appendChild(divLabel);
-
-            const divValue = document.createElement('div');
-            divValue.className = 'fw-medium text-truncate';
-            divValue.title = value;
-            divValue.textContent = value; 
-            divOverflow.appendChild(divValue);
-
-            divFlex.appendChild(divOverflow);
-            col.appendChild(divFlex);
-            configDetails.appendChild(col);
+            const item = BenchmarkUtils.renderTemplate('tpl-run-config-item', {
+                '.config-icon': { addClass: icon },
+                '.config-detail-label': { text: label },
+                '.config-value': { text: value, attrs: { title: value } }
+            });
+            configDetails.appendChild(item);
         };
 
         const shouldShow = (key) => !whitelist || whitelist.includes(key);

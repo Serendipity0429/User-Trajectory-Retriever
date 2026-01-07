@@ -154,11 +154,11 @@ class BrowserAgentPipeline(BaseAgentPipeline):
     async def _init_agent(self):
         # Ensure model and toolkit are initialized
         if not self.agent_model or not self.agent_toolkit:
-                self.agent_model, self.agent_toolkit = await sync_to_async(BrowserAgentFactory.init_agentscope, thread_sensitive=False)(self.temp_settings)
+            self.agent_model, self.agent_toolkit = await sync_to_async(BrowserAgentFactory.init_agentscope, thread_sensitive=False)(self.temp_settings)
         
         # Lazy init for MCP client
         if not self.mcp_client:
-                self.mcp_client = await self.mcp_manager.connect(self.agent_toolkit)
+            self.mcp_client = await self.mcp_manager.connect(self.agent_toolkit)
 
         return await BrowserAgentFactory.create_agent(
             self.agent_model, 

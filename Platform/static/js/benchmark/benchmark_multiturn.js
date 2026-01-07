@@ -78,28 +78,27 @@ window.BenchmarkUtils.MultiTurnPage = (function() {
                                 if (indicatorParent) indicatorParent.remove();
                             });
 
-                            let newStepsHtml = '';
-                            newSteps.forEach((step, idx) => {
-                                newStepsHtml += BenchmarkUtils.BenchmarkRenderer.renderAgentStep(step, currentCount + idx, trialId);
-                            });
-                            
-                            // Insert new steps correctly (before verdict if it exists)
                             const verdictContainer = wrapper.querySelector('.trial-verdict-container');
-                            if (verdictContainer) {
-                                verdictContainer.insertAdjacentHTML('beforebegin', newStepsHtml);
-                            } else {
-                                wrapper.insertAdjacentHTML('beforeend', newStepsHtml);
-                            }
+                            
+                            newSteps.forEach((step, idx) => {
+                                const stepEl = BenchmarkUtils.BenchmarkRenderer.renderAgentStep(step, currentCount + idx, trialId, trialInfo ? trialInfo.answer : null);
+                                // Insert new steps correctly (before verdict if it exists)
+                                if (verdictContainer) {
+                                    verdictContainer.insertAdjacentElement('beforebegin', stepEl);
+                                } else {
+                                    wrapper.appendChild(stepEl);
+                                }
+                            });
                             
                             // Re-append processing indicator if still processing
                             if (trialInfo && trialInfo.status === 'processing') {
-                                const indicatorHtml = BenchmarkUtils.BenchmarkRenderer.createMessageBubble('assistant', `<div class="d-flex align-items-center trial-processing-indicator"><span class="spinner-border spinner-border-sm text-primary me-2"></span>${config.loadingText}</div>`, '', config.icon);
+                                const indicatorEl = BenchmarkUtils.BenchmarkRenderer.createMessageBubble('assistant', `<div class="d-flex align-items-center trial-processing-indicator"><span class="spinner-border spinner-border-sm text-primary me-2"></span>${config.loadingText}</div>`, '', config.icon);
                                 
                                 // Insert indicator before verdict if exists, else append
                                 if (verdictContainer) {
-                                    verdictContainer.insertAdjacentHTML('beforebegin', indicatorHtml);
+                                    verdictContainer.insertAdjacentElement('beforebegin', indicatorEl);
                                 } else {
-                                    wrapper.insertAdjacentHTML('beforeend', indicatorHtml);
+                                    wrapper.appendChild(indicatorEl);
                                 }
                             }
                         }

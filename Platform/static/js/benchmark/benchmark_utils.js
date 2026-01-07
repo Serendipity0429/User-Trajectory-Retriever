@@ -130,6 +130,65 @@ window.BenchmarkComponents = {
 
 window.BenchmarkUtils = {
     /**
+     * Renders a template by ID with data mapping.
+     * @param {string} templateId - The ID of the <template> element.
+     * @param {object} dataMap - Key-value pairs where keys are selectors and values are objects with text/html/src/href/class/style/attrs.
+     * @returns {HTMLElement} - The rendered DOM element.
+     */
+    renderTemplate: function(templateId, dataMap = {}) {
+        const template = document.getElementById(templateId);
+        if (!template) {
+            console.error(`Template not found: ${templateId}`);
+            return document.createElement('div'); 
+        }
+
+        const clone = template.content.cloneNode(true);
+        
+        for (const [selector, actions] of Object.entries(dataMap)) {
+            let elements = [];
+            if (selector === 'root') {
+                 // Try to find the root element(s)
+                 elements = Array.from(clone.children); 
+            } else {
+                elements = clone.querySelectorAll(selector);
+            }
+
+            elements.forEach(el => {
+                if (!el) return;
+                
+                if (actions.text !== undefined) el.textContent = actions.text;
+                if (actions.html !== undefined) el.innerHTML = actions.html;
+                if (actions.src !== undefined) el.src = actions.src;
+                if (actions.href !== undefined) el.href = actions.href;
+                
+                if (actions.class !== undefined) el.className = actions.class;
+                if (actions.addClass !== undefined) el.classList.add(...actions.addClass.split(' ').filter(c => c));
+                if (actions.removeClass !== undefined) el.classList.remove(...actions.removeClass.split(' ').filter(c => c));
+                
+                if (actions.style !== undefined) Object.assign(el.style, actions.style);
+                
+                if (actions.attrs) {
+                    for (const [attr, val] of Object.entries(actions.attrs)) {
+                         if (val === null) el.removeAttribute(attr);
+                         else el.setAttribute(attr, val);
+                    }
+                }
+                
+                // Event Handling: if 'onclick' is a function, we must attach it directly
+                // Note: passing functions in dataMap works because we are in the same JS context
+                if (typeof actions.onclick === 'function') {
+                    el.onclick = actions.onclick;
+                }
+            });
+        }
+        
+        // If the clone has multiple top-level elements, return a DocumentFragment,
+        // otherwise return the single element. 
+        // Most templates should have a single root for easier handling.
+        return clone.children.length === 1 ? clone.firstElementChild : clone;
+    },
+
+    /**
      * Test the LLM connection.
      * @param {string} url - The URL to the test connection view.
      * @param {string} csrfToken - The CSRF token.

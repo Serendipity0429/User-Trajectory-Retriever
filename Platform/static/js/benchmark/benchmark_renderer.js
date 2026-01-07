@@ -290,6 +290,128 @@ window.BenchmarkUtils.BenchmarkRenderer = {
         return tr;
     },
 
+    /**
+     * Helper function to render a unified tool card for both actions and observations
+     * @param {string} type - 'action' or 'observation'
+     * @param {string} toolName - Name of the tool
+     * @param {any} content - Content to display (input for action, output for observation)
+     * @param {Object} options - Additional options (isSearch, parsedData, etc.)
+     */
+    renderToolCard: function(type, toolName, content, options = {}) {
+        const isAction = type === 'action';
+        const isObservation = type === 'observation';
+
+        // Configure badge based on type
+        const badgeConfig = isAction ? {
+            label: 'Tool Execution',
+            icon: 'bi-tools',
+            class: 'bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25'
+        } : {
+            label: 'Observation',
+            icon: 'bi-eye',
+            class: 'bg-success bg-opacity-10 text-success border border-success border-opacity-25'
+        };
+
+        let innerHtml = '';
+        let contentStyle = {};
+        let removeClasses = '';
+
+        // Special handling for search results (observation only)
+        if (isObservation && options.isSearch && options.parsedData && Array.isArray(options.parsedData)) {
+            const list = document.createElement('div');
+            list.className = 'list-group list-group-flush';
+
+            const displayLimit = 3;
+            const visibleItems = options.parsedData.slice(0, displayLimit);
+
+            visibleItems.forEach((item, idx) => {
+                const itemEl = document.createElement('div');
+                itemEl.className = 'list-group-item bg-transparent px-0 py-2 border-bottom border-light';
+
+                let snippet = item.snippet || '';
+                if (snippet.length > 120) snippet = snippet.substring(0, 120) + '...';
+
+                itemEl.innerHTML = `
+                    <div class="d-flex w-100 justify-content-between align-items-start mb-1">
+                        <div class="d-flex align-items-start" style="max-width: 90%;">
+                            <span class="badge bg-light text-secondary border me-2 flex-shrink-0" style="font-size: 0.75rem;">${idx + 1}</span>
+                            <h6 class="mb-0 text-primary fw-bold text-wrap" style="line-height: 1.4; font-size: 0.95rem;">${item.title || 'No Title'}</h6>
+                        </div>
+                        <a href="${item.link || item.url || '#'}" target="_blank" class="text-secondary opacity-50 hover-opacity-100 ms-2"><i class="bi bi-box-arrow-up-right"></i></a>
+                    </div>
+                    <p class="mb-0 text-muted ps-4 ms-1" style="font-size: 0.85rem;">${snippet}</p>
+                `;
+                list.appendChild(itemEl);
+            });
+
+            const footer = document.createElement('div');
+            footer.className = 'mt-2 pt-1';
+
+            const resultsJson = encodeURIComponent(JSON.stringify(options.parsedData));
+            const remaining = Math.max(0, options.parsedData.length - displayLimit);
+            const remainingText = remaining > 0 ? ` (+${remaining} more)` : '';
+
+            footer.innerHTML = `
+                <div class="d-flex align-items-center justify-content-between">
+                    <span class="text-success small fw-medium" style="font-size: 0.8rem;"><i class="bi bi-check-all me-1"></i>Found ${options.parsedData.length} results</span>
+                    <button class="btn btn-sm btn-light border btn-xs text-primary shadow-sm" style="font-size: 0.8rem;" onclick="
+                        const data = JSON.parse(decodeURIComponent('${resultsJson}'));
+                        const container = document.getElementById('modal-generic-content-container');
+                        window.BenchmarkUtils.BenchmarkRenderer.renderModalSearchResults(data, container);
+                        bootstrap.Modal.getOrCreateInstance(document.getElementById('benchmarkGenericModal')).show();
+                    ">View Full Details${remainingText}</button>
+                </div>
+            `;
+            list.appendChild(footer);
+
+            innerHtml = list.outerHTML;
+            contentStyle = { 'white-space': 'normal', 'font-family': 'var(--bs-body-font-family)' };
+            removeClasses = 'font-monospace text-dark small';
+        } else if (toolName && toolName !== 'undefined') {
+            // Structured card with tool name and content
+            const sectionLabel = isAction ? 'Input Parameters' : 'Output';
+            const contentText = typeof content === 'string' ? content : JSON.stringify(content, null, 2);
+
+            innerHtml = `
+                <div class="card border border-light shadow-sm">
+                     <div class="card-header bg-light bg-gradient border-bottom py-2 px-3 d-flex align-items-center">
+                        <i class="bi bi-terminal-fill text-secondary me-2"></i>
+                        <span class="fw-bold font-monospace text-primary">${toolName}</span>
+                     </div>
+                     <div class="card-body p-3 bg-white">
+                        <div class="text-muted small text-uppercase fw-bold mb-2" style="font-size: 0.7rem; letter-spacing: 0.5px;">${sectionLabel}</div>
+                        <div class="p-2 bg-light border rounded font-monospace small text-dark" style="white-space: pre-wrap; max-height: 500px; overflow-y: auto;">${contentText}</div>
+                     </div>
+                </div>
+            `;
+            contentStyle = { 'white-space': 'normal' };
+            removeClasses = 'p-3 bg-white border rounded-3 shadow-sm font-monospace small text-dark';
+        } else {
+            // Fallback: plain content
+            innerHtml = typeof content === 'string' ? content : JSON.stringify(content, null, 2);
+            contentStyle = {
+                'white-space': 'pre-wrap',
+                'max-height': '500px',
+                'overflow-y': 'auto',
+                'font-size': '0.9rem'
+            };
+            removeClasses = 'small';
+        }
+
+        const element = BenchmarkUtils.renderTemplate('tpl-agent-action', {
+            '.agent-badge-text': { addClass: badgeConfig.class },
+            '.badge-icon': { addClass: badgeConfig.icon },
+            '.badge-label': { text: badgeConfig.label },
+            '.tool-content': {
+                html: innerHtml,
+                style: contentStyle,
+                removeClass: removeClasses
+            }
+        });
+
+        return this.createMessageBubble('assistant', element.outerHTML, 'bg-transparent border-0 shadow-none p-0', isAction ? 'bi-gear' : 'bi-eye');
+    },
+
     createMessageBubble: function(role, content, extraClass = '', iconClass = '') {
         const isUser = role === 'user';
         const isSystem = role === 'system';
@@ -391,68 +513,29 @@ window.BenchmarkUtils.BenchmarkRenderer = {
 
         // --- 2. Assistant: Action (Tool Call) ---
         if (type === 'action') {
-            let title = 'Tool Execution';
-            let icon = 'bi-tools';
-            let badgeClass = 'bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25';
-            
+            // Special case: Search Query text format
             if (typeof content === 'string' && content.trim().startsWith('Search Query:')) {
-                title = 'Search Query';
-                icon = 'bi-search';
-                badgeClass = 'bg-info bg-opacity-10 text-info border-info border-opacity-25';
-                
-                const actionElement = BenchmarkUtils.renderTemplate('tpl-agent-action', {
-                    '.agent-badge-text': { addClass: badgeClass },
-                    '.badge-icon': { addClass: icon },
-                    '.badge-label': { text: title },
+                const element = BenchmarkUtils.renderTemplate('tpl-agent-action', {
+                    '.agent-badge-text': { addClass: 'bg-info bg-opacity-10 text-info border-info border-opacity-25' },
+                    '.badge-icon': { addClass: 'bi-search' },
+                    '.badge-label': { text: 'Search Query' },
                     '.tool-content': { text: content }
                 });
-                return this.createMessageBubble('assistant', actionElement.outerHTML, 'bg-transparent border-0 shadow-none p-0', 'bi-gear');
+                return this.createMessageBubble('assistant', element.outerHTML, 'bg-transparent border-0 shadow-none p-0', 'bi-gear');
             }
 
-            // General Tool Parsing
+            // Parse structured tool data
             let toolName = null;
             let toolInput = null;
             try {
                 const toolData = (typeof content === 'string') ? JSON.parse(content) : content;
                 if (toolData && toolData.name && toolData.input) {
                     toolName = toolData.name;
-                    toolInput = JSON.stringify(toolData.input, null, 2);
+                    toolInput = toolData.input;
                 }
             } catch(e) {}
 
-            if (toolName) {
-                const innerHtml = `
-                    <div class="card border border-light shadow-sm">
-                         <div class="card-header bg-light bg-gradient border-bottom py-2 px-3 d-flex align-items-center">
-                            <i class="bi bi-terminal-fill text-secondary me-2"></i>
-                            <span class="fw-bold font-monospace text-primary">${toolName}</span>
-                         </div>
-                         <div class="card-body p-3 bg-white">
-                            <div class="text-muted small text-uppercase fw-bold mb-2" style="font-size: 0.7rem; letter-spacing: 0.5px;">Input Parameters</div>
-                            <div class="p-2 bg-light border rounded font-monospace small text-dark" style="white-space: pre-wrap;">${toolInput}</div>
-                         </div>
-                    </div>
-                `;
-                const actionElement = BenchmarkUtils.renderTemplate('tpl-agent-action', {
-                    '.agent-badge-text': { addClass: badgeClass },
-                    '.badge-icon': { addClass: icon },
-                    '.badge-label': { text: title },
-                    '.tool-content': { 
-                        html: innerHtml, 
-                        removeClass: 'p-3 bg-white border rounded-3 shadow-sm font-monospace small text-dark',
-                        style: { 'white-space': 'normal' } 
-                    }
-                });
-                return this.createMessageBubble('assistant', actionElement.outerHTML, 'bg-transparent border-0 shadow-none p-0', 'bi-gear');
-            } else {
-                 const actionElement = BenchmarkUtils.renderTemplate('tpl-agent-action', {
-                    '.agent-badge-text': { addClass: badgeClass },
-                    '.badge-icon': { addClass: icon },
-                    '.badge-label': { text: title },
-                    '.tool-content': { text: content }
-                });
-                return this.createMessageBubble('assistant', actionElement.outerHTML, 'bg-transparent border-0 shadow-none p-0', 'bi-gear');
-            }
+            return this.renderToolCard('action', toolName, toolInput || content);
         }
 
         // --- 3. Assistant: Observation (Tool Output) ---
@@ -461,8 +544,22 @@ window.BenchmarkUtils.BenchmarkRenderer = {
             let isSearch = false;
             let isFinalAnswer = false;
             let displayContent = content;
-            
-            if (name === 'web_search_tool' || (parsedData && Array.isArray(parsedData) && parsedData.length > 0 && parsedData[0].title)) {
+            let toolName = name || '';
+
+            // Extract tool name and output from structured JSON
+            if (parsedData && typeof parsedData === 'object' && !Array.isArray(parsedData)) {
+                if (parsedData.name) {
+                    toolName = parsedData.name;
+                }
+                if (parsedData.output !== undefined) {
+                    displayContent = parsedData.output;
+                    // Re-parse if output is JSON string
+                    const outputParsed = parseContent(displayContent);
+                    if (outputParsed) parsedData = outputParsed;
+                }
+            }
+
+            if (toolName === 'web_search_tool' || (parsedData && Array.isArray(parsedData) && parsedData.length > 0 && parsedData[0].title)) {
                 isSearch = true;
             }
 
@@ -491,43 +588,23 @@ window.BenchmarkUtils.BenchmarkRenderer = {
                 }
             }
             
-            if ((parsedData && parsedData.name === 'answer_question') || (typeof content === 'string' && content.includes('Answer submitted successfully'))) {
+            if ((parsedData && parsedData.name === 'answer_question') || (toolName === 'answer_question') || (typeof displayContent === 'string' && displayContent.includes('Answer submitted successfully'))) {
                 isFinalAnswer = true;
             }
 
-            if (isSearch) {
-                if (parsedData && Array.isArray(parsedData)) {
-                    const resultsJson = encodeURIComponent(JSON.stringify(parsedData));
-                    const obsSearch = BenchmarkUtils.renderTemplate('tpl-agent-obs-search', {
-                        '.search-count': { text: `${parsedData.length} relevant documents found` },
-                        '.view-details-btn': {
-                            attrs: { 'data-results': resultsJson },
-                            onclick: function() {
-                                const data = JSON.parse(decodeURIComponent(this.dataset.results));
-                                const container = document.getElementById('modal-generic-content-container'); 
-                                window.BenchmarkUtils.BenchmarkRenderer.renderModalSearchResults(data, container);
-                                bootstrap.Modal.getOrCreateInstance(document.getElementById('benchmarkGenericModal')).show();
-                            }
-                        }
-                    });
-                    return this.createMessageBubble('assistant', obsSearch.outerHTML, 'bg-transparent border-0 shadow-none p-0', 'bi-eye');
-                } else {
-                    const obsGeneric = BenchmarkUtils.renderTemplate('tpl-agent-obs-generic', {
-                         '.obs-content': { text: displayContent }
-                    });
-                    return this.createMessageBubble('assistant', obsGeneric.outerHTML, 'bg-transparent border-0 shadow-none p-0', 'bi-eye');
-                }
-            } else if (isFinalAnswer) {
+            // Handle Final Answer separately (Special Case)
+            if (isFinalAnswer) {
                 const finalAnswer = BenchmarkUtils.renderTemplate('tpl-agent-final-answer', {
                     '.response-text': { text: finalAnswerText || '' }
                 });
                 return this.createMessageBubble('assistant', finalAnswer.outerHTML, '', 'bi-chat-left-dots');
-            } else {
-                const obsGeneric = BenchmarkUtils.renderTemplate('tpl-agent-obs-generic', {
-                    '.obs-content': { text: content }
-                });
-                return this.createMessageBubble('assistant', obsGeneric.outerHTML, 'bg-transparent border-0 shadow-none p-0', 'bi-eye');
             }
+
+            // Render observation using unified tool card
+            return this.renderToolCard('observation', toolName, displayContent, {
+                isSearch: isSearch,
+                parsedData: parsedData
+            });
         }
 
         // --- 4. System Prompt ---

@@ -522,23 +522,73 @@ window.BenchmarkUtils.BenchmarkRenderer = {
             let icon = 'bi-tools';
             let badgeClass = 'bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25';
             
+            // Check for specific search query pattern first (legacy/special case)
             if (typeof content === 'string' && content.trim().startsWith('Search Query:')) {
                 title = 'Search Query';
                 icon = 'bi-search';
                 badgeClass = 'bg-info bg-opacity-10 text-info border-info border-opacity-25';
+                 const toolHtml = `
+                    <div class="d-flex flex-column">
+                        <div class="d-flex align-items-center mb-2">
+                            <span class="badge ${badgeClass} text-uppercase agent-badge-text">
+                                <i class="bi ${icon} me-1"></i> ${title}
+                            </span>
+                        </div>
+                        <div class="p-3 bg-white border rounded-3 shadow-sm font-monospace small text-dark tool-execution-content" style="white-space: pre-wrap;">${content}</div>
+                    </div>
+                `;
+                return this.createMessageBubble('assistant', toolHtml, '', 'bi-gear');
             }
 
-            const toolHtml = `
-                <div class="d-flex flex-column">
-                    <div class="d-flex align-items-center mb-2">
-                        <span class="badge ${badgeClass} text-uppercase agent-badge-text">
-                            <i class="bi ${icon} me-1"></i> ${title}
-                        </span>
+            // General Tool Parsing
+            let toolName = null;
+            let toolInput = null;
+            let rawContent = content;
+
+            try {
+                const toolData = (typeof content === 'string') ? JSON.parse(content) : content;
+                if (toolData && toolData.name && toolData.input) {
+                    toolName = toolData.name;
+                    toolInput = JSON.stringify(toolData.input, null, 2);
+                }
+            } catch(e) {}
+
+            let innerHtml = '';
+
+            if (toolName) {
+                innerHtml = `
+                    <div class="d-flex flex-column">
+                        <div class="d-flex align-items-center mb-2">
+                            <span class="badge ${badgeClass} text-uppercase agent-badge-text">
+                                <i class="bi ${icon} me-1"></i> ${title}
+                            </span>
+                        </div>
+                        <div class="card border border-light shadow-sm">
+                             <div class="card-header bg-light bg-gradient border-bottom py-2 px-3 d-flex align-items-center">
+                                <i class="bi bi-terminal-fill text-secondary me-2"></i>
+                                <span class="fw-bold font-monospace text-primary">${toolName}</span>
+                             </div>
+                             <div class="card-body p-3 bg-white">
+                                <div class="text-muted small text-uppercase fw-bold mb-2" style="font-size: 0.7rem; letter-spacing: 0.5px;">Input Parameters</div>
+                                <div class="p-3 bg-light border rounded font-monospace small text-dark" style="white-space: pre-wrap;">${toolInput}</div>
+                             </div>
+                        </div>
                     </div>
-                    <div class="p-3 bg-white border rounded-3 shadow-sm font-monospace small text-dark tool-execution-content">${content}</div>
-                </div>
-            `;
-            return this.createMessageBubble('assistant', toolHtml, '', 'bi-gear');
+                `;
+            } else {
+                 innerHtml = `
+                    <div class="d-flex flex-column">
+                        <div class="d-flex align-items-center mb-2">
+                            <span class="badge ${badgeClass} text-uppercase agent-badge-text">
+                                <i class="bi ${icon} me-1"></i> ${title}
+                            </span>
+                        </div>
+                        <div class="p-3 bg-white border rounded-3 shadow-sm font-monospace small text-dark tool-execution-content" style="white-space: pre-wrap;">${rawContent}</div>
+                    </div>
+                `;
+            }
+
+            return this.createMessageBubble('assistant', innerHtml, '', 'bi-gear');
         }
 
         // --- 3. Assistant: Observation (Tool Output) ---

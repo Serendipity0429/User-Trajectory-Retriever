@@ -1,132 +1,8 @@
-// Centralized URL configuration
-const API_PREFIX = '/benchmark/api';
-
-const BenchmarkUrls = {
-    // LLM & Settings
-    saveSettings: `${API_PREFIX}/settings/save/`,
-    getDefaultSettings: `${API_PREFIX}/get_default_settings/`,
-    testLlmConnection: `${API_PREFIX}/test_llm_connection/`,
-    
-    // API - Common / General
-    webSearch: `${API_PREFIX}/web_search/`,
-
-    // Datasets
-    datasets: {
-        sync: `${API_PREFIX}/datasets/sync/`,
-        upload: `${API_PREFIX}/datasets/upload/`,
-        delete: (id) => `${API_PREFIX}/datasets/delete/${id}/`,
-        activate: (id) => `${API_PREFIX}/datasets/activate/${id}/`
-    },
-
-    // Multi-turn Common
-    multiTurn: {
-        createSession: `${API_PREFIX}/sessions/create_session/`,
-        createSessionGroup: `${API_PREFIX}/sessions/create_session_group/`,
-        batchDeleteSessions: `${API_PREFIX}/sessions/batch_delete_sessions/`,
-        deleteSessionGroup: (id) => `${API_PREFIX}/sessions/delete_session_group/${id}/`,
-        getSession: (id) => `${API_PREFIX}/sessions/get_session/${id}/`,
-        runTrial: (id) => `${API_PREFIX}/sessions/run_trial/${id}/`,
-        retrySession: (id) => `${API_PREFIX}/sessions/retry_session/${id}/`,
-        deleteSession: (id) => `${API_PREFIX}/sessions/delete_session/${id}/`,
-        stopSession: `${API_PREFIX}/sessions/stop_session/`,
-        exportSession: (id) => `${API_PREFIX}/sessions/export_session/${id}/`,
-        getTrialPrompt: (id) => `${API_PREFIX}/sessions/get_trial_prompt/${id}/`,
-    },
-
-    // Pipelines (Unified)
-    pipeline: {
-        start: (type) => `${API_PREFIX}/pipeline/start/${type}/`,
-        stop: (type) => `${API_PREFIX}/pipeline/stop/${type}/`,
-        loadRun: (type, id) => {
-            const map = {
-                'vanilla_llm': 'load_vanilla_run',
-                'rag': 'load_rag_run',
-                'vanilla_agent': 'load_agent_run',
-                'browser_agent': 'load_agent_run'
-            };
-            return `${API_PREFIX}/sessions/${map[type] || 'load_vanilla_run'}/${id}/`;
-        }
-    },
-
-    // Compatibility (Mapping to unified)
-    vanillaLlmMultiTurn: {
-        loadRun: (id) => `${API_PREFIX}/sessions/load_vanilla_run/${id}/`,
-        runPipeline: `${API_PREFIX}/pipeline/start/vanilla_llm/`,
-        stopPipeline: `${API_PREFIX}/pipeline/stop/vanilla_llm/`
-    },
-    ragMultiTurn: {
-        loadRun: (id) => `${API_PREFIX}/sessions/load_rag_run/${id}/`,
-        runPipeline: `${API_PREFIX}/pipeline/start/rag/`,
-        stopPipeline: `${API_PREFIX}/pipeline/stop/rag/`
-    },
-    vanillaAgent: {
-        loadRun: (id) => `${API_PREFIX}/sessions/load_agent_run/${id}/`,
-        runPipeline: `${API_PREFIX}/pipeline/start/vanilla_agent/`,
-        stopPipeline: `${API_PREFIX}/pipeline/stop/vanilla_agent/`
-    },
-    browserAgent: {
-        loadRun: (id) => `${API_PREFIX}/sessions/load_agent_run/${id}/`,
-        runPipeline: `${API_PREFIX}/pipeline/start/browser_agent/`,
-        stopPipeline: `${API_PREFIX}/pipeline/stop/browser_agent/`
-    }
-};
-
-const BenchmarkState = {
-    config: {
-        lastSavedBaseUrl: '',
-        settingsInitialState: {}, // Stores the initial state of settings for change detection
-        hasUnsavedChanges: false,
-    },
-    activeRun: {
-        id: null,
-        type: null, // 'multi_turn'
-        data: null
-    },
-    ui: {}
-};
-
-window.BenchmarkComponents = {
-    createBadge: function(text, isCorrect, showNAForNull = false) {
-        const span = document.createElement('span');
-        span.className = 'badge';
-        if (isCorrect === null && showNAForNull) {
-            span.classList.add('bg-secondary');
-            span.textContent = 'N/A';
-        } else if (isCorrect) {
-            span.classList.add('bg-success');
-            span.textContent = text || 'Correct';
-        } else {
-            span.classList.add('bg-danger');
-            span.textContent = text || 'Incorrect';
-        }
-        return span;
-    },
-
-    createIcon: function(className) {
-        const i = document.createElement('i');
-        i.className = className;
-        return i;
-    },
-
-    createTextElement: function(tagName, className, textContent, title = '') {
-        const element = document.createElement(tagName);
-        element.className = className;
-        element.textContent = textContent;
-        if (title) {
-            element.title = title;
-        }
-        return element;
-    },
-
-    createLink: function(href, className, textContent, target = '_self') {
-        const link = document.createElement('a');
-        link.href = href;
-        link.className = className;
-        link.textContent = textContent;
-        link.target = target;
-        return link;
-    }
-};
+/**
+ * Benchmark Utilities - Main Module
+ * Refactored to use modular files for better maintainability
+ * Dependencies loaded via separate script tags in proper order
+ */
 
 window.BenchmarkUtils = {
     /**
@@ -670,13 +546,7 @@ window.BenchmarkUtils = {
      * @returns {string} The UUID.
      */
     generateUUID: function() {
-        if (crypto.randomUUID) {
-            return crypto.randomUUID();
-        }
-        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-            var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
-            return v.toString(16);
-        });
+        return window.BenchmarkHelpers.generateUUID();
     },
 
     /**
@@ -904,17 +774,12 @@ window.BenchmarkUtils = {
 
     /**
      * Debounce a function.
-     * @param {function} func - The function to debounce.
+     * @param {Function} func - The function to debounce.
      * @param {number} wait - The delay in milliseconds.
-     * @returns {function} The debounced function.
+     * @returns {Function} The debounced function.
      */
     debounce: function(func, wait) {
-        let timeout;
-        return function(...args) {
-            const context = this;
-            clearTimeout(timeout);
-            timeout = setTimeout(() => func.apply(context, args), wait);
-        };
+        return window.BenchmarkHelpers.debounce(func, wait);
     },
 
     /**
@@ -925,50 +790,7 @@ window.BenchmarkUtils = {
      * @param {Function} rowMapper - Function that takes a data item and index, returns an array of cell values.
      */
     exportToCSV: function(data, filenamePrefix, headers, rowMapper) {
-        if (!data || data.length === 0) {
-            alert("No results to export.");
-            return;
-        }
-
-        const csvRows = [headers.join(',')];
-
-        data.forEach((item, index) => {
-            const rowValues = rowMapper(item, index);
-            // Escape quotes and wrap in quotes
-            const escapedRow = rowValues.map(val => {
-                if (val === null || val === undefined) return '';
-                const str = String(val);
-                return `"${str.replace(/"/g, '""')}"`;
-            });
-            csvRows.push(escapedRow.join(','));
-        });
-
-        const csvString = csvRows.join('\n');
-        const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
-
-        const link = document.createElement("a");
-        if (link.download !== undefined) {
-            const url = URL.createObjectURL(blob);
-            
-            // Try to get a meaningful name from the UI if possible, else use timestamp
-            let nameSuffix = '';
-            const resultsHeader = document.getElementById("results-header-text");
-            if (resultsHeader && resultsHeader.textContent) {
-                nameSuffix = resultsHeader.textContent.replace('Results for', '').trim();
-            }
-            if (!nameSuffix) {
-                nameSuffix = new Date().toISOString().slice(0, 19).replace('T', '_').replace(/:/g, '-');
-            }
-
-            const filename = `${filenamePrefix}-${nameSuffix.replace(/[^a-zA-Z0-9-_]/g, '_')}.csv`;
-            
-            link.setAttribute("href", url);
-            link.setAttribute("download", filename);
-            link.style.visibility = 'hidden';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-        }
+        return window.BenchmarkExport.exportToCSV(data, filenamePrefix, headers, rowMapper);
     },
 
     /**
@@ -977,36 +799,7 @@ window.BenchmarkUtils = {
      * @param {string} filenamePrefix - Prefix for the filename.
      */
     exportToJSON: function(data, filenamePrefix) {
-        if (!data || data.length === 0) {
-            alert("No results to export.");
-            return;
-        }
-
-        const jsonString = JSON.stringify(data, null, 2);
-        const blob = new Blob([jsonString], { type: 'application/json;charset=utf-8;' });
-
-        const link = document.createElement("a");
-        if (link.download !== undefined) {
-            const url = URL.createObjectURL(blob);
-            
-            let nameSuffix = '';
-            const resultsHeader = document.getElementById("results-header-text");
-            if (resultsHeader && resultsHeader.textContent) {
-                nameSuffix = resultsHeader.textContent.replace('Results for', '').trim();
-            }
-            if (!nameSuffix) {
-                nameSuffix = new Date().toISOString().slice(0, 19).replace('T', '_').replace(/:/g, '-');
-            }
-
-            const filename = `${filenamePrefix}-${nameSuffix.replace(/[^a-zA-Z0-9-_]/g, '_')}.json`;
-            
-            link.setAttribute("href", url);
-            link.setAttribute("download", filename);
-            link.style.visibility = 'hidden';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-        }
+        return window.BenchmarkExport.exportToJSON(data, filenamePrefix);
     },
 
     /**
@@ -1018,55 +811,7 @@ window.BenchmarkUtils = {
      * @param {AbortSignal} abortSignal - Signal to check for abortion.
      */
     processStreamedResponse: function(response, onData, onComplete, onError, abortSignal) {
-        if (!response.ok) {
-            onError(new Error(`HTTP error! status: ${response.status}`));
-            return;
-        }
-
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = '';
-
-        function push() {
-            reader.read().then(({ done, value }) => {
-                if (done) {
-                    if (onComplete) onComplete();
-                    return;
-                }
-
-                buffer += decoder.decode(value, { stream: true });
-                const lines = buffer.split('\n');
-                buffer = lines.pop(); // Keep partial line
-
-                lines.forEach(line => {
-                    if (abortSignal && abortSignal.aborted) {
-                        reader.cancel();
-                        return;
-                    }
-                    if (line.trim() === '') return;
-
-                    try {
-                        let data = JSON.parse(line);
-                        // Handle double-encoded JSON if necessary (though ideally backend shouldn't do this)
-                        if (typeof data === 'string') {
-                            try { data = JSON.parse(data); } catch(e) {}
-                        }
-                        onData(data);
-                    } catch (e) {
-                        console.error("Failed to parse JSON chunk:", e, line);
-                    }
-                });
-                
-                if (abortSignal && abortSignal.aborted) {
-                     return; // Don't continue reading
-                }
-
-                push();
-            }).catch(error => {
-                if (onError) onError(error);
-            });
-        }
-        push();
+        return window.BenchmarkHelpers.processStreamedResponse(response, onData, onComplete, onError, abortSignal);
     },
 
 

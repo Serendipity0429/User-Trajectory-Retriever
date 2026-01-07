@@ -34,6 +34,14 @@
 {% endblock modal_container %}
 
 {% block scripts %}
+    <!-- Load modular dependencies first -->
+    <script src="{% static 'js/benchmark/config/urls.js' %}"></script>
+    <script src="{% static 'js/benchmark/config/state.js' %}"></script>
+    <script src="{% static 'js/benchmark/utils/helpers.js' %}"></script>
+    <script src="{% static 'js/benchmark/utils/export.js' %}"></script>
+    <script src="{% static 'js/benchmark/ui/components.js' %}"></script>
+
+    <!-- Load main utilities -->
     <script src="{% static 'js/benchmark/benchmark_utils.js' %}"></script>
     <script src="{% static 'js/benchmark/benchmark_renderer.js' %}"></script>
 

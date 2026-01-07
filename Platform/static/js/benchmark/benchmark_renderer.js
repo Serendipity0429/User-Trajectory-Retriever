@@ -370,13 +370,14 @@ window.BenchmarkUtils.BenchmarkRenderer = {
         } else if (toolName && toolName !== 'undefined') {
             // Structured card with tool name and content
             const sectionLabel = isAction ? 'Input Parameters' : 'Output';
+            const titleColor = isAction ? 'text-primary' : 'text-success';
             const contentText = typeof content === 'string' ? content : JSON.stringify(content, null, 2);
 
             innerHtml = `
                 <div class="card border border-light shadow-sm">
                      <div class="card-header bg-light bg-gradient border-bottom py-2 px-3 d-flex align-items-center">
                         <i class="bi bi-terminal-fill text-secondary me-2"></i>
-                        <span class="fw-bold font-monospace text-primary">${toolName}</span>
+                        <span class="fw-bold font-monospace ${titleColor}">${toolName}</span>
                      </div>
                      <div class="card-body p-3 bg-white">
                         <div class="text-muted small text-uppercase fw-bold mb-2" style="font-size: 0.7rem; letter-spacing: 0.5px;">${sectionLabel}</div>

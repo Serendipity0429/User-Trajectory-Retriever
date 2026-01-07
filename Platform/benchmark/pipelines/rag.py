@@ -22,7 +22,7 @@ class RagMultiTurnPipeline(BaseMultiTurnPipeline):
     def get_settings_snapshot(self):
         settings = BenchmarkSettings.get_effective_settings()
         snapshot = super().get_settings_snapshot()
-        snapshot['search_settings'] = {
+        snapshot['search'] = {
             'search_provider': settings.search_provider,
             'search_limit': settings.search_limit,
             'serper_fetch_full_content': settings.fetch_full_content
@@ -67,7 +67,7 @@ class RagMultiTurnPipeline(BaseMultiTurnPipeline):
         trial_log = trial.log or {}
         search_query = trial_log.get('search_query')
         if search_query:
-            allow_reasoning = session.run.settings_snapshot.get('llm_settings', {}).get('allow_reasoning', False)
+            allow_reasoning = session.run.settings.allow_reasoning if session.run and session.run.settings else False
             
             if trial.trial_number == 1:
                 instruction = PROMPTS["rag_query_gen_cot_prompt" if allow_reasoning else "rag_query_gen_prompt"].format(question=session.question)
@@ -97,7 +97,7 @@ class RagMultiTurnPipeline(BaseMultiTurnPipeline):
             completed_trials = list(session.trials.filter(status='completed').order_by('trial_number'))
             
         messages = []
-        allow_reasoning = session.run.settings_snapshot.get('llm_settings', {}).get('allow_reasoning', False)
+        allow_reasoning = session.run.settings.allow_reasoning if session.run and session.run.settings else False
         
         system_prompt = PROMPTS["rag_system_prompt"]
         if allow_reasoning:
@@ -135,8 +135,7 @@ class RagMultiTurnPipeline(BaseMultiTurnPipeline):
     def run_single_turn(self, session, trial, completed_trials=None):
         from ..utils import TrialGuard
         with TrialGuard(trial):
-            settings_snapshot = session.run.settings_snapshot
-            allow_reasoning = settings_snapshot.get('llm_settings', {}).get('allow_reasoning', False)
+            allow_reasoning = session.run.settings.allow_reasoning if session.run and session.run.settings else False
             
             history_key = self._get_history_key(session.id)
             history_json = redis_client.get(history_key)

@@ -264,12 +264,12 @@ window.BenchmarkUtils.MultiTurnPage = (function() {
                         BenchmarkUtils.MultiTurnUtils.renderSession(data.session, data.trials, { sessionTrials: [], pipelineType: sessionPipelineType }); 
                         window.sessionTrials = data.trials; 
                         
-                        const settingsWhitelist = ['llm_model', 'llm_base_url', 'max_retries', 'allow_reasoning'];
+                        const settingsWhitelist = ['llm_model', 'llm_base_url', 'max_retries', 'allow_reasoning', 'temperature', 'top_p', 'max_tokens'];
                          if (sessionPipelineType.includes('rag')) {
-                            settingsWhitelist.push('rag_settings', 'search_settings');
+                            settingsWhitelist.push('search');
                         }
                         if (sessionPipelineType.includes('agent')) {
-                            settingsWhitelist.push('agent_config');
+                            settingsWhitelist.push('agent');
                         }
                         BenchmarkUtils.BenchmarkRenderer.renderRunConfiguration(data.session.settings_snapshot, settingsWhitelist);
                         
@@ -342,9 +342,9 @@ window.BenchmarkUtils.MultiTurnPage = (function() {
                          loadSession(sid);
                      });
                      
-                     const settingsWhitelist = ['llm_model', 'llm_base_url', 'max_retries', 'allow_reasoning'];
-                     if (runPipelineType.includes('rag')) settingsWhitelist.push('rag_settings', 'search_settings');
-                     if (runPipelineType.includes('agent')) settingsWhitelist.push('agent_config');
+                     const settingsWhitelist = ['llm_model', 'llm_base_url', 'max_retries', 'allow_reasoning', 'temperature', 'top_p', 'max_tokens'];
+                     if (runPipelineType.includes('rag')) settingsWhitelist.push('search');
+                     if (runPipelineType.includes('agent')) settingsWhitelist.push('agent');
                      BenchmarkUtils.BenchmarkRenderer.renderRunConfiguration(data.settings, settingsWhitelist);
                      if (statsContainer) statsContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                  });

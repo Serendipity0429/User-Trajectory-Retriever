@@ -53,10 +53,12 @@ class BenchmarkDataset(models.Model):
                 os.remove(self.file.path)
         super(BenchmarkDataset, self).delete(*args, **kwargs)
 
-class BenchmarkSettings(SingletonModel):
+class BenchmarkSettings(models.Model):
     """
     Unified settings model for LLM, Search, and Agent configurations.
     """
+    is_template = models.BooleanField(default=False, help_text="If True, this is a global configuration template.")
+
     # LLM Settings
     llm_base_url = models.CharField(max_length=255, blank=True, help_text="Optional: e.g., http://localhost:11434/v1")
     llm_model = models.CharField(max_length=100, blank=True, help_text="e.g., gpt-4o")
@@ -88,7 +90,19 @@ class BenchmarkSettings(SingletonModel):
     memory_type = models.CharField(max_length=50, choices=MEMORY_TYPE_CHOICES, default='naive', help_text="Select the long-term memory mechanism.")
 
     def __str__(self):
-        return "Benchmark Settings"
+        return f"Benchmark Settings ({'Template' if self.is_template else 'Run Instance'}) - {self.pk}"
+
+    @classmethod
+    def load(cls):
+        # Prefer the template, or create one if none exists
+        obj = cls.objects.filter(is_template=True).first()
+        if not obj:
+            # Fallback to ID 1 or create new
+            obj, created = cls.objects.get_or_create(pk=1, defaults={'is_template': True})
+            if not obj.is_template:
+                obj.is_template = True
+                obj.save()
+        return obj
 
     @classmethod
     def get_effective_settings(cls):
@@ -103,13 +117,55 @@ class BenchmarkSettings(SingletonModel):
             settings.serper_api_key = config("SERPER_API_KEY", default="")
         return settings
 
+    def clone(self):
+        """Creates a copy of the current settings."""
+        new_settings = BenchmarkSettings(
+            is_template=False,
+            llm_base_url=self.llm_base_url,
+            llm_model=self.llm_model,
+            llm_api_key=self.llm_api_key,
+            max_retries=self.max_retries,
+            allow_reasoning=self.allow_reasoning,
+            temperature=self.temperature,
+            top_p=self.top_p,
+            max_tokens=self.max_tokens,
+            search_provider=self.search_provider,
+            serper_api_key=self.serper_api_key,
+            search_limit=self.search_limit,
+            fetch_full_content=self.fetch_full_content,
+            memory_type=self.memory_type
+        )
+        return new_settings
+
+    def to_snapshot_dict(self):
+        return {
+            "llm": {
+                "llm_base_url": self.llm_base_url,
+                "llm_model": self.llm_model,
+                "max_retries": self.max_retries,
+                "allow_reasoning": self.allow_reasoning,
+                "temperature": self.temperature,
+                "top_p": self.top_p,
+                "max_tokens": self.max_tokens,
+                "llm_api_key": self.llm_api_key,
+            },
+            "search": {
+                "search_provider": self.search_provider,
+                "search_limit": self.search_limit,
+                "serper_fetch_full_content": self.fetch_full_content,
+            },
+            "agent": {
+                "memory_type": self.memory_type
+            }
+        }
+
 class MultiTurnRun(models.Model):
     """
     Represents a group of benchmark sessions, typically from a single pipeline run.
     """
     name = models.CharField(max_length=255, default='Pipeline Run')
     created_at = models.DateTimeField(auto_now_add=True)
-    settings_snapshot = models.JSONField(default=dict, blank=True, help_text="Snapshot of settings used for this run.")
+    settings = models.ForeignKey(BenchmarkSettings, on_delete=models.CASCADE, null=True, blank=True)
 
     class Meta:
         ordering = ['-created_at']

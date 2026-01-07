@@ -427,7 +427,7 @@ window.BenchmarkUtils.BenchmarkRenderer = {
                             <i class="bi bi-terminal-fill text-secondary me-2"></i>
                             <span class="fw-bold font-monospace text-primary">${toolName}</span>
                          </div>
-                         <div class="card-body p-2 bg-white">
+                         <div class="card-body p-3 bg-white">
                             <div class="text-muted small text-uppercase fw-bold mb-2" style="font-size: 0.7rem; letter-spacing: 0.5px;">Input Parameters</div>
                             <div class="p-2 bg-light border rounded font-monospace small text-dark" style="white-space: pre-wrap;">${toolInput}</div>
                          </div>
@@ -715,9 +715,9 @@ window.BenchmarkUtils.BenchmarkRenderer = {
         if (!configCard || !configDetails) return;
 
         snapshot = snapshot || {}; 
-
         configDetails.innerHTML = '';
-        
+
+        // Helper to add item to UI
         const addItem = (label, value, icon) => {
             const item = BenchmarkUtils.renderTemplate('tpl-run-config-item', {
                 '.config-icon': { addClass: icon },
@@ -727,87 +727,114 @@ window.BenchmarkUtils.BenchmarkRenderer = {
             configDetails.appendChild(item);
         };
 
-        const shouldShow = (key) => !whitelist || whitelist.includes(key);
-        const getValue = (obj, key, domId) => {
-            if (obj && (obj[key] !== undefined && obj[key] !== null && obj[key] !== '')) return obj[key];
-            const el = document.getElementById(domId);
-            return el ? el.value : null;
+        // Configuration Definition
+        const CONFIG_GROUPS = {
+            'llm': {
+                sources: ['llm', 'llm_settings'],
+                fields: [
+                    { key: 'llm_model', label: 'LLM Model', icon: 'bi-cpu' },
+                    { key: 'max_retries', label: 'Max Retries', icon: 'bi-arrow-repeat' },
+                    { key: 'temperature', label: 'Temperature', icon: 'bi-thermometer-half' },
+                    { key: 'top_p', label: 'Top P', icon: 'bi-percent' },
+                    { key: 'max_tokens', label: 'Max Tokens', icon: 'bi-text-paragraph' },
+                    { key: 'allow_reasoning', label: 'Reasoning', icon: 'bi-lightbulb', type: 'boolean' },
+                    { key: 'llm_base_url', label: 'Base URL', icon: 'bi-link-45deg' }
+                ]
+            },
+            'search': {
+                sources: ['search', 'search_settings'],
+                fields: [
+                    { 
+                        key: 'search_provider', 
+                        label: 'Search Provider', 
+                        icon: 'bi-globe', 
+                        formatter: val => val === 'mcp' ? 'MCP Server' : (val === 'serper' ? 'Serper API' : val) 
+                    },
+                    { key: 'search_limit', label: 'Top-K Limit', icon: 'bi-list-ol' },
+                    { key: 'serper_fetch_full_content', label: 'Full Content', icon: 'bi-file-text', type: 'boolean', domId: 'serper_fetch_full_content' }
+                ]
+            },
+            'agent': {
+                sources: ['agent', 'agent_config'],
+                fields: [
+                    { 
+                        key: 'memory_type', 
+                        label: 'Agent Memory', 
+                        icon: 'bi-memory', 
+                        map: {'naive': 'Naive Memory', 'mem0': 'Mem0 Memory', 'reme': 'ReMe Memory'}, 
+                        domId: 'agent_memory_type' // Mapping specific DOM ID
+                    },
+                    { key: 'model_name', label: 'Agent Model', icon: 'bi-robot' }
+                ]
+            }
         };
-        
-        // Check for nested first (if full snapshot passed)
-        let llmSettings = snapshot.llm_settings || snapshot; 
 
-        if (shouldShow('llm_model')) {
-            const val = getValue(llmSettings, 'llm_model', 'llm_model');
-            if (val) addItem('LLM Model', val, 'bi-cpu');
-        }
-        if (shouldShow('max_retries')) {
-            const val = getValue(llmSettings, 'max_retries', 'max_retries');
-            if (val) addItem('Max Retries', val, 'bi-arrow-repeat');
-        }
-        if (shouldShow('allow_reasoning')) {
-            let val = getValue(llmSettings, 'allow_reasoning', 'allow_reasoning');
-            // If pulling from DOM checkbox
-            if (val === 'on' || val === true) val = 'Enabled';
-            else if (val === false) val = 'Disabled';
+        // Helper to retrieve value from Snapshot OR DOM
+        const resolveValue = (groupObj, fieldConfig) => {
+            const key = fieldConfig.key;
             
-            // If pulling from snapshot (boolean)
-            if (val === true) val = 'Enabled';
-            if (val === false) val = 'Disabled';
-
-            if (val) addItem('Reasoning', val, 'bi-lightbulb');
-        }
-        if (shouldShow('llm_base_url')) {
-            const val = getValue(llmSettings, 'llm_base_url', 'llm_base_url');
-            if (val) addItem('Base URL', val, 'bi-link-45deg');
-        }
-        
-        if (shouldShow('search_settings')) {
-            const ss = snapshot.search_settings || {};
-            let provider = ss.search_provider;
-            if (!provider && document.querySelector('input[name="search_provider"]:checked')) {
-                provider = document.querySelector('input[name="search_provider"]:checked').value;
-            }
-            if (provider) {
-                addItem('Search Provider', provider === 'mcp' ? 'MCP Server' : (provider === 'serper' ? 'Serper API' : provider), 'bi-globe');
+            // 1. Try Snapshot
+            if (groupObj && groupObj[key] !== undefined && groupObj[key] !== null && groupObj[key] !== '') {
+                return groupObj[key];
             }
             
-            // Search Limit
-            let searchLimit = ss.search_limit;
-            if ((searchLimit === undefined || searchLimit === '') && document.getElementById('search_limit')) {
-                searchLimit = document.getElementById('search_limit').value;
+            // 2. Try DOM
+            const domId = fieldConfig.domId || key; // Default to key if no specific domId
+            const el = document.getElementById(domId);
+            if (el) {
+                if (el.type === 'checkbox') return el.checked;
+                return el.value;
             }
-            if (searchLimit) {
-                addItem('Top-K Limit', searchLimit, 'bi-list-ol');
+            
+            return null;
+        };
+
+        const formatValue = (val, fieldConfig) => {
+            if (val === null || val === undefined || val === '') return null;
+
+            if (fieldConfig.map) {
+                return fieldConfig.map[val] || val;
             }
 
-            // Full content
-            let fullContent = ss.serper_fetch_full_content;
-             if (fullContent === undefined && document.getElementById('serper_fetch_full_content')) {
-                 fullContent = document.getElementById('serper_fetch_full_content').checked;
-             }
-            
-            if (fullContent !== undefined) {
-                addItem('Full Content', fullContent ? 'Enabled' : 'Disabled', 'bi-file-text');
+            if (fieldConfig.formatter) {
+                return fieldConfig.formatter(val);
             }
-        }
-        
-        if (shouldShow('agent_config')) {
-            const ac = snapshot.agent_config || {};
-            // If pulling from DOM
-            let memory = ac.memory_type;
-             if (!memory && document.getElementById('agent_memory_type')) {
-                 memory = document.getElementById('agent_memory_type').value;
-             }
-             if (memory) {
-                 const memoryMap = {
-                     'naive': 'Naive Memory',
-                     'mem0': 'Mem0 Memory',
-                     'reme': 'ReMe Memory'
-                 };
-                 addItem('Agent Memory', memoryMap[memory] || memory, 'bi-memory');
-             }
-        }
+
+            if (fieldConfig.type === 'boolean') {
+                if (val === true || val === 'on' || val === 'true') return 'Enabled';
+                return 'Disabled';
+            }
+
+            return val;
+        };
+
+        // Execution
+        Object.keys(CONFIG_GROUPS).forEach(groupName => {
+            const groupConfig = CONFIG_GROUPS[groupName];
+            
+            // Find the data source object in snapshot (support legacy keys)
+            let groupData = null;
+            for (const src of groupConfig.sources) {
+                if (snapshot[src]) {
+                    groupData = snapshot[src];
+                    break;
+                }
+            }
+            // Fallback: if snapshot is flat (legacy root level), use snapshot itself
+            if (!groupData && groupName === 'llm') groupData = snapshot;
+
+            groupConfig.fields.forEach(field => {
+                // Check whitelist
+                if (whitelist && !whitelist.includes(field.key)) return;
+
+                const rawVal = resolveValue(groupData, field);
+                const displayVal = formatValue(rawVal, field);
+
+                if (displayVal !== null) {
+                    addItem(field.label, displayVal, field.icon);
+                }
+            });
+        });
 
         if (configDetails.children.length > 0) {
             configCard.style.display = 'block';

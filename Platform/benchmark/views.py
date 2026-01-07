@@ -510,31 +510,14 @@ def create_session(request):
         )
     
     settings = BenchmarkSettings.get_effective_settings()
-    snapshot = {
-        "llm_settings": {
-            "llm_base_url": settings.llm_base_url,
-            "llm_model": settings.llm_model,
-            "max_retries": settings.max_retries,
-            "allow_reasoning": settings.allow_reasoning,
-            "temperature": settings.temperature,
-            "top_p": settings.top_p,
-            "max_tokens": settings.max_tokens,
-        },
-        "search_settings": {
-            "search_provider": settings.search_provider,
-            "search_limit": settings.search_limit,
-            "serper_fetch_full_content": settings.fetch_full_content,
-        },
-        "agent_config": {
-            "memory_type": settings.memory_type
-        }
-    }
-
+    
     if group_id:
         group = get_object_or_404(MultiTurnRun, pk=group_id)
     else:
         group_name = f"Ad-hoc Session - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-        group = MultiTurnRun.objects.create(name=group_name, settings_snapshot=snapshot)
+        new_settings = settings.clone()
+        new_settings.save()
+        group = MultiTurnRun.objects.create(name=group_name, settings=new_settings)
 
     session = MultiTurnSession.objects.create(
         question=question_text,
@@ -552,11 +535,10 @@ def create_session(request):
 def run_trial(request, trial_id):
     trial = get_object_or_404(MultiTurnTrial.objects.select_related("session", "session__run"), pk=trial_id)
     session = trial.session
-    snapshot = session.run.settings_snapshot if session.run else {}
-
-    llm_s = snapshot.get("llm_settings", {})
-    base_url = llm_s.get("llm_base_url")
-    model = llm_s.get("llm_model")
+    
+    settings = session.run.settings if session.run and session.run.settings else BenchmarkSettings.get_effective_settings()
+    base_url = settings.llm_base_url
+    model = settings.llm_model
     api_key = config("LLM_API_KEY", default=None)
 
     if not api_key or not model:
@@ -615,8 +597,8 @@ def retry_session(request, trial_id):
         original_trial.save()
 
         session = original_trial.session
-        snapshot = session.run.settings_snapshot if session.run else {}
-        max_retries = snapshot.get("llm_settings", {}).get("max_retries", 3)
+        settings = session.run.settings if session.run and session.run.settings else BenchmarkSettings.get_effective_settings()
+        max_retries = settings.max_retries
 
         if is_correct:
             session.is_completed = True
@@ -854,8 +836,9 @@ def get_session(request, session_id):
         return JsonResponse({"error": "Session not found"}, status=404)
     
     pipeline_type = session.pipeline_type
-    snapshot = session.run.settings_snapshot if session.run else {}
-    max_retries = snapshot.get("llm_settings", {}).get("max_retries", 3)
+    settings = session.run.settings if session.run and session.run.settings else BenchmarkSettings.get_effective_settings()
+    snapshot = settings.to_snapshot_dict()
+    max_retries = settings.max_retries
 
     trials_qs = session.trials.values(
         "id", "trial_number", "answer", "feedback", "is_correct_llm", "is_correct_rule",
@@ -893,8 +876,9 @@ def _get_run_results(group_id, pipeline_types):
         
     sessions = group.sessions.filter(pipeline_type__in=pipeline_types).prefetch_related("trials")
     results = []
-    snapshot = group.settings_snapshot or {}
-    max_retries = snapshot.get("llm_settings", {}).get("max_retries", BenchmarkSettings.load().max_retries)
+    settings = group.settings if group.settings else BenchmarkSettings.get_effective_settings()
+    snapshot = settings.to_snapshot_dict()
+    max_retries = settings.max_retries
 
     for session in sessions:
         trials = list(session.trials.all().order_by('trial_number'))
@@ -942,10 +926,11 @@ def export_session(request, session_id):
         return HttpResponse("Session not found", status=404)
     
     pipeline_type = session.pipeline_type
-    snapshot = session.run.settings_snapshot if session.run else {}
-    if snapshot and "llm_settings" in snapshot:
-        snapshot["llm_settings"].pop("llm_api_key", None)
-    max_retries = snapshot.get("llm_settings", {}).get("max_retries", 3)
+    settings = session.run.settings if session.run and session.run.settings else BenchmarkSettings.get_effective_settings()
+    snapshot = settings.to_snapshot_dict()
+    if snapshot and "llm" in snapshot:
+        snapshot["llm"].pop("llm_api_key", None)
+    max_retries = settings.max_retries
 
     trials = list(session.trials.values(
         "trial_number", "answer", "feedback", "is_correct_llm", "is_correct_rule", 

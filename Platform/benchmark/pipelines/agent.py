@@ -59,7 +59,7 @@ class VanillaAgentPipeline(BaseAgentPipeline):
         settings = BenchmarkSettings.get_effective_settings()
         snapshot = super().get_settings_snapshot()
         snapshot['pipeline_type'] = 'vanilla_agent'
-        snapshot['agent_config'] = {
+        snapshot['agent'] = {
             'model_name': self.agent_model.model_name if hasattr(self.agent_model, 'model_name') else 'unknown',
             'memory_type': settings.memory_type
         }
@@ -124,7 +124,7 @@ class BrowserAgentPipeline(BaseAgentPipeline):
         settings = BenchmarkSettings.get_effective_settings()
         snapshot = super().get_settings_snapshot()
         snapshot['pipeline_type'] = 'browser_agent'
-        snapshot['agent_config'] = {
+        snapshot['agent'] = {
             'model_name': self.agent_model.model_name if hasattr(self, 'agent_model') and self.agent_model and hasattr(self.agent_model, 'model_name') else 'unknown',
             'memory_type': settings.memory_type
         }

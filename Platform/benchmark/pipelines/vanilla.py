@@ -35,8 +35,7 @@ class VanillaLLMMultiTurnPipeline(BaseMultiTurnPipeline):
         messages = []
         
         # session.run is the MultiTurnRun object
-        settings_snapshot = session.run.settings_snapshot
-        allow_reasoning = settings_snapshot.get('llm_settings', {}).get('allow_reasoning', False) # Reverted to use settings
+        allow_reasoning = session.run.settings.allow_reasoning if session.run and session.run.settings else False
 
         # 1. System and Initial Prompt
         sys_prompt = PROMPTS["vanilla_system_prompt"]

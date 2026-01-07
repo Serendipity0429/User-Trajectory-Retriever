@@ -194,14 +194,15 @@ class BasePipeline:
         Subclasses can extend this.
         """
         return {
-            'llm_settings': {
+            'llm': {
                 'llm_base_url': self.llm_settings.llm_base_url,
                 'llm_model': self.llm_settings.llm_model,
                 'max_retries': getattr(self.llm_settings, 'max_retries', 3), # Handle defaults safely
                 'allow_reasoning': getattr(self.llm_settings, 'allow_reasoning', False),
                 'temperature': getattr(self.llm_settings, 'temperature', 0.0),
                 'top_p': getattr(self.llm_settings, 'top_p', 1.0),
-                'max_tokens': getattr(self.llm_settings, 'max_tokens', None)
+                'max_tokens': getattr(self.llm_settings, 'max_tokens', None),
+                'llm_api_key': self.llm_settings.llm_api_key
             }
         }
 
@@ -347,8 +348,10 @@ class BaseMultiTurnPipeline(BasePipeline):
                 return
         else:
             group_name = f"{str(self)}- {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}" 
-            snapshot = self.get_settings_snapshot()
-            group = MultiTurnRun.objects.create(name=group_name, settings_snapshot=snapshot)
+            # Create a new settings instance for this run
+            new_settings = self.llm_settings.clone()
+            new_settings.save()
+            group = MultiTurnRun.objects.create(name=group_name, settings=new_settings)
         
         try:
             total_questions = 0
@@ -403,9 +406,10 @@ class BaseMultiTurnPipeline(BasePipeline):
                     instruction = msg.get("content", "")
                     break
             
-            # Extract allow_reasoning from session snapshot to ensure consistency
-            settings_snapshot = session.run.settings_snapshot
-            allow_reasoning = settings_snapshot.get('llm_settings', {}).get('allow_reasoning', False)
+            # Extract allow_reasoning from session run settings
+            allow_reasoning = False
+            if session.run and session.run.settings:
+                allow_reasoning = session.run.settings.allow_reasoning
             
             # Prepare trace components using TraceFormatter
             class SimpleMsg:
@@ -600,8 +604,9 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
         """
         def create_run_obj():
             name = f"{str(self)}- {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}" 
-            snapshot = self.get_settings_snapshot()
-            return MultiTurnRun.objects.create(name=name, settings_snapshot=snapshot)
+            new_settings = self.llm_settings.clone()
+            new_settings.save()
+            return MultiTurnRun.objects.create(name=name, settings=new_settings)
 
         completed_questions = set()
         incomplete_sessions = {}

@@ -3,7 +3,6 @@ db.sqlite3*
 THUIRChromeExtension
 __pycache__
 *.ipynb
-utils
 tempFiles
 .idea
 node_modules
@@ -23,3 +22,4 @@ tempCodes
 .github
 gha-creds-*.json
 AGENTS.md
+CLAUDE.md

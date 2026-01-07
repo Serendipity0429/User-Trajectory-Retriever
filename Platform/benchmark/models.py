@@ -2,27 +2,7 @@ from django.db import models
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator, MaxValueValidator
 import os
-
 from decouple import config
-
-# --- Abstract Base Classes ---
-class SingletonModel(models.Model):
-    """
-    Abstract base class for singleton models.
-    Ensures only one instance exists.
-    """
-    class Meta:
-        abstract = True
-
-    def save(self, *args, **kwargs):
-        if not self.pk and self.__class__.objects.exists():
-            raise ValidationError(f"There can be only one {self.__class__.__name__} instance.")
-        return super(SingletonModel, self).save(*args, **kwargs)
-
-    @classmethod
-    def load(cls):
-        obj, created = cls.objects.get_or_create(pk=1)
-        return obj
 
 # --- Concrete Models ---
 class BenchmarkDataset(models.Model):
@@ -166,6 +146,7 @@ class MultiTurnRun(models.Model):
     name = models.CharField(max_length=255, default='Pipeline Run')
     created_at = models.DateTimeField(auto_now_add=True)
     settings = models.ForeignKey(BenchmarkSettings, on_delete=models.CASCADE, null=True, blank=True)
+    is_ad_hoc = models.BooleanField(default=False, help_text="True if this is a single ad-hoc session, False if it's a pipeline run.")
 
     class Meta:
         ordering = ['-created_at']
@@ -224,7 +205,3 @@ class MultiTurnTrial(models.Model):
 
     def __str__(self):
         return f"Trial {self.trial_number} for Session {self.session.id}"
-
-
-# Backwards-compatible alias for older imports.
-SearchSettings = BenchmarkSettings

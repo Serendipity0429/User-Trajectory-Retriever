@@ -34,6 +34,45 @@ window.BenchmarkHelpers.debounce = function(func, wait) {
 }
 
 /**
+ * Escape HTML entities to prevent XSS
+ * @param {string} str - String to escape
+ * @returns {string} Escaped string
+ */
+window.BenchmarkHelpers.escapeHtml = function(str) {
+    if (typeof str !== 'string') return String(str);
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+}
+
+/**
+ * Create an expandable toggle for show more/less functionality
+ * @param {HTMLElement} showBtn - The "show more" button
+ * @param {HTMLElement} hideBtn - The "show less" button
+ * @param {HTMLElement} container - The container to toggle visibility
+ * @param {Function} onExpand - Optional callback when expanded
+ * @param {Function} onCollapse - Optional callback when collapsed
+ */
+window.BenchmarkHelpers.createExpandableToggle = function(showBtn, hideBtn, container, onExpand, onCollapse) {
+    container.classList.add('d-none');
+    hideBtn.classList.add('d-none');
+
+    showBtn.onclick = function(e) {
+        e.stopPropagation();
+        container.classList.remove('d-none');
+        showBtn.classList.add('d-none');
+        hideBtn.classList.remove('d-none');
+        if (onExpand) onExpand();
+    };
+
+    hideBtn.onclick = function(e) {
+        e.stopPropagation();
+        container.classList.add('d-none');
+        showBtn.classList.remove('d-none');
+        hideBtn.classList.add('d-none');
+        if (onCollapse) onCollapse();
+    };
+}
+
+/**
  * Process a streamed JSON response (NDJSON)
  * @param {Response} response - The fetch Response object
  * @param {Function} onData - Callback for each parsed JSON object

@@ -233,9 +233,23 @@ class BaseMultiTurnPipeline(BasePipeline):
                 session = existing_session
                 # Clean up stalled/incomplete trials to retry the step
                 session.trials.exclude(status='completed').delete()
-                
+
                 last_completed = session.trials.order_by('trial_number').last()
-                trial_number = (last_completed.trial_number + 1) if last_completed else 1
+
+                if last_completed:
+                    # Check if session is actually finished (correct or reached max retries)
+                    if last_completed.is_correct_llm or last_completed.trial_number >= self.max_retries:
+                        # Session is done, mark as completed and skip
+                        session.is_completed = True
+                        session.save()
+                        return  # Skip processing this session
+                    else:
+                        # Session not finished yet, delete last trial and rerun it
+                        trial_number = last_completed.trial_number
+                        last_completed.delete()
+                else:
+                    # No completed trials, start from trial 1
+                    trial_number = 1
             else:
                 session = self.create_session(self.llm_settings, question_text, ground_truths, group)
                 trial_number = 1
@@ -532,11 +546,28 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
             if existing_session:
                 session = existing_session
                 # Resumption logic: clean up stalled trials and find where we left off.
-                def cleanup_trials():
+                def cleanup_and_check():
                     session.trials.exclude(status='completed').delete()
                     last_completed = session.trials.order_by('trial_number').last()
-                    return (last_completed.trial_number + 1) if last_completed else 1
-                trial_number = await sync_to_async(cleanup_trials)()
+
+                    if last_completed:
+                        # Check if session is actually finished (correct or reached max retries)
+                        if last_completed.is_correct_llm or last_completed.trial_number >= self.max_retries:
+                            # Session is done, mark as completed and return None to signal skip
+                            session.is_completed = True
+                            session.save()
+                            return None
+                        else:
+                            # Session not finished yet, delete last trial and rerun it
+                            trial_num = last_completed.trial_number
+                            last_completed.delete()
+                            return trial_num
+                    else:
+                        return 1
+
+                trial_number = await sync_to_async(cleanup_and_check)()
+                if trial_number is None:
+                    return  # Skip processing this session
             else:
                 session = await sync_to_async(self.create_session)(self.llm_settings, question_text, ground_truths, group)
                 trial_number = 1

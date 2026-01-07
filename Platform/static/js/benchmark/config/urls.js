@@ -27,6 +27,7 @@ window.BenchmarkUrls = {
         createSessionGroup: `${API_PREFIX}/sessions/create_session_group/`,
         batchDeleteSessions: `${API_PREFIX}/sessions/batch_delete_sessions/`,
         deleteSessionGroup: (id) => `${API_PREFIX}/sessions/delete_session_group/${id}/`,
+        renameSessionGroup: (id) => `${API_PREFIX}/sessions/rename_session_group/${id}/`,
         getSession: (id) => `${API_PREFIX}/sessions/get_session/${id}/`,
         runTrial: (id) => `${API_PREFIX}/sessions/run_trial/${id}/`,
         retrySession: (id) => `${API_PREFIX}/sessions/retry_session/${id}/`,

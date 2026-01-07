@@ -45,7 +45,9 @@ urlpatterns = [
     path("api/sessions/delete_session/<int:session_id>/", views.delete_session, name="delete_session"),
     path('api/sessions/batch_delete_sessions/', views.batch_delete_sessions, name='batch_delete_sessions'),
     path('api/sessions/delete_session_group/<int:group_id>/', views.delete_session_group, name='delete_session_group'),
+    path('api/sessions/rename_session_group/<int:group_id>/', views.rename_session_group, name='rename_session_group'),
     path('api/sessions/export_session/<int:session_id>/', views.export_session, name='export_session'),
+    path('api/sessions/export_run/<int:group_id>/', views.export_run, name='export_run'),
     
     # Trial Execution
     path("api/sessions/run_trial/<int:trial_id>/", views.run_trial, name="run_trial"),

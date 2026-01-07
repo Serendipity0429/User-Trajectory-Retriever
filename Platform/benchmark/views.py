@@ -178,8 +178,7 @@ def _render_benchmark_view(request, pipeline_type, template_name):
 
     # Load sessions and group them
     groups = (
-        MultiTurnRun.objects.filter(sessions__pipeline_type=pipeline_type)
-        .exclude(name__startswith="Ad-hoc Session")
+        MultiTurnRun.objects.filter(sessions__pipeline_type=pipeline_type, is_ad_hoc=False)
         .prefetch_related(
             models.Prefetch(
                 "sessions",
@@ -191,7 +190,7 @@ def _render_benchmark_view(request, pipeline_type, template_name):
     )
 
     individual_sessions = MultiTurnSession.objects.filter(
-        models.Q(run__name__startswith="Ad-hoc Session") | models.Q(run__isnull=True),
+        models.Q(run__is_ad_hoc=True) | models.Q(run__isnull=True),
         pipeline_type=pipeline_type
     ).order_by("-created_at")
 
@@ -517,7 +516,7 @@ def create_session(request):
         group_name = f"Ad-hoc Session - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
         new_settings = settings.clone()
         new_settings.save()
-        group = MultiTurnRun.objects.create(name=group_name, settings=new_settings)
+        group = MultiTurnRun.objects.create(name=group_name, settings=new_settings, is_ad_hoc=True)
 
     session = MultiTurnSession.objects.create(
         question=question_text,
@@ -663,6 +662,23 @@ def delete_session_group(request, group_id):
         group = get_object_or_404(MultiTurnRun, pk=group_id)
         group.delete()
         return JsonResponse({"status": "ok"})
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)}, status=500)
+
+@admin_required
+@require_POST
+def rename_session_group(request, group_id):
+    try:
+        data = json.loads(request.body)
+        new_name = data.get("name", "").strip()
+
+        if not new_name:
+            return JsonResponse({"status": "error", "message": "Name cannot be empty."}, status=400)
+
+        group = get_object_or_404(MultiTurnRun, pk=group_id)
+        group.name = new_name
+        group.save()
+        return JsonResponse({"status": "ok", "name": group.name})
     except Exception as e:
         return JsonResponse({"status": "error", "message": str(e)}, status=500)
 
@@ -963,6 +979,60 @@ def export_session(request, session_id):
         response = HttpResponse(json.dumps(export_data, indent=2), content_type="application/json")
         response["Content-Disposition"] = f'attachment; filename="benchmark_session_{session_id}.json"'
         return response
+
+@admin_required
+def export_run(request, group_id):
+    try:
+        group = get_object_or_404(MultiTurnRun, pk=group_id)
+        sessions = group.sessions.all().order_by('id')
+        
+        export_data = {
+            "group_id": group.id,
+            "group_name": group.name,
+            "created_at": group.created_at.isoformat() if group.created_at else None,
+            "settings": None,
+            "sessions": []
+        }
+        
+        # Get settings from the run
+        settings = group.settings
+        if settings:
+             snapshot = settings.to_snapshot_dict()
+             if snapshot and "llm" in snapshot:
+                snapshot["llm"].pop("llm_api_key", None)
+             export_data["settings"] = snapshot
+
+        sessions_data = []
+        for session in sessions:
+            trials = list(session.trials.values(
+                "trial_number", "answer", "feedback", "is_correct_llm", "is_correct_rule", 
+                "created_at", "full_response", "log"
+            ))
+
+            for trial in trials:
+                trial["is_correct"] = trial["is_correct_llm"]
+                if trial.get("created_at"): trial["created_at"] = trial.get("created_at").isoformat()
+                log = trial.get("log") or {}
+                trial["trace"], trial["search_results"] = log.get("trace", []), log.get("search_results", [])
+                trial["search_query"] = log.get("search_query")
+            
+            sessions_data.append({
+                "session_id": session.id,
+                "question": session.question,
+                "ground_truths": session.ground_truths,
+                "is_completed": session.is_completed,
+                "pipeline_type": session.pipeline_type,
+                "created_at": session.created_at.isoformat() if session.created_at else None,
+                "trials": trials
+            })
+        
+        export_data["sessions"] = sessions_data
+
+        response = HttpResponse(json.dumps(export_data, indent=2), content_type="application/json")
+        response["Content-Disposition"] = f'attachment; filename="benchmark_run_{group_id}.json"'
+        return response
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)}, status=500)
 
 # ========================================== 
 # Debug & Interaction Utilities

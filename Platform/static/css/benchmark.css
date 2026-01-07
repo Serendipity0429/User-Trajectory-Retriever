@@ -137,6 +137,10 @@
 .text-primary-emphasis { color: #052c65; }
 .text-success-emphasis { color: #0a3622; }
 .text-danger-emphasis { color: #58151c; }
+.text-info-emphasis { color: #055160; }
+.text-warning-emphasis { color: #664d03; }
+.text-secondary-emphasis { color: #2b2f32; }
+.text-purple-emphasis { color: #3d2465; }
 
 /* Section Headers */
 .section-header {
@@ -203,7 +207,7 @@
 
 .system-config-content {
     white-space: pre-wrap;
-    font-size: 0.85em;
+    font-size: 0.7em;
     line-height: 1.5;
 }
 
@@ -241,4 +245,16 @@
 
 .search-results-title {
     font-size: 0.9rem;
+}
+
+/* Sticky Table Header for Pipeline Results */
+.table-responsive thead {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.table-responsive thead th {
+    background-color: #f8f9fa !important;
+    box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.1);
 }

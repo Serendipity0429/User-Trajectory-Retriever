@@ -2,7 +2,8 @@ import json
 from task_manager.utils import check_answer_rule, check_answer_llm, redis_client
 from ..utils import (
     get_search_engine, print_debug, extract_final_answer, extract_query,
-    RedisKeys, PipelinePrefix, TraceFormatter, SimpleMsg, PROMPTS, TrialGuard
+    RedisKeys, PipelinePrefix, TraceFormatter, SimpleMsg, PROMPTS, TrialGuard,
+    clear_trial_cache
 )
 from ..models import (
     BenchmarkSettings, MultiTurnSession, MultiTurnTrial
@@ -39,11 +40,14 @@ class RagMultiTurnPipeline(BaseMultiTurnPipeline):
         )
 
     def create_trial(self, session, trial_number):
-        return MultiTurnTrial.objects.create(
+        trial = MultiTurnTrial.objects.create(
             session=session,
             trial_number=trial_number,
             status='processing'
         )
+        # Clear any stale Redis cache for this trial ID (prevents data leakage from reused IDs)
+        clear_trial_cache(trial.id)
+        return trial
 
     def _construct_messages(self, session, trial, completed_trials=None):
         """
@@ -170,8 +174,8 @@ class RagMultiTurnPipeline(BaseMultiTurnPipeline):
             else:
                 answer = full_response
 
-            # === Phase 3: Finalize ===
-            is_correct_llm = check_answer_llm(session.question, session.ground_truths, answer, client=self.client, model=self.model)
+            # === Phase 3: Finalize (uses judge client/model, not generation model) ===
+            is_correct_llm = check_answer_llm(session.question, session.ground_truths, answer, client=self.judge_client, model=self.judge_model)
             is_correct_rule = check_answer_rule(session.question, session.ground_truths, answer)
 
             trial.answer = answer

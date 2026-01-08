@@ -1,6 +1,6 @@
 # --- Shared Rule Component ---
 _RULES = """Rules for the FINAL answer:
-1. Provide only the exact answer.
+1. Provide only the exact answer in plain text. No markdown or any other formatting.
 2. No punctuation, no extra words or sentences. Capitalization is ignored.
 
 One-shot Example of the Final Answer format:

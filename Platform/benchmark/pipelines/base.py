@@ -49,6 +49,10 @@ class BasePipeline:
         self.redis_prefix = REDIS_PREFIX_ACTIVE
         self.llm_settings = BenchmarkSettings.get_effective_settings()
 
+        # Initialize judge client (uses same base_url/api_key but potentially different model)
+        self.judge_client = self.client  # Same client, different model
+        self.judge_model = self.llm_settings.llm_judge_model or model  # Fallback to generation model
+
     def check_active(self):
         if not self.pipeline_id:
             return True
@@ -197,6 +201,7 @@ class BasePipeline:
             'llm': {
                 'llm_base_url': self.llm_settings.llm_base_url,
                 'llm_model': self.llm_settings.llm_model,
+                'llm_judge_model': getattr(self.llm_settings, 'llm_judge_model', '') or self.llm_settings.llm_model,
                 'max_retries': getattr(self.llm_settings, 'max_retries', 3), # Handle defaults safely
                 'allow_reasoning': getattr(self.llm_settings, 'allow_reasoning', False),
                 'temperature': getattr(self.llm_settings, 'temperature', 0.0),
@@ -461,8 +466,8 @@ class BaseMultiTurnPipeline(BasePipeline):
             else:
                 answer = full_response
 
-            # Logic for checking answer
-            is_correct_llm = check_answer_llm(session.question, session.ground_truths, answer, client=self.client, model=self.model)
+            # Logic for checking answer (uses judge client/model, not generation model)
+            is_correct_llm = check_answer_llm(session.question, session.ground_truths, answer, client=self.judge_client, model=self.judge_model)
             is_correct_rule = check_answer_rule(session.question, session.ground_truths, answer)
 
             # Store only this trial's messages (delta), not full conversation history
@@ -802,7 +807,8 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
             trace_data: Parsed trace for UI rendering
         Returns: (answer, is_correct_llm)
         """
-        is_correct_llm = check_answer_llm(session.question, session.ground_truths, answer, client=self.client, model=self.model)
+        # Uses judge client/model, not generation model
+        is_correct_llm = check_answer_llm(session.question, session.ground_truths, answer, client=self.judge_client, model=self.judge_model)
         is_correct_rule = check_answer_rule(session.question, session.ground_truths, answer)
 
         trial.answer = answer

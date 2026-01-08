@@ -20,6 +20,8 @@ window.BenchmarkUI.AgentSteps = {
 
         if (type === 'thought') return this._renderThought(content, trialId, idx);
         if (type === 'action') return this._renderAction(content);
+        if (type === 'search_query') return this._renderSearchQuery(content);
+        if (type === 'final_answer') return this._renderFinalAnswer(content);
         if (type === 'observation') return this._renderObservation(content, name, finalAnswerText);
         if (role === 'system') return this._renderSystemPrompt(content);
         if (role === 'user') return this._renderUserInput(content);
@@ -41,17 +43,6 @@ window.BenchmarkUI.AgentSteps = {
     },
 
     _renderAction: function(content) {
-        // Special case: Search Query text format
-        if (typeof content === 'string' && content.trim().startsWith('Search Query:')) {
-            const element = BenchmarkUtils.renderTemplate('tpl-agent-action', {
-                '.agent-badge-text': { addClass: 'bg-info bg-opacity-10 text-info border-info border-opacity-25' },
-                '.badge-icon': { addClass: 'bi-search' },
-                '.badge-label': { text: 'Search Query' },
-                '.tool-content': { text: content }
-            });
-            return BenchmarkUI.MessageBubble.create('assistant', element.outerHTML, 'bg-transparent border-0 shadow-none p-0', 'bi-gear');
-        }
-
         // Parse structured tool data
         let toolName = null;
         let toolInput = null;
@@ -64,6 +55,23 @@ window.BenchmarkUI.AgentSteps = {
         } catch (e) { }
 
         return BenchmarkUI.ToolCards.render('action', toolName, toolInput || content);
+    },
+
+    _renderSearchQuery: function(content) {
+        const element = BenchmarkUtils.renderTemplate('tpl-agent-action', {
+            '.agent-badge-text': { addClass: 'bg-info bg-opacity-10 text-info border-info border-opacity-25' },
+            '.badge-icon': { addClass: 'bi-search' },
+            '.badge-label': { text: 'Search Query' },
+            '.tool-content': { text: content }
+        });
+        return BenchmarkUI.MessageBubble.create('assistant', element.outerHTML, 'bg-transparent border-0 shadow-none p-0', 'bi-gear');
+    },
+
+    _renderFinalAnswer: function(content) {
+        const finalAnswer = BenchmarkUtils.renderTemplate('tpl-agent-final-answer', {
+            '.response-text': { text: content }
+        });
+        return BenchmarkUI.MessageBubble.create('assistant', finalAnswer.outerHTML, '', 'bi-chat-left-dots');
     },
 
     _renderObservation: function(content, name, finalAnswerText) {

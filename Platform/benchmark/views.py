@@ -19,7 +19,7 @@ from task_manager.utils import check_answer_rule, check_answer_llm
 from .utils import (
     get_search_engine, count_questions_in_file,
     handle_api_error, handle_async_api_error,
-    print_debug, RedisKeys, PipelinePrefix
+    print_debug, RedisKeys, PipelinePrefix, clear_trial_cache
 )
 from .models import (
     BenchmarkSettings,
@@ -351,12 +351,13 @@ def get_default_settings(request):
             "llm_base_url": config("LLM_BASE_URL", default=settings.llm_base_url),
             "llm_api_key": config("LLM_API_KEY", default=settings.llm_api_key),
             "llm_model": config("LLM_MODEL", default=settings.llm_model),
+            "llm_judge_model": config("LLM_JUDGE_MODEL", default=settings.llm_judge_model),
             "max_retries": settings.max_retries,
             "allow_reasoning": settings.allow_reasoning,
             "temperature": settings.temperature,
             "top_p": settings.top_p,
             "max_tokens": settings.max_tokens,
-            
+
             # Search
             "search_provider": settings.search_provider,
             "serper_api_key": config("SERPER_API_KEY", default=settings.serper_api_key),
@@ -389,6 +390,7 @@ def save_settings(request):
         if "llm_base_url" in data: settings.llm_base_url = data.get("llm_base_url", "")
         if "llm_model" in data: settings.llm_model = data.get("llm_model", "")
         if "llm_api_key" in data: settings.llm_api_key = data.get("llm_api_key", "")
+        if "llm_judge_model" in data: settings.llm_judge_model = data.get("llm_judge_model", "")
         if "max_retries" in data: settings.max_retries = int(data.get("max_retries", 3))
         if "allow_reasoning" in data: settings.allow_reasoning = data.get("allow_reasoning", True)
         if "temperature" in data: settings.temperature = float(data.get("temperature", 0.0))
@@ -638,6 +640,8 @@ def create_session(request):
     )
 
     trial = MultiTurnTrial.objects.create(session=session, trial_number=1, status="processing")
+    # Clear any stale Redis cache for this trial ID (prevents data leakage from reused IDs)
+    clear_trial_cache(trial.id)
 
     return JsonResponse({"session_id": session.id, "trial_id": trial.id})
 
@@ -726,6 +730,8 @@ def retry_session(request, trial_id):
             trial_number=original_trial.trial_number + 1,
             status="processing",
         )
+        # Clear any stale Redis cache for this trial ID (prevents data leakage from reused IDs)
+        clear_trial_cache(new_trial.id)
         return JsonResponse({"status": "retrying", "new_trial_id": new_trial.id})
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
@@ -832,7 +838,7 @@ def _get_llm_settings_from_request(request, data_source=None):
     
     base_url = data.get("llm_base_url") or db_settings.llm_base_url
     api_key = data.get("llm_api_key") or db_settings.llm_api_key
-    model = data.get("llm_model") or db_settings.llm_model or "gpt-3.5-turbo"
+    model = data.get("llm_model") or db_settings.llm_model 
     max_retries = int(data.get("max_retries", 3))
     
     return base_url, api_key, model, max_retries

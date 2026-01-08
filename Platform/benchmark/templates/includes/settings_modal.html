@@ -61,7 +61,7 @@
                             <div class="card-body bg-light rounded-3">
                                 <h6 class="text-primary fw-bold mb-3"><i class="bi bi-hdd-network me-2"></i>Connection Details</h6>
                                 <div class="row g-3">
-                                    <div class="col-md-6">
+                                    <div class="col-12">
                                         <label for="llm_base_url" class="form-label small text-muted fw-bold">Base URL</label>
                                         <div class="input-group input-group-sm">
                                             <span class="input-group-text bg-white"><i class="bi bi-link-45deg"></i></span>
@@ -73,6 +73,13 @@
                                         <div class="input-group input-group-sm">
                                             <span class="input-group-text bg-white"><i class="bi bi-box"></i></span>
                                             <input type="text" class="form-control" id="llm_model" placeholder="e.g., gpt-4o" value="{{ llm_settings.llm_model|safe }}">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="llm_judge_model" class="form-label small text-muted fw-bold">Judge Model <span class="badge bg-secondary bg-opacity-25 text-secondary ms-1" style="font-size: 0.65em;">LLM-as-Judge</span></label>
+                                        <div class="input-group input-group-sm">
+                                            <span class="input-group-text bg-white"><i class="bi bi-clipboard-check"></i></span>
+                                            <input type="text" class="form-control" id="llm_judge_model" placeholder="e.g., gpt-4o" value="{{ llm_settings.llm_judge_model|default:''|safe }}">
                                         </div>
                                     </div>
                                     <div class="col-12">

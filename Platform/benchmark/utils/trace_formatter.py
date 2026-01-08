@@ -104,15 +104,32 @@ def parse_react_content(content):
         lines = text_content.split('\n')
         for line in lines:
             stripped = line.strip()
-            # Detect headers (deprecated Thought:/Reasoning: removed - use <think> tags or think tool)
-            if stripped.startswith("Search Query:"):
+            stripped_lower = stripped.lower()
+            # Detect headers (case-insensitive)
+            if stripped_lower.startswith("search query:"):
                 flush_current()
-                current_type = "action"
-                current_lines.append(line)  # Keep header for Query
-            elif stripped.startswith("Final Answer:") or stripped.startswith("Answer:"):
+                current_type = "search_query"
+                # Strip the prefix (find colon position to handle any casing)
+                colon_idx = stripped.find(':')
+                query_content = stripped[colon_idx + 1:].strip() if colon_idx != -1 else stripped
+                if query_content:
+                    current_lines.append(query_content)
+            elif stripped_lower.startswith("final answer:"):
                 flush_current()
-                current_type = "text"  # Final answer is standard text
-                current_lines.append(line)
+                current_type = "final_answer"
+                # Strip the prefix (find colon position to handle any casing)
+                colon_idx = stripped.find(':')
+                answer_content = stripped[colon_idx + 1:].strip() if colon_idx != -1 else stripped
+                if answer_content:
+                    current_lines.append(answer_content)
+            elif stripped_lower.startswith("answer:"):
+                flush_current()
+                current_type = "final_answer"
+                # Strip the prefix (find colon position to handle any casing)
+                colon_idx = stripped.find(':')
+                answer_content = stripped[colon_idx + 1:].strip() if colon_idx != -1 else stripped
+                if answer_content:
+                    current_lines.append(answer_content)
             else:
                 current_lines.append(line)
 

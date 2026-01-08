@@ -44,6 +44,9 @@ class BenchmarkSettings(models.Model):
     llm_api_key = models.CharField(max_length=255, blank=True, help_text="Your API Key")
     max_retries = models.PositiveIntegerField(default=5, help_text="Maximum number of retries allowed for the LLM.")
     allow_reasoning = models.BooleanField(default=True, help_text="Allow the LLM to output its chain of thought reasoning before the final answer.")
+
+    # LLM Judge Settings (for LLM-as-a-judge evaluation)
+    llm_judge_model = models.CharField(max_length=100, blank=True, help_text="Model for LLM-as-a-judge. If empty, uses LLM_JUDGE_MODEL env or falls back to llm_model.")
     
     # LLM Advanced Parameters
     temperature = models.FloatField(default=0.0, help_text="Sampling temperature (0.0 to 2.0).")
@@ -89,6 +92,8 @@ class BenchmarkSettings(models.Model):
             settings.llm_model = config("LLM_MODEL", default="")
         if not settings.llm_base_url:
             settings.llm_base_url = config("LLM_BASE_URL", default="")
+        if not settings.llm_judge_model:
+            settings.llm_judge_model = config("LLM_JUDGE_MODEL", default="")
         if not settings.serper_api_key:
             settings.serper_api_key = config("SERPER_API_KEY", default="")
         return settings
@@ -100,6 +105,7 @@ class BenchmarkSettings(models.Model):
             llm_base_url=self.llm_base_url,
             llm_model=self.llm_model,
             llm_api_key=self.llm_api_key,
+            llm_judge_model=self.llm_judge_model,
             max_retries=self.max_retries,
             allow_reasoning=self.allow_reasoning,
             temperature=self.temperature,
@@ -118,6 +124,7 @@ class BenchmarkSettings(models.Model):
             "llm": {
                 "llm_base_url": self.llm_base_url,
                 "llm_model": self.llm_model,
+                "llm_judge_model": self.llm_judge_model,
                 "max_retries": self.max_retries,
                 "allow_reasoning": self.allow_reasoning,
                 "temperature": self.temperature,

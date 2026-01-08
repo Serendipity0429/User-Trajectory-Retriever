@@ -211,6 +211,7 @@ window.BenchmarkUtils.BenchmarkRenderer = {
                 sources: ['llm', 'llm_settings'],
                 fields: [
                     { key: 'llm_model', label: 'LLM Model', icon: 'bi-cpu' },
+                    { key: 'llm_judge_model', label: 'Judge Model', icon: 'bi-clipboard-check' },
                     { key: 'max_retries', label: 'Max Retries', icon: 'bi-arrow-repeat' },
                     { key: 'temperature', label: 'Temperature', icon: 'bi-thermometer-half' },
                     { key: 'top_p', label: 'Top P', icon: 'bi-percent' },

@@ -75,7 +75,7 @@ class Command(BaseCommand):
             base_url=config("LLM_BASE_URL", default=None),
             api_key=config("LLM_API_KEY", default=None),
         )
-        model = config("LLM_MODEL", default="gpt-3.5-turbo")
+        model = config("LLM_MODEL", default="gpt-4o")
 
         queue = asyncio.Queue()
         for i, q in enumerate(questions):

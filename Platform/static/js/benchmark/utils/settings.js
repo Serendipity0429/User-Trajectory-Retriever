@@ -25,40 +25,44 @@ window.BenchmarkSettings.testConnection = function(url, data, resultDivId, btnId
         .then(body => {
             resultDiv.innerHTML = `<span class="text-success small fw-semibold"><i class="bi bi-check-circle-fill me-1"></i>${body.message}</span>`;
 
-            // If models are returned, enable datalist for the input
+            // If models are returned, enable datalist for both model inputs
             if (body.models && Array.isArray(body.models) && body.models.length > 0) {
-                let modelInput = document.getElementById('llm_model');
-                if (modelInput) {
-                    // If it was previously converted to select (by old logic), revert to input
-                    if (modelInput.tagName === 'SELECT') {
-                        const input = document.createElement('input');
-                        input.type = 'text';
-                        input.id = modelInput.id;
-                        input.className = modelInput.className.replace('form-select', 'form-control');
-                        input.value = modelInput.value;
-                        modelInput.parentNode.replaceChild(input, modelInput);
-                        modelInput = input;
+                const modelInputIds = ['llm_model', 'llm_judge_model'];
+
+                modelInputIds.forEach(inputId => {
+                    let modelInput = document.getElementById(inputId);
+                    if (modelInput) {
+                        // If it was previously converted to select (by old logic), revert to input
+                        if (modelInput.tagName === 'SELECT') {
+                            const input = document.createElement('input');
+                            input.type = 'text';
+                            input.id = modelInput.id;
+                            input.className = modelInput.className.replace('form-select', 'form-control');
+                            input.value = modelInput.value;
+                            modelInput.parentNode.replaceChild(input, modelInput);
+                            modelInput = input;
+                        }
+
+                        const datalistId = `${inputId}_datalist`;
+                        let datalist = document.getElementById(datalistId);
+
+                        if (!datalist) {
+                            datalist = document.createElement('datalist');
+                            datalist.id = datalistId;
+                            modelInput.parentNode.appendChild(datalist);
+                            modelInput.setAttribute('list', datalistId);
+                        } else {
+                            datalist.innerHTML = '';
+                        }
+
+                        body.models.sort();
+                        body.models.forEach(modelName => {
+                            const option = document.createElement('option');
+                            option.value = modelName;
+                            datalist.appendChild(option);
+                        });
                     }
-
-                    const datalistId = 'llm_model_datalist';
-                    let datalist = document.getElementById(datalistId);
-
-                    if (!datalist) {
-                        datalist = document.createElement('datalist');
-                        datalist.id = datalistId;
-                        modelInput.parentNode.appendChild(datalist);
-                        modelInput.setAttribute('list', datalistId);
-                    } else {
-                        datalist.innerHTML = '';
-                    }
-
-                    body.models.sort();
-                    body.models.forEach(modelName => {
-                        const option = document.createElement('option');
-                        option.value = modelName;
-                        datalist.appendChild(option);
-                    });
-                }
+                });
             }
         })
         .catch(error => {
@@ -76,7 +80,7 @@ window.BenchmarkSettings.testConnection = function(url, data, resultDivId, btnId
  * List of settings field IDs for state tracking
  */
 window.BenchmarkSettings.SETTINGS_FIELDS = [
-    'llm_base_url', 'llm_api_key', 'llm_model', 'max_retries', 'allow_reasoning',
+    'llm_base_url', 'llm_api_key', 'llm_model', 'llm_judge_model', 'max_retries', 'allow_reasoning',
     'temperature', 'top_p', 'max_tokens',
     'search_provider', 'search_limit', 'serper_api_key', 'serper_fetch_full_content',
     'agent_memory_type'
@@ -148,6 +152,7 @@ window.BenchmarkSettings.restoreDefaults = function() {
                 'llm_base_url': 'llm_base_url',
                 'llm_api_key': 'llm_api_key',
                 'llm_model': 'llm_model',
+                'llm_judge_model': 'llm_judge_model',
                 'max_retries': 'max_retries',
                 'allow_reasoning': 'allow_reasoning',
                 'temperature': 'temperature',
@@ -335,6 +340,7 @@ window.BenchmarkSettings.setupConfigurationActionHandlers = function() {
                 llm_base_url: document.getElementById('llm_base_url').value,
                 llm_api_key: document.getElementById('llm_api_key').value,
                 llm_model: document.getElementById('llm_model').value,
+                llm_judge_model: document.getElementById('llm_judge_model') ? document.getElementById('llm_judge_model').value : '',
                 max_retries: document.getElementById('max_retries') ? document.getElementById('max_retries').value : 3,
                 allow_reasoning: document.getElementById('allow_reasoning') ? document.getElementById('allow_reasoning').checked : false,
                 temperature: document.getElementById('temperature') ? document.getElementById('temperature').value : 0.0,

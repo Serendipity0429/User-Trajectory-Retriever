@@ -43,3 +43,19 @@ class PipelinePrefix:
     VANILLA = "vanilla_llm_pipeline_active"
     RAG = "rag_pipeline_active"
     BROWSER_AGENT = "browser_agent_pipeline_active"
+
+
+def clear_trial_cache(trial_id: int) -> None:
+    """
+    Clear any stale Redis cache for a trial ID.
+
+    This should be called after creating a new trial to ensure no stale data
+    from a potentially reused trial ID (e.g., after database reset) is served.
+    """
+    from core.utils import redis_client
+    try:
+        redis_client.delete(RedisKeys.trial_trace(trial_id))
+        redis_client.delete(RedisKeys.trial_status(trial_id))
+    except Exception:
+        # Silently ignore Redis errors during cleanup
+        pass

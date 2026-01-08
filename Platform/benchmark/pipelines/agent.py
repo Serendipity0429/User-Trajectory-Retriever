@@ -7,8 +7,9 @@ from asgiref.sync import sync_to_async
 from agentscope.message import Msg
 from ..models import BenchmarkSettings, MultiTurnRun, MultiTurnSession, MultiTurnTrial
 from ..utils import (
-    print_debug, 
-    VanillaAgentFactory, BrowserAgentFactory
+    print_debug,
+    VanillaAgentFactory, BrowserAgentFactory,
+    clear_trial_cache
 )
 from ..utils.mcp_manager import MCPManager
 from .base import BaseAgentPipeline, REDIS_PREFIX_BROWSER_AGENT
@@ -75,11 +76,14 @@ class VanillaAgentPipeline(BaseAgentPipeline):
         )
 
     def create_trial(self, session, trial_number):
-        return MultiTurnTrial.objects.create(
+        trial = MultiTurnTrial.objects.create(
             session=session,
             trial_number=trial_number,
             status='processing'
         )
+        # Clear any stale Redis cache for this trial ID (prevents data leakage from reused IDs)
+        clear_trial_cache(trial.id)
+        return trial
 
     # Hooks for BaseAgentPipeline template
     async def _init_agent(self):
@@ -140,11 +144,14 @@ class BrowserAgentPipeline(BaseAgentPipeline):
         )
 
     def create_trial(self, session, trial_number):
-        return MultiTurnTrial.objects.create(
+        trial = MultiTurnTrial.objects.create(
             session=session,
             trial_number=trial_number,
             status='processing'
         )
+        # Clear any stale Redis cache for this trial ID (prevents data leakage from reused IDs)
+        clear_trial_cache(trial.id)
+        return trial
 
     async def cleanup(self):
         await self.mcp_manager.disconnect()

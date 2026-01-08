@@ -4,7 +4,7 @@ Consolidates all utility functions and classes for the benchmark app.
 """
 
 # Re-export from submodules for convenient imports
-from .redis import RedisKeys, PipelinePrefix
+from .redis import RedisKeys, PipelinePrefix, clear_trial_cache
 from .config import PipelineConfig
 from .trace_formatter import TraceFormatter, SimpleMsg
 from .prompts import PROMPTS
@@ -25,6 +25,7 @@ __all__ = [
     # Redis
     'RedisKeys',
     'PipelinePrefix',
+    'clear_trial_cache',
     # Config
     'PipelineConfig',
     # Trace

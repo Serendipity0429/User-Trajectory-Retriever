@@ -408,7 +408,7 @@ def check_answer_llm(question, authentic_answers, user_answer, client = None, mo
     if not client:
         base_url = config("LLM_BASE_URL", default=None)
         api_key = config("LLM_API_KEY", default=None)
-        model = config("LLM_MODEL", default="gpt-3.5-turbo")
+        model = config("LLM_JUDGE_MODEL", default="gpt-3.5-turbo")
 
         if not base_url or not api_key:
             raise ValueError(

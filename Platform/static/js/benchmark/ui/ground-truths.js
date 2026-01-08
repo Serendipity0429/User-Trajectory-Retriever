@@ -43,7 +43,7 @@ window.BenchmarkUI.GroundTruths = {
         const ul = gtElement.querySelector('.ground-truths-list');
         gtArray.forEach((gt, idx) => {
             const li = document.createElement('li');
-            li.className = 'list-group-item px-0 py-0 border-0 small text-dark';
+            li.className = 'px-0 py-0 my-1 border-0 small text-dark';
             li.innerHTML = `<i class="bi bi-check2 text-success me-2"></i><span class="fw-medium">${idx + 1}.</span> ${BenchmarkHelpers.escapeHtml(gt)}`;
             ul.appendChild(li);
         });

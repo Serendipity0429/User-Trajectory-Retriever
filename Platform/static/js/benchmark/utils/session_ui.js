@@ -181,8 +181,9 @@ window.BenchmarkSessionUI.addNewSessionToList = function(sessionListId, sessionI
  * @param {Array} results - Array of result objects.
  * @param {string} groupName - Name of the group/run.
  * @param {function} loadSessionCallback - Callback to load a session.
+ * @param {string} pipelineType - Pipeline type for filtering applicable metrics.
  */
-window.BenchmarkSessionUI.updateStatsUI = function(results, groupName, loadSessionCallback) {
+window.BenchmarkSessionUI.updateStatsUI = function(results, groupName, loadSessionCallback, pipelineType) {
     const statsBody = document.getElementById('stats-details-tbody');
     if (statsBody) {
         statsBody.innerHTML = '';
@@ -198,8 +199,8 @@ window.BenchmarkSessionUI.updateStatsUI = function(results, groupName, loadSessi
         return;
     }
 
-    // Call the backend metrics API
-    BenchmarkAPI.post(BenchmarkUrls.metrics.calculate, { results })
+    // Call the backend metrics API with pipeline_type
+    BenchmarkAPI.post(BenchmarkUrls.metrics.calculate, { results, pipeline_type: pipelineType })
         .then(response => {
             if (response.status !== 'ok') {
                 console.error('Metrics calculation failed:', response.message);
@@ -258,21 +259,21 @@ window.BenchmarkSessionUI._renderAllMetricsFromAPI = function(metrics, groups, s
         metricsByGroup[group].sort((a, b) => a.priority - b.priority);
     }
 
-    // Render each group
+    // Render each group as foldable details element
     for (const group of sortedGroups) {
         const groupMetrics = metricsByGroup[group.key];
         if (!groupMetrics || groupMetrics.length === 0) continue;
 
-        // Create group container
-        const groupDiv = document.createElement('div');
-        groupDiv.className = 'mb-4';
-        groupDiv.id = `metrics-group-${group.key}`;
+        // Create foldable group container
+        const details = document.createElement('details');
+        details.className = 'metrics-group-details';
+        details.id = `metrics-group-${group.key}`;
+        details.open = true; // Open by default
 
-        // Group header
-        const header = document.createElement('h6');
-        header.className = 'section-header';
-        header.textContent = group.label;
-        groupDiv.appendChild(header);
+        // Group header (clickable summary)
+        const summary = document.createElement('summary');
+        summary.textContent = group.label;
+        details.appendChild(summary);
 
         // Metrics row
         const metricsRow = document.createElement('div');
@@ -284,55 +285,17 @@ window.BenchmarkSessionUI._renderAllMetricsFromAPI = function(metrics, groups, s
             metricsRow.appendChild(card);
         }
 
-        groupDiv.appendChild(metricsRow);
-        container.appendChild(groupDiv);
+        details.appendChild(metricsRow);
+        container.appendChild(details);
     }
 };
 
 /**
- * Create a metric card element based on group and metric type
+ * Create a metric card element
  * @private
  */
 window.BenchmarkSessionUI._createMetricCardElement = function(metric, groupKey) {
-    // Special layout for outcome group (horizontal counts)
-    if (groupKey === 'outcome' && metric.format_type === 'count') {
-        return this._createOutcomeMetricCard(metric);
-    }
-
-    // Default card layout
     return BenchmarkUtils.createMetricCardWithColor(metric);
-};
-
-/**
- * Create outcome count metric card with appropriate styling
- * @private
- */
-window.BenchmarkSessionUI._createOutcomeMetricCard = function(metric) {
-    const col = document.createElement('div');
-    col.className = 'col-lg-3 col-md-4';
-
-    const color = metric.color || { border: '#6c757d', text: '#495057', bg: '#f8f9fa' };
-
-    // Map metric keys to icons
-    const icons = {
-        'correct_count': 'bi-check-circle',
-        'incorrect_count': 'bi-x-circle',
-        'error_count': 'bi-exclamation-triangle'
-    };
-    const icon = icons[metric.key] || 'bi-circle';
-
-    col.innerHTML = `
-        <div class="metric-card" style="border-top: 4px solid ${color.border};">
-            <div class="card-body text-center">
-                <div class="fw-bold fs-3" style="color: ${color.text};">${metric.formatted}</div>
-                <div class="small fw-medium" style="color: ${color.text};">
-                    <i class="bi ${icon} me-1"></i>${metric.label}
-                </div>
-                <div class="small text-muted">${metric.description}</div>
-            </div>
-        </div>
-    `;
-    return col;
 };
 
 /**

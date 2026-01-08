@@ -119,6 +119,18 @@ def get_metric_color(metric_name: str) -> Dict[str, str]:
 
 
 # ==========================================
+# Pipeline -> Metric Groups Mapping
+# ==========================================
+
+PIPELINE_METRIC_GROUPS: Dict[str, List[str]] = {
+    "vanilla_llm": ["core", "outcome", "efficiency", "behavioral"],
+    "rag": ["core", "outcome", "efficiency", "behavioral", "search"],
+    "vanilla_agent": ["core", "outcome", "efficiency", "behavioral", "search"],
+    "browser_agent": ["core", "outcome", "efficiency", "behavioral", "search"],
+}
+
+
+# ==========================================
 # Metric & Group Definitions
 # ==========================================
 
@@ -556,17 +568,24 @@ def calculate_query_diversity(results: List[Dict]) -> Optional[Dict[str, Any]]:
 # Aggregate Metrics Calculation
 # ==========================================
 
-def calculate_aggregate_metrics(results: List[Dict[str, Any]]) -> Dict[str, Any]:
+def calculate_aggregate_metrics(results: List[Dict[str, Any]], pipeline_type: str = None) -> Dict[str, Any]:
     """
     Calculate all aggregate metrics from a list of session results.
 
-    Returns metrics organized by groups with proper ordering.
+    Args:
+        results: List of session result dicts
+        pipeline_type: Pipeline type to filter applicable groups (vanilla_llm, rag, etc.)
+
+    Returns metrics organized by groups with proper ordering, filtered by pipeline_type.
     """
+    # Get applicable groups for this pipeline
+    applicable_groups = PIPELINE_METRIC_GROUPS.get(pipeline_type, list(METRIC_GROUPS.keys()))
+
     total = len(results)
     if total == 0:
         return {
             "metrics": {},
-            "groups": get_metric_groups(),
+            "groups": get_metric_groups(pipeline_type),
             "total": 0,
             "summary": {}
         }
@@ -574,67 +593,76 @@ def calculate_aggregate_metrics(results: List[Dict[str, Any]]) -> Dict[str, Any]
     metrics = {}
 
     # Core accuracy metrics
-    metrics["accuracy"] = calculate_accuracy(results)
-    metrics["rule_accuracy"] = calculate_rule_accuracy(results)
-    metrics["coherence"] = calculate_coherence(results)
+    if "core" in applicable_groups:
+        metrics["accuracy"] = calculate_accuracy(results)
+        metrics["rule_accuracy"] = calculate_rule_accuracy(results)
+        metrics["coherence"] = calculate_coherence(results)
 
-    # Count metrics
-    metrics["correct_count"] = calculate_correct_count(results)
-    metrics["incorrect_count"] = calculate_incorrect_count(results)
-    metrics["error_count"] = calculate_error_count(results)
+    # Outcome metrics
+    if "outcome" in applicable_groups:
+        metrics["correct_count"] = calculate_correct_count(results)
+        metrics["incorrect_count"] = calculate_incorrect_count(results)
+        metrics["error_count"] = calculate_error_count(results)
 
     # Efficiency metrics
-    metrics["avg_trials"] = calculate_avg_trials(results)
-    metrics["avg_success_trials"] = calculate_avg_success_trials(results)
+    if "efficiency" in applicable_groups:
+        metrics["avg_trials"] = calculate_avg_trials(results)
+        metrics["avg_success_trials"] = calculate_avg_success_trials(results)
 
     # Behavioral metrics
-    metrics["first_try_rate"] = calculate_first_try_rate(results)
-    metrics["recovery_rate"] = calculate_recovery_rate(results)
-    metrics["correction_gain"] = calculate_correction_gain(results)
-    metrics["give_up_rate"] = calculate_give_up_rate(results)
-    metrics["error_rate"] = calculate_error_rate(results)
+    if "behavioral" in applicable_groups:
+        metrics["first_try_rate"] = calculate_first_try_rate(results)
+        metrics["recovery_rate"] = calculate_recovery_rate(results)
+        metrics["correction_gain"] = calculate_correction_gain(results)
+        metrics["give_up_rate"] = calculate_give_up_rate(results)
+        metrics["error_rate"] = calculate_error_rate(results)
+        stubbornness = calculate_stubbornness(results)
+        if stubbornness:
+            metrics["stubbornness"] = stubbornness
 
-    # Conditional metrics
-    stubbornness = calculate_stubbornness(results)
-    if stubbornness:
-        metrics["stubbornness"] = stubbornness
-
-    search_count = calculate_search_count(results)
-    if search_count:
-        metrics["search_count"] = search_count
-
-    query_diversity = calculate_query_diversity(results)
-    if query_diversity:
-        metrics["query_diversity"] = query_diversity
+    # Search metrics (only for pipelines with search group)
+    if "search" in applicable_groups:
+        search_count = calculate_search_count(results)
+        if search_count:
+            metrics["search_count"] = search_count
+        query_diversity = calculate_query_diversity(results)
+        if query_diversity:
+            metrics["query_diversity"] = query_diversity
 
     # Build summary
     summary = {
         "total_sessions": total,
-        "correct": int(metrics["correct_count"]["value"]),
-        "incorrect": int(metrics["incorrect_count"]["value"]),
-        "error": int(metrics["error_count"]["value"]),
-        "has_search_metrics": search_count is not None,
-        "has_stubbornness": stubbornness is not None,
+        "correct": int(metrics.get("correct_count", {}).get("value", 0)),
+        "incorrect": int(metrics.get("incorrect_count", {}).get("value", 0)),
+        "error": int(metrics.get("error_count", {}).get("value", 0)),
     }
 
     return {
         "metrics": metrics,
-        "groups": get_metric_groups(),
-        "definitions": get_metric_definitions(),
+        "groups": get_metric_groups(pipeline_type),
+        "definitions": get_metric_definitions(pipeline_type),
         "total": total,
         "summary": summary
     }
 
 
-def get_metric_groups() -> List[Dict[str, Any]]:
-    """Get all metric groups sorted by priority."""
-    groups = [group.to_dict() for group in METRIC_GROUPS.values()]
+def get_metric_groups(pipeline_type: str = None) -> List[Dict[str, Any]]:
+    """Get metric groups sorted by priority, filtered by pipeline_type."""
+    applicable_keys = PIPELINE_METRIC_GROUPS.get(pipeline_type, list(METRIC_GROUPS.keys()))
+    groups = [
+        group.to_dict() for group in METRIC_GROUPS.values()
+        if group.key in applicable_keys
+    ]
     return sorted(groups, key=lambda g: g["priority"])
 
 
-def get_metric_definitions() -> Dict[str, Dict[str, Any]]:
-    """Get all metric definitions as dicts."""
-    return {key: defn.to_dict() for key, defn in METRIC_DEFINITIONS.items()}
+def get_metric_definitions(pipeline_type: str = None) -> Dict[str, Dict[str, Any]]:
+    """Get metric definitions as dicts, filtered by pipeline_type."""
+    applicable_groups = PIPELINE_METRIC_GROUPS.get(pipeline_type, list(METRIC_GROUPS.keys()))
+    return {
+        key: defn.to_dict() for key, defn in METRIC_DEFINITIONS.items()
+        if defn.group in applicable_groups
+    }
 
 
 def get_all_metric_colors() -> Dict[str, Dict[str, str]]:

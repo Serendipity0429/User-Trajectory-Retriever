@@ -94,9 +94,9 @@ window.BenchmarkUtils = {
         const color = metric.color || { border: '#6c757d', text: '#495057', bg: '#f8f9fa' };
 
         col.innerHTML = `
-            <div class="metric-card" style="border-top: 4px solid ${color.border};">
+            <div class="metric-card" style="border-top: 4px solid ${color.border}; background: ${color.bg};">
                 <div class="card-body">
-                    <div class="metric-label">${metric.label}</div>
+                    <div class="metric-label" style="color: ${color.text};">${metric.label}</div>
                     <div class="metric-value" style="color: ${color.text};">${metric.formatted}</div>
                     <div class="small text-muted">${metric.description}</div>
                 </div>

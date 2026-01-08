@@ -253,7 +253,7 @@ window.BenchmarkUtils.MultiTurnPage = (function() {
             BenchmarkSessionUI.updateStatsUI(data.results, data.group_name, (sid) => {
                 document.getElementById('session-container').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                 loadSession(sid, null, pipelineType);
-            });
+            }, pipelineType);
 
             const whitelist = ['llm_model', 'llm_base_url', 'max_retries', 'allow_reasoning', 'temperature', 'top_p', 'max_tokens'];
             if (pipelineType.includes('rag')) whitelist.push('search');
@@ -304,7 +304,7 @@ window.BenchmarkUtils.MultiTurnPage = (function() {
                         BenchmarkSessionUI.updateStatsUI(currentPipelineResults, data.group_name || "Current Run", (sid) => {
                             document.getElementById('session-container').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                             loadSession(sid, null, pipelineType);
-                        });
+                        }, pipelineType);
                         ui.statusDiv.textContent = `Resuming... Loaded ${preloadedCount} existing results.`;
                     }
                 })
@@ -362,7 +362,7 @@ window.BenchmarkUtils.MultiTurnPage = (function() {
                         BenchmarkSessionUI.updateStatsUI(currentPipelineResults, data.group_name || "Current Run", (sid) => {
                             document.getElementById('session-container').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                             loadSession(sid, null, pipelineType);
-                        });
+                        }, pipelineType);
                         BenchmarkSessionUI.addNewSessionToList('session-list', data.session_id, { question: data.question }, null, data.group_id, data.group_name, 'Finished', pipelineType);
                     }
                 }

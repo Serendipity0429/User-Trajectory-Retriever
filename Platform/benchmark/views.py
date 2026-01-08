@@ -161,15 +161,18 @@ def calculate_metrics(request):
 
     Accepts POST with JSON body containing:
     - results: List of result dicts (from _get_run_results or frontend)
+    - pipeline_type: Pipeline type to filter applicable metrics (vanilla_llm, rag, etc.)
 
     Returns:
     - metrics: Dict of all calculated metrics with values and colors
+    - groups: Applicable metric groups for the pipeline
     - total: Total number of sessions
     - summary: Quick summary stats
     """
     try:
         data = json.loads(request.body)
         results = data.get("results", [])
+        pipeline_type = data.get("pipeline_type")
 
         if not results:
             return JsonResponse({
@@ -177,7 +180,7 @@ def calculate_metrics(request):
                 "message": "No results provided"
             }, status=400)
 
-        metrics_data = calculate_aggregate_metrics(results)
+        metrics_data = calculate_aggregate_metrics(results, pipeline_type)
         return JsonResponse({
             "status": "ok",
             **metrics_data

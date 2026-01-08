@@ -108,11 +108,12 @@
 }
 
 .metric-label {
-    font-size: 0.75rem;
+    font-size: 0.9rem;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    color: #6c757d;
-    font-weight: 600;
+    color: #495057;
+    font-weight: 700;
+    margin-bottom: 0.35rem;
 }
 
 .metric-icon-bg {
@@ -146,14 +147,51 @@
 .section-header {
     display: flex;
     align-items: center;
-    font-size: 0.8rem;
+    font-size: 1rem;
     font-weight: 700;
-    color: #adb5bd;
+    color: #343a40;
     text-transform: uppercase;
     letter-spacing: 1px;
     margin-bottom: 1rem;
 }
 .section-header::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: #dee2e6;
+    margin-left: 1rem;
+}
+
+/* Foldable metric groups */
+.metrics-group-details {
+    margin-bottom: 1.5rem;
+}
+.metrics-group-details summary {
+    cursor: pointer;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    font-size: 1rem;
+    font-weight: 700;
+    color: #343a40;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 1rem;
+}
+.metrics-group-details summary::-webkit-details-marker {
+    display: none;
+}
+.metrics-group-details summary::before {
+    content: "\f282";
+    font-family: "bootstrap-icons";
+    margin-right: 0.5rem;
+    font-size: 0.8rem;
+    transition: transform 0.2s;
+}
+.metrics-group-details[open] summary::before {
+    transform: rotate(90deg);
+}
+.metrics-group-details summary::after {
     content: "";
     flex: 1;
     height: 1px;

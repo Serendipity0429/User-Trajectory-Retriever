@@ -1,6 +1,8 @@
 import json
 from core.utils import redis_client, print_debug
 from .models import MultiTurnTrial
+from .utils import RedisKeys
+
 
 class TrialService:
     @staticmethod
@@ -9,8 +11,8 @@ class TrialService:
         Retrieve the real-time execution trace data.
         Optimized: Checks Redis for completion status first to avoid DB I/O loop.
         """
-        trace_key = f"trial_trace:{trial_id}"
-        status_key = f"trial_status:{trial_id}"
+        trace_key = RedisKeys.trial_trace(trial_id)
+        status_key = RedisKeys.trial_status(trial_id)
         
         try:
             # 1. Try Fetching Cached Status from Redis (Fastest)

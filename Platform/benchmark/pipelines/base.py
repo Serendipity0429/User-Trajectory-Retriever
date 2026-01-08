@@ -1,28 +1,28 @@
 import json
 import os
 import openai
-import logging
 import asyncio
 import time
 from asgiref.sync import sync_to_async
 from datetime import datetime
-from concurrent import futures
 from task_manager.utils import redis_client, check_answer_rule, check_answer_llm
-from ..utils import print_debug, extract_final_answer, count_questions_in_file
+from ..utils import (
+    print_debug, extract_final_answer, count_questions_in_file,
+    TrialGuard, RedisKeys, PipelinePrefix,
+    TraceFormatter, SimpleMsg, PROMPTS
+)
 from ..models import (
-    BenchmarkSettings, BenchmarkDataset, 
+    BenchmarkSettings, BenchmarkDataset,
     MultiTurnRun, MultiTurnSession, MultiTurnTrial
 )
-from ..trace_formatter import TraceFormatter
-from ..utils import TrialGuard
-from ..prompts import PROMPTS
 from agentscope.message import Msg
 
 
-REDIS_PREFIX_ACTIVE = "pipeline_active"
-REDIS_PREFIX_MULTI_TURN = "multi_turn_pipeline_active"
-REDIS_PREFIX_VANILLA_MULTI_TURN = "vanilla_llm_pipeline_active"
-REDIS_PREFIX_BROWSER_AGENT = "browser_agent_pipeline_active"
+# Re-export for backward compatibility with other modules
+REDIS_PREFIX_ACTIVE = PipelinePrefix.ACTIVE
+REDIS_PREFIX_MULTI_TURN = PipelinePrefix.MULTI_TURN
+REDIS_PREFIX_VANILLA_MULTI_TURN = PipelinePrefix.VANILLA
+REDIS_PREFIX_BROWSER_AGENT = PipelinePrefix.BROWSER_AGENT
 
 HARD_QUESTIONS_PATH = os.path.join(os.path.dirname(__file__), '..', '..', 'data', 'hard_questions_refined.jsonl')
 
@@ -52,11 +52,11 @@ class BasePipeline:
     def check_active(self):
         if not self.pipeline_id:
             return True
-        return redis_client.get(f"{self.redis_prefix}:{self.pipeline_id}")
+        return redis_client.get(RedisKeys.pipeline_active(self.redis_prefix, self.pipeline_id))
 
     def stop_token(self):
         if self.pipeline_id:
-            redis_client.delete(f"{self.redis_prefix}:{self.pipeline_id}")
+            redis_client.delete(RedisKeys.pipeline_active(self.redis_prefix, self.pipeline_id))
 
     def get_questions_file_path(self):
         file_path = None
@@ -266,13 +266,13 @@ class BaseMultiTurnPipeline(BasePipeline):
             is_session_completed = False
             final_is_correct = False
             final_answer = ""
-            
+
             while trial_number <= self.max_retries and not is_session_completed:
                 if not self.check_active():
                     break
 
                 trial = self.create_trial(session, trial_number)
-                
+
                 yield {
                     'is_meta': True,
                     'type': 'trial_started',
@@ -283,14 +283,14 @@ class BaseMultiTurnPipeline(BasePipeline):
 
                 try:
                     # Delegate execution to run_single_turn
-                    # This method is overridden by subclasses (e.g. VanillaAgentPipeline) 
+                    # This method is overridden by subclasses (e.g. VanillaAgentPipeline)
                     # or used as-is (VanillaLLM, RAG)
                     parsed_answer, is_correct_llm, _ = self.run_single_turn(session, trial)
                 except Exception as e:
                     raise e
-                
+
                 # run_single_turn handles saving the trial
-                
+
                 yield {
                     'is_meta': True,
                     'type': 'trial_completed',
@@ -299,8 +299,7 @@ class BaseMultiTurnPipeline(BasePipeline):
                     'is_correct': is_correct_llm,
                     'is_correct_llm': is_correct_llm,
                     'is_correct_rule': trial.is_correct_rule,
-                    'answer': parsed_answer, 
-                    'full_response': trial.full_response, # Access stored full response
+                    'answer': parsed_answer,
                     'group_id': group.id
                 }
 
@@ -311,10 +310,10 @@ class BaseMultiTurnPipeline(BasePipeline):
                     is_session_completed = True
                 else:
                     trial_number += 1
-            
             session.is_completed = True
             session.save()
 
+            first_trial = session.trials.order_by('trial_number').first()
             yield {
                 'question': question_text,
                 'correct': final_is_correct,
@@ -327,8 +326,8 @@ class BaseMultiTurnPipeline(BasePipeline):
                 'max_retries': self.max_retries,
                 'group_name': group.name,
                 'group_id': group.id,
-                'initial_correct': session.trials.order_by('trial_number').first().is_correct_llm,
-                'initial_correct_rule': session.trials.order_by('trial_number').first().is_correct_rule,
+                'initial_correct': first_trial.is_correct_llm if first_trial else None,
+                'initial_correct_rule': first_trial.is_correct_rule if first_trial else None,
                 'coherence': (
                     sum(1 for t in session.trials.all() if t.is_correct_llm == t.is_correct_rule) / session.trials.count()
                     if session.trials.count() > 0 else 0
@@ -394,7 +393,7 @@ class BaseMultiTurnPipeline(BasePipeline):
                 
                 # Check for existing incomplete session
                 existing_session = incomplete_sessions.get(question_text)
-                
+
                 yield from self._process_single_session(group, question_text, ground_truths, existing_session)
         except Exception as e:
             yield {'error': str(e)}
@@ -426,14 +425,6 @@ class BaseMultiTurnPipeline(BasePipeline):
                 allow_reasoning = session.run.settings.allow_reasoning
             
             # Prepare trace components using TraceFormatter
-            class SimpleMsg:
-                def __init__(self, role, content):
-                    self.role = role
-                    self.content = content
-                    self.name = None
-                def to_dict(self):
-                    return {"role": self.role, "content": self.content}
-
             static_trace_msgs = []
             if messages:
                 if messages[0].get('role') == 'system':
@@ -443,7 +434,7 @@ class BaseMultiTurnPipeline(BasePipeline):
             def update_redis_trace(current_full_response):
                 temp_trace_msgs = static_trace_msgs + [SimpleMsg("assistant", current_full_response)]
                 trace_data, _ = TraceFormatter.serialize(temp_trace_msgs)
-                redis_client.set(f"trial_trace:{trial.id}", json.dumps(trace_data), ex=3600)
+                redis_client.set(RedisKeys.trial_trace(trial.id), json.dumps(trace_data), ex=RedisKeys.DEFAULT_TTL)
 
             full_response = ""
             # 1. Stream the response and update Redis periodically
@@ -467,40 +458,37 @@ class BaseMultiTurnPipeline(BasePipeline):
             is_correct_llm = check_answer_llm(session.question, session.ground_truths, answer, client=self.client, model=self.model)
             is_correct_rule = check_answer_rule(session.question, session.ground_truths, answer)
 
-            # Final Trace
-            trace, _ = TraceFormatter.serialize(static_trace_msgs + [SimpleMsg("assistant", full_response)])
+            # Store raw messages (authentic LLM context) - trace is parsed on-demand
+            final_messages = messages + [{"role": "assistant", "content": full_response}]
 
             trial.answer = answer
-            trial.full_response = full_response
             trial.is_correct_llm = is_correct_llm
             trial.is_correct_rule = is_correct_rule
             trial.feedback = "Correct" if is_correct_llm else "Incorrect"
-            
+
             trial.log = trial.log or {}
-            trial.log['trace'] = trace
+            trial.log['messages'] = final_messages
             trial.status = 'completed'
             trial.save()
-            
-            # Cache completion status in Redis for efficient polling
+
+            # Cache completion status in Redis for efficient polling (parse trace for UI)
             try:
+                trace, _ = TraceFormatter.serialize([SimpleMsg(m["role"], m["content"]) for m in final_messages])
                 status_data = {
                     "id": trial.id,
                     "status": "completed",
                     "answer": trial.answer,
                     "feedback": trial.feedback,
-                    "is_correct": trial.is_correct_llm,
                     "is_correct_llm": trial.is_correct_llm,
                     "is_correct_rule": trial.is_correct_rule,
-                    "full_response": trial.full_response,
-                    "trace": trace
                 }
-                redis_client.set(f"trial_status:{trial.id}", json.dumps(status_data), ex=3600)
-                redis_client.set(f"trial_trace:{trial.id}", json.dumps(trace), ex=3600)
+                redis_client.set(RedisKeys.trial_status(trial.id), json.dumps(status_data), ex=RedisKeys.DEFAULT_TTL)
+                redis_client.set(RedisKeys.trial_trace(trial.id), json.dumps(trace), ex=RedisKeys.DEFAULT_TTL)
             except Exception as e:
                 print_debug(f"Failed to cache trial status/trace: {e}")
             
             return answer, is_correct_llm, []
-from agentscope.message import Msg
+
 
 class BaseAgentPipeline(BaseMultiTurnPipeline):
     """
@@ -513,27 +501,27 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
 
     async def _populate_agent_memory(self, session, agent):
         """
-        Reconstructs the agent's internal state from database traces of previous trials.
-        
-        This is critical for 'Long-Term Coherence': it ensures that if a session is 
-        interrupted and resumed, the LLM still 'remembers' its previous attempts and 
+        Reconstructs the agent's internal state from database messages of previous trials.
+
+        This is critical for 'Long-Term Coherence': it ensures that if a session is
+        interrupted and resumed, the LLM still 'remembers' its previous attempts and
         can reflect on its failures as if the conversation never broke.
         """
         completed_trials = await sync_to_async(lambda: list(session.trials.filter(
             status='completed'
         ).order_by('trial_number')))()
-        
+
         for t in completed_trials:
-            trace = t.log.get('trace', [])
-            for step in trace:
-                if step.get('role') == 'system':
+            messages = t.log.get('messages', [])
+            for msg_dict in messages:
+                if msg_dict.get('role') == 'system':
                     continue
-                
-                # We rebuild the Msg objects to satisfy AgentScope's memory format.
+
+                # Rebuild Msg objects from stored dict representation
                 msg = Msg(
-                    name=step.get('name'), 
-                    role=step.get('role'), 
-                    content=step.get('content')
+                    name=msg_dict.get('name'),
+                    role=msg_dict.get('role'),
+                    content=msg_dict.get('content')
                 )
                 await agent.memory.add(msg)
 
@@ -600,7 +588,7 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
                     'is_meta': True, 'type': 'trial_completed', 'session_id': session.id,
                     'trial_number': trial_number, 'is_correct': is_correct_llm,
                     'is_correct_llm': is_correct_llm, 'is_correct_rule': trial.is_correct_rule,
-                    'answer': parsed_answer, 'full_response': trial.full_response, 'group_id': group.id
+                    'answer': parsed_answer, 'group_id': group.id
                 }
 
                 final_answer = parsed_answer
@@ -611,6 +599,7 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
             session.is_completed = True
             await sync_to_async(session.save)()
 
+            first_trial = await sync_to_async(lambda: session.trials.order_by('trial_number').first())()
             yield {
                 'question': question_text, 'correct': final_is_correct,
                 'is_correct_llm': final_is_correct, 'is_correct_rule': trial.is_correct_rule,
@@ -618,8 +607,8 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
                 'session_id': session.id, 'final_answer': final_answer,
                 'ground_truths': ground_truths, 'max_retries': self.max_retries,
                 'group_name': group.name, 'group_id': group.id,
-                'initial_correct': (await sync_to_async(lambda: session.trials.order_by('trial_number').first())()).is_correct_llm,
-                'initial_correct_rule': (await sync_to_async(lambda: session.trials.order_by('trial_number').first())()).is_correct_rule,
+                'initial_correct': first_trial.is_correct_llm if first_trial else None,
+                'initial_correct_rule': first_trial.is_correct_rule if first_trial else None,
                 'coherence': await sync_to_async(lambda: (
                     sum(1 for t in session.trials.all() if t.is_correct_llm == t.is_correct_rule) / session.trials.count()
                     if session.trials.count() > 0 else 0
@@ -729,27 +718,27 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
             try:
                 # 2. Execute Agent (delegated hook)
                 response_msg = await self._execute_agent(current_msg)
-                
+
                 # 3. Process Response
                 trace_msgs = await self.active_agent.memory.get_memory()
                 answer = self._parse_answer(response_msg)
 
-                # Slice trace to only save the 'delta' for the current trial.
+                # Slice to only save the 'delta' for the current trial
                 relevant_trace_msgs = trace_msgs[turn_start_index:] if len(trace_msgs) > turn_start_index else []
+
+                # Parse trace for UI rendering and answer extraction
                 trace_data, real_answer_found = self._serialize_trace(relevant_trace_msgs)
                 if real_answer_found: answer = real_answer_found
-                
-                # Ensure the system prompt is always recorded at the top of the trial trace.
+
+                # Ensure system prompt is at top of trace
                 if not trace_data or trace_data[0].get('role') != 'system':
                     system_prompt_step = {"role": "system", "content": PROMPTS[self._get_system_prompt_key()], "step_type": "text"}
                     trace_data = [system_prompt_step] + trace_data
-                
-                full_response = json.dumps(trace_data)
-                if not trace_data:
-                     full_response = json.dumps([{"role": "assistant", "name": "Agent Debug", "content": answer}])
 
-                # 4. Save
-                answer, is_correct_llm = await sync_to_async(self.save_trial_result)(session, trial, answer, full_response, trace_data)
+                # 4. Save - pass raw messages and parsed trace
+                answer, is_correct_llm = await sync_to_async(self.save_trial_result)(
+                    session, trial, answer, relevant_trace_msgs, trace_data
+                )
             finally:
                 # Avoid side-effects after trial finishes.
                 if hasattr(self, 'active_agent') and self.active_agent:
@@ -789,52 +778,54 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
             if not trace_data or trace_data[0].get('role') != 'system':
                 system_prompt_step = {"role": "system", "content": PROMPTS[system_prompt_key], "step_type": "text"}
                 trace_data = [system_prompt_step] + trace_data
-            key = f"trial_trace:{trial.id}"
-            await asyncio.to_thread(redis_client.set, key, json.dumps(trace_data), ex=3600)
+            key = RedisKeys.trial_trace(trial.id)
+            await asyncio.to_thread(redis_client.set, key, json.dumps(trace_data), RedisKeys.DEFAULT_TTL)
         except Exception as e: print_debug(f"Trace update failed: {e}")
 
-    def save_trial_result(self, session, trial, answer, full_response, trace_data):
+    def save_trial_result(self, session, trial, answer, messages, trace_data):
         """
         Saves the trial result to DB and caches status in Redis.
+        Args:
+            messages: Raw Msg objects (list) - the authentic agent context
+            trace_data: Parsed trace for UI rendering
         Returns: (answer, is_correct_llm)
         """
         is_correct_llm = check_answer_llm(session.question, session.ground_truths, answer, client=self.client, model=self.model)
         is_correct_rule = check_answer_rule(session.question, session.ground_truths, answer)
 
         trial.answer = answer
-        trial.full_response = full_response
         trial.is_correct_llm = is_correct_llm
         trial.is_correct_rule = is_correct_rule
         trial.feedback = "Correct" if is_correct_llm else "Incorrect"
-        
+
+        # Store raw messages (authentic agent context)
         trial.log = trial.log or {}
-        trial.log['trace'] = trace_data
-        
-        # Calculate query metrics
+        trial.log['messages'] = [m.to_dict() if hasattr(m, 'to_dict') else m for m in messages]
+
+        # Calculate query metrics from trace
         query_metrics = self._calculate_query_metrics(trace_data)
         trial.log.update(query_metrics)
-        
+
         trial.status = 'completed'
         trial.save()
 
-        # Cache completion status in Redis
+        # Cache completion status in Redis (with trace for live UI)
         try:
             status_data = {
                 "id": trial.id,
                 "status": "completed",
                 "answer": trial.answer,
                 "feedback": trial.feedback,
-                "is_correct": trial.is_correct_llm,
                 "is_correct_llm": trial.is_correct_llm,
                 "is_correct_rule": trial.is_correct_rule,
-                "full_response": trial.full_response,
-                "trace": trace_data,
                 "query_metrics": query_metrics
             }
-            redis_client.set(f"trial_status:{trial.id}", json.dumps(status_data), ex=3600)
+            redis_client.set(RedisKeys.trial_status(trial.id), json.dumps(status_data), ex=RedisKeys.DEFAULT_TTL)
+            # Cache trace separately for live UI rendering
+            redis_client.set(RedisKeys.trial_trace(trial.id), json.dumps(trace_data), ex=RedisKeys.DEFAULT_TTL)
         except Exception as e:
             print_debug(f"Failed to cache agent trial status: {e}")
-            
+
         return answer, is_correct_llm
 
     def _calculate_query_metrics(self, trace_data):
@@ -856,7 +847,7 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
                                 args = action.get('input') or action.get('function', {}).get('arguments')
                                 if isinstance(args, str):
                                     try: args = json.loads(args)
-                                    except: pass
+                                    except (json.JSONDecodeError, ValueError): pass
                                 if isinstance(args, dict) and 'query' in args:
                                     queries.append(args['query'])
                     elif isinstance(actions, dict):
@@ -866,10 +857,10 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
                                 args = actions.get('input') or actions.get('function', {}).get('arguments')
                                 if isinstance(args, str):
                                     try: args = json.loads(args)
-                                    except: pass
+                                    except (json.JSONDecodeError, ValueError): pass
                                 if isinstance(args, dict) and 'query' in args:
                                     queries.append(args['query'])
-                except:
+                except (json.JSONDecodeError, ValueError, TypeError):
                     continue
         
         metrics = {

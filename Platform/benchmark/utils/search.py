@@ -9,7 +9,7 @@ from bs4 import BeautifulSoup
 import re
 import random
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from .utils import print_debug
+from core.utils import print_debug
 
 def remove_null_bytes(data):
     """
@@ -70,8 +70,7 @@ class MCPClient:
         if not self._process or not self._process.stderr:
             return
         for line in iter(self._process.stderr.readline, b''):
-            pass
-            # print_debug(f"[MCP-SERVER-STDERR] {line.decode('utf-8').strip()}")
+            pass  # Consume stderr to prevent buffer blocking
 
     def _send_request(self, method, params=None):
         """Builds and sends a JSON-RPC request."""
@@ -90,9 +89,6 @@ class MCPClient:
             self._next_id += 1
             body_str = json.dumps(request)
             full_message = (body_str + '\n').encode('utf-8')
-            
-            # print_debug(f"[PY-CLIENT-SEND] {body_str}")
-
             self._process.stdin.write(full_message)
             self._process.stdin.flush()
 
@@ -112,8 +108,6 @@ class MCPClient:
             if not line_str:
                 continue
 
-            # print_debug(f"[PY-CLIENT-RECV] {line_str}")
-            
             try:
                 return json.loads(line_str)
             except json.JSONDecodeError:
@@ -593,7 +587,7 @@ class SerperSearch(WebSearch):
 
 # For easy swapping of search implementations
 def get_search_engine(fetch_full_content=None) -> WebSearch:
-    from .models import BenchmarkSettings
+    from ..models import BenchmarkSettings
     settings = BenchmarkSettings.load()
     limit = getattr(settings, 'search_limit', 5)
     

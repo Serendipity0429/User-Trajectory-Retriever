@@ -42,7 +42,6 @@ def pipeline_badge(pipeline_type):
         'label': pipeline_type
     })
     
-    # Modern, subtle style: Transparent background with colored text and border
     html = f"""
     <span class="d-inline-flex align-items-center {style['color']} bg-white border border-{style['color'].replace('text-', '')} border-opacity-25 rounded px-2 py-0 ms-1 shadow-sm" style="font-size: 0.75em; height: 20px;">
         <i class="bi {style['icon']} me-1"></i>

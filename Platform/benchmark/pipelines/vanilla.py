@@ -1,6 +1,6 @@
 from datetime import datetime
 from task_manager.utils import check_answer_rule, check_answer_llm
-from ..prompts import PROMPTS
+from ..utils import PROMPTS
 from ..models import MultiTurnSession, MultiTurnTrial
 from .base import (
     BaseMultiTurnPipeline, 
@@ -47,10 +47,18 @@ class VanillaLLMMultiTurnPipeline(BaseMultiTurnPipeline):
         messages.append({"role": "system", "content": sys_prompt})
         messages.append({"role": "user", "content": initial_user_prompt})
 
-        # 2. History
+        # 2. History - get assistant response from stored messages
         for i, past_trial in enumerate(completed_trials):
-            if past_trial.full_response:
-                messages.append({"role": "assistant", "content": past_trial.full_response})
+            past_log = past_trial.log or {}
+            past_messages = past_log.get('messages', [])
+            # Find the assistant's response from stored messages
+            assistant_response = None
+            for m in reversed(past_messages):
+                if m.get('role') == 'assistant':
+                    assistant_response = m.get('content')
+                    break
+            if assistant_response:
+                messages.append({"role": "assistant", "content": assistant_response})
             elif past_trial.answer:
                 messages.append({"role": "assistant", "content": past_trial.answer})
             # Only add the generic feedback if this is NOT the last completed trial.

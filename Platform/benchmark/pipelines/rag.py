@@ -1,20 +1,21 @@
 from datetime import datetime
 import json
 from task_manager.utils import check_answer_rule, check_answer_llm, redis_client
-from ..search_utils import get_search_engine
-from ..prompts import PROMPTS
+from ..utils import (
+    get_search_engine, print_debug, extract_final_answer,
+    RedisKeys, PipelinePrefix, TraceFormatter, SimpleMsg, PROMPTS
+)
 from ..models import (
     BenchmarkSettings, MultiTurnSession, MultiTurnTrial
 )
-from ..utils import print_debug, extract_final_answer
-from ..trace_formatter import TraceFormatter
 from .base import BaseMultiTurnPipeline
+
 
 class RagMultiTurnPipeline(BaseMultiTurnPipeline):
     def __init__(self, base_url, api_key, model, max_retries, pipeline_id=None, dataset_id=None, group_id=None):
         super().__init__(base_url, api_key, model, max_retries, pipeline_id, dataset_id, group_id)
         self.search_engine = get_search_engine()
-        self.redis_prefix = "rag_pipeline_active"
+        self.redis_prefix = PipelinePrefix.RAG
 
     def __str__(self):
         return "RAG Multi-Turn Pipeline"
@@ -46,7 +47,7 @@ class RagMultiTurnPipeline(BaseMultiTurnPipeline):
         )
 
     def _get_history_key(self, session_id):
-        return f"{self.redis_prefix}:history:{session_id}"
+        return RedisKeys.session_history(self.redis_prefix, session_id)
 
     def _construct_messages(self, session, trial, completed_trials=None):
         """
@@ -79,7 +80,7 @@ class RagMultiTurnPipeline(BaseMultiTurnPipeline):
             
             # Add the query generation "exchange"
             final_messages.append({"role": "user", "content": instruction})
-            final_messages.append({"role": "assistant", "content": f"Search Query: {search_query}"})
+            final_messages.append({"role": "assistant", "content": f"Query: {search_query}"})
             
             # Add the result providing "exchange"
             final_instr = "Search Results:\n" + PROMPTS["rag_context_wrapper"].format(formatted_results=formatted_results)
@@ -118,7 +119,7 @@ class RagMultiTurnPipeline(BaseMultiTurnPipeline):
             
             # 2. Assistant's Query
             messages.append({"role": "user", "content": instruction})
-            messages.append({"role": "assistant", "content": f"Search Query: {search_query}"})
+            messages.append({"role": "assistant", "content": f"Query: {search_query}"})
             
             # 3. Search Results and Answer Instruction
             formatted_results = self.search_engine.format_results(search_results)
@@ -126,9 +127,15 @@ class RagMultiTurnPipeline(BaseMultiTurnPipeline):
             final_instr += PROMPTS["shared_reasoning_format" if allow_reasoning else "shared_answer_request"]
             
             messages.append({"role": "user", "content": final_instr})
-            
-            # 4. Assistant's Answer
-            messages.append({"role": "assistant", "content": past_trial.full_response or past_trial.answer})
+
+            # 4. Assistant's Answer - get from stored messages
+            past_messages = past_log.get('messages', [])
+            assistant_response = None
+            for m in reversed(past_messages):
+                if m.get('role') == 'assistant':
+                    assistant_response = m.get('content')
+                    break
+            messages.append({"role": "assistant", "content": assistant_response or past_trial.answer})
             
         return messages
 
@@ -144,17 +151,9 @@ class RagMultiTurnPipeline(BaseMultiTurnPipeline):
             trial.log = trial.log or {}
 
             # Prepare trace using TraceFormatter
-            class SimpleMsg:
-                def __init__(self, role, content):
-                    self.role = role
-                    self.content = content
-                    self.name = None
-                def to_dict(self):
-                    return {"role": self.role, "content": self.content}
-
             def update_redis_trace(messages_to_serialize):
                 trace_data, _ = TraceFormatter.serialize(messages_to_serialize)
-                redis_client.set(f"trial_trace:{trial.id}", json.dumps(trace_data), ex=3600)
+                redis_client.set(RedisKeys.trial_trace(trial.id), json.dumps(trace_data), ex=RedisKeys.DEFAULT_TTL)
 
             # 1. Query Reformulation / Generation
             if trial.trial_number == 1:
@@ -258,33 +257,32 @@ class RagMultiTurnPipeline(BaseMultiTurnPipeline):
                 answer = full_response
             
             # 3. Finalize
-            trace, _ = TraceFormatter.serialize(current_turn_static_msgs + [SimpleMsg("assistant", full_response)])
-            
             is_correct_llm = check_answer_llm(session.question, session.ground_truths, answer, client=self.client, model=self.model)
             is_correct_rule = check_answer_rule(session.question, session.ground_truths, answer)
-            
+
+            # Store raw messages (authentic LLM context) - trace is parsed on-demand
+            final_messages = messages + [{"role": "assistant", "content": full_response}]
+
             trial.answer = answer
-            trial.full_response = full_response
             trial.is_correct_llm = is_correct_llm
             trial.is_correct_rule = is_correct_rule
             trial.feedback = "Correct" if is_correct_llm else "Incorrect"
             trial.status = 'completed'
-            trial.log["trace"] = trace
+            trial.log["messages"] = final_messages
             trial.save()
 
             # 4. Update Persistence Cache
-            new_history = messages + [{"role": "assistant", "content": full_response or answer}]
-            redis_client.set(history_key, json.dumps(new_history), ex=3600)
+            redis_client.set(history_key, json.dumps(final_messages), ex=RedisKeys.DEFAULT_TTL)
 
-            # 5. Cache for UI
+            # 5. Cache for UI (parse trace for real-time display)
             try:
+                trace, _ = TraceFormatter.serialize([SimpleMsg(m["role"], m["content"]) for m in final_messages])
                 status_data = {
                     "id": trial.id, "status": "completed", "answer": answer, "feedback": trial.feedback,
                     "is_correct_llm": is_correct_llm, "is_correct_rule": is_correct_rule,
-                    "full_response": full_response, "trace": trace
                 }
-                redis_client.set(f"trial_status:{trial.id}", json.dumps(status_data), ex=3600)
-                redis_client.set(f"trial_trace:{trial.id}", json.dumps(trace), ex=3600)
+                redis_client.set(RedisKeys.trial_status(trial.id), json.dumps(status_data), ex=RedisKeys.DEFAULT_TTL)
+                redis_client.set(RedisKeys.trial_trace(trial.id), json.dumps(trace), ex=RedisKeys.DEFAULT_TTL)
             except Exception as e:
                 print_debug(f"Failed to cache RAG trace: {e}")
 

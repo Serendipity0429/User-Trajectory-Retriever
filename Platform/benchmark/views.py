@@ -1,7 +1,6 @@
 from django.db import models
 from django.views.decorators.http import require_POST, require_http_methods
-from asgiref.sync import async_to_sync, sync_to_async
-import re
+from asgiref.sync import sync_to_async
 import csv
 import asyncio
 from django.shortcuts import render, get_object_or_404
@@ -10,14 +9,18 @@ import openai
 from decouple import config
 import os
 import json
+import tempfile
 from user_system.decorators import admin_required
 from django.db import OperationalError
-from core.utils import print_debug, print_json_debug, redis_client
+from core.utils import print_debug, redis_client
 
 import httpx
 from task_manager.utils import check_answer_rule, check_answer_llm
-from .search_utils import get_search_engine
-from .utils import count_questions_in_file, handle_api_error, handle_async_api_error, print_debug
+from .utils import (
+    get_search_engine, count_questions_in_file,
+    handle_api_error, handle_async_api_error,
+    print_debug, RedisKeys, PipelinePrefix
+)
 from .models import (
     BenchmarkSettings,
     MultiTurnRun,
@@ -49,7 +52,7 @@ from .pipelines.agent import (
 )
 from .pipeline_manager import PipelineManager
 from .services import TrialService
-from benchmark.prompts import PROMPTS
+from benchmark.utils import PROMPTS
 
 PIPELINE_CLASS_MAP = {
     'vanilla_llm': VanillaLLMMultiTurnPipeline,
@@ -99,8 +102,8 @@ def _calculate_query_metrics(trial_list, is_rag=False, is_agent=False):
             if not q:
                 # Try to extract from trace
                 for msg in t_log.get("trace", []):
-                     if msg.get("role") == "assistant" and "Search Query:" in msg.get("content", ""):
-                        q = msg.get("content").replace("Search Query:", "").strip()
+                     if msg.get("role") == "assistant" and "Query:" in msg.get("content", ""):
+                        q = msg.get("content").replace("Query:", "").strip()
                         break
             if q:
                 all_queries.append(q)
@@ -405,17 +408,20 @@ def dataset_upload(request):
     if form.is_valid():
         dataset = form.save(commit=False)
         try:
-            # Count questions from the uploaded file
+            # Count questions from the uploaded file using secure temp file
             file = request.FILES['file']
-            temp_path = os.path.join('/tmp', file.name)
-            with open(temp_path, 'wb+') as destination:
+            # Use NamedTemporaryFile for secure handling (avoids path traversal)
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.jsonl') as temp_file:
                 for chunk in file.chunks():
-                    destination.write(chunk)
-            
-            dataset.question_count = count_questions_in_file(temp_path)
-            os.remove(temp_path)
-            
-            file.seek(0) 
+                    temp_file.write(chunk)
+                temp_path = temp_file.name
+
+            try:
+                dataset.question_count = count_questions_in_file(temp_path)
+            finally:
+                os.unlink(temp_path)  # Always clean up temp file
+
+            file.seek(0)
         except Exception as e:
             print_debug(f"Error counting questions: {e}")
             dataset.question_count = 0
@@ -631,8 +637,8 @@ def stop_session(request):
         processing_trials = session.trials.filter(status='processing')
         
         for trial in processing_trials:
-            redis_client.delete(f"trial_status:{trial.id}")
-            redis_client.delete(f"trial_trace:{trial.id}")
+            redis_client.delete(RedisKeys.trial_status(trial.id))
+            redis_client.delete(RedisKeys.trial_trace(trial.id))
         
         processing_trials.update(status='error', feedback='Session stopped by user.')
         PipelineManager.get_instance().close_session(session_id)
@@ -740,8 +746,8 @@ def _run_pipeline_generic(request, pipeline_class, redis_prefix_template, **kwar
             prefix = redis_prefix_template.format(**kwargs)
         except KeyError:
             prefix = redis_prefix_template
-        redis_key = f"{prefix}:{pipeline_id}"
-        redis_client.set(redis_key, "1", ex=3600)
+        redis_key = RedisKeys.pipeline_active(prefix, pipeline_id)
+        redis_client.set(redis_key, "1", ex=RedisKeys.DEFAULT_TTL)
 
     constructor_args = {
         "base_url": base_url, "api_key": api_key, "model": model,
@@ -758,7 +764,7 @@ def _stop_pipeline_generic(request, redis_prefix_template):
     data = json.loads(request.body)
     pipeline_id = data.get("pipeline_id")
     if pipeline_id:
-        redis_client.delete(f"{redis_prefix_template}:{pipeline_id}")
+        redis_client.delete(RedisKeys.pipeline_active(redis_prefix_template, pipeline_id))
     return JsonResponse({"status": "ok"})
 
 @admin_required
@@ -821,7 +827,7 @@ def _run_pipeline_generic_async_wrapper(request, pipeline_class, redis_prefix_te
     if not api_key:
         return JsonResponse({"error": "An API Key is required to run the benchmark."}, status=400)
     if pipeline_id:
-        redis_client.set(f"{redis_prefix_template}:{pipeline_id}", "1", ex=3600)
+        redis_client.set(RedisKeys.pipeline_active(redis_prefix_template, pipeline_id), "1", ex=RedisKeys.DEFAULT_TTL)
 
     async def pipeline_lifecycle_wrapper():
         try:
@@ -858,22 +864,30 @@ def get_session(request, session_id):
 
     trials_qs = session.trials.values(
         "id", "trial_number", "answer", "feedback", "is_correct_llm", "is_correct_rule",
-        "created_at", "status", "full_response", "log"
+        "created_at", "status", "log"
     )
     trials = list(trials_qs)
-    
+
     for t in trials:
-        t['is_correct'] = t['is_correct_llm']
-        log = t.get("log") or {}
-        t["trace"] = log.get("trace", [])
-        if 'rag' in pipeline_type:
-            t["search_results"] = log.get("search_results", [])
-            q = None
-            for msg in t["trace"]:
-                if msg.get("role") == "assistant" and "Search Query:" in msg.get("content", ""):
-                    q = msg.get("content").replace("Search Query:", "").strip()
-                    break
-            t["search_query"] = q or log.get("search_query")
+        log = t.pop("log", {}) or {}
+        messages = log.get("messages", [])
+
+        # Parse trace on-demand for UI rendering
+        if messages:
+            from .utils import TraceFormatter, SimpleMsg
+            # Handle both simple dicts and complex agent Msg dicts
+            trace_msgs = []
+            for m in messages:
+                role = m.get("role", "assistant")
+                content = m.get("content", "")
+                trace_msgs.append(SimpleMsg(role, content))
+            t["trace"], _ = TraceFormatter.serialize(trace_msgs)
+        else:
+            t["trace"] = []
+
+        # Always include search data (may be empty for non-RAG pipelines)
+        t["search_results"] = log.get("search_results", [])
+        t["search_query"] = log.get("search_query")
 
     return JsonResponse({
         "session": {
@@ -949,15 +963,17 @@ def export_session(request, session_id):
     max_retries = settings.max_retries
 
     trials = list(session.trials.values(
-        "trial_number", "answer", "feedback", "is_correct_llm", "is_correct_rule", 
-        "created_at", "full_response", "log"
+        "trial_number", "answer", "feedback", "is_correct_llm", "is_correct_rule",
+        "created_at", "log"
     ))
 
     for trial in trials:
-        trial["is_correct"] = trial["is_correct_llm"]
         if trial.get("created_at"): trial["created_at"] = trial["created_at"].isoformat()
-        log = trial.get("log") or {}
-        trial["trace"], trial["search_results"] = log.get("trace", []), log.get("search_results", [])
+        log = trial.pop("log", {}) or {}
+
+        # Export raw messages only (authentic LLM/agent context)
+        trial["messages"] = log.get("messages", [])
+        trial["search_results"] = log.get("search_results", [])
         trial["search_query"] = log.get("search_query")
 
     export_format = request.GET.get("format", "json")
@@ -1005,15 +1021,17 @@ def export_run(request, group_id):
         sessions_data = []
         for session in sessions:
             trials = list(session.trials.values(
-                "trial_number", "answer", "feedback", "is_correct_llm", "is_correct_rule", 
-                "created_at", "full_response", "log"
+                "trial_number", "answer", "feedback", "is_correct_llm", "is_correct_rule",
+                "created_at", "log"
             ))
 
             for trial in trials:
-                trial["is_correct"] = trial["is_correct_llm"]
                 if trial.get("created_at"): trial["created_at"] = trial.get("created_at").isoformat()
-                log = trial.get("log") or {}
-                trial["trace"], trial["search_results"] = log.get("trace", []), log.get("search_results", [])
+                log = trial.pop("log", {}) or {}
+
+                # Export raw messages only (authentic LLM/agent context)
+                trial["messages"] = log.get("messages", [])
+                trial["search_results"] = log.get("search_results", [])
                 trial["search_query"] = log.get("search_query")
             
             sessions_data.append({

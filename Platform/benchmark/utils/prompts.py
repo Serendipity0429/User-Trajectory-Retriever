@@ -25,10 +25,7 @@ Wrap your thinking process inside <think>...</think> tags, then provide the fina
 <step-by-step reasoning>
 </think>
 
-Final Answer:
-<final answer only>
-
-Start your response with 'Reasoning:'.""",
+Final Answer: <final answer only>""",
 
     "shared_user_question": "Question: {question}",
     "shared_answer_request": "\nPlease provide the final answer.",
@@ -155,14 +152,15 @@ CRITICAL: You must VERIFY everything by visiting pages. Do not guess.
 
 {_RULES}
 
-Instructions:
-1. **Plan**: Think about where to go and what to look for.
-2. **Act**: Use tools to navigate and inspect.
-3. **Observe**: Analyze the page content (snapshots/screenshots).
-4. **Reason**: detailed step-by-step thinking.
-5. **Answer**: Call `answer_question(answer: str)` with the EXACT answer.
+Tools Available:
+1. `think(thought: str)`: Record your step-by-step reasoning.
+2. Browser navigation and inspection tools (provided by the environment).
+3. `answer_question(answer: str)`: Submit the final answer.
 
-IMPORTANT: Always output a "Thought: ..." text block before using any tool. This is required for your reasoning to be tracked.""",
+Instructions:
+1. You must use `answer_question` to finish.
+2. CRITICAL: You MUST use the `think` tool to explain your reasoning BEFORE using other tools.
+3. Do not output text directly. Use the tools provided.""",
 
     "browser_agent_retry_request": "Your previous answer was incorrect. Please reflect on the trajectory, re-examine the question, and try again."
 }

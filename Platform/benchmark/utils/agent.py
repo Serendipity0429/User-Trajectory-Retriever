@@ -2,8 +2,8 @@ import os
 import json
 import asyncio
 import agentscope
-from .search_utils import get_search_engine, WebCrawler
-from .models import BenchmarkSettings
+from .search import get_search_engine, WebCrawler
+from ..models import BenchmarkSettings
 from .prompts import PROMPTS
 from agentscope.agent import ReActAgent
 from agentscope.tool import Toolkit, ToolResponse
@@ -22,7 +22,7 @@ from agentscope.formatter import OpenAIChatFormatter
 from agentscope.model import OpenAIChatModel
 from agentscope.embedding import OpenAITextEmbedding
 from agentscope.mcp import StdIOStatefulClient
-from .utils import print_debug
+from core.utils import print_debug
 from asgiref.sync import sync_to_async
 
 

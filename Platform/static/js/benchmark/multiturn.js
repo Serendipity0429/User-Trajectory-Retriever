@@ -165,7 +165,7 @@ window.BenchmarkUtils.MultiTurnPage = (function() {
                 if (delBtn) delBtn.style.display = data.session.group_id ? 'none' : 'inline-block';
 
                 if (initialTrialId) {
-                    executeTrial(initialTrialId, sessionId);
+                    executeTrial(initialTrialId, sessionId, sessionPipelineType);
                 } else {
                     const lastTrial = data.trials[data.trials.length - 1];
                     if (lastTrial?.status === 'completed' && lastTrial.is_correct === false && !data.session.is_completed) {
@@ -185,7 +185,7 @@ window.BenchmarkUtils.MultiTurnPage = (function() {
             });
     }
 
-    function executeTrial(trialId, sessionId) {
+    function executeTrial(trialId, sessionId, pipelineType = 'rag') {
         const signal = sessionAbortController?.signal;
 
         BenchmarkAPI.get(BenchmarkUrls.multiTurn.runTrial(trialId), { signal })
@@ -193,13 +193,47 @@ window.BenchmarkUtils.MultiTurnPage = (function() {
                 if (data.error) {
                     alert(`Error in trial #${trialId}: ${data.error}`);
                     if (sessionAbortController) resetSessionUI();
+                    return;
                 }
-                if (sessionId) loadSession(sessionId);
+
+                // Reload session to show updated trial
+                if (sessionId) loadSession(sessionId, null, pipelineType);
+
+                // If incorrect, trigger retry
+                if (data.is_correct_llm === false) {
+                    // Call retry_session to create new trial
+                    BenchmarkAPI.post(BenchmarkUrls.multiTurn.retrySession(trialId), {
+                        feedback: 'Incorrect',
+                        is_correct: false
+                    }, { signal })
+                    .then(retryData => {
+                        if (retryData.status === 'retrying' && retryData.new_trial_id) {
+                            // Recursively execute the new trial
+                            console.log(`Retrying with new trial ${retryData.new_trial_id}`);
+                            executeTrial(retryData.new_trial_id, sessionId, pipelineType);
+                        } else if (retryData.status === 'max_retries_reached') {
+                            console.log('Max retries reached');
+                            if (sessionAbortController) resetSessionUI();
+                        } else if (retryData.status === 'completed') {
+                            console.log('Session completed');
+                            if (sessionAbortController) resetSessionUI();
+                        }
+                    })
+                    .catch(err => {
+                        if (err.name !== 'AbortError') {
+                            console.error('Error in retry:', err);
+                        }
+                        if (sessionAbortController) resetSessionUI();
+                    });
+                } else {
+                    // Correct answer, session complete
+                    if (sessionAbortController) resetSessionUI();
+                }
             })
             .catch(err => {
                 if (err.name !== 'AbortError') {
                     console.error('Network error in trial.', err);
-                    if (sessionId) loadSession(sessionId);
+                    if (sessionId) loadSession(sessionId, null, pipelineType);
                 }
                 if (sessionAbortController) resetSessionUI();
             });
@@ -533,7 +567,7 @@ window.BenchmarkUtils.MultiTurnPage = (function() {
                         if (sessionAbortController) resetSessionUI();
                     } else {
                         loadSession(activeSessionId, null, pipelineType);
-                        if (data.status === 'retrying') executeTrial(data.new_trial_id, activeSessionId);
+                        if (data.status === 'retrying') executeTrial(data.new_trial_id, activeSessionId, pipelineType);
                         if (data.status === 'max_retries_reached' || data.status === 'completed') {
                             if (sessionAbortController) resetSessionUI();
                         }

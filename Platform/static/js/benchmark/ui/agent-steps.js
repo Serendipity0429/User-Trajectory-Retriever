@@ -42,7 +42,7 @@ window.BenchmarkUI.AgentSteps = {
 
     _renderAction: function(content) {
         // Special case: Search Query text format
-        if (typeof content === 'string' && content.trim().startsWith('Search Query:')) {
+        if (typeof content === 'string' && content.trim().startsWith('Query:')) {
             const element = BenchmarkUtils.renderTemplate('tpl-agent-action', {
                 '.agent-badge-text': { addClass: 'bg-info bg-opacity-10 text-info border-info border-opacity-25' },
                 '.badge-icon': { addClass: 'bi-search' },
@@ -185,15 +185,17 @@ window.BenchmarkUI.AgentSteps = {
             if (extractedResults.length > 0) {
                 const resultsJson = encodeURIComponent(JSON.stringify(extractedResults));
                 const injection = BenchmarkUtils.renderTemplate('tpl-user-search-injection', {
-                    '.docs-count-text': { text: `${extractedResults.length} documents provided in context` },
-                    '.view-search-results-btn': {
-                        attrs: { 'data-results': resultsJson },
-                        onclick: function() {
-                            const data = JSON.parse(decodeURIComponent(this.dataset.results));
-                            window.BenchmarkUI.SearchResults.showInModal(data);
-                        }
-                    }
+                    '.docs-count-text': { text: `${extractedResults.length} documents provided in context` }
                 });
+
+                // Set inline onclick to preserve handler after outerHTML serialization
+                const viewBtn = injection.querySelector('.view-search-results-btn');
+                if (viewBtn) {
+                    viewBtn.setAttribute('onclick', `
+                        const data = JSON.parse(decodeURIComponent('${resultsJson}'));
+                        window.BenchmarkUI.SearchResults.showInModal(data);
+                    `);
+                }
 
                 let displayContent = BenchmarkHelpers.escapeHtml(content);
                 const placeholder = "<!--___RESULTS_CARD_PLACEHOLDER___-->";

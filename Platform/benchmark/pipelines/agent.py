@@ -6,12 +6,12 @@ from datetime import datetime
 from asgiref.sync import sync_to_async
 from agentscope.message import Msg
 from ..models import BenchmarkSettings, MultiTurnRun, MultiTurnSession, MultiTurnTrial
-from ..utils import print_debug, count_questions_in_file
-from ..prompts import PROMPTS
-from ..agent_utils import VanillaAgentFactory, BrowserAgentFactory
+from ..utils import (
+    print_debug, 
+    VanillaAgentFactory, BrowserAgentFactory
+)
 from ..mcp_manager import MCPManager
 from .base import BaseAgentPipeline, REDIS_PREFIX_BROWSER_AGENT
-from task_manager.utils import redis_client
 import inspect
 
 # Helper for reading questions file safely in chunks/lines without DB access

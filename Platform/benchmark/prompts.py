@@ -3,7 +3,7 @@ _RULES = """Rules for the FINAL answer:
 1. Provide only the exact answer.
 2. No punctuation, no extra words or sentences. Capitalization is ignored.
 
-One-shot Example:
+One-shot Example of the Final Answer format:
 Question: What is the capital of France?
 Correct Answer: Paris
 Incorrect Answers:
@@ -17,8 +17,8 @@ PROMPTS = {
     # 1. SHARED COMPONENTS
     # =========================================================================
     
-    "shared_reasoning_instruction": """Please think step-by-step to arrive at the answer. 
-Wrap your thinking process inside <think>...</think> tags, then provide the final answer starting with 'Final Answer: '. """,
+    "shared_reasoning_instruction_no_agent": """Please think step-by-step to arrive at the answer. 
+Wrap your thinking process inside <think>...</think> tags, then provide the final answer starting with 'Final Answer: ' explicitly after thinking. """,
 
     "shared_reasoning_format": """Format your response exactly as follows:
 <think>
@@ -51,7 +51,7 @@ Follow the rules established in the system prompt strictly.
 Answer:""",
 
     "vanilla_followup_reasoning_prompt": """Your previous answer was incorrect.
-Answer the question again.
+Please reflect on the trajectory, re-examine the question, and try again.
 1. Wrap your thinking in <think>...</think> tags.
 2. Final Answer: Output 'Final Answer: <exact_answer>'.
 

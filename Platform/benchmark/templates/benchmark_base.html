@@ -37,6 +37,7 @@
     <!-- Config modules -->
     <script src="{% static 'js/benchmark/config/urls.js' %}"></script>
     <script src="{% static 'js/benchmark/config/state.js' %}"></script>
+    <script src="{% static 'js/benchmark/config/pipeline-config.js' %}"></script>
 
     <!-- Utility modules -->
     <script src="{% static 'js/benchmark/utils/helpers.js' %}"></script>
@@ -48,12 +49,18 @@
     <script src="{% static 'js/benchmark/utils/pipeline_runner.js' %}"></script>
 
     <!-- UI modules -->
+    <script src="{% static 'js/benchmark/ui/init.js' %}"></script>
     <script src="{% static 'js/benchmark/ui/components.js' %}"></script>
-    <script src="{% static 'js/benchmark/ui/rendering.js' %}"></script>
+    <script src="{% static 'js/benchmark/ui/ground-truths.js' %}"></script>
+    <script src="{% static 'js/benchmark/ui/search-results.js' %}"></script>
+    <script src="{% static 'js/benchmark/ui/message-bubble.js' %}"></script>
+    <script src="{% static 'js/benchmark/ui/tool-cards.js' %}"></script>
+    <script src="{% static 'js/benchmark/ui/agent-steps.js' %}"></script>
+    <script src="{% static 'js/benchmark/ui/verdict-cards.js' %}"></script>
 
     <!-- Main modules -->
-    <script src="{% static 'js/benchmark/benchmark_utils.js' %}"></script>
-    <script src="{% static 'js/benchmark/benchmark_renderer.js' %}"></script>
-    <script src="{% static 'js/benchmark/benchmark_multiturn.js' %}"></script>
+    <script src="{% static 'js/benchmark/core.js' %}"></script>
+    <script src="{% static 'js/benchmark/renderer.js' %}"></script>
+    <script src="{% static 'js/benchmark/multiturn.js' %}"></script>
     {% block benchmark_extra_js %}{% endblock benchmark_extra_js %}
 {% endblock scripts %}

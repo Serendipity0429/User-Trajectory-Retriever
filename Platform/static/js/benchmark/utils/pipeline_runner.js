@@ -129,25 +129,3 @@ window.BenchmarkPipelineRunner.start = function(options) {
 
     return controller;
 };
-
-/**
- * Stop a pipeline.
- * @param {string} url - The URL to the stop pipeline view.
- * @param {string} csrfToken - The CSRF token.
- * @param {string} pipelineId - The ID of the pipeline to stop.
- */
-window.BenchmarkPipelineRunner.stop = function(url, csrfToken, pipelineId) {
-    if (!pipelineId) return;
-
-    const data = JSON.stringify({ pipeline_id: pipelineId });
-
-    fetch(url, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': csrfToken
-        },
-        body: data,
-        keepalive: true
-    }).catch(e => console.error("Stop request failed", e));
-};

@@ -1,9 +1,9 @@
 /**
- * Benchmark Utilities - Main Module
- * Core template rendering utility
+ * Core Module - Template rendering utility
+ * Provides the base BenchmarkUtils namespace with template rendering
  *
  * Dependencies (loaded via separate script tags):
- * - config/urls.js, config/state.js
+ * - config/urls.js, config/state.js, config/pipeline-config.js
  * - utils/helpers.js, utils/api.js, utils/export.js, utils/settings.js
  * - utils/batch_selection.js, utils/session_ui.js, utils/pipeline_runner.js
  */

@@ -40,7 +40,7 @@ class VanillaLLMMultiTurnPipeline(BaseMultiTurnPipeline):
         # 1. System and Initial Prompt
         sys_prompt = PROMPTS["vanilla_system_prompt"]
         if allow_reasoning:
-            sys_prompt += PROMPTS["shared_reasoning_instruction"]
+            sys_prompt += PROMPTS["shared_reasoning_instruction_no_agent"]
         
         initial_user_prompt = PROMPTS["shared_user_question"].format(question=session.question)
         

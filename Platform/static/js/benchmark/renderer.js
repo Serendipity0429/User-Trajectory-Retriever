@@ -1,15 +1,11 @@
 /**
- * Benchmark Renderer - Main rendering orchestration
+ * Renderer Module - Rendering orchestration
  * Composes UI modules to render benchmark results, trials, and session displays
  *
  * Dependencies (load in order):
- *   1. ui/components.js      - Basic component creators (badges, icons)
- *   2. ui/ground_truths.js   - Ground truth list/badge rendering
- *   3. ui/search_results.js  - Search results rendering
- *   4. ui/message_bubble.js  - Chat message bubbles
- *   5. ui/tool_cards.js      - Tool action/observation cards
- *   6. ui/agent_steps.js     - Agent step rendering (thought/action/observation)
- *   7. ui/verdict_cards.js   - Trial verdict cards
+ *   1. core.js               - Base BenchmarkUtils namespace
+ *   2. ui/components.js      - Basic component creators (badges, icons)
+ *   3. ui/rendering.js       - UI rendering modules (GroundTruths, SearchResults, etc.)
  */
 
 window.BenchmarkUtils.BenchmarkRenderer = {

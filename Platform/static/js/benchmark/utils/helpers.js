@@ -19,21 +19,6 @@ window.BenchmarkHelpers.generateUUID = function() {
 }
 
 /**
- * Debounce a function
- * @param {Function} func - The function to debounce
- * @param {number} wait - The delay in milliseconds
- * @returns {Function} The debounced function
- */
-window.BenchmarkHelpers.debounce = function(func, wait) {
-    let timeout;
-    return function(...args) {
-        const context = this;
-        clearTimeout(timeout);
-        timeout = setTimeout(() => func.apply(context, args), wait);
-    };
-}
-
-/**
  * Escape HTML entities to prevent XSS
  * @param {string} str - String to escape
  * @returns {string} Escaped string

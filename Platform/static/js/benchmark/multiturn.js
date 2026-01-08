@@ -1,6 +1,11 @@
 /**
- * Multi-turn Benchmark Page Controller
+ * Multi-turn Page Controller
  * Handles session management, pipeline execution, and UI interactions
+ *
+ * Dependencies:
+ *   - core.js, renderer.js
+ *   - config/pipeline-config.js (for pipeline configurations)
+ *   - utils/settings.js, utils/session_ui.js, utils/pipeline_runner.js
  */
 
 window.BenchmarkUtils.MultiTurnPage = (function() {
@@ -15,18 +20,11 @@ window.BenchmarkUtils.MultiTurnPage = (function() {
     let currentRunPipelineType = null;
     let sessionRetryTimeout = null;
 
-    const PIPELINE_CONFIGS = {
-        'vanilla_llm': { loadingText: 'Thinking...', icon: 'bi-robot' },
-        'rag': { loadingText: 'Thinking...', icon: 'bi-globe' },
-        'vanilla_agent': { loadingText: 'Thinking...', icon: 'bi-robot' },
-        'browser_agent': { loadingText: 'Thinking...', icon: 'bi-browser-chrome' }
-    };
-
     // === Polling ===
     function startPolling(trialId, pipelineType) {
         if (activePolls[trialId]) return;
 
-        const config = PIPELINE_CONFIGS[pipelineType] || PIPELINE_CONFIGS['vanilla_llm'];
+        const config = BenchmarkPipelineConfig.get(pipelineType);
         if (!trialState[trialId]) {
             trialState[trialId] = { renderedCount: 0, backoffDelay: 2000, lastStepWasStreaming: false };
         }
@@ -594,7 +592,7 @@ window.BenchmarkUtils.MultiTurnPage = (function() {
             if (buildFormData) window.buildPipelineFormData = buildFormData;
 
             BenchmarkSettings.setupConfigurationHandlers();
-            BenchmarkSettings.setupConfigurationActionHandlers(BenchmarkAPI.getCSRFToken());
+            BenchmarkSettings.setupConfigurationActionHandlers();
 
             initPromptViewer();
             initBatchDelete(pipelineType);
@@ -605,7 +603,6 @@ window.BenchmarkUtils.MultiTurnPage = (function() {
             initExports(csvPrefix);
         },
 
-        startPolling: startPolling,
-        PIPELINE_CONFIGS: PIPELINE_CONFIGS
+        startPolling: startPolling
     };
 })();

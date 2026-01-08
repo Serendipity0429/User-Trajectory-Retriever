@@ -69,3 +69,29 @@ window.BenchmarkAPI.postForm = function(url, formData, options = {}) {
         signal: options.signal
     });
 };
+
+/**
+ * Make a simple POST request with only CSRF token (no body)
+ * @param {string} url - The URL to post to
+ * @returns {Promise<object>} Parsed JSON response
+ */
+window.BenchmarkAPI.postSimple = function(url) {
+    return fetch(url, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': this.getCSRFToken() }
+    }).then(res => res.json());
+};
+
+/**
+ * Make a FormData POST request with CSRF token
+ * @param {string} url - The URL to post to
+ * @param {FormData} formData - FormData to send
+ * @returns {Promise<object>} Parsed JSON response
+ */
+window.BenchmarkAPI.postFormData = function(url, formData) {
+    return fetch(url, {
+        method: 'POST',
+        body: formData,
+        headers: { 'X-CSRFToken': this.getCSRFToken() }
+    }).then(res => res.json());
+};

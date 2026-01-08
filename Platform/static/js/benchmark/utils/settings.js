@@ -8,12 +8,11 @@ window.BenchmarkSettings = window.BenchmarkSettings || {};
 /**
  * Test the LLM connection.
  * @param {string} url - The URL to the test connection view.
- * @param {string} csrfToken - The CSRF token.
  * @param {object} data - The data to send (llm_base_url, llm_api_key).
  * @param {string} resultDivId - The ID of the div to display results.
  * @param {string} btnId - The ID of the test button.
  */
-window.BenchmarkSettings.testConnection = function(url, csrfToken, data, resultDivId, btnId) {
+window.BenchmarkSettings.testConnection = function(url, data, resultDivId, btnId) {
     const resultDiv = document.getElementById(resultDivId);
     const btn = document.getElementById(btnId);
     const originalText = btn.innerHTML;
@@ -22,17 +21,8 @@ window.BenchmarkSettings.testConnection = function(url, csrfToken, data, resultD
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Testing...';
 
-    fetch(url, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': csrfToken
-        },
-        body: JSON.stringify(data)
-    })
-    .then(response => response.json().then(data => ({status: response.status, body: data})))
-    .then(({status, body}) => {
-        if (status === 200) {
+    BenchmarkAPI.post(url, data)
+        .then(body => {
             resultDiv.innerHTML = `<span class="text-success small fw-semibold"><i class="bi bi-check-circle-fill me-1"></i>${body.message}</span>`;
 
             // If models are returned, enable datalist for the input
@@ -62,10 +52,7 @@ window.BenchmarkSettings.testConnection = function(url, csrfToken, data, resultD
                         datalist.innerHTML = '';
                     }
 
-                    // Sort models
                     body.models.sort();
-
-                    // Populate options
                     body.models.forEach(modelName => {
                         const option = document.createElement('option');
                         option.value = modelName;
@@ -73,61 +60,16 @@ window.BenchmarkSettings.testConnection = function(url, csrfToken, data, resultD
                     });
                 }
             }
-        } else {
-            resultDiv.innerHTML = `<span class="text-danger small fw-semibold"><i class="bi bi-exclamation-circle-fill me-1"></i>${body.error || 'An error occurred while testing the connection.'}</span>`;
-        }
-    })
-    .catch(error => {
-        resultDiv.innerHTML = `<span class="text-danger small fw-semibold"><i class="bi bi-exclamation-circle-fill me-1"></i>A network error occurred.</span>`;
-        console.error('Error:', error);
-    })
-    .finally(() => {
-        btn.disabled = false;
-        btn.innerHTML = originalText;
-    });
-};
-
-/**
- * Save settings to the server.
- * @param {string} url - The URL to the save settings view.
- * @param {string} csrfToken - The CSRF token.
- * @param {object} data - The settings data to save.
- * @param {string} btnId - The ID of the save button (to show feedback).
- */
-window.BenchmarkSettings.saveSettings = function(url, csrfToken, data, btnId) {
-    fetch(url, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': csrfToken
-        },
-        body: JSON.stringify(data)
-    })
-    .then(response => response.json())
-    .then(resData => {
-        if (resData.status === 'ok') {
-            const btn = document.getElementById(btnId);
-            const originalText = btn.innerHTML;
-            const originalClass = btn.className;
-
-            btn.innerHTML = '<i class="bi bi-check-lg me-1"></i> Saved!';
-            btn.classList.remove('btn-outline-primary', 'btn-primary', 'btn-outline-secondary');
-            btn.classList.add('btn-success');
-
-            setTimeout(() => {
-                btn.innerHTML = originalText;
-                btn.className = originalClass;
-            }, 1500);
-            BenchmarkState.config.hasUnsavedChanges = false;
-            BenchmarkSettings.saveInitialSettings();
-        } else {
-            alert('Error saving settings: ' + (resData.message || 'Unknown error'));
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        alert('A network error occurred while saving settings.');
-    });
+        })
+        .catch(error => {
+            const errorMsg = error.error || 'An error occurred while testing the connection.';
+            resultDiv.innerHTML = `<span class="text-danger small fw-semibold"><i class="bi bi-exclamation-circle-fill me-1"></i>${errorMsg}</span>`;
+            console.error('Error:', error);
+        })
+        .finally(() => {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+        });
 };
 
 /**
@@ -325,7 +267,7 @@ window.BenchmarkSettings.validateSearchLimit = function() {
 /**
  * Setup event handlers for configuration actions.
  */
-window.BenchmarkSettings.setupConfigurationActionHandlers = function(csrfToken) {
+window.BenchmarkSettings.setupConfigurationActionHandlers = function() {
     const self = this;
 
     // LLM Settings
@@ -335,7 +277,7 @@ window.BenchmarkSettings.setupConfigurationActionHandlers = function(csrfToken) 
             llm_api_key: document.getElementById('llm_api_key').value,
             llm_model: document.getElementById('llm_model').value
         };
-        BenchmarkSettings.testConnection(BenchmarkUrls.testLlmConnection, csrfToken, data, 'test-connection-result', 'test-connection-btn');
+        BenchmarkSettings.testConnection(BenchmarkUrls.testLlmConnection, data, 'test-connection-result', 'test-connection-btn');
     };
 
     const testBtn = document.getElementById('test-connection-btn');
@@ -405,12 +347,7 @@ window.BenchmarkSettings.setupConfigurationActionHandlers = function(csrfToken) 
                 agent_memory_type: document.getElementById('agent_memory_type') ? document.getElementById('agent_memory_type').value : 'naive'
             };
 
-            fetch(BenchmarkUrls.saveSettings, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
-                body: JSON.stringify(settingsData)
-            })
-            .then(r => r.json())
+            BenchmarkAPI.post(BenchmarkUrls.saveSettings, settingsData)
             .then(resData => {
                 if (resData.status === 'ok') {
                     btn.innerHTML = '<i class="bi bi-check-lg me-1"></i> Saved!';

@@ -101,7 +101,7 @@ class RagMultiTurnPipeline(BaseMultiTurnPipeline):
         
         system_prompt = PROMPTS["rag_system_prompt"]
         if allow_reasoning:
-            system_prompt += PROMPTS["shared_reasoning_instruction"]
+            system_prompt += PROMPTS["shared_reasoning_instruction_no_agent"]
             
         messages.append({"role": "system", "content": system_prompt})
         

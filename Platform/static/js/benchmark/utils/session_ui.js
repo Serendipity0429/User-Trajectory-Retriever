@@ -6,16 +6,6 @@
 window.BenchmarkSessionUI = window.BenchmarkSessionUI || {};
 
 /**
- * Pipeline badge configurations
- */
-window.BenchmarkSessionUI.PIPELINE_CONFIG = {
-    'vanilla_llm': { icon: 'bi-chat-square-text', color: 'text-primary', label: 'Vanilla' },
-    'rag': { icon: 'bi-database-gear', color: 'text-warning', label: 'RAG' },
-    'vanilla_agent': { icon: 'bi-robot', color: 'text-info', label: 'Agent' },
-    'browser_agent': { icon: 'bi-browser-chrome', color: 'text-success', label: 'Browser' }
-};
-
-/**
  * Render a multi-turn session, including question, ground truths, and trials.
  * @param {object} session - The session object.
  * @param {Array} trials - Array of trial objects for the session.
@@ -58,17 +48,12 @@ window.BenchmarkSessionUI.renderSession = function(session, trials, options = {}
  * @returns {string} HTML string for the pipeline badge.
  */
 window.BenchmarkSessionUI.generatePipelineBadge = function(pipelineType) {
-    const style = this.PIPELINE_CONFIG[pipelineType] || {
-        icon: 'bi-question-circle',
-        color: 'text-secondary',
-        label: pipelineType
-    };
+    const config = BenchmarkPipelineConfig.get(pipelineType);
 
-    const colorClass = style.color.replace('text-', '');
     return `
-<span class="d-inline-flex align-items-center ${style.color} bg-white border border-${colorClass} border-opacity-25 rounded px-2 py-0 ms-1 shadow-sm" style="font-size: 0.75em; height: 20px;">
-    <i class="bi ${style.icon} me-1"></i>
-    <span class="fw-medium text-uppercase" style="letter-spacing: 0.5px; font-size: 0.9em;">${style.label}</span>
+<span class="d-inline-flex align-items-center ${config.textClass} bg-white border border-${config.color} border-opacity-25 rounded px-2 py-0 ms-1 shadow-sm" style="font-size: 0.75em; height: 20px;">
+    <i class="bi ${config.icon} me-1"></i>
+    <span class="fw-medium text-uppercase" style="letter-spacing: 0.5px; font-size: 0.9em;">${config.label}</span>
 </span>
 `;
 };

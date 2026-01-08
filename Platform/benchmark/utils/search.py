@@ -310,6 +310,12 @@ class WebCrawler:
         ]
 
     def extract(self, url: str) -> str:
+        # Check if the url ends with forbidden extensions
+        forbidden_extensions = ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.zip', '.rar', '.exe', '.png']
+        if any(url.lower().endswith(ext) for ext in forbidden_extensions):
+            print_debug(f"Skipping non-text content based on URL extension: {url}")
+            return ""
+                
         # Method 1: Requests
         content = self._extract_requests(url)
         if content:
@@ -353,6 +359,7 @@ class WebCrawler:
                 if not any(t in content_type for t in allowed_types):
                     print_debug(f"Skipping non-text content: {url} ({content_type})")
                     return ""
+                                        
 
                 # 2. Content Inspection (Magic Numbers & Decoding)
                 content_sample = b""

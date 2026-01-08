@@ -89,7 +89,7 @@ class VanillaAgentPipeline(BaseAgentPipeline):
         return "vanilla_agent_system_prompt"
 
     def _get_retry_prompt_key(self):
-        return "vanilla_agent_retry_request"
+        return "shared_retry_request"
 
 
 class BrowserAgentPipeline(BaseAgentPipeline):
@@ -178,4 +178,4 @@ class BrowserAgentPipeline(BaseAgentPipeline):
         return "browser_agent_system_prompt"
 
     def _get_retry_prompt_key(self):
-        return "browser_agent_retry_request"
+        return "shared_retry_request"

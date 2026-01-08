@@ -465,8 +465,13 @@ class BaseMultiTurnPipeline(BasePipeline):
             is_correct_llm = check_answer_llm(session.question, session.ground_truths, answer, client=self.client, model=self.model)
             is_correct_rule = check_answer_rule(session.question, session.ground_truths, answer)
 
-            # Store raw messages (authentic LLM context) - trace is parsed on-demand
-            final_messages = messages + [{"role": "assistant", "content": full_response}]
+            # Store only this trial's messages (delta), not full conversation history
+            # This matches the trace structure: system prompt + current user input + response
+            trial_messages = []
+            if messages and messages[0].get('role') == 'system':
+                trial_messages.append({"role": "system", "content": messages[0].get("content", "")})
+            trial_messages.append({"role": "user", "content": instruction})
+            trial_messages.append({"role": "assistant", "content": full_response})
 
             trial.answer = answer
             trial.is_correct_llm = is_correct_llm
@@ -474,13 +479,13 @@ class BaseMultiTurnPipeline(BasePipeline):
             trial.feedback = "Correct" if is_correct_llm else "Incorrect"
 
             trial.log = trial.log or {}
-            trial.log['messages'] = final_messages
+            trial.log['messages'] = trial_messages
             trial.status = 'completed'
             trial.save()
 
             # Cache completion status in Redis for efficient polling (parse trace for UI)
             try:
-                trace, _ = TraceFormatter.serialize([SimpleMsg(m["role"], m["content"]) for m in final_messages])
+                trace, _ = TraceFormatter.serialize([SimpleMsg(m["role"], m["content"]) for m in trial_messages])
                 status_data = {
                     "id": trial.id,
                     "status": "completed",
@@ -698,7 +703,7 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
             if trial.trial_number == 1:
                 # Reset agent for fresh start.
                 if hasattr(self, 'active_agent'): self.active_agent = None
-                current_msg = Msg(name="User", role="user", content=PROMPTS["agent_user_question"].format(question=session.question))
+                current_msg = Msg(name="User", role="user", content=PROMPTS["shared_user_question"].format(question=session.question))
                 turn_start_index = 0
             else:
                 # Retry logic: ensure agent is alive and context is inherited.

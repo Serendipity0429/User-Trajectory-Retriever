@@ -36,14 +36,14 @@ window.BenchmarkUI.GroundTruths = {
                     <i class="bi bi-chevron-up small"></i>
                 </button>
             </div>
-            <div class="ground-truths-list-container mt-2">
+            <div class="ground-truths-list-container mt-2" style="max-height: 120px; overflow-y: auto;">
                 <ul class="list-group list-group-flush ground-truths-list"></ul>
             </div>`;
 
         const ul = gtElement.querySelector('.ground-truths-list');
         gtArray.forEach((gt, idx) => {
             const li = document.createElement('li');
-            li.className = 'list-group-item px-0 py-1 border-0 small text-dark';
+            li.className = 'list-group-item px-0 py-0 border-0 small text-dark';
             li.innerHTML = `<i class="bi bi-check2 text-success me-2"></i><span class="fw-medium">${idx + 1}.</span> ${BenchmarkHelpers.escapeHtml(gt)}`;
             ul.appendChild(li);
         });

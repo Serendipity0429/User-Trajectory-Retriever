@@ -14,21 +14,28 @@ Incorrect Answers:
 
 PROMPTS = {
     # =========================================================================
-    # 1. SHARED COMPONENTS
+    # 1. SHARED COMPONENTS (used across all baselines for fair comparison)
     # =========================================================================
-    
-    "shared_reasoning_instruction_no_agent": """Please think step-by-step to arrive at the answer. 
-Wrap your thinking process inside <think>...</think> tags, then provide the final answer starting with 'Final Answer: ' explicitly after thinking. """,
 
-    "shared_reasoning_format": """Format your response exactly as follows:
+    "shared_reasoning_instruction_no_agent": """Please think step-by-step to arrive at the answer. Format your response as follows:
 <think>
 <step-by-step reasoning>
 </think>
+Final Answer: <final answer only> """,
 
-Final Answer: <final answer only>""",
-
-    "shared_user_question": "Question: {question}",
     "shared_answer_request": "\nPlease provide the final answer.",
+
+    "shared_user_question": "Please answer the question: {question}",
+
+    "shared_retry_request": "Your previous answer was incorrect. Please reflect on the conversation, re-examine the question, and try again.",
+
+    "shared_retry_reasoning_prompt": """Your previous answer was incorrect. Please reflect on the conversation, re-examine the question, and try again.
+Format your response as follows:
+<think>
+<step-by-step reasoning>
+</think>
+Final Answer: <final answer only>
+""",
 
     # =========================================================================
     # 2. VANILLA BASELINE
@@ -38,22 +45,6 @@ Final Answer: <final answer only>""",
 Your goal is to provide the exact correct answer to the user's question.
 
 {_RULES}""",
-
-    "vanilla_retry_request": "Your previous answer was incorrect. Please reflect on the trajectory, re-examine the question, and try again.",
-
-    "vanilla_followup_prompt": """Your previous answer was incorrect.
-Answer the question again, potentially correcting yourself.
-Follow the rules established in the system prompt strictly.
-
-Answer:""",
-
-    "vanilla_followup_reasoning_prompt": """Your previous answer was incorrect.
-Please reflect on the trajectory, re-examine the question, and try again.
-1. Wrap your thinking in <think>...</think> tags.
-2. Final Answer: Output 'Final Answer: <exact_answer>'.
-
-Let's think step by step.
-""",
 
     # =========================================================================
     # 3. RAG BASELINE
@@ -104,15 +95,11 @@ Search Query: <search query only>
 Question: {question}
 """,
 
-    "rag_retry_prefix": "Your previous answer was incorrect.",
     "rag_debug_format": "*** SYSTEM PROMPT ***\n{system_prompt}\n\n*** USER INPUT ***\n{instruction}",
-
 
     # =========================================================================
     # 4. AGENT BASELINES (Shared & Specific)
     # =========================================================================
-
-    "agent_user_question": "Please answer the question: {question}",
 
     # --- Vanilla Agent (ReAct) ---
     "vanilla_agent_system_prompt": f"""You are a ReAct (Reasoning and Acting) Agent expert in open-domain QA.
@@ -136,13 +123,10 @@ Example:
 1. Call `think(thought="I need to find...")`
 2. Call `web_search_tool(query="...")`
 3. Call `think(thought="The snippets look promising. I'll check the first one.")`
-4. Call `visit_page(url="http://...")`
+4. Call `visit_page(url="...")`
 5. Call `think(thought="The page confirms...")`
 6. Call `answer_question(answer="...")`
 """,
-
-    "vanilla_agent_retry_request": "Your previous answer was incorrect. Please reflect on the trajectory, re-examine the question, and try again.",
-
 
     # --- Browser Agent (Autonomous) ---
     "browser_agent_system_prompt": f"""You are an autonomous Browser Agent expert in open-domain QA.
@@ -161,6 +145,4 @@ Instructions:
 1. You must use `answer_question` to finish.
 2. CRITICAL: You MUST use the `think` tool to explain your reasoning BEFORE using other tools.
 3. Do not output text directly. Use the tools provided.""",
-
-    "browser_agent_retry_request": "Your previous answer was incorrect. Please reflect on the trajectory, re-examine the question, and try again."
 }

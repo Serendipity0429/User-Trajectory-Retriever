@@ -105,8 +105,8 @@ class RagMultiTurnPipeline(BaseMultiTurnPipeline):
             if trial.trial_number == 1:
                 query_instruction = PROMPTS["rag_query_gen_cot_prompt" if allow_reasoning else "rag_query_gen_prompt"].format(question=session.question)
             else:
-                # Add retry prefix to history
-                retry_msg = {"role": "user", "content": PROMPTS["rag_retry_prefix"]}
+                # Add retry message to history (uses shared prompt for consistency)
+                retry_msg = {"role": "user", "content": PROMPTS["shared_retry_request"]}
                 history.append(retry_msg)
                 turn_messages.append(retry_msg)
                 query_instruction = PROMPTS["rag_query_reform_cot_prompt" if allow_reasoning else "rag_query_reform_prompt"]
@@ -138,7 +138,7 @@ class RagMultiTurnPipeline(BaseMultiTurnPipeline):
             # === Phase 2: Answer Synthesis ===
             formatted_results = self.search_engine.format_results(search_results)
             results_instruction = "Search Results:\n" + PROMPTS["rag_context_wrapper"].format(formatted_results=formatted_results)
-            results_instruction += PROMPTS["shared_reasoning_format" if allow_reasoning else "shared_answer_request"]
+            results_instruction += PROMPTS["shared_reasoning_instruction_no_agent" if allow_reasoning else "shared_answer_request"]
 
             results_msg = {"role": "user", "content": results_instruction}
             turn_messages.append(results_msg)

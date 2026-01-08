@@ -76,11 +76,8 @@ class BenchmarkSettings(models.Model):
         # Prefer the template, or create one if none exists
         obj = cls.objects.filter(is_template=True).first()
         if not obj:
-            # Fallback to ID 1 or create new
-            obj, created = cls.objects.get_or_create(pk=1, defaults={'is_template': True})
-            if not obj.is_template:
-                obj.is_template = True
-                obj.save()
+            # Create a new template without specifying pk to let PostgreSQL generate it
+            obj = cls.objects.create(is_template=True)
         return obj
 
     @classmethod

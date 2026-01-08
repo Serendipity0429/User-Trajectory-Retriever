@@ -41,7 +41,7 @@ class VanillaLLMMultiTurnPipeline(BaseMultiTurnPipeline):
         sys_prompt = PROMPTS["vanilla_system_prompt"]
         if allow_reasoning:
             sys_prompt += PROMPTS["shared_reasoning_instruction_no_agent"]
-        
+
         initial_user_prompt = PROMPTS["shared_user_question"].format(question=session.question)
         
         messages.append({"role": "system", "content": sys_prompt})
@@ -64,13 +64,13 @@ class VanillaLLMMultiTurnPipeline(BaseMultiTurnPipeline):
             # Only add the generic feedback if this is NOT the last completed trial.
             # The last trial's feedback is handled by the follow-up prompt.
             if i < len(completed_trials) - 1:
-                messages.append({"role": "user", "content": PROMPTS["vanilla_retry_request"]})
+                messages.append({"role": "user", "content": PROMPTS["shared_retry_request"]})
 
         # 3. Follow-up instructions (only if we have history)
         if completed_trials:
             if allow_reasoning:
-                messages.append({"role": "user", "content": PROMPTS["vanilla_followup_reasoning_prompt"]})
+                messages.append({"role": "user", "content": PROMPTS["shared_retry_reasoning_prompt"]})
             else:
-                messages.append({"role": "user", "content": PROMPTS["vanilla_followup_prompt"]})
+                messages.append({"role": "user", "content": PROMPTS["shared_retry_request"]})
             
         return messages

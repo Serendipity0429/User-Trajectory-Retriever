@@ -240,10 +240,10 @@ window.BenchmarkSessionUI.updateStatsUI = function(results, groupName, loadSessi
     // Self-Correction Rate
     const initialFailures = results.filter(r => r.initial_correct === false);
     const selfCorrected = initialFailures.filter(r => r.correct === true);
-    const selfCorrectionRate = initialFailures.length > 0 ? (selfCorrected.length / initialFailures.length) * 100 : 0;
+    const selfRecoveryRate = initialFailures.length > 0 ? (selfCorrected.length / initialFailures.length) * 100 : 0;
     const scEl = document.getElementById('stats-self-correction-rate');
     if (scEl) {
-        scEl.textContent = `${selfCorrectionRate.toFixed(2)}%`;
+        scEl.textContent = `${selfRecoveryRate.toFixed(2)}%`;
         scEl.title = `${selfCorrected.length} corrected out of ${initialFailures.length} initial failures`;
     }
 
@@ -252,7 +252,7 @@ window.BenchmarkSessionUI.updateStatsUI = function(results, groupName, loadSessi
     this._setElementText('stats-error-rate', `${errorRate.toFixed(2)}%`);
 
     // Behavioral Analysis Metrics
-    this._renderBehavioralMetrics(results, firstTryRate, selfCorrectionRate, correctionGain);
+    this._renderBehavioralMetrics(results, firstTryRate, selfRecoveryRate, correctionGain);
 
     // Baseline-Specific Metrics
     this._renderSpecificMetrics(results);
@@ -271,7 +271,7 @@ window.BenchmarkSessionUI._setElementText = function(id, text) {
  * Render behavioral analysis metrics
  * @private
  */
-window.BenchmarkSessionUI._renderBehavioralMetrics = function(results, firstTryRate, selfCorrectionRate, correctionGain) {
+window.BenchmarkSessionUI._renderBehavioralMetrics = function(results, firstTryRate, selfRecoveryRate, correctionGain) {
     const behavioralRow = document.getElementById('behavioral-metrics-row');
     if (!behavioralRow) return;
 
@@ -287,7 +287,7 @@ window.BenchmarkSessionUI._renderBehavioralMetrics = function(results, firstTryR
 
     // Recovery Rate
     behavioralRow.appendChild(BenchmarkUtils.createMetricCard({
-        value: `${selfCorrectionRate.toFixed(2)}%`,
+        value: `${selfRecoveryRate.toFixed(2)}%`,
         label: 'Recovery Rate',
         description: 'Failures Fixed Later',
         color: 'primary'

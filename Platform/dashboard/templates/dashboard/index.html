@@ -331,7 +331,7 @@
                                     <div class="card h-100 border-start border-4 border-info shadow-sm">
                                         <div class="card-body text-center">
                                             <h6 class="text-uppercase text-muted small fw-bold mb-2">Self-Correction</h6>
-                                            <h2 class="mb-0 fw-bold text-info display-6"><span id="selfCorrectionRateVal">--</span>%</h2>
+                                            <h2 class="mb-0 fw-bold text-info display-6"><span id="selfRecoveryRateVal">--</span>%</h2>
                                             <small class="text-muted">of successful tasks</small>
                                         </div>
                                     </div>
@@ -1060,7 +1060,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (statistics.success_rate !== undefined) {
                 document.getElementById('successRateVal').textContent = statistics.success_rate;
                 document.getElementById('cancelRateVal').textContent = statistics.cancel_rate;
-                document.getElementById('selfCorrectionRateVal').textContent = statistics.self_correction_rate;
+                document.getElementById('selfRecoveryRateVal').textContent = statistics.self_correction_rate;
                 document.getElementById('firstTrySuccessRateVal').textContent = statistics.first_try_success_rate;
                 
                 // Success Composition Chart

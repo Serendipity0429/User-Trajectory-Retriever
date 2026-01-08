@@ -1,9 +1,8 @@
-from datetime import datetime
 import json
 from task_manager.utils import check_answer_rule, check_answer_llm, redis_client
 from ..utils import (
-    get_search_engine, print_debug, extract_final_answer,
-    RedisKeys, PipelinePrefix, TraceFormatter, SimpleMsg, PROMPTS
+    get_search_engine, print_debug, extract_final_answer, extract_query,
+    RedisKeys, PipelinePrefix, TraceFormatter, SimpleMsg, PROMPTS, TrialGuard
 )
 from ..models import (
     BenchmarkSettings, MultiTurnSession, MultiTurnTrial
@@ -46,237 +45,150 @@ class RagMultiTurnPipeline(BaseMultiTurnPipeline):
             status='processing'
         )
 
-    def _get_history_key(self, session_id):
-        return RedisKeys.session_history(self.redis_prefix, session_id)
-
     def _construct_messages(self, session, trial, completed_trials=None):
         """
-        Builds the conversation history including the current turn's query and results.
-        This is what the LLM sees when generating the final answer.
-        """
-        history_key = self._get_history_key(session.id)
-        cached_history_json = redis_client.get(history_key)
-        
-        if cached_history_json:
-            messages = json.loads(cached_history_json)
-        else:
-            messages = self._reconstruct_history(session, completed_trials)
-
-        final_messages = messages.copy() 
-        
-        # If the trial has already performed its search, append the conversational steps
-        trial_log = trial.log or {}
-        search_query = trial_log.get('search_query')
-        if search_query:
-            allow_reasoning = session.run.settings.allow_reasoning if session.run and session.run.settings else False
-            
-            if trial.trial_number == 1:
-                instruction = PROMPTS["rag_query_gen_cot_prompt" if allow_reasoning else "rag_query_gen_prompt"].format(question=session.question)
-            else:
-                instruction = PROMPTS["rag_query_reform_cot_prompt" if allow_reasoning else "rag_query_reform_prompt"]
-            
-            search_results = trial_log.get('search_results') or []
-            formatted_results = self.search_engine.format_results(search_results)
-            
-            # Add the query generation "exchange"
-            final_messages.append({"role": "user", "content": instruction})
-            final_messages.append({"role": "assistant", "content": f"Query: {search_query}"})
-            
-            # Add the result providing "exchange"
-            final_instr = "Search Results:\n" + PROMPTS["rag_context_wrapper"].format(formatted_results=formatted_results)
-            final_instr += PROMPTS["shared_reasoning_format" if allow_reasoning else "shared_answer_request"]
-
-            final_messages.append({"role": "user", "content": final_instr})
-            
-        return final_messages
-
-    def _reconstruct_history(self, session, completed_trials=None):
-        """
-        Reconstructs the full conversational trajectory from past trials.
+        Builds the conversation history from past trials.
+        Unified pattern: system prompt + past trials' full conversations.
         """
         if completed_trials is None:
             completed_trials = list(session.trials.filter(status='completed').order_by('trial_number'))
-            
-        messages = []
+
         allow_reasoning = session.run.settings.allow_reasoning if session.run and session.run.settings else False
-        
+
+        # System prompt
         system_prompt = PROMPTS["rag_system_prompt"]
         if allow_reasoning:
             system_prompt += PROMPTS["shared_reasoning_instruction_no_agent"]
-            
-        messages.append({"role": "system", "content": system_prompt})
-        
+
+        messages = [{"role": "system", "content": system_prompt}]
+
+        # Append past trials' messages (excluding system prompts)
         for past_trial in completed_trials:
-            past_log = past_trial.log or {}
-            search_query = past_log.get('search_query')
-            search_results = past_log.get('search_results') or []
+            past_msgs = past_trial.log.get('messages', [])
+            for m in past_msgs:
+                if m.get('role') != 'system':
+                    messages.append(m)
 
-            # 1. Query Instruction
-            if past_trial.trial_number == 1:
-                instruction = PROMPTS["rag_query_gen_cot_prompt" if allow_reasoning else "rag_query_gen_prompt"].format(question=session.question)
-            else:
-                instruction = PROMPTS["rag_query_reform_cot_prompt" if allow_reasoning else "rag_query_reform_prompt"]
-            
-            # 2. Assistant's Query
-            messages.append({"role": "user", "content": instruction})
-            messages.append({"role": "assistant", "content": f"Query: {search_query}"})
-            
-            # 3. Search Results and Answer Instruction
-            formatted_results = self.search_engine.format_results(search_results)
-            final_instr = "Search Results:\n" + PROMPTS["rag_context_wrapper"].format(formatted_results=formatted_results)
-            final_instr += PROMPTS["shared_reasoning_format" if allow_reasoning else "shared_answer_request"]
-            
-            messages.append({"role": "user", "content": final_instr})
-
-            # 4. Assistant's Answer - get from stored messages
-            past_messages = past_log.get('messages', [])
-            assistant_response = None
-            for m in reversed(past_messages):
-                if m.get('role') == 'assistant':
-                    assistant_response = m.get('content')
-                    break
-            messages.append({"role": "assistant", "content": assistant_response or past_trial.answer})
-            
         return messages
 
+    def _get_trial_meta(self, trial) -> dict:
+        """Return RAG-specific metadata for export/analytics."""
+        log = trial.log or {}
+        return {
+            'search_query': log.get('search_query'),
+            'search_results': log.get('search_results'),
+        }
+
     def run_single_turn(self, session, trial, completed_trials=None):
-        from ..utils import TrialGuard
         with TrialGuard(trial):
             allow_reasoning = session.run.settings.allow_reasoning if session.run and session.run.settings else False
-            
-            history_key = self._get_history_key(session.id)
-            history_json = redis_client.get(history_key)
-            history = json.loads(history_json) if history_json else self._reconstruct_history(session, completed_trials)
+
+            # Build base history from past trials
+            history = self._construct_messages(session, trial, completed_trials)
 
             trial.log = trial.log or {}
+            turn_messages = []  # Messages added during this turn
 
-            # Prepare trace using TraceFormatter
-            def update_redis_trace(messages_to_serialize):
-                trace_data, _ = TraceFormatter.serialize(messages_to_serialize)
+            # Helper for trace updates
+            def build_trace_msgs(all_messages):
+                trace_msgs = []
+                for m in all_messages:
+                    trace_msgs.append(SimpleMsg(m["role"], m["content"]))
+                return trace_msgs
+
+            def update_redis_trace(all_messages):
+                trace_msgs = build_trace_msgs(all_messages)
+                trace_data, _ = TraceFormatter.serialize(trace_msgs)
                 redis_client.set(RedisKeys.trial_trace(trial.id), json.dumps(trace_data), ex=RedisKeys.DEFAULT_TTL)
 
-            # 1. Query Reformulation / Generation
+            # === Phase 1: Query Generation ===
             if trial.trial_number == 1:
-                instruction = PROMPTS["rag_query_gen_cot_prompt" if allow_reasoning else "rag_query_gen_prompt"].format(question=session.question)
+                query_instruction = PROMPTS["rag_query_gen_cot_prompt" if allow_reasoning else "rag_query_gen_prompt"].format(question=session.question)
             else:
-                history.append({"role": "user", "content": PROMPTS["rag_retry_prefix"]})
-                instruction = PROMPTS["rag_query_reform_cot_prompt" if allow_reasoning else "rag_query_reform_prompt"]
+                # Add retry prefix to history
+                retry_msg = {"role": "user", "content": PROMPTS["rag_retry_prefix"]}
+                history.append(retry_msg)
+                turn_messages.append(retry_msg)
+                query_instruction = PROMPTS["rag_query_reform_cot_prompt" if allow_reasoning else "rag_query_reform_prompt"]
 
-            if not trial.log.get("search_query"):
-                reformulation_messages = history + [{"role": "user", "content": instruction}]
-                raw_query_response, _ = self.get_llm_response(reformulation_messages, temperature=0.0, allow_reasoning=False)
+            # Add query instruction
+            query_instruction_msg = {"role": "user", "content": query_instruction}
+            query_messages = history + [query_instruction_msg]
 
-                if allow_reasoning:
-                    from ..utils import extract_query
-                    trial.log["search_query"] = extract_query(raw_query_response)
-                    trial.log["query_full_response"] = raw_query_response
-                else:
-                    trial.log["search_query"] = raw_query_response.strip().strip('"').strip("'")
-                
-                trial.log["search_results"] = self.search_engine.search(trial.log["search_query"])
-                trial.save()
-                
-                # Initial Trace update after search
-                initial_msgs = self._construct_messages(session, trial, completed_trials)
-                
-                # Apply enhancement for rich rendering, but keep FULL HISTORY
-                trace_msgs_for_update = []
-                for idx, m in enumerate(initial_msgs):
-                    role = m.get('role')
-                    content = m.get('content')
-                    
-                    if role == 'system' and idx == 0:
-                        trace_msgs_for_update.append(SimpleMsg('system', content))
-                        continue
-                    
-                    # Enhance ONLY the current turn's result message (the last one)
-                    is_current_results = (idx == len(initial_msgs) - 1) and role == 'user' and isinstance(content, str) and content.strip().startswith("Search Results:")
-                    
-                    if is_current_results:
-                        results = trial.log.get("search_results")
-                        if results:
-                            wrapper_intro = PROMPTS["rag_context_wrapper"].split("{formatted_results}")[0].strip()
-                            formatted_str = self.search_engine.format_results(results)
-                            instruction_text = PROMPTS["shared_reasoning_format" if allow_reasoning else "shared_answer_request"]
-                            
-                            full_combined_content = f"{wrapper_intro}\n\n{formatted_str}\n\n{instruction_text}"
-                            trace_msgs_for_update.append(SimpleMsg(role, full_combined_content))
-                            continue
-                    
-                    if role != 'system':
-                        trace_msgs_for_update.append(SimpleMsg(role, content))
+            # Get query from LLM
+            raw_query_response, _ = self.get_llm_response(query_messages, temperature=0.0, allow_reasoning=False)
 
-                update_redis_trace(trace_msgs_for_update)
+            if allow_reasoning:
+                search_query = extract_query(raw_query_response)
+                trial.log["query_full_response"] = raw_query_response
+            else:
+                search_query = raw_query_response.strip().strip('"').strip("'")
 
-            # 2. Answer Question (Synthesize with Streaming)
-            messages = self._construct_messages(session, trial, completed_trials)
-            
-            # Identify ALL messages for TRACE (Cumulative)
-            current_turn_static_msgs = []
-            if messages:
-                for idx, m in enumerate(messages):
-                    role = m.get('role')
-                    content = m.get('content')
-                    
-                    if role == 'system' and idx == 0:
-                        current_turn_static_msgs.append(SimpleMsg('system', content))
-                        continue
-                    
-                    # Enhance ONLY the current turn's result message (the last one)
-                    is_current_results = (idx == len(messages) - 1) and role == 'user' and isinstance(content, str) and content.strip().startswith("Search Results:")
-                    
-                    if is_current_results:
-                        results = trial.log.get("search_results")
-                        if results:
-                            wrapper_intro = PROMPTS["rag_context_wrapper"].split("{formatted_results}")[0].strip()
-                            formatted_str = self.search_engine.format_results(results)
-                            instruction_text = PROMPTS["shared_reasoning_format" if allow_reasoning else "shared_answer_request"]
-                            
-                            full_combined_content = f"{wrapper_intro}\n\n{formatted_str}\n\n{instruction_text}"
-                            current_turn_static_msgs.append(SimpleMsg(role, full_combined_content))
-                            continue
+            trial.log["search_query"] = search_query
 
-                    if role != 'system':
-                        current_turn_static_msgs.append(SimpleMsg(role, content))
+            # Perform search
+            search_results = self.search_engine.search(search_query)
+            trial.log["search_results"] = search_results
+            trial.save()
 
+            # Record the query exchange
+            turn_messages.append(query_instruction_msg)
+            turn_messages.append({"role": "assistant", "content": f"Search Query: {search_query}"})
+
+            # === Phase 2: Answer Synthesis ===
+            formatted_results = self.search_engine.format_results(search_results)
+            results_instruction = "Search Results:\n" + PROMPTS["rag_context_wrapper"].format(formatted_results=formatted_results)
+            results_instruction += PROMPTS["shared_reasoning_format" if allow_reasoning else "shared_answer_request"]
+
+            results_msg = {"role": "user", "content": results_instruction}
+            turn_messages.append(results_msg)
+
+            # Build full message list for answer generation
+            answer_messages = history + turn_messages
+
+            # Update trace before streaming
+            update_redis_trace(answer_messages)
+
+            # Stream the answer
             full_response = ""
-            
             chunk_count = 0
-            for partial_response in self.get_llm_response_stream(messages):
+            for partial_response in self.get_llm_response_stream(answer_messages):
                 full_response = partial_response
                 chunk_count += 1
                 if chunk_count % 5 == 0:
-                    update_redis_trace(current_turn_static_msgs + [SimpleMsg("assistant", full_response)])
-            
-            # Final trace update for synthesising phase
-            update_redis_trace(current_turn_static_msgs + [SimpleMsg("assistant", full_response)])
-            
+                    update_redis_trace(answer_messages + [{"role": "assistant", "content": full_response}])
+
+            # Final trace update
+            assistant_msg = {"role": "assistant", "content": full_response}
+            turn_messages.append(assistant_msg)
+            final_messages = history + turn_messages
+            update_redis_trace(final_messages)
+
+            # Extract answer
             if allow_reasoning:
                 answer = extract_final_answer(full_response)
             else:
                 answer = full_response
-            
-            # 3. Finalize
+
+            # === Phase 3: Finalize ===
             is_correct_llm = check_answer_llm(session.question, session.ground_truths, answer, client=self.client, model=self.model)
             is_correct_rule = check_answer_rule(session.question, session.ground_truths, answer)
-
-            # Store raw messages (authentic LLM context) - trace is parsed on-demand
-            final_messages = messages + [{"role": "assistant", "content": full_response}]
 
             trial.answer = answer
             trial.is_correct_llm = is_correct_llm
             trial.is_correct_rule = is_correct_rule
             trial.feedback = "Correct" if is_correct_llm else "Incorrect"
             trial.status = 'completed'
-            trial.log["messages"] = final_messages
+
+            # Store only this turn's messages (not full history) for clean reconstruction
+            trial.log["messages"] = turn_messages
+            trial.log["meta"] = self._get_trial_meta(trial)
             trial.save()
 
-            # 4. Update Persistence Cache
-            redis_client.set(history_key, json.dumps(final_messages), ex=RedisKeys.DEFAULT_TTL)
-
-            # 5. Cache for UI (parse trace for real-time display)
+            # Cache status for UI
             try:
-                trace, _ = TraceFormatter.serialize([SimpleMsg(m["role"], m["content"]) for m in final_messages])
+                trace_msgs = build_trace_msgs(final_messages)
+                trace, _ = TraceFormatter.serialize(trace_msgs)
                 status_data = {
                     "id": trial.id, "status": "completed", "answer": answer, "feedback": trial.feedback,
                     "is_correct_llm": is_correct_llm, "is_correct_rule": is_correct_rule,
@@ -286,4 +198,4 @@ class RagMultiTurnPipeline(BaseMultiTurnPipeline):
             except Exception as e:
                 print_debug(f"Failed to cache RAG trace: {e}")
 
-            return answer, is_correct_llm, trial.log.get("search_results", [])
+            return answer, is_correct_llm, search_results

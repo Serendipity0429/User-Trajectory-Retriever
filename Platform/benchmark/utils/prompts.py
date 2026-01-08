@@ -68,14 +68,14 @@ Your goal is to answer the user's question accurately using the provided search 
 Output ONLY the query.
 
 Question: {question}
-Query:""",
+Search Query:""",
 
     "rag_query_gen_cot_prompt": """Generate a search query to answer the following question.
 Format your response as follows:
 <think>
 <step-by-step thinking>
 </think>
-Query: <search query only>
+Search Query: <search query only>
 
 Question: {question}""",
 
@@ -92,13 +92,13 @@ Format your response as follows:
 <think>
 <step-by-step thinking>
 </think>
-Query: <search query only>
+Search Query: <search query only>
 """,
 
     "rag_context_wrapper": """Here are the search results you can use to answer the question. Each result is wrapped in <source i> ... </source i> tags, where i is the result number.
 {formatted_results}""",
 
-    "rag_context_debug_wrapper": """Context from search results (Query: {query}):
+    "rag_context_debug_wrapper": """Context from search results (Search Query: {query}):
 {results}
 
 Question: {question}

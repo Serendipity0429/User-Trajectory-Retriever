@@ -42,7 +42,7 @@ window.BenchmarkUI.AgentSteps = {
 
     _renderAction: function(content) {
         // Special case: Search Query text format
-        if (typeof content === 'string' && content.trim().startsWith('Query:')) {
+        if (typeof content === 'string' && content.trim().startsWith('Search Query:')) {
             const element = BenchmarkUtils.renderTemplate('tpl-agent-action', {
                 '.agent-badge-text': { addClass: 'bg-info bg-opacity-10 text-info border-info border-opacity-25' },
                 '.badge-icon': { addClass: 'bi-search' },

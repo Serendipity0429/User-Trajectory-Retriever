@@ -45,7 +45,7 @@ def extract_query(text):
     """
     Extracts the query from an LLM response.
     1. Handles <think>...</think> blocks by removing them.
-    2. Looks for "Query:".
+    2. Looks for "Search Query:".
     """
     if not text:
         return ""

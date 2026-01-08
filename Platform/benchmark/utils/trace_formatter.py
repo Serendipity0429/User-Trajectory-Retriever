@@ -105,7 +105,7 @@ def parse_react_content(content):
         for line in lines:
             stripped = line.strip()
             # Detect headers (deprecated Thought:/Reasoning: removed - use <think> tags or think tool)
-            if stripped.startswith("Query:"):
+            if stripped.startswith("Search Query:"):
                 flush_current()
                 current_type = "action"
                 current_lines.append(line)  # Keep header for Query

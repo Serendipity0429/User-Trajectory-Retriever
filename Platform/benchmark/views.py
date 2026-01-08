@@ -102,8 +102,8 @@ def _calculate_query_metrics(trial_list, is_rag=False, is_agent=False):
             if not q:
                 # Try to extract from trace
                 for msg in t_log.get("trace", []):
-                     if msg.get("role") == "assistant" and "Query:" in msg.get("content", ""):
-                        q = msg.get("content").replace("Query:", "").strip()
+                     if msg.get("role") == "assistant" and "Search Query:" in msg.get("content", ""):
+                        q = msg.get("content").replace("Search Query:", "").strip()
                         break
             if q:
                 all_queries.append(q)

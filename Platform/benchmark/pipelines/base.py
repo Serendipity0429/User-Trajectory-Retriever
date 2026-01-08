@@ -223,6 +223,13 @@ class BaseMultiTurnPipeline(BasePipeline):
     def _construct_messages(self, session, trial, completed_trials):
         raise NotImplementedError("Subclasses must implement _construct_messages")
 
+    def _get_trial_meta(self, trial) -> dict:
+        """
+        Override to return baseline-specific metadata for export/analytics.
+        This data is stored in trial.log['meta'] separate from conversation messages.
+        """
+        return {}
+
     def _process_single_session(self, group, question_text, ground_truths, existing_session=None):
         """
         Process a single question session, including retries.

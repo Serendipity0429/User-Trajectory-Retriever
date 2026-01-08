@@ -177,6 +177,7 @@ window.BenchmarkSessionUI.addNewSessionToList = function(sessionListId, sessionI
 
 /**
  * Update statistics UI for multi-turn benchmarks.
+ * Uses backend API for metrics calculation and renders all groups dynamically.
  * @param {Array} results - Array of result objects.
  * @param {string} groupName - Name of the group/run.
  * @param {function} loadSessionCallback - Callback to load a session.
@@ -192,70 +193,146 @@ window.BenchmarkSessionUI.updateStatsUI = function(results, groupName, loadSessi
     }
 
     const total = results.length;
-    if (total === 0) return;
-
-    const correct = results.filter(r => r.correct === true).length;
-    const incorrect = results.filter(r => r.correct === false).length;
-    const error = results.filter(r => r.correct !== true && r.correct !== false).length;
-    const accuracy = (correct / total) * 100;
-
-    // Basic Stats
-    this._setElementText('stats-accuracy', `${accuracy.toFixed(2)}%`);
-    this._setElementText('stats-correct-count', correct);
-    this._setElementText('stats-incorrect-count', incorrect);
-    this._setElementText('stats-error-count', error);
-
-    // Rule-based Accuracy & Coherence
-    const correctRule = results.filter(r => r.is_correct_rule === true).length;
-    const ruleAccuracy = (correctRule / total) * 100;
-    this._setElementText('stats-rule-accuracy', `${ruleAccuracy.toFixed(2)}%`);
-
-    const avgCoherence = results.reduce((sum, r) => sum + (r.coherence || 0), 0) / total;
-    this._setElementText('stats-coherence', `${(avgCoherence * 100).toFixed(2)}%`);
-
-    // Average trials
-    const totalTrials = results.reduce((sum, r) => sum + (r.trials || 0), 0);
-    const avgTrials = totalTrials / total;
-    this._setElementText('stats-avg-trials-all', avgTrials.toFixed(2));
-
-    const successResults = results.filter(r => r.correct === true);
-    const successTrials = successResults.reduce((sum, r) => sum + (r.trials || 0), 0);
-    const avgSuccessTrials = successResults.length > 0 ? successTrials / successResults.length : 0;
-    this._setElementText('stats-avg-trials-success', avgSuccessTrials.toFixed(2));
-
-    // First try success
-    const firstTrySuccess = results.filter(r => r.initial_correct === true).length;
-    const firstTryRate = (firstTrySuccess / total) * 100;
-    this._setElementText('stats-first-try-success', `${firstTryRate.toFixed(2)}%`);
-
-    // Correction Gain
-    const correctionGain = accuracy - firstTryRate;
-    this._setElementText('stats-correction-gain', `+${correctionGain.toFixed(2)}%`);
-
-    // Give up rate
-    const giveUp = results.filter(r => r.correct === false).length;
-    const giveUpRate = (giveUp / total) * 100;
-    this._setElementText('stats-give-up-rate', `${giveUpRate.toFixed(2)}%`);
-
-    // Self-Correction Rate
-    const initialFailures = results.filter(r => r.initial_correct === false);
-    const selfCorrected = initialFailures.filter(r => r.correct === true);
-    const selfRecoveryRate = initialFailures.length > 0 ? (selfCorrected.length / initialFailures.length) * 100 : 0;
-    const scEl = document.getElementById('stats-self-correction-rate');
-    if (scEl) {
-        scEl.textContent = `${selfRecoveryRate.toFixed(2)}%`;
-        scEl.title = `${selfCorrected.length} corrected out of ${initialFailures.length} initial failures`;
+    if (total === 0) {
+        this._showMetricsPlaceholder('No results to display');
+        return;
     }
 
-    // Error Rate
-    const errorRate = (error / total) * 100;
-    this._setElementText('stats-error-rate', `${errorRate.toFixed(2)}%`);
+    // Call the backend metrics API
+    BenchmarkAPI.post(BenchmarkUrls.metrics.calculate, { results })
+        .then(response => {
+            if (response.status !== 'ok') {
+                console.error('Metrics calculation failed:', response.message);
+                this._showMetricsPlaceholder('Failed to calculate metrics');
+                return;
+            }
+            this._renderAllMetricsFromAPI(response.metrics, response.groups, response.summary);
+        })
+        .catch(err => {
+            console.error('Error fetching metrics:', err);
+            this._showMetricsPlaceholder('Error loading metrics');
+        });
+};
 
-    // Behavioral Analysis Metrics
-    this._renderBehavioralMetrics(results, firstTryRate, selfRecoveryRate, correctionGain);
+/**
+ * Show placeholder message in metrics container
+ * @private
+ */
+window.BenchmarkSessionUI._showMetricsPlaceholder = function(message) {
+    const container = document.getElementById('metrics-groups-container');
+    if (container) {
+        container.innerHTML = `
+            <div class="text-center text-muted py-4">
+                <i class="bi bi-info-circle me-2"></i>${message}
+            </div>
+        `;
+    }
+};
 
-    // Baseline-Specific Metrics
-    this._renderSpecificMetrics(results);
+/**
+ * Render all metrics organized by groups from API response
+ * @private
+ */
+window.BenchmarkSessionUI._renderAllMetricsFromAPI = function(metrics, groups, summary) {
+    const container = document.getElementById('metrics-groups-container');
+    if (!container) return;
+
+    // Clear container
+    container.innerHTML = '';
+
+    // Sort groups by priority
+    const sortedGroups = (groups || []).slice().sort((a, b) => a.priority - b.priority);
+
+    // Organize metrics by group
+    const metricsByGroup = {};
+    for (const [key, metric] of Object.entries(metrics)) {
+        const group = metric.group;
+        if (!metricsByGroup[group]) {
+            metricsByGroup[group] = [];
+        }
+        metricsByGroup[group].push(metric);
+    }
+
+    // Sort metrics within each group by priority
+    for (const group of Object.keys(metricsByGroup)) {
+        metricsByGroup[group].sort((a, b) => a.priority - b.priority);
+    }
+
+    // Render each group
+    for (const group of sortedGroups) {
+        const groupMetrics = metricsByGroup[group.key];
+        if (!groupMetrics || groupMetrics.length === 0) continue;
+
+        // Create group container
+        const groupDiv = document.createElement('div');
+        groupDiv.className = 'mb-4';
+        groupDiv.id = `metrics-group-${group.key}`;
+
+        // Group header
+        const header = document.createElement('h6');
+        header.className = 'section-header';
+        header.textContent = group.label;
+        groupDiv.appendChild(header);
+
+        // Metrics row
+        const metricsRow = document.createElement('div');
+        metricsRow.className = 'row g-4';
+
+        // Render metrics for this group
+        for (const metric of groupMetrics) {
+            const card = this._createMetricCardElement(metric, group.key);
+            metricsRow.appendChild(card);
+        }
+
+        groupDiv.appendChild(metricsRow);
+        container.appendChild(groupDiv);
+    }
+};
+
+/**
+ * Create a metric card element based on group and metric type
+ * @private
+ */
+window.BenchmarkSessionUI._createMetricCardElement = function(metric, groupKey) {
+    // Special layout for outcome group (horizontal counts)
+    if (groupKey === 'outcome' && metric.format_type === 'count') {
+        return this._createOutcomeMetricCard(metric);
+    }
+
+    // Default card layout
+    return BenchmarkUtils.createMetricCardWithColor(metric);
+};
+
+/**
+ * Create outcome count metric card with appropriate styling
+ * @private
+ */
+window.BenchmarkSessionUI._createOutcomeMetricCard = function(metric) {
+    const col = document.createElement('div');
+    col.className = 'col-lg-3 col-md-4';
+
+    const color = metric.color || { border: '#6c757d', text: '#495057', bg: '#f8f9fa' };
+
+    // Map metric keys to icons
+    const icons = {
+        'correct_count': 'bi-check-circle',
+        'incorrect_count': 'bi-x-circle',
+        'error_count': 'bi-exclamation-triangle'
+    };
+    const icon = icons[metric.key] || 'bi-circle';
+
+    col.innerHTML = `
+        <div class="metric-card" style="border-top: 4px solid ${color.border};">
+            <div class="card-body text-center">
+                <div class="fw-bold fs-3" style="color: ${color.text};">${metric.formatted}</div>
+                <div class="small fw-medium" style="color: ${color.text};">
+                    <i class="bi ${icon} me-1"></i>${metric.label}
+                </div>
+                <div class="small text-muted">${metric.description}</div>
+            </div>
+        </div>
+    `;
+    return col;
 };
 
 /**
@@ -265,100 +342,4 @@ window.BenchmarkSessionUI.updateStatsUI = function(results, groupName, loadSessi
 window.BenchmarkSessionUI._setElementText = function(id, text) {
     const el = document.getElementById(id);
     if (el) el.textContent = text;
-};
-
-/**
- * Render behavioral analysis metrics
- * @private
- */
-window.BenchmarkSessionUI._renderBehavioralMetrics = function(results, firstTryRate, selfRecoveryRate, correctionGain) {
-    const behavioralRow = document.getElementById('behavioral-metrics-row');
-    if (!behavioralRow) return;
-
-    behavioralRow.innerHTML = '';
-
-    // One-Shot Success
-    behavioralRow.appendChild(BenchmarkUtils.createMetricCard({
-        value: `${firstTryRate.toFixed(2)}%`,
-        label: 'One-Shot Success',
-        description: 'Solved on Turn 1',
-        color: 'success'
-    }));
-
-    // Recovery Rate
-    behavioralRow.appendChild(BenchmarkUtils.createMetricCard({
-        value: `${selfRecoveryRate.toFixed(2)}%`,
-        label: 'Recovery Rate',
-        description: 'Failures Fixed Later',
-        color: 'primary'
-    }));
-
-    // Stubbornness Index
-    const stubbornSessions = results.filter(r => r.stubborn_score !== undefined && r.stubborn_score !== null && r.stubborn_score > 0);
-    if (stubbornSessions.length > 0) {
-        const totalStub = stubbornSessions.reduce((sum, r) => sum + Number(r.stubborn_score), 0);
-        const avgStub = totalStub / stubbornSessions.length;
-
-        behavioralRow.appendChild(BenchmarkUtils.createMetricCard({
-            value: `${(avgStub * 100).toFixed(2)}%`,
-            label: 'Stubbornness Index',
-            description: 'Repetition on Failure',
-            color: 'secondary'
-        }));
-    }
-
-    // Correction Gain
-    behavioralRow.appendChild(BenchmarkUtils.createMetricCard({
-        value: `+${correctionGain.toFixed(2)}%`,
-        label: 'Correction Gain',
-        description: 'Multi-turn Lift',
-        color: 'purple'
-    }));
-};
-
-/**
- * Render baseline-specific metrics
- * @private
- */
-window.BenchmarkSessionUI._renderSpecificMetrics = function(results) {
-    const specificContainer = document.getElementById('specific-metrics-container');
-    const specificRow = document.getElementById('specific-metrics-row');
-    if (!specificContainer || !specificRow) return;
-
-    specificRow.innerHTML = '';
-    let hasSpecific = false;
-
-    // Avg Search Count
-    const searchCountSessions = results.filter(r => r.search_count !== undefined);
-    if (searchCountSessions.length > 0) {
-        const totalSearch = searchCountSessions.reduce((sum, r) => sum + Number(r.search_count), 0);
-        const avgSearch = totalSearch / searchCountSessions.length;
-
-        specificRow.appendChild(BenchmarkUtils.createMetricCard({
-            value: avgSearch.toFixed(2),
-            label: 'Search Queries',
-            description: 'Avg. Queries per Session',
-            color: 'info'
-        }));
-        hasSpecific = true;
-    }
-
-    // Avg Query Shift
-    const shiftSessions = results.filter(r => r.query_shift !== undefined && r.query_shift !== null);
-    if (shiftSessions.length > 0) {
-        const totalShift = shiftSessions.reduce((sum, r) => sum + Number(r.query_shift), 0);
-        const avgShift = totalShift / shiftSessions.length;
-
-        specificRow.appendChild(BenchmarkUtils.createMetricCard({
-            value: avgShift.toFixed(3),
-            label: 'Query Diversity',
-            description: 'Avg. Query Shift Distance',
-            color: 'warning'
-        }));
-        hasSpecific = true;
-
-        this._setElementText('stats-avg-query-shift', avgShift.toFixed(3));
-    }
-
-    specificContainer.style.display = hasSpecific ? 'block' : 'none';
 };

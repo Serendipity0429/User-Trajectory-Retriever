@@ -1,8 +1,8 @@
 import asyncio
 import threading
 from asgiref.sync import sync_to_async
-from .pipelines.agent import BrowserAgentPipeline
-from .models import MultiTurnSession, MultiTurnTrial
+from ..pipelines.agent import BrowserAgentPipeline
+from ..models import MultiTurnSession, MultiTurnTrial
 
 class PipelineManager:
     _instance = None

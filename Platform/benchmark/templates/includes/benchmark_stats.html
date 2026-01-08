@@ -7,113 +7,16 @@
                 <button id="export-results-btn" class="btn btn-sm btn-outline-success"><i class="bi bi-file-earmark-excel me-1"></i> Export as CSV</button>
             </div>
         </div>
-        
-        <!-- Grouped Metrics -->
-        <div class="row g-4 mb-4" id="summary-container">
-            <!-- Row 1: Key Performance Indicators -->
-            <div class="col-12">
-                <h6 class="section-header">Key Performance Indicators</h6>
-            </div>
-            
-            <!-- Accuracy (LLM) - Hero Metric with Validation -->
-            <div class="col-md-4">
-                <div class="metric-card border-top-primary">
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between">
-                            <div class="flex-grow-1">
-                                <div class="metric-label">Accuracy (LLM Judge)</div>
-                                <div class="metric-value text-primary-emphasis" id="stats-accuracy">0.00%</div>
-                                <div class="small text-muted">Core Success Rate</div>
-                            </div>
-                            <div class="d-flex flex-column justify-content-between text-end ms-3">
-                                <div>
-                                    <div class="h5 mb-0 fw-bold text-primary-emphasis" id="stats-rule-accuracy">0.00%</div>
-                                    <div class="text-muted" style="font-size: 0.7rem;">Rule-Based</div>
-                                </div>
-                                <div>
-                                    <div class="h5 mb-0 fw-bold text-primary-emphasis" id="stats-coherence">0.00%</div>
-                                    <div class="text-muted" style="font-size: 0.7rem;">Coherence</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
 
-            <!-- Counts - Horizontal with Vertical Lines -->
-            <div class="col-md-4">
-                <div class="metric-card border-top-secondary">
-                    <div class="card-body d-flex flex-column justify-content-center">
-                        <div class="metric-label mb-3 text-center">Outcome Distribution</div>
-                        <div class="d-flex justify-content-between align-items-center text-center">
-                            <!-- Correct -->
-                            <div class="flex-grow-1">
-                                <div class="fw-bold text-success fs-4" id="stats-correct-count">0</div>
-                                <div class="small text-success fw-medium"><i class="bi bi-check-circle me-1"></i>Correct</div>
-                            </div>
-
-                            <!-- Vertical Divider -->
-                            <div class="vr bg-secondary opacity-25" style="height: 40px; width: 1px;"></div>
-
-                            <!-- Incorrect -->
-                            <div class="flex-grow-1">
-                                <div class="fw-bold text-danger fs-4" id="stats-incorrect-count">0</div>
-                                <div class="small text-danger fw-medium"><i class="bi bi-x-circle me-1"></i>Incorrect</div>
-                            </div>
-
-                            <!-- Vertical Divider -->
-                            <div class="vr bg-secondary opacity-25" style="height: 40px; width: 1px;"></div>
-
-                            <!-- Error -->
-                            <div class="flex-grow-1">
-                                <div class="fw-bold text-warning text-dark fs-4" id="stats-error-count">0</div>
-                                <div class="small text-warning text-dark fw-medium"><i class="bi bi-exclamation-triangle me-1"></i>Error</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Efficiency (Combined) -->
-            <div class="col-md-4">
-                <div class="metric-card border-top-warning">
-                     <div class="card-body d-flex flex-column justify-content-center">
-                        <div class="metric-label">Efficiency Cost</div>
-                        <div class="d-flex align-items-baseline">
-                            <span class="metric-value text-dark me-2" id="stats-avg-trials-all">0.00</span>
-                            <span class="text-muted small">avg. turns</span>
-                        </div>
-                        <div class="small text-muted mt-1">
-                           Success Avg: <span class="fw-bold" id="stats-avg-trials-success">0.00</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Row 2: Behavioral & Validation -->
-            <div class="col-12 mt-4">
-                <h6 class="section-header">Behavioral Analysis & Validation</h6>
-            </div>
-
-            <!-- Behavioral Analysis Cards Container (Dynamically Generated) -->
-            <div class="col-12">
-                <div class="row g-4" id="behavioral-metrics-row"></div>
-            </div>
-
-             <!-- Search & Retrieval Metrics Placeholder -->
-            <div class="col-12" id="specific-metrics-container" style="display: none;">
-                 <h6 class="section-header mt-4">Search & Retrieval Metrics</h6>
-                 <div class="row g-4 mt-2" id="specific-metrics-row"></div>
-            </div>
-            
-            <!-- Hidden Stats for Compatibility -->
-            <div style="display: none;">
-                 <span id="stats-give-up-rate">0.00%</span>
-                 <span id="stats-avg-query-shift">0.00</span>
-                 <span id="stats-error-rate">0.00%</span>
+        <!-- Dynamic Metrics Container - All groups rendered from API -->
+        <div id="metrics-groups-container" class="mb-4">
+            <!-- Groups will be dynamically inserted here by JavaScript -->
+            <div class="text-center text-muted py-4" id="metrics-loading-placeholder">
+                <i class="bi bi-hourglass-split me-2"></i>Waiting for results...
             </div>
         </div>
 
+        <!-- Results Table -->
         <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
             <table class="table table-hover align-middle mb-0">
                 <thead class="table-light text-uppercase small fw-bold text-muted">

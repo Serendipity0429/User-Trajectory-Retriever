@@ -63,7 +63,7 @@ window.BenchmarkUtils = {
     },
 
     /**
-     * Create a styled metric card.
+     * Create a styled metric card (legacy, uses Bootstrap color names).
      * @param {object} config - { value, label, description, color }
      * @returns {HTMLElement} The metric card element
      */
@@ -76,6 +76,29 @@ window.BenchmarkUtils = {
                     <div class="metric-label">${config.label}</div>
                     <div class="metric-value text-${config.color}-emphasis">${config.value}</div>
                     <div class="small text-muted">${config.description}</div>
+                </div>
+            </div>`;
+        return col;
+    },
+
+    /**
+     * Create a styled metric card with dynamic colors from API.
+     * Uses inline styles for consistent color rendering based on metric name hash.
+     * @param {object} metric - Metric object from API with { formatted, label, description, color }
+     * @returns {HTMLElement} The metric card element
+     */
+    createMetricCardWithColor: function(metric) {
+        const col = document.createElement('div');
+        col.className = 'col-lg-3 col-md-6';
+
+        const color = metric.color || { border: '#6c757d', text: '#495057', bg: '#f8f9fa' };
+
+        col.innerHTML = `
+            <div class="metric-card" style="border-top: 4px solid ${color.border};">
+                <div class="card-body">
+                    <div class="metric-label">${metric.label}</div>
+                    <div class="metric-value" style="color: ${color.text};">${metric.formatted}</div>
+                    <div class="small text-muted">${metric.description}</div>
                 </div>
             </div>`;
         return col;

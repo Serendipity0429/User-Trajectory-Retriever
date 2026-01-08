@@ -10,7 +10,7 @@ from ..utils import (
     print_debug, 
     VanillaAgentFactory, BrowserAgentFactory
 )
-from ..mcp_manager import MCPManager
+from ..utils.mcp_manager import MCPManager
 from .base import BaseAgentPipeline, REDIS_PREFIX_BROWSER_AGENT
 import inspect
 

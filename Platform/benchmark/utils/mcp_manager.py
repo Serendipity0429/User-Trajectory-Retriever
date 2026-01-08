@@ -1,7 +1,7 @@
 import os
 from agentscope.mcp import StdIOStatefulClient
 from agentscope.tool import Toolkit
-from .utils import print_debug
+from . import print_debug
 
 class MCPManager:
     """

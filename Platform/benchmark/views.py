@@ -50,7 +50,7 @@ from .pipelines.agent import (
     VanillaAgentPipeline,
     BrowserAgentPipeline,
 )
-from .pipeline_manager import PipelineManager
+from .utils.pipeline_manager import PipelineManager
 from .services import TrialService
 from benchmark.utils import PROMPTS
 
@@ -137,10 +137,113 @@ def _calculate_session_metrics(trial_list, is_rag=False, is_agent=False):
 
     stubborn_score = _calculate_stubbornness(trial_list)
     query_shift, search_count = _calculate_query_metrics(trial_list, is_rag, is_agent)
-    
+
     return stubborn_score, (query_shift if (is_rag or is_agent) else None), search_count
 
-# ========================================== 
+
+# ==========================================
+# Aggregate Metrics API
+# ==========================================
+
+from .utils.metrics import (
+    calculate_aggregate_metrics,
+    get_all_metric_colors,
+    get_metric_groups,
+    get_metric_definitions,
+    get_metrics_by_group,
+)
+
+@admin_required
+@require_POST
+def calculate_metrics(request):
+    """
+    Calculate aggregate metrics from session results.
+
+    Accepts POST with JSON body containing:
+    - results: List of result dicts (from _get_run_results or frontend)
+
+    Returns:
+    - metrics: Dict of all calculated metrics with values and colors
+    - total: Total number of sessions
+    - summary: Quick summary stats
+    """
+    try:
+        data = json.loads(request.body)
+        results = data.get("results", [])
+
+        if not results:
+            return JsonResponse({
+                "status": "error",
+                "message": "No results provided"
+            }, status=400)
+
+        metrics_data = calculate_aggregate_metrics(results)
+        return JsonResponse({
+            "status": "ok",
+            **metrics_data
+        })
+    except json.JSONDecodeError:
+        return JsonResponse({
+            "status": "error",
+            "message": "Invalid JSON"
+        }, status=400)
+    except Exception as e:
+        return JsonResponse({
+            "status": "error",
+            "message": str(e)
+        }, status=500)
+
+
+@admin_required
+def get_metric_colors(request):
+    """
+    Get the color mapping for all metrics.
+
+    Useful for frontend to preload consistent colors.
+    """
+    try:
+        colors = get_all_metric_colors()
+        return JsonResponse({
+            "status": "ok",
+            "colors": colors
+        })
+    except Exception as e:
+        return JsonResponse({
+            "status": "error",
+            "message": str(e)
+        }, status=500)
+
+
+@admin_required
+def get_metric_schema(request):
+    """
+    Get the full metric schema including groups, definitions, and colors.
+
+    This provides the frontend with all information needed to render metrics
+    without hardcoding any group or metric information.
+
+    Returns:
+    - groups: List of metric groups sorted by priority
+    - definitions: Dict of all metric definitions
+    - metrics_by_group: Metrics organized by group, sorted by priority within each group
+    - colors: Color mapping for all metrics
+    """
+    try:
+        return JsonResponse({
+            "status": "ok",
+            "groups": get_metric_groups(),
+            "definitions": get_metric_definitions(),
+            "metrics_by_group": get_metrics_by_group(),
+            "colors": get_all_metric_colors(),
+        })
+    except Exception as e:
+        return JsonResponse({
+            "status": "error",
+            "message": str(e)
+        }, status=500)
+
+
+# ==========================================
 # Core UI Views
 # ========================================== 
 

@@ -26,6 +26,13 @@ urlpatterns = [
     path("api/test_llm_connection/", views.test_llm_connection, name="test_llm_connection"),
 
     # ==========================================
+    # 3.1. API - Metrics
+    # ==========================================
+    path("api/metrics/calculate/", views.calculate_metrics, name="calculate_metrics"),
+    path("api/metrics/colors/", views.get_metric_colors, name="get_metric_colors"),
+    path("api/metrics/schema/", views.get_metric_schema, name="get_metric_schema"),
+
+    # ==========================================
     # 4. API - Datasets
     # ==========================================
     path('api/datasets/list/', views.dataset_list, name='dataset_list'),

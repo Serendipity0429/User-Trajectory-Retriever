@@ -13,6 +13,13 @@ window.BenchmarkUrls = {
     // API - Common / General
     webSearch: `${API_PREFIX}/web_search/`,
 
+    // Metrics
+    metrics: {
+        calculate: `${API_PREFIX}/metrics/calculate/`,
+        colors: `${API_PREFIX}/metrics/colors/`,
+        schema: `${API_PREFIX}/metrics/schema/`
+    },
+
     // Datasets
     datasets: {
         sync: `${API_PREFIX}/datasets/sync/`,

@@ -84,15 +84,31 @@ def _calculate_stubbornness(trial_list):
         return total_stubbornness / incorrect_transitions
     return 0.0
 
-def _calculate_query_metrics(trial_list, is_rag=False, is_agent=False):
+def _calculate_query_metrics(trial_list, is_rag=False, is_agent=False, original_question=None):
     """
-    Computes query shift and search count from session logs.
+    Computes comprehensive query diversity metrics from session logs.
+
+    Returns a dict with all query metrics:
+    - query_shift: Average dissimilarity between consecutive queries
+    - search_count: Total number of search queries
+    - query_uniqueness: Ratio of unique queries (0-1)
+    - query_repetition: Count of duplicate queries
+    - avg_query_length: Mean word count per query
+    - first_query_success: 1 if first trial was correct, 0 otherwise (or None)
+    - query_drift: Average deviation from original question (0-1)
+    - query_convergence: Diversity trend (negative = converging)
     """
     search_count = 0
     all_queries = []
-    
-    for t in trial_list:
+    first_trial_correct = None
+
+    for i, t in enumerate(trial_list):
         t_log = t.log or {}
+
+        # Track first trial correctness for first_query_success
+        if i == 0:
+            first_trial_correct = t.is_correct_llm
+
         if is_agent:
             t_queries = t_log.get("search_queries", [])
             all_queries.extend(t_queries)
@@ -108,12 +124,46 @@ def _calculate_query_metrics(trial_list, is_rag=False, is_agent=False):
             if q:
                 all_queries.append(q)
                 search_count += 1
-                
-    query_shift = 0.0
-    shift_count = 0
-    total_query_shift = 0.0
-    
+
+    # Initialize result dict with defaults
+    result = {
+        'query_shift': 0.0,
+        'search_count': search_count,
+        'query_uniqueness': None,
+        'query_repetition': None,
+        'avg_query_length': None,
+        'first_query_success': None,
+        'query_drift': None,
+        'query_convergence': None,
+    }
+
+    # Return early if no queries
+    if len(all_queries) == 0:
+        return result
+
+    # Basic metrics (valid for >= 1 query)
+    unique_queries = set(all_queries)
+    unique_count = len(unique_queries)
+    result['query_uniqueness'] = unique_count / len(all_queries)
+    result['query_repetition'] = len(all_queries) - unique_count
+    result['avg_query_length'] = sum(len(q.split()) for q in all_queries) / len(all_queries)
+
+    # First query success (valid for >= 1 query with first trial result)
+    if first_trial_correct is not None:
+        result['first_query_success'] = 1 if first_trial_correct else 0
+
+    # Query drift from original question (valid for >= 1 query with original_question)
+    if original_question and len(all_queries) >= 1:
+        total_drift = 0.0
+        for q in all_queries:
+            similarity = SequenceMatcher(None, original_question.lower(), q.lower()).ratio()
+            total_drift += (1.0 - similarity)
+        result['query_drift'] = total_drift / len(all_queries)
+
+    # Query shift (consecutive diversity, valid for >= 2 queries)
     if len(all_queries) > 1:
+        shift_count = 0
+        total_query_shift = 0.0
         for i in range(len(all_queries) - 1):
             q1, q2 = all_queries[i], all_queries[i+1]
             if q1 and q2:
@@ -121,24 +171,148 @@ def _calculate_query_metrics(trial_list, is_rag=False, is_agent=False):
                 total_query_shift += (1.0 - similarity)
                 shift_count += 1
         if shift_count > 0:
-            query_shift = total_query_shift / shift_count
-            
-    return query_shift, search_count
+            result['query_shift'] = total_query_shift / shift_count
 
-def _calculate_session_metrics(trial_list, is_rag=False, is_agent=False):
+    # Query convergence (diversity trend, valid for >= 3 queries)
+    if len(all_queries) >= 3:
+        mid = len(all_queries) // 2
+        first_half_shifts = []
+        second_half_shifts = []
+        for i in range(len(all_queries) - 1):
+            q1, q2 = all_queries[i], all_queries[i+1]
+            if q1 and q2:
+                sim = SequenceMatcher(None, q1, q2).ratio()
+                shift = 1.0 - sim
+                if i < mid:
+                    first_half_shifts.append(shift)
+                else:
+                    second_half_shifts.append(shift)
+        if first_half_shifts and second_half_shifts:
+            first_avg = sum(first_half_shifts) / len(first_half_shifts)
+            second_avg = sum(second_half_shifts) / len(second_half_shifts)
+            result['query_convergence'] = second_avg - first_avg  # Negative = converging
+
+    return result
+
+
+def _calculate_session_metrics(trial_list, is_rag=False, is_agent=False, original_question=None):
     """
-    Computes stubbornness and query shift metrics for a session trajectory.
+    Computes stubbornness and comprehensive query metrics for a session trajectory.
+
+    Returns: (stubborn_score, query_metrics_dict)
     """
     if not isinstance(trial_list, list):
         trial_list = list(trial_list)
 
     if len(trial_list) == 0:
-        return 0.0, None, 0
+        return 0.0, {
+            'query_shift': None,
+            'search_count': 0,
+            'query_uniqueness': None,
+            'query_repetition': None,
+            'avg_query_length': None,
+            'first_query_success': None,
+            'query_drift': None,
+            'query_convergence': None,
+        }
 
     stubborn_score = _calculate_stubbornness(trial_list)
-    query_shift, search_count = _calculate_query_metrics(trial_list, is_rag, is_agent)
+    query_metrics = _calculate_query_metrics(trial_list, is_rag, is_agent, original_question)
 
-    return stubborn_score, (query_shift if (is_rag or is_agent) else None), search_count
+    # Set query_shift to None for non-RAG/Agent pipelines
+    if not (is_rag or is_agent):
+        query_metrics['query_shift'] = None
+
+    return stubborn_score, query_metrics
+
+
+def _calculate_dynamics_metrics(trial_list, ground_truths=None, is_rag=False, is_agent=False):
+    """
+    Computes multi-turn dynamics metrics for a session trajectory.
+
+    Returns dict with:
+    - oscillation_count, oscillation_opportunities: For A→B→A pattern detection
+    - near_miss_count, incorrect_count: For near-miss rate calculation
+    - recovery_stuck, recovery_wasted, recovery_random, recovery_effective, recovery_total: Recovery strategy breakdown
+    """
+    if not isinstance(trial_list, list):
+        trial_list = list(trial_list)
+
+    result = {
+        'oscillation_count': 0,
+        'oscillation_opportunities': 0,
+        'near_miss_count': 0,
+        'incorrect_count': 0,
+        'recovery_stuck': 0,
+        'recovery_wasted': 0,
+        'recovery_random': 0,
+        'recovery_effective': 0,
+        'recovery_total': 0,
+    }
+
+    if len(trial_list) == 0:
+        return result
+
+    answers = [t.answer for t in trial_list if t.answer]
+
+    # 1. Answer Oscillation Detection (A→B→A patterns)
+    if len(answers) >= 3:
+        for i in range(2, len(answers)):
+            result['oscillation_opportunities'] += 1
+            sim_to_prev = SequenceMatcher(None, answers[i], answers[i-1]).ratio()
+            sim_to_two_back = SequenceMatcher(None, answers[i], answers[i-2]).ratio()
+            # Oscillation: similar to 2 steps back (>0.6), different from 1 step back (<0.4)
+            if sim_to_two_back > 0.6 and sim_to_prev < 0.4:
+                result['oscillation_count'] += 1
+
+    # 2. Near-Miss Detection (incorrect answers >50% similar to ground truth)
+    if ground_truths:
+        for t in trial_list:
+            if t.is_correct_llm is False and t.answer:
+                result['incorrect_count'] += 1
+                answer_lower = t.answer.lower().strip()
+                max_sim = 0.0
+                for gt in ground_truths:
+                    sim = SequenceMatcher(None, answer_lower, gt.lower()).ratio()
+                    max_sim = max(max_sim, sim)
+                if max_sim > 0.5:
+                    result['near_miss_count'] += 1
+
+    # 3. Recovery Strategy Analysis (only for RAG/Agent with queries)
+    if (is_rag or is_agent) and len(trial_list) >= 2:
+        for i in range(len(trial_list) - 1):
+            t1, t2 = trial_list[i], trial_list[i+1]
+            # Only analyze recovery attempts (after incorrect trial)
+            if t1.is_correct_llm is False:
+                a1 = t1.answer or ""
+                a2 = t2.answer or ""
+                log1 = t1.log or {}
+                log2 = t2.log or {}
+
+                # Get queries
+                if is_agent:
+                    q1 = " ".join(log1.get("search_queries", []))
+                    q2 = " ".join(log2.get("search_queries", []))
+                else:  # RAG
+                    q1 = log1.get("search_query", "")
+                    q2 = log2.get("search_query", "")
+
+                if a1 and a2 and q1 and q2:
+                    result['recovery_total'] += 1
+                    query_change = 1 - SequenceMatcher(None, q1, q2).ratio()
+                    answer_change = 1 - SequenceMatcher(None, a1, a2).ratio()
+
+                    # Categorize recovery strategy (threshold: 0.3)
+                    if query_change < 0.3 and answer_change < 0.3:
+                        result['recovery_stuck'] += 1
+                    elif query_change >= 0.3 and answer_change < 0.3:
+                        result['recovery_wasted'] += 1
+                    elif query_change < 0.3 and answer_change >= 0.3:
+                        result['recovery_random'] += 1
+                    else:
+                        result['recovery_effective'] += 1
+
+    return result
 
 
 # ==========================================
@@ -1036,7 +1210,12 @@ def _get_run_results(group_id, pipeline_types):
 
         ptype = session.pipeline_type
         is_agent, is_rag = ptype in ['vanilla_agent', 'browser_agent'], 'rag' in ptype
-        stubborn_score, query_shift, search_count = _calculate_session_metrics(trials, is_rag=is_rag, is_agent=is_agent)
+        stubborn_score, query_metrics = _calculate_session_metrics(
+            trials, is_rag=is_rag, is_agent=is_agent, original_question=session.question
+        )
+        dynamics_metrics = _calculate_dynamics_metrics(
+            trials, ground_truths=session.ground_truths, is_rag=is_rag, is_agent=is_agent
+        )
 
         results.append({
             "question": session.question, "correct": last_trial.is_correct_llm,
@@ -1045,7 +1224,25 @@ def _get_run_results(group_id, pipeline_types):
             "final_answer": last_trial.answer, "ground_truths": session.ground_truths, "max_retries": max_retries,
             "initial_correct": first_trial.is_correct_llm, "initial_correct_rule": first_trial.is_correct_rule,
             "pipeline_type": session.pipeline_type, "stubborn_score": stubborn_score,
-            "query_shift": query_shift, "search_count": search_count
+            # Flatten query metrics into result
+            "query_shift": query_metrics.get('query_shift'),
+            "search_count": query_metrics.get('search_count'),
+            "query_uniqueness": query_metrics.get('query_uniqueness'),
+            "query_repetition": query_metrics.get('query_repetition'),
+            "avg_query_length": query_metrics.get('avg_query_length'),
+            "first_query_success": query_metrics.get('first_query_success'),
+            "query_drift": query_metrics.get('query_drift'),
+            "query_convergence": query_metrics.get('query_convergence'),
+            # Flatten dynamics metrics into result
+            "oscillation_count": dynamics_metrics.get('oscillation_count'),
+            "oscillation_opportunities": dynamics_metrics.get('oscillation_opportunities'),
+            "near_miss_count": dynamics_metrics.get('near_miss_count'),
+            "incorrect_count": dynamics_metrics.get('incorrect_count'),
+            "recovery_stuck": dynamics_metrics.get('recovery_stuck'),
+            "recovery_wasted": dynamics_metrics.get('recovery_wasted'),
+            "recovery_random": dynamics_metrics.get('recovery_random'),
+            "recovery_effective": dynamics_metrics.get('recovery_effective'),
+            "recovery_total": dynamics_metrics.get('recovery_total'),
         })
     return JsonResponse({"results": results, "group_name": group.name, "settings": snapshot})
 

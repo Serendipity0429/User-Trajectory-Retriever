@@ -123,10 +123,10 @@ def get_metric_color(metric_name: str) -> Dict[str, str]:
 # ==========================================
 
 PIPELINE_METRIC_GROUPS: Dict[str, List[str]] = {
-    "vanilla_llm": ["core", "outcome", "efficiency", "behavioral"],
-    "rag": ["core", "outcome", "efficiency", "behavioral", "search"],
-    "vanilla_agent": ["core", "outcome", "efficiency", "behavioral", "search"],
-    "browser_agent": ["core", "outcome", "efficiency", "behavioral", "search"],
+    "vanilla_llm": ["core", "outcome", "efficiency", "behavioral", "dynamics"],
+    "rag": ["core", "outcome", "efficiency", "behavioral", "search", "dynamics"],
+    "vanilla_agent": ["core", "outcome", "efficiency", "behavioral", "search", "dynamics"],
+    "browser_agent": ["core", "outcome", "efficiency", "behavioral", "search", "dynamics"],
 }
 
 
@@ -212,6 +212,12 @@ METRIC_GROUPS: Dict[str, MetricGroup] = {
         label="Search & Retrieval",
         priority=5,
         description="RAG and Agent search metrics"
+    ),
+    "dynamics": MetricGroup(
+        key="dynamics",
+        label="Multi-Turn Dynamics",
+        priority=6,
+        description="Answer stability and recovery patterns"
     ),
 }
 
@@ -353,6 +359,131 @@ METRIC_DEFINITIONS: Dict[str, MetricDefinition] = {
         precision=3,
         is_conditional=True,
         priority=2,
+    ),
+
+    # Tier 1 - Essential Query Diversity Metrics
+    "query_uniqueness": MetricDefinition(
+        key="query_uniqueness",
+        label="Query Uniqueness",
+        description="Ratio of unique queries (100% = no duplicates)",
+        group="search",
+        format_type="percentage",
+        precision=1,
+        is_conditional=True,
+        priority=3,
+    ),
+    "query_repetition": MetricDefinition(
+        key="query_repetition",
+        label="Query Repetition",
+        description="Total duplicate queries",
+        group="search",
+        format_type="count",
+        is_conditional=True,
+        priority=4,
+    ),
+    "avg_query_length": MetricDefinition(
+        key="avg_query_length",
+        label="Avg Query Length",
+        description="Mean words per query",
+        group="search",
+        format_type="number",
+        precision=1,
+        is_conditional=True,
+        priority=5,
+    ),
+    "first_query_success": MetricDefinition(
+        key="first_query_success",
+        label="First Query Success",
+        description="Sessions where first query was sufficient",
+        group="search",
+        format_type="percentage",
+        precision=1,
+        is_conditional=True,
+        priority=6,
+    ),
+
+    # Tier 2 - Analytical Query Metrics
+    "query_drift": MetricDefinition(
+        key="query_drift",
+        label="Query Drift",
+        description="Avg deviation from original question (0=on-topic)",
+        group="search",
+        format_type="number",
+        precision=3,
+        is_conditional=True,
+        priority=7,
+    ),
+    "query_convergence": MetricDefinition(
+        key="query_convergence",
+        label="Query Convergence",
+        description="Diversity trend (negative = converging)",
+        group="search",
+        format_type="number",
+        precision=3,
+        is_conditional=True,
+        priority=8,
+    ),
+
+    # Multi-Turn Dynamics Group
+    "oscillation_rate": MetricDefinition(
+        key="oscillation_rate",
+        label="Answer Oscillation",
+        description="Rate of A→B→A flip-flopping patterns",
+        group="dynamics",
+        format_type="percentage",
+        precision=1,
+        is_conditional=True,
+        priority=1,
+    ),
+    "near_miss_rate": MetricDefinition(
+        key="near_miss_rate",
+        label="Near-Miss Rate",
+        description="Wrong answers >50% similar to ground truth",
+        group="dynamics",
+        format_type="percentage",
+        precision=1,
+        is_conditional=True,
+        priority=2,
+    ),
+    "recovery_stuck": MetricDefinition(
+        key="recovery_stuck",
+        label="Stuck Rate",
+        description="Same query & answer after failure",
+        group="dynamics",
+        format_type="percentage",
+        precision=1,
+        is_conditional=True,
+        priority=3,
+    ),
+    "recovery_wasted": MetricDefinition(
+        key="recovery_wasted",
+        label="Wasted Query Rate",
+        description="Changed query but same answer",
+        group="dynamics",
+        format_type="percentage",
+        precision=1,
+        is_conditional=True,
+        priority=4,
+    ),
+    "recovery_random": MetricDefinition(
+        key="recovery_random",
+        label="Random Answer Rate",
+        description="Same query but different answer",
+        group="dynamics",
+        format_type="percentage",
+        precision=1,
+        is_conditional=True,
+        priority=5,
+    ),
+    "recovery_effective": MetricDefinition(
+        key="recovery_effective",
+        label="Effective Recovery Rate",
+        description="Changed both query and answer",
+        group="dynamics",
+        format_type="percentage",
+        precision=1,
+        is_conditional=True,
+        priority=6,
     ),
 }
 
@@ -564,6 +695,144 @@ def calculate_query_diversity(results: List[Dict]) -> Optional[Dict[str, Any]]:
     return _build_metric(METRIC_DEFINITIONS["query_diversity"], avg_query_shift)
 
 
+def calculate_query_uniqueness(results: List[Dict]) -> Optional[Dict[str, Any]]:
+    """Calculate average query uniqueness ratio. Returns None if no data."""
+    sessions = [r for r in results if r.get("query_uniqueness") is not None]
+    if not sessions:
+        return None
+    avg = sum(r.get("query_uniqueness", 0) for r in sessions) / len(sessions) * 100
+    return _build_metric(METRIC_DEFINITIONS["query_uniqueness"], avg)
+
+
+def calculate_query_repetition(results: List[Dict]) -> Optional[Dict[str, Any]]:
+    """Calculate total duplicate query count. Returns None if no data."""
+    sessions = [r for r in results if r.get("query_repetition") is not None]
+    if not sessions:
+        return None
+    total = sum(r.get("query_repetition", 0) for r in sessions)
+    return _build_metric(METRIC_DEFINITIONS["query_repetition"], total)
+
+
+def calculate_avg_query_length(results: List[Dict]) -> Optional[Dict[str, Any]]:
+    """Calculate average query length in words. Returns None if no data."""
+    sessions = [r for r in results if r.get("avg_query_length") is not None]
+    if not sessions:
+        return None
+    avg = sum(r.get("avg_query_length", 0) for r in sessions) / len(sessions)
+    return _build_metric(METRIC_DEFINITIONS["avg_query_length"], avg)
+
+
+def calculate_first_query_success(results: List[Dict]) -> Optional[Dict[str, Any]]:
+    """Calculate first query success rate. Returns None if no data."""
+    sessions = [r for r in results if r.get("first_query_success") is not None]
+    if not sessions:
+        return None
+    rate = sum(r.get("first_query_success", 0) for r in sessions) / len(sessions) * 100
+    return _build_metric(METRIC_DEFINITIONS["first_query_success"], rate)
+
+
+def calculate_query_drift(results: List[Dict]) -> Optional[Dict[str, Any]]:
+    """Calculate average query drift from original question. Returns None if no data."""
+    sessions = [r for r in results if r.get("query_drift") is not None]
+    if not sessions:
+        return None
+    avg = sum(r.get("query_drift", 0) for r in sessions) / len(sessions)
+    return _build_metric(METRIC_DEFINITIONS["query_drift"], avg)
+
+
+def calculate_query_convergence(results: List[Dict]) -> Optional[Dict[str, Any]]:
+    """Calculate average query convergence trend. Returns None if no data."""
+    sessions = [r for r in results if r.get("query_convergence") is not None]
+    if not sessions:
+        return None
+    avg = sum(r.get("query_convergence", 0) for r in sessions) / len(sessions)
+    return _build_metric(METRIC_DEFINITIONS["query_convergence"], avg)
+
+
+# ==========================================
+# Multi-Turn Dynamics Metrics
+# ==========================================
+
+def calculate_oscillation_rate(results: List[Dict]) -> Optional[Dict[str, Any]]:
+    """
+    Calculate answer oscillation rate (A→B→A patterns).
+    Returns None if no multi-trial sessions.
+    """
+    total_oscillations = 0
+    total_opportunities = 0
+
+    for r in results:
+        oscillations = r.get("oscillation_count", 0)
+        opportunities = r.get("oscillation_opportunities", 0)
+        if opportunities is not None and opportunities > 0:
+            total_oscillations += oscillations or 0
+            total_opportunities += opportunities
+
+    if total_opportunities == 0:
+        return None
+
+    rate = (total_oscillations / total_opportunities) * 100
+    return _build_metric(METRIC_DEFINITIONS["oscillation_rate"], rate)
+
+
+def calculate_near_miss_rate(results: List[Dict]) -> Optional[Dict[str, Any]]:
+    """
+    Calculate near-miss rate (incorrect answers >50% similar to ground truth).
+    Returns None if no incorrect answers.
+    """
+    total_near_misses = 0
+    total_incorrect = 0
+
+    for r in results:
+        near_misses = r.get("near_miss_count", 0)
+        incorrect = r.get("incorrect_count", 0)
+        if incorrect is not None and incorrect > 0:
+            total_near_misses += near_misses or 0
+            total_incorrect += incorrect
+
+    if total_incorrect == 0:
+        return None
+
+    rate = (total_near_misses / total_incorrect) * 100
+    return _build_metric(METRIC_DEFINITIONS["near_miss_rate"], rate)
+
+
+def calculate_recovery_stuck(results: List[Dict]) -> Optional[Dict[str, Any]]:
+    """Calculate stuck rate (same query & answer after failure)."""
+    total = sum(r.get("recovery_total", 0) or 0 for r in results)
+    if total == 0:
+        return None
+    stuck = sum(r.get("recovery_stuck", 0) or 0 for r in results)
+    return _build_metric(METRIC_DEFINITIONS["recovery_stuck"], (stuck / total) * 100)
+
+
+def calculate_recovery_wasted(results: List[Dict]) -> Optional[Dict[str, Any]]:
+    """Calculate wasted query rate (changed query but same answer)."""
+    total = sum(r.get("recovery_total", 0) or 0 for r in results)
+    if total == 0:
+        return None
+    wasted = sum(r.get("recovery_wasted", 0) or 0 for r in results)
+    return _build_metric(METRIC_DEFINITIONS["recovery_wasted"], (wasted / total) * 100)
+
+
+def calculate_recovery_random(results: List[Dict]) -> Optional[Dict[str, Any]]:
+    """Calculate random answer rate (same query but different answer)."""
+    total = sum(r.get("recovery_total", 0) or 0 for r in results)
+    if total == 0:
+        return None
+    random_ans = sum(r.get("recovery_random", 0) or 0 for r in results)
+    return _build_metric(METRIC_DEFINITIONS["recovery_random"], (random_ans / total) * 100)
+
+
+def calculate_recovery_effective(results: List[Dict]) -> Optional[Dict[str, Any]]:
+    """Calculate effective recovery rate (changed both query and answer)."""
+    total = sum(r.get("recovery_total", 0) or 0 for r in results)
+    if total == 0:
+        return None
+    effective = sum(r.get("recovery_effective", 0) or 0 for r in results)
+    return _build_metric(METRIC_DEFINITIONS["recovery_effective"], (effective / total) * 100)
+
+
 # ==========================================
 # Aggregate Metrics Calculation
 # ==========================================
@@ -628,6 +897,49 @@ def calculate_aggregate_metrics(results: List[Dict[str, Any]], pipeline_type: st
         query_diversity = calculate_query_diversity(results)
         if query_diversity:
             metrics["query_diversity"] = query_diversity
+
+        # Tier 1 - Essential Query Diversity Metrics
+        query_uniqueness = calculate_query_uniqueness(results)
+        if query_uniqueness:
+            metrics["query_uniqueness"] = query_uniqueness
+        query_repetition = calculate_query_repetition(results)
+        if query_repetition:
+            metrics["query_repetition"] = query_repetition
+        avg_query_length = calculate_avg_query_length(results)
+        if avg_query_length:
+            metrics["avg_query_length"] = avg_query_length
+        first_query_success = calculate_first_query_success(results)
+        if first_query_success:
+            metrics["first_query_success"] = first_query_success
+
+        # Tier 2 - Analytical Query Metrics
+        query_drift = calculate_query_drift(results)
+        if query_drift:
+            metrics["query_drift"] = query_drift
+        query_convergence = calculate_query_convergence(results)
+        if query_convergence:
+            metrics["query_convergence"] = query_convergence
+
+    # Multi-Turn Dynamics metrics
+    if "dynamics" in applicable_groups:
+        oscillation_rate = calculate_oscillation_rate(results)
+        if oscillation_rate:
+            metrics["oscillation_rate"] = oscillation_rate
+        near_miss_rate = calculate_near_miss_rate(results)
+        if near_miss_rate:
+            metrics["near_miss_rate"] = near_miss_rate
+        recovery_stuck = calculate_recovery_stuck(results)
+        if recovery_stuck:
+            metrics["recovery_stuck"] = recovery_stuck
+        recovery_wasted = calculate_recovery_wasted(results)
+        if recovery_wasted:
+            metrics["recovery_wasted"] = recovery_wasted
+        recovery_random = calculate_recovery_random(results)
+        if recovery_random:
+            metrics["recovery_random"] = recovery_random
+        recovery_effective = calculate_recovery_effective(results)
+        if recovery_effective:
+            metrics["recovery_effective"] = recovery_effective
 
     # Build summary
     summary = {

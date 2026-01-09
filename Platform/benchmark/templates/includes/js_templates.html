@@ -182,10 +182,13 @@
 
 <!-- 12. Agent Final Answer -->
 <template id="tpl-agent-final-answer">
-    <div class="position-relative">
-       <div class="text-uppercase text-muted fw-bold mb-2 response-label">Response</div>
-       <div class="fs-6 text-dark response-text" style="white-space: pre-wrap;"></div>
-   </div>
+    <div class="final-answer-card border-start border-4 border-primary ps-3">
+        <div class="d-flex align-items-center mb-2">
+            <i class="bi bi-chat-square-quote-fill text-primary me-2"></i>
+            <span class="text-uppercase fw-bold text-primary small response-label">Final Answer</span>
+        </div>
+        <div class="fs-6 fw-medium text-dark response-text" style="white-space: pre-wrap;"></div>
+    </div>
 </template>
 
 <!-- 13. System Prompt -->

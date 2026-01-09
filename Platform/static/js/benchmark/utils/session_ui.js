@@ -19,7 +19,6 @@ window.BenchmarkSessionUI.renderSession = function(session, trials, options = {}
         pipelineType = 'vanilla_llm'
     } = options;
 
-    // Update external sessionTrials reference if provided
     if (sessionTrials) {
         sessionTrials.length = 0;
         sessionTrials.push(...trials);
@@ -33,8 +32,24 @@ window.BenchmarkSessionUI.renderSession = function(session, trials, options = {}
     gtContainer.appendChild(BenchmarkUtils.BenchmarkRenderer.renderGroundTruthsList(session.ground_truths));
 
     const trialsContainer = document.getElementById('trials-container');
-    trialsContainer.innerHTML = '';
-    trials.forEach(trial => {
+    const trialIds = new Set(trials.map(t => `trial-${t.id}`));
+    // Remove elements not in current session (handles session switching)
+    Array.from(trialsContainer.children).forEach(el => {
+        const trialEl = el.id?.startsWith('trial-') ? el : el.querySelector('[id^="trial-"]');
+        if (trialEl && !trialIds.has(trialEl.id)) el.remove();
+    });
+
+    trials.forEach((trial, idx) => {
+        const existing = document.getElementById(`trial-${trial.id}`);
+        const needsDivider = idx < trials.length - 1;
+        const hasDivider = existing?.parentElement !== trialsContainer; // wrapped in container = has divider
+        // Skip only if completed AND divider state unchanged
+        if (existing && trial.status === 'completed' && needsDivider === hasDivider) return;
+        // Remove existing (and its container if any)
+        if (existing) {
+            const toRemove = existing.parentElement === trialsContainer ? existing : existing.parentElement;
+            toRemove.remove();
+        }
         trialsContainer.appendChild(BenchmarkUtils.BenchmarkRenderer.renderTrial(trial, session.is_completed, trials.length, session.max_retries, session.question, pipelineType));
     });
 

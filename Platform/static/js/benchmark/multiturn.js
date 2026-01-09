@@ -12,6 +12,7 @@ window.BenchmarkUtils.MultiTurnPage = (function() {
     // === State ===
     const activePolls = {};
     const trialState = {};
+    const trialTraceCache = {};  // Cache for completed trial traces
     let activeGroupId = null;
     let activeSessionId = null;
     let sessionAbortController = null;
@@ -19,6 +20,7 @@ window.BenchmarkUtils.MultiTurnPage = (function() {
     let currentPipelineResults = [];
     let currentRunPipelineType = null;
     let sessionRetryTimeout = null;
+    let loadSessionDebounceTimer = null;  // Debounce timer for loadSession
 
     // === Polling ===
     function stopPolling(trialId) {
@@ -73,48 +75,50 @@ window.BenchmarkUtils.MultiTurnPage = (function() {
                     const existingBubbles = Array.from(wrapper.querySelectorAll('.message-bubble'))
                         .filter(b => !b.closest('.trial-verdict-container') && !b.querySelector('.trial-processing-indicator'));
 
-                    // Remove processing indicators
-                    wrapper.querySelectorAll('.trial-processing-indicator').forEach(indicator => {
-                        const parent = indicator.closest('.message-bubble');
-                        if (parent) parent.remove();
-                    });
-
-                    // Check if we need to update
                     const lastStep = allSteps.length > 0 ? allSteps[allSteps.length - 1] : null;
                     const isStreaming = !!(lastStep && lastStep.is_streaming);
+                    const existingCount = existingBubbles.length;
+                    const verdictContainer = wrapper.querySelector('.trial-verdict-container');
+                    const hasNewSteps = allSteps.length > existingCount;
 
-                    // Smart update: only re-render if step count changed or last step is streaming
-                    const needsUpdate = allSteps.length !== existingBubbles.length || isStreaming;
-
-                    if (needsUpdate && allSteps.length > 0) {
-                        // Clear existing bubbles (but preserve verdict)
-                        existingBubbles.forEach(b => b.remove());
-
-                        // Render all steps
-                        const verdictContainer = wrapper.querySelector('.trial-verdict-container');
-                        allSteps.forEach((step, idx) => {
-                            const stepEl = BenchmarkUtils.BenchmarkRenderer.renderAgentStep(step, idx, trialId, trialInfo ? trialInfo.answer : null);
+                    // Only remove spinner when we have new steps to show (prevents flicker)
+                    if (hasNewSteps) {
+                        wrapper.querySelectorAll('.trial-processing-indicator').forEach(indicator => {
+                            const parent = indicator.closest('.message-bubble');
+                            if (parent) parent.remove();
+                        });
+                        // Append only NEW steps
+                        for (let i = existingCount; i < allSteps.length; i++) {
+                            const stepEl = BenchmarkUtils.BenchmarkRenderer.renderAgentStep(allSteps[i], i, trialId, trialInfo ? trialInfo.answer : null);
                             if (verdictContainer) verdictContainer.insertAdjacentElement('beforebegin', stepEl);
                             else wrapper.appendChild(stepEl);
-                        });
+                        }
+                    }
+
+                    // Update last step if streaming (content may have changed)
+                    if (isStreaming && existingCount > 0 && allSteps.length === existingCount) {
+                        const lastBubble = existingBubbles[existingCount - 1];
+                        const lastStepEl = BenchmarkUtils.BenchmarkRenderer.renderAgentStep(lastStep, existingCount - 1, trialId, trialInfo ? trialInfo.answer : null);
+                        lastBubble.replaceWith(lastStepEl);
                     }
 
                     // Set backoff based on streaming state
                     const backoffDelay = isStreaming ? 500 : 2000;
 
-                    // Add processing indicator if still processing
-                    if (trialInfo && trialInfo.status === 'processing') {
-                        if (!wrapper.querySelector('.trial-processing-indicator')) {
-                            const verdictContainer = wrapper.querySelector('.trial-verdict-container');
-                            const indicatorEl = BenchmarkUtils.BenchmarkRenderer.createMessageBubble('assistant', `<div class="d-flex align-items-center trial-processing-indicator"><span class="spinner-border spinner-border-sm text-primary me-2"></span>${config.loadingText}</div>`, '', config.icon);
-                            if (verdictContainer) verdictContainer.insertAdjacentElement('beforebegin', indicatorEl);
-                            else wrapper.appendChild(indicatorEl);
-                        }
+                    // Add processing indicator if still processing and not already present
+                    if (trialInfo && trialInfo.status === 'processing' && !wrapper.querySelector('.trial-processing-indicator')) {
+                        const indicatorEl = BenchmarkUtils.BenchmarkRenderer.createMessageBubble('assistant', `<div class="d-flex align-items-center trial-processing-indicator"><span class="spinner-border spinner-border-sm text-primary me-2"></span>${config.loadingText}</div>`, '', config.icon);
+                        wrapper.appendChild(indicatorEl);
                     }
 
                     // Handle completion
                     if (trialInfo && (trialInfo.status === 'completed' || trialInfo.status === 'error')) {
                         stopPolling(trialId);
+
+                        // Cache the completed trace for future use
+                        if (allSteps.length > 0) {
+                            trialTraceCache[trialId] = allSteps;
+                        }
 
                         // Final cleanup: remove all processing indicators
                         wrapper.querySelectorAll('.trial-processing-indicator').forEach(indicator => {
@@ -163,6 +167,40 @@ window.BenchmarkUtils.MultiTurnPage = (function() {
     }
 
     function loadSession(sessionId, initialTrialId = null, pipelineType = 'vanilla_llm') {
+        // Debounce rapid successive calls to prevent redundant renders
+        if (loadSessionDebounceTimer) {
+            clearTimeout(loadSessionDebounceTimer);
+        }
+
+        loadSessionDebounceTimer = setTimeout(() => {
+            loadSessionDebounceTimer = null;
+            _loadSessionImpl(sessionId, initialTrialId, pipelineType);
+        }, 50);  // 50ms debounce - fast enough to feel instant, but prevents burst calls
+    }
+
+    // Helper to ensure a trial's final state is rendered after completion
+    // This catches any missed updates if polling was behind
+    function _ensureTrialRendered(trialId, trialData) {
+        const trialDiv = document.getElementById(`trial-${trialId}`);
+        if (!trialDiv) return;
+
+        const wrapper = trialDiv.querySelector('.trial-wrapper');
+        if (!wrapper) return;
+
+        // Remove any lingering processing indicators
+        wrapper.querySelectorAll('.trial-processing-indicator').forEach(indicator => {
+            const parent = indicator.closest('.message-bubble');
+            if (parent) parent.remove();
+        });
+
+        // Add verdict if not present
+        if (!wrapper.querySelector('.trial-verdict-container') && trialData) {
+            const verdictContainer = BenchmarkUtils.BenchmarkRenderer.renderTrialVerdict(trialData);
+            if (verdictContainer) wrapper.appendChild(verdictContainer);
+        }
+    }
+
+    function _loadSessionImpl(sessionId, initialTrialId = null, pipelineType = 'vanilla_llm') {
         console.log(`[loadSession] Loading session ${sessionId}`);
         activeSessionId = sessionId;
 
@@ -206,11 +244,9 @@ window.BenchmarkUtils.MultiTurnPage = (function() {
     function executeTrial(trialId, sessionId, pipelineType = 'rag') {
         const signal = sessionAbortController?.signal;
 
-        // Load session FIRST to show processing trial and start polling
+        // Load session to show processing trial - this triggers renderTrial which starts polling
+        // NOTE: startPolling is called via renderTrial, no need to call it explicitly
         if (sessionId) loadSession(sessionId, null, pipelineType);
-
-        // Start polling for this specific trial immediately
-        startPolling(trialId, pipelineType);
 
         BenchmarkAPI.get(BenchmarkUrls.multiTurn.runTrial(trialId), { signal })
             .then(data => {
@@ -221,8 +257,12 @@ window.BenchmarkUtils.MultiTurnPage = (function() {
                     return;
                 }
 
-                // Reload session to show completed trial result
-                if (sessionId) loadSession(sessionId, null, pipelineType);
+                // Stop polling first
+                stopPolling(trialId);
+
+                // Ensure final state is rendered - do one final poll to catch any missed updates
+                // This is a lightweight check since polling already rendered most of the trace
+                _ensureTrialRendered(trialId, data);
 
                 // If incorrect, trigger retry
                 if (data.is_correct_llm === false) {
@@ -258,6 +298,7 @@ window.BenchmarkUtils.MultiTurnPage = (function() {
             .catch(err => {
                 if (err.name !== 'AbortError') {
                     console.error('Network error in trial.', err);
+                    // On error, reload session to show current state
                     if (sessionId) loadSession(sessionId, null, pipelineType);
                 }
                 if (sessionAbortController) resetSessionUI();
@@ -594,10 +635,15 @@ window.BenchmarkUtils.MultiTurnPage = (function() {
                         alert(data.error);
                         if (sessionAbortController) resetSessionUI();
                     } else {
-                        loadSession(activeSessionId, null, pipelineType);
-                        if (data.status === 'retrying') executeTrial(data.new_trial_id, activeSessionId, pipelineType);
-                        if (data.status === 'max_retries_reached' || data.status === 'completed') {
-                            if (sessionAbortController) resetSessionUI();
+                        // NOTE: executeTrial will call loadSession, avoid double call
+                        if (data.status === 'retrying') {
+                            executeTrial(data.new_trial_id, activeSessionId, pipelineType);
+                        } else {
+                            // Only load session if not retrying (to show final state)
+                            loadSession(activeSessionId, null, pipelineType);
+                            if (data.status === 'max_retries_reached' || data.status === 'completed') {
+                                if (sessionAbortController) resetSessionUI();
+                            }
                         }
                     }
                 })
@@ -609,6 +655,15 @@ window.BenchmarkUtils.MultiTurnPage = (function() {
 
         document.getElementById('delete-session-btn')?.addEventListener('click', function() {
             if (activeSessionId && confirm('Delete session?')) {
+                // Clear cached traces for trials in this session
+                const trialsContainer = document.getElementById('trials-container');
+                if (trialsContainer) {
+                    trialsContainer.querySelectorAll('[id^="trial-"]').forEach(trialEl => {
+                        const trialId = trialEl.id.replace('trial-', '');
+                        if (trialId) delete trialTraceCache[trialId];
+                    });
+                }
+
                 BenchmarkAPI.delete(BenchmarkUrls.multiTurn.deleteSession(activeSessionId))
                     .then(data => {
                         if (data.status === 'ok') {
@@ -665,6 +720,27 @@ window.BenchmarkUtils.MultiTurnPage = (function() {
             initExports(csvPrefix);
         },
 
-        startPolling: startPolling
+        startPolling: startPolling,
+
+        // Get cached trace for a trial (returns null if not cached)
+        getCachedTrace: function(trialId) {
+            return trialTraceCache[trialId] || null;
+        },
+
+        // Set cached trace for a trial
+        setCachedTrace: function(trialId, trace) {
+            if (trace && trace.length > 0) {
+                trialTraceCache[trialId] = trace;
+            }
+        },
+
+        // Clear cache for a specific trial or all trials
+        clearTraceCache: function(trialId) {
+            if (trialId) {
+                delete trialTraceCache[trialId];
+            } else {
+                Object.keys(trialTraceCache).forEach(k => delete trialTraceCache[k]);
+            }
+        }
     };
 })();

@@ -47,6 +47,9 @@ class BenchmarkSettings(models.Model):
 
     # LLM Judge Settings (for LLM-as-a-judge evaluation)
     llm_judge_model = models.CharField(max_length=100, blank=True, help_text="Model for LLM-as-a-judge. If empty, uses LLM_JUDGE_MODEL env or falls back to llm_model.")
+
+    # Embedding Model Settings (for long-term memory)
+    embedding_model = models.CharField(max_length=100, blank=True, help_text="Embedding model for long-term memory. If empty, uses EMBEDDING_MODEL env or defaults to text-embedding-3-small.")
     
     # LLM Advanced Parameters
     temperature = models.FloatField(default=0.0, help_text="Sampling temperature (0.0 to 2.0).")
@@ -94,6 +97,8 @@ class BenchmarkSettings(models.Model):
             settings.llm_base_url = config("LLM_BASE_URL", default="")
         if not settings.llm_judge_model:
             settings.llm_judge_model = config("LLM_JUDGE_MODEL", default="")
+        if not settings.embedding_model:
+            settings.embedding_model = config("EMBEDDING_MODEL", default="text-embedding-3-small")
         if not settings.serper_api_key:
             settings.serper_api_key = config("SERPER_API_KEY", default="")
         return settings
@@ -106,6 +111,7 @@ class BenchmarkSettings(models.Model):
             llm_model=self.llm_model,
             llm_api_key=self.llm_api_key,
             llm_judge_model=self.llm_judge_model,
+            embedding_model=self.embedding_model,
             max_retries=self.max_retries,
             allow_reasoning=self.allow_reasoning,
             temperature=self.temperature,
@@ -125,6 +131,7 @@ class BenchmarkSettings(models.Model):
                 "llm_base_url": self.llm_base_url,
                 "llm_model": self.llm_model,
                 "llm_judge_model": self.llm_judge_model,
+                "embedding_model": self.embedding_model,
                 "max_retries": self.max_retries,
                 "allow_reasoning": self.allow_reasoning,
                 "temperature": self.temperature,

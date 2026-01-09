@@ -19,7 +19,9 @@ from task_manager.utils import check_answer_rule, check_answer_llm
 from .utils import (
     get_search_engine, count_questions_in_file,
     handle_api_error, handle_async_api_error,
-    print_debug, RedisKeys, PipelinePrefix, clear_trial_cache
+    print_debug, RedisKeys, PipelinePrefix, clear_trial_cache,
+    TraceFormatter, SimpleMsg,
+    apply_trial_metadata, is_rag_pipeline,
 )
 from .models import (
     BenchmarkSettings,
@@ -526,6 +528,7 @@ def get_default_settings(request):
             "llm_api_key": config("LLM_API_KEY", default=settings.llm_api_key),
             "llm_model": config("LLM_MODEL", default=settings.llm_model),
             "llm_judge_model": config("LLM_JUDGE_MODEL", default=settings.llm_judge_model),
+            "embedding_model": config("EMBEDDING_MODEL", default=settings.embedding_model),
             "max_retries": settings.max_retries,
             "allow_reasoning": settings.allow_reasoning,
             "temperature": settings.temperature,
@@ -565,6 +568,7 @@ def save_settings(request):
         if "llm_model" in data: settings.llm_model = data.get("llm_model", "")
         if "llm_api_key" in data: settings.llm_api_key = data.get("llm_api_key", "")
         if "llm_judge_model" in data: settings.llm_judge_model = data.get("llm_judge_model", "")
+        if "embedding_model" in data: settings.embedding_model = data.get("embedding_model", "")
         if "max_retries" in data: settings.max_retries = int(data.get("max_retries", 3))
         if "allow_reasoning" in data: settings.allow_reasoning = data.get("allow_reasoning", True)
         if "temperature" in data: settings.temperature = float(data.get("temperature", 0.0))
@@ -1160,7 +1164,6 @@ def get_session(request, session_id):
 
         # Parse trace on-demand for UI rendering
         if messages:
-            from .utils import TraceFormatter, SimpleMsg
             # Handle both simple dicts and complex agent Msg dicts
             trace_msgs = []
             for m in messages:
@@ -1171,9 +1174,8 @@ def get_session(request, session_id):
         else:
             t["trace"] = []
 
-        # Always include search data (may be empty for non-RAG pipelines)
-        t["search_results"] = log.get("search_results", [])
-        t["search_query"] = log.get("search_query")
+        # Apply pipeline-specific metadata (search data for RAG, memory data for agents)
+        apply_trial_metadata(t, log, pipeline_type)
 
     return JsonResponse({
         "session": {
@@ -1282,8 +1284,9 @@ def export_session(request, session_id):
 
         # Export raw messages only (authentic LLM/agent context)
         trial["messages"] = log.get("messages", [])
-        trial["search_results"] = log.get("search_results", [])
-        trial["search_query"] = log.get("search_query")
+
+        # Apply pipeline-specific metadata (search data for RAG, memory data for agents)
+        apply_trial_metadata(trial, log, pipeline_type)
 
     export_format = request.GET.get("format", "json")
     if export_format == "csv":
@@ -1291,12 +1294,11 @@ def export_session(request, session_id):
         response["Content-Disposition"] = f'attachment; filename="benchmark_session_{session_id}.csv"'
         writer = csv.writer(response)
         headers = ["Session ID", "Question", "Ground Truths", "Pipeline Type", "Session Created At", "Trial Number", "Answer", "Feedback", "Is Correct (LLM)", "Is Correct (Rule)", "Trial Created At"]
-        is_rag = 'rag' in pipeline_type
-        if is_rag: headers.extend(["Search Query", "Search Results"])
+        if is_rag_pipeline(pipeline_type): headers.extend(["Search Query", "Search Results"])
         writer.writerow(headers)
         for trial in trials:
             row = [session.id, session.question, session.ground_truths, pipeline_type, session.created_at.isoformat(), trial.get("trial_number"), trial.get("answer"), trial.get("feedback"), trial.get("is_correct_llm"), trial.get("is_correct_rule"), trial.get("created_at")]
-            if is_rag: row.extend([trial.get("search_query"), trial.get("search_results")])
+            if is_rag_pipeline(pipeline_type): row.extend([trial.get("search_query"), trial.get("search_results")])
             writer.writerow(row)
         return response
     else:
@@ -1334,15 +1336,18 @@ def export_run(request, group_id):
                 "created_at", "log"
             ))
 
+            session_pipeline_type = session.pipeline_type or ''
+
             for trial in trials:
                 if trial.get("created_at"): trial["created_at"] = trial.get("created_at").isoformat()
                 log = trial.pop("log", {}) or {}
 
                 # Export raw messages only (authentic LLM/agent context)
                 trial["messages"] = log.get("messages", [])
-                trial["search_results"] = log.get("search_results", [])
-                trial["search_query"] = log.get("search_query")
-            
+
+                # Apply pipeline-specific metadata (search data for RAG, memory data for agents)
+                apply_trial_metadata(trial, log, session_pipeline_type)
+
             sessions_data.append({
                 "session_id": session.id,
                 "question": session.question,

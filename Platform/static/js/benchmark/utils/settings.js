@@ -83,7 +83,7 @@ window.BenchmarkSettings.SETTINGS_FIELDS = [
     'llm_base_url', 'llm_api_key', 'llm_model', 'llm_judge_model', 'max_retries', 'allow_reasoning',
     'temperature', 'top_p', 'max_tokens',
     'search_provider', 'search_limit', 'serper_api_key', 'serper_fetch_full_content',
-    'agent_memory_type'
+    'agent_memory_type', 'embedding_model'
 ];
 
 /**
@@ -162,7 +162,8 @@ window.BenchmarkSettings.restoreDefaults = function() {
                 'search_limit': 'search_limit',
                 'serper_api_key': 'serper_api_key',
                 'serper_fetch_full_content': 'serper_fetch_full_content',
-                'agent_memory_type': 'agent_memory_type'
+                'agent_memory_type': 'agent_memory_type',
+                'embedding_model': 'embedding_model'
             };
 
             for (const [elementId, dataKey] of Object.entries(fieldMappings)) {
@@ -350,7 +351,8 @@ window.BenchmarkSettings.setupConfigurationActionHandlers = function() {
                 search_limit: document.getElementById('search_limit') ? document.getElementById('search_limit').value : 5,
                 serper_api_key: document.getElementById('serper_api_key') ? document.getElementById('serper_api_key').value : '',
                 serper_fetch_full_content: document.getElementById('serper_fetch_full_content') ? document.getElementById('serper_fetch_full_content').checked : false,
-                agent_memory_type: document.getElementById('agent_memory_type') ? document.getElementById('agent_memory_type').value : 'naive'
+                agent_memory_type: document.getElementById('agent_memory_type') ? document.getElementById('agent_memory_type').value : 'naive',
+                embedding_model: document.getElementById('embedding_model') ? document.getElementById('embedding_model').value : ''
             };
 
             BenchmarkAPI.post(BenchmarkUrls.saveSettings, settingsData)

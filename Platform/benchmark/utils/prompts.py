@@ -138,7 +138,7 @@ CRITICAL: You must VERIFY everything by visiting pages. Do not guess.
 
 Tools Available:
 1. `think(thought: str)`: Record your step-by-step reasoning.
-2. Browser navigation and inspection tools (provided by the environment).
+2. browser-related tools (provided by the Chrome-Devtools-MCP).
 3. `answer_question(answer: str)`: Submit the final answer.
 
 Instructions:

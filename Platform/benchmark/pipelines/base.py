@@ -588,16 +588,16 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
             # Session lifecycle: setup resources (e.g., browser instance)
             await self._on_session_start(session)
 
-            yield {
-                'is_meta': True, 'type': 'session_created', 'session_id': session.id,
-                'question': question_text, 'group_id': group.id, 'group_name': group.name
-            }
-
             is_session_completed = False
             final_is_correct = False
             final_answer = ""
 
             try:
+                yield {
+                    'is_meta': True, 'type': 'session_created', 'session_id': session.id,
+                    'question': question_text, 'group_id': group.id, 'group_name': group.name
+                }
+
                 while trial_number <= self.max_retries and not is_session_completed:
                     if not await sync_to_async(self.check_active)():
                         break
@@ -678,7 +678,11 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
                  return
         else:
             group = await sync_to_async(create_run_obj)()
-        
+
+        # Set run_id for memory isolation (used by agent pipelines)
+        if hasattr(self, '_current_run_id'):
+            self._current_run_id = group.id
+
         file_path = await sync_to_async(self.get_questions_file_path)()
         total_questions = await sync_to_async(count_questions_in_file)(file_path)
         yield {'is_meta': True, 'type': 'total_count', 'count': total_questions}
@@ -835,9 +839,10 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
         trial.log = trial.log or {}
         trial.log['messages'] = [m.to_dict() if hasattr(m, 'to_dict') else m for m in messages]
 
-        # Calculate query metrics from trace
-        query_metrics = self._calculate_query_metrics(trace_data)
-        trial.log.update(query_metrics)
+        # Store baseline-specific metadata (e.g., memory operations for agent baselines)
+        trial_meta = self._get_trial_meta(trial)
+        if trial_meta:
+            trial.log['meta'] = trial_meta
 
         trial.status = 'completed'
         trial.save()
@@ -851,7 +856,6 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
                 "feedback": trial.feedback,
                 "is_correct_llm": trial.is_correct_llm,
                 "is_correct_rule": trial.is_correct_rule,
-                "query_metrics": query_metrics
             }
             redis_client.set(RedisKeys.trial_status(trial.id), json.dumps(status_data), ex=RedisKeys.DEFAULT_TTL)
             # Cache trace separately for live UI rendering
@@ -860,56 +864,3 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
             print_debug(f"Failed to cache agent trial status: {e}")
 
         return answer, is_correct_llm
-
-    def _calculate_query_metrics(self, trace_data):
-        """
-        Extracts search queries from trace_data and calculates metrics.
-        """
-        queries = []
-        for step in trace_data:
-            if step.get('step_type') == 'action':
-                content = step.get('content', '')
-                try:
-                    # Content can be a JSON string of a list of tool calls
-                    actions = json.loads(content)
-                    if isinstance(actions, list):
-                        for action in actions:
-                            # Handle different AgentScope/OpenAI formats
-                            name = action.get('name') or action.get('function', {}).get('name')
-                            if name == 'web_search_tool':
-                                args = action.get('input') or action.get('function', {}).get('arguments')
-                                if isinstance(args, str):
-                                    try: args = json.loads(args)
-                                    except (json.JSONDecodeError, ValueError): pass
-                                if isinstance(args, dict) and 'query' in args:
-                                    queries.append(args['query'])
-                    elif isinstance(actions, dict):
-                         # Single action
-                         name = actions.get('name') or actions.get('function', {}).get('name')
-                         if name == 'web_search_tool':
-                                args = actions.get('input') or actions.get('function', {}).get('arguments')
-                                if isinstance(args, str):
-                                    try: args = json.loads(args)
-                                    except (json.JSONDecodeError, ValueError): pass
-                                if isinstance(args, dict) and 'query' in args:
-                                    queries.append(args['query'])
-                except (json.JSONDecodeError, ValueError, TypeError):
-                    continue
-        
-        metrics = {
-            'search_queries': queries,
-            'query_count': len(queries),
-            'distinct_query_count': len(set(queries))
-        }
-        
-        # Simple query shift: percentage of consecutive queries that are different
-        if len(queries) > 1:
-            shifts = 0
-            for i in range(len(queries) - 1):
-                if queries[i] != queries[i+1]:
-                    shifts += 1
-            metrics['query_shift_ratio'] = shifts / (len(queries) - 1)
-        else:
-            metrics['query_shift_ratio'] = 0.0
-            
-        return metrics

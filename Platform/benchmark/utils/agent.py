@@ -2,6 +2,7 @@ import os
 import json
 import asyncio
 import agentscope
+from decouple import config
 from .search import get_search_engine, WebCrawler
 from ..models import BenchmarkSettings
 from .prompts import PROMPTS
@@ -101,54 +102,91 @@ def answer_question(answer: str):
     """
     return ToolResponse(content="Answer submitted successfully.")
 
-def create_memory(memory_type, user_id, model=None, llm_settings=None):
-    """Helper to initialize agent memory based on settings."""
-    print_debug(f"Initializing memory with type: {memory_type}")
-    
+def create_memory(memory_type, agent_name, user_id, model=None, llm_settings=None, run_id=None):
+    """
+    Helper to initialize agent memory based on settings.
+
+    Args:
+        memory_type: 'naive', 'mem0', or 'reme'
+        agent_name: Name of the agent (e.g., 'VanillaAgent')
+        user_id: Base user identifier
+        model: LLM model for memory operations
+        llm_settings: Settings for embedding model
+        run_id: Optional run ID for memory isolation (appended to user_id)
+
+    Returns a tuple: (short_term_memory, long_term_memory)
+    - short_term_memory: InMemoryMemory for conversation history
+    - long_term_memory: Mem0/ReMe for persistent knowledge (or None if naive/failed)
+    """
+    # Create unique user_id per run for memory isolation
+    effective_user_id = f"{user_id}_run_{run_id}" if run_id else user_id
+    print_debug(f"Initializing memory with type: {memory_type}, user_id: {effective_user_id}")
+
+    # Short-term memory for conversation history (always created)
+    short_term_memory = InMemoryMemory()
+
+    # Implementation of the update hook for short-term memory
+    # This allows pipelines to subscribe to memory updates for real-time trace rendering
+    short_term_memory._update_hook = None
+    original_add = short_term_memory.add
+
+    async def wrapped_add(*args, **kwargs):
+        await original_add(*args, **kwargs)
+        if callable(short_term_memory._update_hook):
+            # The hook can be sync or async
+            res = short_term_memory._update_hook()
+            if asyncio.iscoroutine(res):
+                await res
+
+    short_term_memory.add = wrapped_add
+
+    # Long-term memory for persistent knowledge (optional)
+    long_term_memory = None
+
+    if memory_type == 'naive':
+        # No long-term memory for naive mode
+        return short_term_memory, None
+
     embedding_model = None
     if llm_settings:
         try:
-             # Default to text-embedding-3-small if not configured elsewhere
-             # Assuming standard OpenAI compatible API for embeddings
+            # Use embedding_model from settings (already populated from env if not set)
+            embedding_model_name = llm_settings.embedding_model or "text-embedding-3-small"
+            # text-embedding-3-small outputs 1536 dimensions by default
+            # text-embedding-3-large outputs 3072 dimensions by default
+            dimensions = 1536 if "small" in embedding_model_name else 3072
             embedding_model = OpenAITextEmbedding(
-                api_key=llm_settings.llm_api_key, 
-                model_name="text-embedding-3-small"
+                api_key=llm_settings.llm_api_key,
+                model_name=embedding_model_name,
+                base_url=llm_settings.llm_base_url,
+                dimensions=dimensions
             )
         except Exception as e:
             print_debug(f"Failed to init embedding model: {e}")
 
-    memory = None
     if memory_type == 'mem0' and Mem0LongTermMemory:
         try:
-            memory = Mem0LongTermMemory(user_name=user_id, model=model, embedding_model=embedding_model)
+            long_term_memory = Mem0LongTermMemory(
+                agent_name=agent_name,
+                user_name=effective_user_id,
+                model=model,
+                embedding_model=embedding_model
+            )
         except Exception as e:
             print_debug(f"Failed to init Mem0: {e}")
 
     elif memory_type == 'reme' and ReMePersonalLongTermMemory:
         try:
-            memory = ReMePersonalLongTermMemory(user_name=user_id, model=model, embedding_model=embedding_model)
+            long_term_memory = ReMePersonalLongTermMemory(
+                agent_name=agent_name,
+                user_name=effective_user_id,
+                model=model,
+                embedding_model=embedding_model
+            )
         except Exception as e:
             print_debug(f"Failed to init ReMe: {e}")
-            
-    if memory is None:
-        memory = InMemoryMemory()
-    
-    # Implementation of the update hook upon initialization
-    # This allows pipelines to subscribe to memory updates for real-time trace rendering
-    memory._update_hook = None
-    original_add = memory.add
-    
-    async def wrapped_add(*args, **kwargs):
-        await original_add(*args, **kwargs)
-        if callable(memory._update_hook):
-            # The hook can be sync or async
-            res = memory._update_hook()
-            if asyncio.iscoroutine(res):
-                await res
-                
-    memory.add = wrapped_add
-        
-    return memory
+
+    return short_term_memory, long_term_memory
 
 def think(thought: str):
     """
@@ -162,26 +200,55 @@ def think(thought: str):
 
 class VanillaAgentFactory:
     @staticmethod
-    def create_agent(model, verbose: bool = False):
+    def create_agent(model, verbose: bool = False, run_id=None):
+        """
+        Create a VanillaAgent with optional long-term memory.
+
+        Args:
+            model: The LLM model to use
+            verbose: Enable verbose logging
+            run_id: Optional run ID for memory isolation
+
+        Returns:
+            tuple: (agent, long_term_memory) where long_term_memory may be None
+        """
         # Create Toolkit and register tool
         toolkit = Toolkit()
         toolkit.register_tool_function(think)
         toolkit.register_tool_function(web_search_tool)
         toolkit.register_tool_function(visit_page)
         toolkit.register_tool_function(answer_question)
-        
-        settings = BenchmarkSettings.get_effective_settings()
-        memory = create_memory(settings.memory_type, "vanilla_agent_user", model=model, llm_settings=settings)
 
-        return ReActAgent(
-            name="Assistant",
-            sys_prompt=PROMPTS["vanilla_agent_system_prompt"],
+        settings = BenchmarkSettings.get_effective_settings()
+        short_term_memory, long_term_memory = create_memory(
+            settings.memory_type,
+            agent_name="VanillaAgent",
+            user_id="vanilla_agent_user",
             model=model,
-            toolkit=toolkit,
-            memory=memory,
-            formatter=OpenAIChatFormatter(),
-            max_iters=30,
+            llm_settings=settings,
+            run_id=run_id
         )
+
+        # Build ReActAgent with proper memory parameters per AgentScope docs
+        agent_kwargs = {
+            "name": "Assistant",
+            "sys_prompt": PROMPTS["vanilla_agent_system_prompt"],
+            "model": model,
+            "toolkit": toolkit,
+            "memory": short_term_memory,
+            "formatter": OpenAIChatFormatter(),
+            "max_iters": 30,
+        }
+
+        # Only add long-term memory if it was successfully created
+        # Use static_control mode: developer explicitly calls record/retrieve
+        # This is better for QA benchmarks where we want automatic context management
+        if long_term_memory is not None:
+            agent_kwargs["long_term_memory"] = long_term_memory
+            agent_kwargs["long_term_memory_mode"] = "static_control"
+
+        agent = ReActAgent(**agent_kwargs)
+        return agent, long_term_memory
 
     @staticmethod
     def init_agentscope(llm_settings: BenchmarkSettings):
@@ -206,28 +273,58 @@ class VanillaAgentFactory:
         return model
 class BrowserAgentFactory:
     @staticmethod
-    async def create_agent(model, toolkit: Toolkit, mcp_client: StdIOStatefulClient, verbose: bool = False):
+    async def create_agent(model, toolkit: Toolkit, mcp_client: StdIOStatefulClient, verbose: bool = False, run_id=None):
+        """
+        Create a BrowserAgent with optional long-term memory.
+
+        Args:
+            model: The LLM model to use
+            toolkit: Tool registry with MCP tools
+            mcp_client: MCP client for browser automation
+            verbose: Enable verbose logging
+            run_id: Optional run ID for memory isolation
+
+        Returns:
+            tuple: (agent, long_term_memory) where long_term_memory may be None
+        """
         # DEBUG: Print all registered tools
         print_debug(f"BrowserAgent Toolkit Tools: {list(toolkit.tools.keys())}")
-        
-        settings = await sync_to_async(BenchmarkSettings.get_effective_settings)()
-        memory = create_memory(settings.memory_type, "browser_agent_user", model=model, llm_settings=settings)
 
-        agent = ReActAgent(
-            name="BrowserAgent",
-            sys_prompt=PROMPTS["browser_agent_system_prompt"],
+        settings = await sync_to_async(BenchmarkSettings.get_effective_settings)()
+        short_term_memory, long_term_memory = create_memory(
+            settings.memory_type,
+            agent_name="BrowserAgent",
+            user_id="browser_agent_user",
             model=model,
-            toolkit=toolkit,
-            memory=memory,
-            formatter=OpenAIChatFormatter(),
-            max_iters=30,
+            llm_settings=settings,
+            run_id=run_id
         )
-        
+
+        # Build ReActAgent with proper memory parameters per AgentScope docs
+        agent_kwargs = {
+            "name": "BrowserAgent",
+            "sys_prompt": PROMPTS["browser_agent_system_prompt"],
+            "model": model,
+            "toolkit": toolkit,
+            "memory": short_term_memory,
+            "formatter": OpenAIChatFormatter(),
+            "max_iters": 30,
+        }
+
+        # Only add long-term memory if it was successfully created
+        # Use static_control mode: developer explicitly calls record/retrieve
+        # This is better for QA benchmarks where we want automatic context management
+        if long_term_memory is not None:
+            agent_kwargs["long_term_memory"] = long_term_memory
+            agent_kwargs["long_term_memory_mode"] = "static_control"
+
+        agent = ReActAgent(**agent_kwargs)
+
         # Attach client to agent for cleanup
         if mcp_client:
             agent.mcp_client = mcp_client
-            
-        return agent
+
+        return agent, long_term_memory
 
     @staticmethod
     def init_agentscope(llm_settings: BenchmarkSettings):

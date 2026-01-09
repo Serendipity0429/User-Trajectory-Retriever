@@ -17,6 +17,16 @@ from .django import (
 )
 from .search import get_search_engine, WebCrawler
 from .agent import VanillaAgentFactory, BrowserAgentFactory
+from .metadata import (
+    get_pipeline_category,
+    is_rag_pipeline,
+    is_agent_pipeline,
+    is_vanilla_pipeline,
+    format_trial_for_export,
+    format_session_for_export,
+    format_trial_metadata,
+    apply_trial_metadata,
+)
 
 # Re-export print_debug for convenience
 from core.utils import print_debug
@@ -48,6 +58,15 @@ __all__ = [
     # Agent
     'VanillaAgentFactory',
     'BrowserAgentFactory',
+    # Metadata
+    'get_pipeline_category',
+    'is_rag_pipeline',
+    'is_agent_pipeline',
+    'is_vanilla_pipeline',
+    'format_trial_for_export',
+    'format_session_for_export',
+    'format_trial_metadata',
+    'apply_trial_metadata',
     # Debug
     'print_debug',
 ]

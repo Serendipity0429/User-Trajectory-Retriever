@@ -51,19 +51,25 @@ class ChromeDevToolsMCPManager:
         """
         if self.client:
             try:
-                # Check if connected before closing (close() raises if not connected)
-                if getattr(self.client, 'is_connected', False):
-                    await self.client.close()
-                    print_debug("MCP client closed successfully")
-                else:
-                    print_debug("MCP client was not connected, skipping close")
+                # Always try to close - don't rely on is_connected attribute
+                # which may not be set correctly on StdIOStatefulClient
+                await self.client.close()
+                print_debug("MCP client closed successfully")
             except Exception as e:
                 print_debug(f"Error disconnecting MCP client: {e}")
                 # Try to forcefully terminate the subprocess if close() failed
                 try:
+                    if hasattr(self.client, '_process') and self.client._process:
+                        self.client._process.terminate()
+                        print_debug("Forcefully terminated MCP subprocess")
+                except Exception as e2:
+                    print_debug(f"Error terminating MCP process: {e2}")
+                # Also try closing the stack if it exists
+                try:
                     if hasattr(self.client, 'stack') and self.client.stack:
                         await self.client.stack.aclose()
-                except Exception as e2:
-                    print_debug(f"Error force-closing MCP stack: {e2}")
+                        print_debug("Closed MCP stack")
+                except Exception as e3:
+                    print_debug(f"Error closing MCP stack: {e3}")
             finally:
                 self.client = None

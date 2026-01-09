@@ -218,6 +218,14 @@
                                     </select>
                                     <div class="form-text small text-muted mt-2"><i class="bi bi-info-circle me-1"></i> Choose the memory mechanism for the agent.</div>
                                 </div>
+                                <div class="mb-3">
+                                    <label for="embedding_model" class="form-label small text-muted fw-bold">Embedding Model</label>
+                                    <div class="input-group input-group-sm">
+                                        <span class="input-group-text bg-white"><i class="bi bi-vector-pen"></i></span>
+                                        <input type="text" class="form-control" id="embedding_model" placeholder="e.g., text-embedding-3-small" value="{{ agent_settings.embedding_model|default:''|safe }}">
+                                    </div>
+                                    <div class="form-text small text-muted mt-2"><i class="bi bi-info-circle me-1"></i> Embedding model for long-term memory vector storage.</div>
+                                </div>
                             </div>
                         </div>
                     </div>

@@ -139,6 +139,12 @@ class VanillaAgentPipeline(BaseAgentPipeline):
     def _get_retry_prompt_key(self):
         return "shared_retry_request"
 
+    def _get_actual_system_prompt(self):
+        """Return the actual system prompt from the agent (includes memory tools if enabled)."""
+        if hasattr(self, 'active_agent') and self.active_agent:
+            return getattr(self.active_agent, 'sys_prompt', None) or super()._get_actual_system_prompt()
+        return super()._get_actual_system_prompt()
+
 
 class BrowserAgentPipeline(BaseAgentPipeline):
     def __init__(self, base_url, api_key, model, max_retries, pipeline_id=None, dataset_id=None, group_id=None):
@@ -307,3 +313,9 @@ class BrowserAgentPipeline(BaseAgentPipeline):
 
     def _get_retry_prompt_key(self):
         return "shared_retry_request"
+
+    def _get_actual_system_prompt(self):
+        """Return the actual system prompt from the agent (includes memory tools if enabled)."""
+        if hasattr(self, 'active_agent') and self.active_agent:
+            return getattr(self.active_agent, 'sys_prompt', None) or super()._get_actual_system_prompt()
+        return super()._get_actual_system_prompt()

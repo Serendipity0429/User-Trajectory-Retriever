@@ -749,7 +749,7 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
                 self.active_agent = await self._init_agent()
             
             # The update hook allows real-time trace streaming to the frontend.
-            self.active_agent.memory._update_hook = lambda: self._update_trace(trial, turn_start_index, self._get_system_prompt_key())
+            self.active_agent.memory._update_hook = lambda: self._update_trace(trial, turn_start_index)
 
             try:
                 # 2. Execute Agent (delegated hook)
@@ -768,7 +768,7 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
 
                 # Ensure system prompt is at top of trace
                 if not trace_data or trace_data[0].get('role') != 'system':
-                    system_prompt_step = {"role": "system", "content": PROMPTS[self._get_system_prompt_key()], "step_type": "text"}
+                    system_prompt_step = {"role": "system", "content": self._get_actual_system_prompt(), "step_type": "text"}
                     trace_data = [system_prompt_step] + trace_data
 
                 # 4. Save - pass raw messages and parsed trace
@@ -794,6 +794,14 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
     
     def _get_system_prompt_key(self): raise NotImplementedError()
     def _get_retry_prompt_key(self): raise NotImplementedError()
+
+    def _get_actual_system_prompt(self):
+        """Get the actual system prompt used by this pipeline.
+
+        Subclasses can override this to return modified prompts (e.g., with memory tools).
+        Default implementation returns the base prompt from PROMPTS dict.
+        """
+        return PROMPTS[self._get_system_prompt_key()]
     
     def _parse_answer(self, response_msg):
         """Extracts text answer from multi-modal or structured responses."""
@@ -805,14 +813,14 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
             except: return json.dumps(raw_content)
         return str(raw_content) if raw_content is not None else ""
 
-    async def _update_trace(self, trial, turn_start_index, system_prompt_key):
+    async def _update_trace(self, trial, turn_start_index):
         """Updates the real-time trace in Redis for frontend rendering."""
         try:
             msgs = await self.active_agent.memory.get_memory()
             relevant_msgs = msgs[turn_start_index:] if len(msgs) > turn_start_index else []
             trace_data, _ = self._serialize_trace(relevant_msgs)
             if not trace_data or trace_data[0].get('role') != 'system':
-                system_prompt_step = {"role": "system", "content": PROMPTS[system_prompt_key], "step_type": "text"}
+                system_prompt_step = {"role": "system", "content": self._get_actual_system_prompt(), "step_type": "text"}
                 trace_data = [system_prompt_step] + trace_data
             key = RedisKeys.trial_trace(trial.id)
             await asyncio.to_thread(redis_client.set, key, json.dumps(trace_data), RedisKeys.DEFAULT_TTL)

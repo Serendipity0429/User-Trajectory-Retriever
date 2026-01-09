@@ -1113,7 +1113,7 @@ def _run_pipeline_generic_async_wrapper(request, pipeline_class, redis_prefix_te
     pipeline_id = request.POST.get("pipeline_id")
     dataset_id = request.POST.get("dataset_id")
     group_id = request.POST.get("group_id")
-    
+
     if not api_key:
         return JsonResponse({"error": "An API Key is required to run the benchmark."}, status=400)
     if pipeline_id:
@@ -1282,8 +1282,18 @@ def export_session(request, session_id):
         if trial.get("created_at"): trial["created_at"] = trial["created_at"].isoformat()
         log = trial.pop("log", {}) or {}
 
-        # Export raw messages only (authentic LLM/agent context)
-        trial["messages"] = log.get("messages", [])
+        # Export raw messages (authentic LLM/agent context)
+        messages = log.get("messages", [])
+
+        # Ensure system prompt is included (stored separately for agent pipelines)
+        system_prompt = log.get("system_prompt")
+        if system_prompt:
+            # Check if first message is already a system message
+            has_system_msg = messages and isinstance(messages[0], dict) and messages[0].get("role") == "system"
+            if not has_system_msg:
+                messages = [{"role": "system", "content": system_prompt}] + messages
+
+        trial["messages"] = messages
 
         # Apply pipeline-specific metadata (search data for RAG, memory data for agents)
         apply_trial_metadata(trial, log, pipeline_type)
@@ -1342,8 +1352,18 @@ def export_run(request, group_id):
                 if trial.get("created_at"): trial["created_at"] = trial.get("created_at").isoformat()
                 log = trial.pop("log", {}) or {}
 
-                # Export raw messages only (authentic LLM/agent context)
-                trial["messages"] = log.get("messages", [])
+                # Export raw messages (authentic LLM/agent context)
+                messages = log.get("messages", [])
+
+                # Ensure system prompt is included (stored separately for agent pipelines)
+                system_prompt = log.get("system_prompt")
+                if system_prompt:
+                    # Check if first message is already a system message
+                    has_system_msg = messages and isinstance(messages[0], dict) and messages[0].get("role") == "system"
+                    if not has_system_msg:
+                        messages = [{"role": "system", "content": system_prompt}] + messages
+
+                trial["messages"] = messages
 
                 # Apply pipeline-specific metadata (search data for RAG, memory data for agents)
                 apply_trial_metadata(trial, log, session_pipeline_type)

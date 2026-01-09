@@ -449,6 +449,7 @@ class BaseMultiTurnPipeline(BasePipeline):
                 # Mark last step as streaming for frontend optimization
                 if is_streaming and trace_data:
                     trace_data[-1]['is_streaming'] = True
+                print_debug(f"[VanillaLLM Trace Update] Trial {trial.id}: {len(trace_data)} steps, streaming={is_streaming}")
                 redis_client.set(RedisKeys.trial_trace(trial.id), json.dumps(trace_data), ex=RedisKeys.DEFAULT_TTL)
 
             full_response = ""
@@ -497,6 +498,17 @@ class BaseMultiTurnPipeline(BasePipeline):
             # Cache completion status in Redis for efficient polling (parse trace for UI)
             try:
                 trace, _ = TraceFormatter.serialize([SimpleMsg(m["role"], m["content"]) for m in trial_messages])
+
+                # Ensure system prompt is at top of trace
+                if not trace or trace[0].get('role') != 'system':
+                    # Get system prompt from messages or construct it
+                    system_prompt = None
+                    if messages and messages[0].get('role') == 'system':
+                        system_prompt = messages[0].get('content', '')
+                    if system_prompt:
+                        system_prompt_step = {"role": "system", "content": system_prompt, "step_type": "text"}
+                        trace = [system_prompt_step] + trace
+
                 status_data = {
                     "id": trial.id,
                     "status": "completed",
@@ -760,9 +772,19 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
 
             if not hasattr(self, 'active_agent') or not self.active_agent:
                 self.active_agent = await self._init_agent()
-            
+
             # The update hook allows real-time trace streaming to the frontend.
-            self.active_agent.memory._update_hook = lambda: self._update_trace(trial, turn_start_index)
+            # Use asyncio.create_task to properly schedule the async function
+            def create_update_hook(t, idx):
+                def hook():
+                    try:
+                        loop = asyncio.get_running_loop()
+                        asyncio.ensure_future(self._update_trace(t, idx), loop=loop)
+                    except RuntimeError:
+                        # No running loop - create task in default loop
+                        asyncio.create_task(self._update_trace(t, idx))
+                return hook
+            self.active_agent.memory._update_hook = create_update_hook(trial, turn_start_index)
 
             try:
                 # 2. Execute Agent (delegated hook)
@@ -864,7 +886,8 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
             if trace_data:
                 trace_data[-1]['is_streaming'] = True
             key = RedisKeys.trial_trace(trial.id)
-            await asyncio.to_thread(redis_client.set, key, json.dumps(trace_data), RedisKeys.DEFAULT_TTL)
+            print_debug(f"[Trace Update] Trial {trial.id}: {len(trace_data)} steps, turn_start={turn_start_index}")
+            await asyncio.to_thread(lambda: redis_client.set(key, json.dumps(trace_data), ex=RedisKeys.DEFAULT_TTL))
         except Exception as e: print_debug(f"Trace update failed: {e}")
 
     def save_trial_result(self, session, trial, answer, messages, trace_data):

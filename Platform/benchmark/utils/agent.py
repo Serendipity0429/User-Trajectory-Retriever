@@ -229,7 +229,7 @@ class VanillaAgentFactory:
 
         # Build ReActAgent with proper memory parameters per AgentScope docs
         agent_kwargs = {
-            "name": "Assistant",
+            "name": "ReActAgent",
             "sys_prompt": sys_prompt,
             "model": model,
             "toolkit": toolkit,

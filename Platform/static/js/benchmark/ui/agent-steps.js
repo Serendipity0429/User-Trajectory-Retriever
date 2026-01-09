@@ -18,6 +18,11 @@ window.BenchmarkUI.AgentSteps = {
         let content = step.content || '';
         const name = step.name || '';
 
+        // Debug: log system prompt steps
+        if (role === 'system') {
+            console.log('[AgentSteps] Rendering system prompt:', { idx, role, type, contentLength: content?.length });
+        }
+
         if (type === 'thought') return this._renderThought(content, trialId, idx);
         if (type === 'action') return this._renderAction(content);
         if (type === 'search_query') return this._renderSearchQuery(content);
@@ -171,10 +176,20 @@ window.BenchmarkUI.AgentSteps = {
     },
 
     _renderSystemPrompt: function(content) {
-        const systemPrompt = BenchmarkUtils.renderTemplate('tpl-system-prompt', {
-            '.system-config-content': { text: content }
-        });
-        return BenchmarkUI.MessageBubble.create('system', systemPrompt.outerHTML, 'bg-light border-secondary border-opacity-10 shadow-none');
+        try {
+            const systemPrompt = BenchmarkUtils.renderTemplate('tpl-system-prompt', {
+                '.system-config-content': { text: content }
+            });
+            if (systemPrompt) {
+                return BenchmarkUI.MessageBubble.create('system', systemPrompt.outerHTML, 'bg-light border-secondary border-opacity-10 shadow-none');
+            }
+        } catch (e) {
+            console.error('Failed to render system prompt template:', e);
+        }
+        // Fallback: render as simple text if template fails
+        const escapedContent = BenchmarkHelpers.escapeHtml(content).replace(/\n/g, '<br>');
+        const fallbackHtml = `<div><div class="d-flex align-items-center mb-2 pb-2 border-bottom border-secondary border-opacity-25"><i class="bi bi-gear text-secondary me-2"></i><span class="text-uppercase fw-bold text-secondary small">System Prompt</span></div><div class="font-monospace text-muted small" style="white-space: pre-wrap;">${escapedContent}</div></div>`;
+        return BenchmarkUI.MessageBubble.create('system', fallbackHtml, 'bg-light border-secondary border-opacity-10 shadow-none');
     },
 
     _renderUserInput: function(content) {

@@ -154,13 +154,6 @@
     letter-spacing: 1px;
     margin-bottom: 1rem;
 }
-.section-header::after {
-    content: "";
-    flex: 1;
-    height: 1px;
-    background: #dee2e6;
-    margin-left: 1rem;
-}
 
 /* Foldable metric groups */
 .metrics-group-details {

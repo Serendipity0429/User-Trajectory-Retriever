@@ -66,30 +66,27 @@ class TrialService:
                 except MultiTurnTrial.DoesNotExist:
                     trial_data = {"status": "error", "error": "Trial not found"}
 
-            # 3. Fetch Trace from Redis (only if not invalidated)
+            # 3. Fetch Trace
             response_data = {"trial": trial_data, "trace": [], "total_steps": 0}
+            full_trace = None
 
+            # Try Redis first if not invalidated
             if use_redis_trace:
                 trace_json = redis_client.get(trace_key)
                 if trace_json:
                     full_trace = json.loads(trace_json)
-                    response_data["total_steps"] = len(full_trace)
 
-                    if cursor > 0:
-                        if cursor < len(full_trace):
-                            response_data["trace"] = full_trace[cursor:]
-                    else:
-                        response_data["trace"] = full_trace
+            # DATABASE FALLBACK: Redis expired/invalidated or empty, reconstruct from database
+            if not full_trace:
+                full_trace = TrialService._reconstruct_trace_from_db(trial_id)
+
+            # Apply cursor and return
+            if full_trace:
+                response_data["total_steps"] = len(full_trace)
+                if cursor > 0 and cursor < len(full_trace):
+                    response_data["trace"] = full_trace[cursor:]
                 else:
-                    # DATABASE FALLBACK: Redis expired, reconstruct from database
-                    full_trace = TrialService._reconstruct_trace_from_db(trial_id)
-                    if full_trace:
-                        response_data["total_steps"] = len(full_trace)
-                        if cursor > 0:
-                            if cursor < len(full_trace):
-                                response_data["trace"] = full_trace[cursor:]
-                        else:
-                            response_data["trace"] = full_trace
+                    response_data["trace"] = full_trace
 
             return response_data
 
@@ -112,6 +109,12 @@ class TrialService:
             if not messages:
                 return []
 
+            # Try to get system prompt from stored value or first message
+            system_prompt = trial.log.get('system_prompt')
+            if not system_prompt and messages and isinstance(messages[0], dict):
+                if messages[0].get('role') == 'system':
+                    system_prompt = messages[0].get('content', '')
+
             # Convert messages to SimpleMsg objects for TraceFormatter
             simple_msgs = []
             for msg in messages:
@@ -123,8 +126,7 @@ class TrialService:
             # Serialize using TraceFormatter
             trace_data, _ = TraceFormatter.serialize(simple_msgs)
 
-            # Ensure system prompt is at the top of trace
-            system_prompt = trial.log.get('system_prompt')
+            # Ensure system prompt is at the top of trace (if we have one and it's not already there)
             if system_prompt and (not trace_data or trace_data[0].get('role') != 'system'):
                 system_prompt_step = {"role": "system", "content": system_prompt, "step_type": "text"}
                 trace_data = [system_prompt_step] + trace_data

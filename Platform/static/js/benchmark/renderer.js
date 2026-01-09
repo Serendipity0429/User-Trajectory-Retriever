@@ -133,40 +133,73 @@ window.BenchmarkUtils.BenchmarkRenderer = {
         });
 
         const wrapper = trialDiv.querySelector('.trial-wrapper');
+        const self = this;
 
-        let trace = trial.trace || [];
-        if (typeof trace === 'string') {
-            try { trace = JSON.parse(trace); } catch (e) { trace = []; }
-        }
-
-        if (trace.length === 0 && trial.full_response && pipelineType.includes('agent')) {
-            try { trace = JSON.parse(trial.full_response); } catch (e) { }
-        }
-
-        // Start polling for processing trials - polling will handle the indicator
+        // Start polling for processing trials
         if (trial.status === 'processing') {
+            // Add initial loading indicator (polling will replace it with actual content)
+            const config = window.BenchmarkPipelineConfig ? window.BenchmarkPipelineConfig.get(pipelineType) : { loadingText: 'Processing...', icon: 'bi-robot' };
+            const initialIndicator = this.createMessageBubble('assistant',
+                `<div class="d-flex align-items-center trial-processing-indicator"><span class="spinner-border spinner-border-sm text-primary me-2"></span>${config.loadingText}</div>`,
+                '', config.icon);
+            wrapper.appendChild(initialIndicator);
+
             if (window.BenchmarkUtils && window.BenchmarkUtils.MultiTurnPage && window.BenchmarkUtils.MultiTurnPage.startPolling) {
                 setTimeout(() => window.BenchmarkUtils.MultiTurnPage.startPolling(trial.id, pipelineType), 100);
             }
         }
 
-        if (trace && trace.length > 0) {
-            trace.forEach((step, idx) => {
-                const stepEl = this.renderAgentStep(step, idx, trial.id, trial.answer);
-                if (typeof stepEl === 'string') {
-                    wrapper.insertAdjacentHTML('beforeend', stepEl);
-                } else {
-                    wrapper.appendChild(stepEl);
-                }
-            });
-        } else if (trial.status !== 'processing') {
-            // Only show "no trace" message if not processing (polling will show indicator)
-            wrapper.appendChild(this.createMessageBubble('system', 'No execution trace available for this trial.', 'bg-light border-secondary border-opacity-10 shadow-none'));
-        }
+        // For completed trials, always fetch trace from the proper endpoint (ensures system prompt is included)
+        if (trial.status === 'completed') {
+            // Show loading placeholder
+            const loadingEl = this.createMessageBubble('system', '<span class="spinner-border spinner-border-sm me-2"></span>Loading trace...', 'bg-light border-secondary border-opacity-10 shadow-none');
+            wrapper.appendChild(loadingEl);
 
-        if (trial.status === 'completed' && (trial.feedback || trial.is_correct_rule !== undefined)) {
-            const verdictHtml = this.renderTrialVerdict(trial);
-            if (verdictHtml) wrapper.appendChild(verdictHtml);
+            // Fetch trace from server
+            BenchmarkAPI.get(`/benchmark/api/sessions/get_trial_trace/${trial.id}/?cursor=0`)
+                .then(data => {
+                    // Remove loading placeholder
+                    loadingEl.remove();
+
+                    const fetchedTrace = data.trace || [];
+                    // Debug: log fetched trace
+                    console.log('[Renderer] Fetched trace for completed trial:', {
+                        trialId: trial.id,
+                        traceLength: fetchedTrace.length,
+                        firstStep: fetchedTrace[0] ? { role: fetchedTrace[0].role, step_type: fetchedTrace[0].step_type } : null
+                    });
+                    if (fetchedTrace.length > 0) {
+                        // Get verdict container to insert before it
+                        const verdictContainer = wrapper.querySelector('.trial-verdict-container');
+                        fetchedTrace.forEach((step, idx) => {
+                            const stepEl = self.renderAgentStep(step, idx, trial.id, trial.answer);
+                            if (verdictContainer) {
+                                verdictContainer.insertAdjacentElement('beforebegin', stepEl);
+                            } else {
+                                wrapper.appendChild(stepEl);
+                            }
+                        });
+                    } else {
+                        wrapper.insertBefore(
+                            self.createMessageBubble('system', 'No execution trace available for this trial.', 'bg-light border-secondary border-opacity-10 shadow-none'),
+                            wrapper.querySelector('.trial-verdict-container')
+                        );
+                    }
+                })
+                .catch(err => {
+                    console.error('Failed to fetch trace:', err);
+                    loadingEl.remove();
+                    wrapper.insertBefore(
+                        self.createMessageBubble('system', 'Failed to load execution trace.', 'bg-light border-danger border-opacity-10 shadow-none'),
+                        wrapper.querySelector('.trial-verdict-container')
+                    );
+                });
+
+            // Add verdict after setting up the fetch (it will be inserted before verdict by the fetch callback)
+            if (trial.feedback || trial.is_correct_rule !== undefined) {
+                const verdictHtml = this.renderTrialVerdict(trial);
+                if (verdictHtml) wrapper.appendChild(verdictHtml);
+            }
         }
 
         const container = document.createElement('div');

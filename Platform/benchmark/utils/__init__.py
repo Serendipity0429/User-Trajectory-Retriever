@@ -8,12 +8,13 @@ from .redis import RedisKeys, PipelinePrefix, clear_trial_cache
 from .config import PipelineConfig
 from .trace_formatter import TraceFormatter, SimpleMsg
 from .prompts import PROMPTS
-from .text import count_questions_in_file, extract_final_answer, extract_query
+from .text import count_questions_in_file, extract_final_answer, extract_query, ensure_system_prompt
 from .django import (
     handle_api_error,
     handle_async_api_error,
     TrialGuard,
     AsyncTrialGuard,
+    get_session_settings,
 )
 from .search import get_search_engine, WebCrawler
 from .agent import VanillaAgentFactory, BrowserAgentFactory
@@ -47,11 +48,13 @@ __all__ = [
     'count_questions_in_file',
     'extract_final_answer',
     'extract_query',
+    'ensure_system_prompt',
     # Django utilities
     'handle_api_error',
     'handle_async_api_error',
     'TrialGuard',
     'AsyncTrialGuard',
+    'get_session_settings',
     # Search
     'get_search_engine',
     'WebCrawler',

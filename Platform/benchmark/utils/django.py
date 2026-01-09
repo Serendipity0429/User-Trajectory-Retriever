@@ -11,6 +11,12 @@ from core.utils import print_debug
 from .redis import RedisKeys
 
 
+def get_session_settings(session):
+    """Get session-specific settings or fallback to defaults."""
+    from benchmark.models import BenchmarkSettings
+    return session.run.settings if session.run and session.run.settings else BenchmarkSettings.get_effective_settings()
+
+
 def handle_api_error(view_func):
     """Decorator to handle exceptions in API views and return JSON error response."""
     @wraps(view_func)

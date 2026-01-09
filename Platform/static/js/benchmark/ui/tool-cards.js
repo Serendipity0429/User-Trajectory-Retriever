@@ -60,80 +60,62 @@ window.BenchmarkUI.ToolCards = {
      */
     _wrapInCard: function(toolName, bodyContent, isAction) {
         const titleColor = isAction ? 'text-primary' : 'text-success';
-
-        return `
-            <div class="card border border-light shadow-sm">
-                <div class="card-header bg-light bg-gradient border-bottom py-2 px-3 d-flex align-items-center">
-                    <i class="bi bi-terminal-fill text-secondary me-2"></i>
-                    <span class="fw-bold font-monospace ${titleColor}">${BenchmarkHelpers.escapeHtml(toolName)}</span>
-                </div>
-                <div class="card-body p-3 bg-white">
-                    ${bodyContent}
-                </div>
-            </div>`;
+        const card = BenchmarkUtils.renderTemplate('tpl-tool-card-wrapper', {
+            '.tool-name': { text: toolName, addClass: titleColor },
+            '.tool-body': { html: bodyContent }
+        });
+        return card.outerHTML;
     },
 
     _renderSearchResultsCard: function(parsedData) {
         const displayLimit = 5;
         const visibleItems = parsedData.slice(0, displayLimit);
 
-        let listHtml = '<div class="list-group list-group-flush">';
+        const listContainer = document.createElement('div');
+        listContainer.className = 'list-group list-group-flush';
 
         visibleItems.forEach((item, idx) => {
             let snippet = item.snippet || '';
             if (snippet.length > 120) snippet = snippet.substring(0, 120) + '...';
 
-            const safeTitle = BenchmarkHelpers.escapeHtml(item.title || 'No Title');
-            const safeSnippet = BenchmarkHelpers.escapeHtml(snippet);
-            const safeLink = BenchmarkHelpers.escapeHtml(item.link || item.url || '#');
-
-            listHtml += `
-                <div class="list-group-item bg-transparent px-0 py-2 border-bottom border-light">
-                    <div class="d-flex w-100 justify-content-between align-items-start mb-1">
-                        <div class="d-flex align-items-start" style="max-width: 90%;">
-                            <span class="badge bg-light text-secondary border me-2 flex-shrink-0" style="font-size: 0.75rem;">${idx + 1}</span>
-                            <h6 class="mb-0 text-primary fw-bold text-wrap" style="line-height: 1.4; font-size: 0.95rem;">${safeTitle}</h6>
-                        </div>
-                        <a href="${safeLink}" target="_blank" class="text-secondary opacity-50 hover-opacity-100 ms-2"><i class="bi bi-box-arrow-up-right"></i></a>
-                    </div>
-                    <p class="mb-0 text-muted ps-4 ms-1" style="font-size: 0.85rem;">${safeSnippet}</p>
-                </div>`;
+            const itemEl = BenchmarkUtils.renderTemplate('tpl-tool-search-result-item', {
+                '.result-index': { text: idx + 1 },
+                '.result-title': { text: item.title || 'No Title' },
+                '.result-link': { attrs: { href: item.link || item.url || '#' } },
+                '.result-snippet': { text: snippet }
+            });
+            listContainer.appendChild(itemEl);
         });
 
-        const resultsJson = encodeURIComponent(JSON.stringify(parsedData));
         const remaining = Math.max(0, parsedData.length - displayLimit);
         const remainingText = remaining > 0 ? ` (+${remaining} more)` : '';
+        const dataId = 'search-data-' + Math.random().toString(36).substr(2, 9);
 
-        listHtml += `
-            <div class="mt-2 pt-1">
-                <div class="d-flex align-items-center justify-content-between">
-                    <span class="text-success small fw-medium" style="font-size: 0.8rem;"><i class="bi bi-check-all me-1"></i>Found ${parsedData.length} results</span>
-                    <button class="btn btn-sm btn-light border btn-xs text-primary shadow-sm" style="font-size: 0.8rem;" onclick="
-                        const data = JSON.parse(decodeURIComponent('${resultsJson}'));
-                        window.BenchmarkUI.SearchResults.showInModal(data);
-                    ">View Full Details${remainingText}</button>
-                </div>
-            </div>
-        </div>`;
+        // Store data globally for onclick access
+        window._benchmarkSearchData = window._benchmarkSearchData || {};
+        window._benchmarkSearchData[dataId] = parsedData;
 
-        return listHtml;
+        const footer = BenchmarkUtils.renderTemplate('tpl-tool-search-results-footer', {
+            '.results-count': { html: `<i class="bi bi-check-all me-1"></i>Found ${parsedData.length} results` },
+            '.view-full-btn': {
+                text: `View Full Details${remainingText}`,
+                attrs: { onclick: `window.BenchmarkUI.SearchResults.showInModal(window._benchmarkSearchData['${dataId}'])` }
+            }
+        });
+
+        listContainer.appendChild(footer);
+        return listContainer.outerHTML;
     },
 
     _renderStructuredCard: function(toolName, content, isAction) {
         const sectionLabel = isAction ? 'Input Parameters' : 'Output';
-        const titleColor = isAction ? 'text-primary' : 'text-success';
         const contentText = typeof content === 'string' ? content : JSON.stringify(content, null, 2);
 
-        return `
-            <div class="card border border-light shadow-sm">
-                <div class="card-header bg-light bg-gradient border-bottom py-2 px-3 d-flex align-items-center">
-                    <i class="bi bi-terminal-fill text-secondary me-2"></i>
-                    <span class="fw-bold font-monospace ${titleColor}">${BenchmarkHelpers.escapeHtml(toolName)}</span>
-                </div>
-                <div class="card-body p-3 bg-white">
-                    <div class="text-muted small text-uppercase fw-bold mb-2" style="font-size: 0.7rem; letter-spacing: 0.5px;">${sectionLabel}</div>
-                    <div class="p-2 bg-light border rounded font-monospace small text-dark" style="white-space: pre-wrap; max-height: 500px; overflow-y: auto;">${BenchmarkHelpers.escapeHtml(contentText)}</div>
-                </div>
-            </div>`;
+        const structured = BenchmarkUtils.renderTemplate('tpl-tool-structured-content', {
+            '.section-label': { text: sectionLabel },
+            '.content-text': { text: contentText }
+        });
+
+        return this._wrapInCard(toolName, structured.outerHTML, isAction);
     }
 };

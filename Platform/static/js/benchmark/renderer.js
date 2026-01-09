@@ -174,8 +174,6 @@ window.BenchmarkUtils.BenchmarkRenderer = {
             };
 
             if (cachedTrace) {
-                // Use cached trace immediately (no loading state needed)
-                console.log('[Renderer] Using cached trace for trial:', { trialId: trial.id, traceLength: cachedTrace.length });
                 renderTraceSteps(cachedTrace);
             } else {
                 // Show loading placeholder and fetch from server
@@ -186,11 +184,6 @@ window.BenchmarkUtils.BenchmarkRenderer = {
                     .then(data => {
                         loadingEl.remove();
                         const fetchedTrace = data.trace || [];
-                        console.log('[Renderer] Fetched trace for completed trial:', {
-                            trialId: trial.id,
-                            traceLength: fetchedTrace.length,
-                            firstStep: fetchedTrace[0] ? { role: fetchedTrace[0].role, step_type: fetchedTrace[0].step_type } : null
-                        });
                         // Cache the fetched trace for future use
                         if (fetchedTrace.length > 0 && window.BenchmarkUtils?.MultiTurnPage?.setCachedTrace) {
                             window.BenchmarkUtils.MultiTurnPage.setCachedTrace(trial.id, fetchedTrace);

@@ -17,8 +17,8 @@ from core.utils import print_debug, redis_client
 import httpx
 from task_manager.utils import check_answer_rule, check_answer_llm
 from .utils import (
-    get_search_engine, count_questions_in_file,
-    handle_api_error, handle_async_api_error,
+    get_search_engine, count_questions_in_file, ensure_system_prompt,
+    handle_api_error, handle_async_api_error, get_session_settings,
     print_debug, RedisKeys, PipelinePrefix, clear_trial_cache,
     TraceFormatter, SimpleMsg,
     apply_trial_metadata, is_rag_pipeline,
@@ -562,33 +562,29 @@ def save_settings(request):
     try:
         data = json.loads(request.body)
         settings = BenchmarkSettings.load()
-        
-        # LLM Settings
-        if "llm_base_url" in data: settings.llm_base_url = data.get("llm_base_url", "")
-        if "llm_model" in data: settings.llm_model = data.get("llm_model", "")
-        if "llm_api_key" in data: settings.llm_api_key = data.get("llm_api_key", "")
-        if "llm_judge_model" in data: settings.llm_judge_model = data.get("llm_judge_model", "")
-        if "embedding_model" in data: settings.embedding_model = data.get("embedding_model", "")
-        if "max_retries" in data: settings.max_retries = int(data.get("max_retries", 3))
-        if "allow_reasoning" in data: settings.allow_reasoning = data.get("allow_reasoning", True)
-        if "temperature" in data: settings.temperature = float(data.get("temperature", 0.0))
-        if "top_p" in data: settings.top_p = float(data.get("top_p", 1.0))
-        
-        max_tokens_val = data.get("max_tokens")
-        if max_tokens_val is not None and max_tokens_val != "":
-            settings.max_tokens = int(max_tokens_val)
-        elif "max_tokens" in data:
-            settings.max_tokens = None
-            
-        # Search Settings
-        if "search_provider" in data: settings.search_provider = data.get("search_provider", settings.search_provider)
-        if "serper_api_key" in data: settings.serper_api_key = data.get("serper_api_key", settings.serper_api_key)
-        if "search_limit" in data: settings.search_limit = int(data.get("search_limit", settings.search_limit))
-        if "serper_fetch_full_content" in data: settings.fetch_full_content = data.get("serper_fetch_full_content", settings.fetch_full_content)
-        
-        # Agent Settings
-        if "memory_type" in data: settings.memory_type = data.get("memory_type", settings.memory_type)
-        if "agent_memory_type" in data: settings.memory_type = data.get("agent_memory_type", settings.memory_type)
+
+        # Field mappings: data_key -> (attr_name, type_converter, default)
+        field_map = {
+            'llm_base_url': (str, ''), 'llm_model': (str, ''), 'llm_api_key': (str, ''),
+            'llm_judge_model': (str, ''), 'embedding_model': (str, ''),
+            'max_retries': (int, 3), 'allow_reasoning': (bool, True),
+            'temperature': (float, 0.0), 'top_p': (float, 1.0),
+            'search_provider': (str, None), 'serper_api_key': (str, None),
+            'search_limit': (int, None), 'memory_type': (str, None),
+        }
+        for key, (conv, default) in field_map.items():
+            if key in data:
+                val = data[key] if default is None else data.get(key, default)
+                setattr(settings, key, conv(val) if val is not None else val)
+
+        # Special cases
+        if 'serper_fetch_full_content' in data:
+            settings.fetch_full_content = data['serper_fetch_full_content']
+        if 'agent_memory_type' in data:
+            settings.memory_type = data['agent_memory_type']
+        if 'max_tokens' in data:
+            val = data['max_tokens']
+            settings.max_tokens = int(val) if val not in (None, '') else None
 
         settings.save()
         return JsonResponse({"status": "ok"})
@@ -829,7 +825,7 @@ def run_trial(request, trial_id):
     trial = get_object_or_404(MultiTurnTrial.objects.select_related("session", "session__run"), pk=trial_id)
     session = trial.session
     
-    settings = session.run.settings if session.run and session.run.settings else BenchmarkSettings.get_effective_settings()
+    settings = get_session_settings(session)
     base_url = settings.llm_base_url
     model = settings.llm_model
     api_key = config("LLM_API_KEY", default=None)
@@ -890,7 +886,7 @@ def retry_session(request, trial_id):
         original_trial.save()
 
         session = original_trial.session
-        settings = session.run.settings if session.run and session.run.settings else BenchmarkSettings.get_effective_settings()
+        settings = get_session_settings(session)
         max_retries = settings.max_retries
 
         if is_correct:
@@ -1148,7 +1144,7 @@ def get_session(request, session_id):
         return JsonResponse({"error": "Session not found"}, status=404)
     
     pipeline_type = session.pipeline_type
-    settings = session.run.settings if session.run and session.run.settings else BenchmarkSettings.get_effective_settings()
+    settings = get_session_settings(session)
     snapshot = settings.to_snapshot_dict()
     max_retries = settings.max_retries
 
@@ -1267,10 +1263,8 @@ def export_session(request, session_id):
         return HttpResponse("Session not found", status=404)
     
     pipeline_type = session.pipeline_type
-    settings = session.run.settings if session.run and session.run.settings else BenchmarkSettings.get_effective_settings()
-    snapshot = settings.to_snapshot_dict()
-    if snapshot and "llm" in snapshot:
-        snapshot["llm"].pop("llm_api_key", None)
+    settings = get_session_settings(session)
+    snapshot = settings.to_safe_snapshot_dict()
     max_retries = settings.max_retries
 
     trials = list(session.trials.values(
@@ -1282,18 +1276,8 @@ def export_session(request, session_id):
         if trial.get("created_at"): trial["created_at"] = trial["created_at"].isoformat()
         log = trial.pop("log", {}) or {}
 
-        # Export raw messages (authentic LLM/agent context)
-        messages = log.get("messages", [])
-
-        # Ensure system prompt is included (stored separately for agent pipelines)
-        system_prompt = log.get("system_prompt")
-        if system_prompt:
-            # Check if first message is already a system message
-            has_system_msg = messages and isinstance(messages[0], dict) and messages[0].get("role") == "system"
-            if not has_system_msg:
-                messages = [{"role": "system", "content": system_prompt}] + messages
-
-        trial["messages"] = messages
+        # Export raw messages with system prompt
+        trial["messages"] = ensure_system_prompt(log.get("messages", []), log.get("system_prompt"))
 
         # Apply pipeline-specific metadata (search data for RAG, memory data for agents)
         apply_trial_metadata(trial, log, pipeline_type)
@@ -1334,10 +1318,7 @@ def export_run(request, group_id):
         # Get settings from the run
         settings = group.settings
         if settings:
-             snapshot = settings.to_snapshot_dict()
-             if snapshot and "llm" in snapshot:
-                snapshot["llm"].pop("llm_api_key", None)
-             export_data["settings"] = snapshot
+            export_data["settings"] = settings.to_safe_snapshot_dict()
 
         sessions_data = []
         for session in sessions:
@@ -1351,21 +1332,7 @@ def export_run(request, group_id):
             for trial in trials:
                 if trial.get("created_at"): trial["created_at"] = trial.get("created_at").isoformat()
                 log = trial.pop("log", {}) or {}
-
-                # Export raw messages (authentic LLM/agent context)
-                messages = log.get("messages", [])
-
-                # Ensure system prompt is included (stored separately for agent pipelines)
-                system_prompt = log.get("system_prompt")
-                if system_prompt:
-                    # Check if first message is already a system message
-                    has_system_msg = messages and isinstance(messages[0], dict) and messages[0].get("role") == "system"
-                    if not has_system_msg:
-                        messages = [{"role": "system", "content": system_prompt}] + messages
-
-                trial["messages"] = messages
-
-                # Apply pipeline-specific metadata (search data for RAG, memory data for agents)
+                trial["messages"] = ensure_system_prompt(log.get("messages", []), log.get("system_prompt"))
                 apply_trial_metadata(trial, log, session_pipeline_type)
 
             sessions_data.append({

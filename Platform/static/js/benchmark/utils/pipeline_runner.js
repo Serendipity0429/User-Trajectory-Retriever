@@ -22,25 +22,17 @@ window.BenchmarkPipelineRunner.start = function(options) {
     const { url, formData, ui, callbacks, itemsData } = options;
 
     // UI Reset
-    if (ui.runBtn) ui.runBtn.style.display = 'none';
-    if (ui.stopBtn) {
-        ui.stopBtn.style.display = 'block';
-        ui.stopBtn.disabled = false;
-    }
-    if (ui.retryBtn) ui.retryBtn.style.display = 'none';
-
-    if (ui.progressContainer) ui.progressContainer.style.display = 'block';
+    BenchmarkHelpers.setUIState(ui, { runBtn: 'none', stopBtn: 'block', retryBtn: 'none', progressContainer: 'block' });
+    if (ui.stopBtn) ui.stopBtn.disabled = false;
     if (ui.progressBar) {
         const initialProgress = (totalItems > 0) ? Math.round((initialProcessedCount / totalItems) * 100) : 0;
         ui.progressBar.style.width = `${initialProgress}%`;
         ui.progressBar.textContent = `${initialProgress}%`;
     }
 
-    if (ui.resultsContainer) ui.resultsContainer.style.display = 'block';
+    BenchmarkHelpers.setUIState(ui, { resultsContainer: 'block', spinner: 'inline-block' });
     if (ui.resultsBody) ui.resultsBody.innerHTML = '';
-
     if (ui.statusDiv) ui.statusDiv.textContent = 'Initializing pipeline...';
-    if (ui.spinner) ui.spinner.style.display = 'inline-block';
 
     BenchmarkSettings.toggleConfigurationInputs(true);
 
@@ -87,27 +79,16 @@ window.BenchmarkPipelineRunner.start = function(options) {
             },
             () => { // onComplete
                 BenchmarkSettings.toggleConfigurationInputs(false);
-                if (ui.runBtn) ui.runBtn.style.display = 'block';
-                if (ui.stopBtn) ui.stopBtn.style.display = 'none';
-                if (ui.spinner) ui.spinner.style.display = 'none';
+                BenchmarkHelpers.setUIState(ui, { runBtn: 'block', stopBtn: 'none', spinner: 'none' });
                 if (ui.statusDiv) ui.statusDiv.textContent = 'Pipeline finished.';
-
                 if (callbacks.onComplete) callbacks.onComplete(processedCount);
             },
             (error) => { // onError
-                if (error.name === 'AbortError') {
-                    if (ui.statusDiv) ui.statusDiv.textContent = "Pipeline stopped by user.";
-                    console.log('Pipeline stopped by user.');
-                } else {
-                    console.error('Error during stream processing:', error);
-                    if (ui.statusDiv) ui.statusDiv.textContent = `Error: ${error.message}`;
-                }
-
+                if (ui.statusDiv) ui.statusDiv.textContent = error.name === 'AbortError'
+                    ? "Pipeline stopped by user." : `Error: ${error.message}`;
+                if (error.name !== 'AbortError') console.error('Error during stream processing:', error);
                 BenchmarkSettings.toggleConfigurationInputs(false);
-                if (ui.runBtn) ui.runBtn.style.display = 'block';
-                if (ui.stopBtn) ui.stopBtn.style.display = 'none';
-                if (ui.spinner) ui.spinner.style.display = 'none';
-
+                BenchmarkHelpers.setUIState(ui, { runBtn: 'block', stopBtn: 'none', spinner: 'none' });
                 if (callbacks.onError) callbacks.onError(error);
             },
             signal
@@ -122,9 +103,7 @@ window.BenchmarkPipelineRunner.start = function(options) {
             if (ui.statusDiv) ui.statusDiv.textContent = "Failed to start pipeline.";
         }
         BenchmarkSettings.toggleConfigurationInputs(false);
-        if (ui.runBtn) ui.runBtn.style.display = 'block';
-        if (ui.stopBtn) ui.stopBtn.style.display = 'none';
-        if (ui.spinner) ui.spinner.style.display = 'none';
+        BenchmarkHelpers.setUIState(ui, { runBtn: 'block', stopBtn: 'none', spinner: 'none' });
     });
 
     return controller;

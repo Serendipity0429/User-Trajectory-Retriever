@@ -34,42 +34,29 @@ window.BenchmarkUtils.MultiTurnPage = (function() {
     function startPolling(trialId, pipelineType) {
         // SINGLETON PATTERN: If already polling this trial, don't start another
         if (activePolls[trialId]) {
-            console.log(`[Polling] Already polling trial ${trialId}, skipping`);
             return;
         }
-
-        console.log(`[Polling] Starting poll for trial ${trialId}, pipeline: ${pipelineType}`);
         const config = BenchmarkPipelineConfig.get(pipelineType);
 
         const poll = () => {
             const trialDiv = document.getElementById(`trial-${trialId}`);
             if (!trialDiv) {
-                console.log(`[Polling] Trial div not found for ${trialId}, stopping`);
                 stopPolling(trialId);
                 return;
             }
 
             const wrapper = trialDiv.querySelector('.trial-wrapper');
             if (!wrapper) {
-                console.log(`[Polling] Wrapper not found for trial ${trialId}, stopping`);
                 stopPolling(trialId);
                 return;
             }
 
             // Always fetch full trace (cursor=0) and do a smart diff/replace
             // This avoids sync issues between DOM state and cursor tracking
-            console.log(`[Polling] Fetching trace for trial ${trialId}...`);
             BenchmarkAPI.get(`/benchmark/api/sessions/get_trial_trace/${trialId}/?cursor=0`)
                 .then(data => {
                     const allSteps = data.trace || [];
                     const trialInfo = data.trial;
-                    const totalSteps = data.total_steps || allSteps.length;
-
-                    console.log(`[Polling] Trial ${trialId}: received ${allSteps.length} steps, status: ${trialInfo?.status}`);
-                    // Debug: check if first step is system prompt
-                    if (allSteps.length > 0) {
-                        console.log('[Polling] First step:', { role: allSteps[0]?.role, step_type: allSteps[0]?.step_type, totalSteps: allSteps.length });
-                    }
 
                     // Get current bubbles (excluding verdict and indicators)
                     const existingBubbles = Array.from(wrapper.querySelectorAll('.message-bubble'))
@@ -201,12 +188,10 @@ window.BenchmarkUtils.MultiTurnPage = (function() {
     }
 
     function _loadSessionImpl(sessionId, initialTrialId = null, pipelineType = 'vanilla_llm') {
-        console.log(`[loadSession] Loading session ${sessionId}`);
         activeSessionId = sessionId;
 
         BenchmarkAPI.get(BenchmarkUrls.multiTurn.getSession(sessionId))
             .then(data => {
-                console.log(`[loadSession] Received ${data.trials?.length || 0} trials:`, data.trials?.map(t => ({ id: t.id, status: t.status, trial_number: t.trial_number })));
                 const sessionPipelineType = data.session?.pipeline_type || pipelineType;
                 BenchmarkSessionUI.renderSession(data.session, data.trials, { sessionTrials: [], pipelineType: sessionPipelineType });
                 window.sessionTrials = data.trials;
@@ -274,13 +259,10 @@ window.BenchmarkUtils.MultiTurnPage = (function() {
                     .then(retryData => {
                         if (retryData.status === 'retrying' && retryData.new_trial_id) {
                             // Recursively execute the new trial
-                            console.log(`Retrying with new trial ${retryData.new_trial_id}`);
                             executeTrial(retryData.new_trial_id, sessionId, pipelineType);
                         } else if (retryData.status === 'max_retries_reached') {
-                            console.log('Max retries reached');
                             if (sessionAbortController) resetSessionUI();
                         } else if (retryData.status === 'completed') {
-                            console.log('Session completed');
                             if (sessionAbortController) resetSessionUI();
                         }
                     })
@@ -400,16 +382,13 @@ window.BenchmarkUtils.MultiTurnPage = (function() {
                 initialProcessedCount: preloadedCount,
                 callbacks: {
                     onMeta: (data) => {
-                        console.log('[SSE] onMeta received:', data.type, data);
                         if (data.type === 'info') ui.statusDiv.textContent = data.message;
                         if (data.type === 'session_created') {
-                            console.log('[SSE] session_created:', data.session_id);
                             BenchmarkSessionUI.addNewSessionToList('session-list', data.session_id, { question: data.question }, null, data.group_id, data.group_name, 'Processing...', pipelineType);
                             loadSession(data.session_id, null, pipelineType);
                             if (data.group_id) activeGroupId = data.group_id;
                         }
                         if (data.type === 'trial_started' || data.type === 'trial_completed') {
-                            console.log(`[SSE] ${data.type}: trial=${data.trial_id}, session=${data.session_id}, activeSession=${activeSessionId}`);
                             if (activeSessionId && String(activeSessionId) === String(data.session_id)) {
                                 loadSession(data.session_id, null, pipelineType);
                             }

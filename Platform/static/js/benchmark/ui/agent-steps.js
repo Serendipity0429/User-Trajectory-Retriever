@@ -17,12 +17,7 @@ window.BenchmarkUI.AgentSteps = {
         const type = step.step_type || 'text';
         let content = step.content || '';
         const name = step.name || '';
-
-        // Debug: log system prompt steps
-        if (role === 'system') {
-            console.log('[AgentSteps] Rendering system prompt:', { idx, role, type, contentLength: content?.length });
-        }
-
+        
         if (type === 'thought') return this._renderThought(content, trialId, idx);
         if (type === 'action') return this._renderAction(content);
         if (type === 'search_query') return this._renderSearchQuery(content);
@@ -206,38 +201,27 @@ window.BenchmarkUI.AgentSteps = {
             }
 
             if (extractedResults.length > 0) {
-                const resultsJson = encodeURIComponent(JSON.stringify(extractedResults));
+                const dataId = 'search-data-' + Math.random().toString(36).substr(2, 9);
+
+                // Store data globally for onclick access
+                window._benchmarkSearchData = window._benchmarkSearchData || {};
+                window._benchmarkSearchData[dataId] = extractedResults;
+
                 const injection = BenchmarkUtils.renderTemplate('tpl-user-search-injection', {
-                    '.docs-count-text': { text: `${extractedResults.length} documents provided in context` }
+                    '.docs-count-text': { text: `${extractedResults.length} search results` },
+                    '.view-search-results-btn': {
+                        attrs: { onclick: `window.BenchmarkUI.SearchResults.showInModal(window._benchmarkSearchData['${dataId}'])` }
+                    }
                 });
 
-                // Set inline onclick to preserve handler after outerHTML serialization
-                const viewBtn = injection.querySelector('.view-search-results-btn');
-                if (viewBtn) {
-                    viewBtn.setAttribute('onclick', `
-                        const data = JSON.parse(decodeURIComponent('${resultsJson}'));
-                        window.BenchmarkUI.SearchResults.showInModal(data);
-                    `);
-                }
-
                 let displayContent = BenchmarkHelpers.escapeHtml(content);
-                const placeholder = "<!--___RESULTS_CARD_PLACEHOLDER___-->";
                 const escapedSourceBlockRegex = /(?:&lt;source \d+&gt;[\s\S]*?&lt;\/source \d+&gt;\s*)+/;
-                const blockMatch = displayContent.match(escapedSourceBlockRegex);
 
-                if (blockMatch) {
-                    const rawSourceBlock = blockMatch[0];
-                    displayContent = displayContent.replace(escapedSourceBlockRegex, placeholder);
-                    displayContent = displayContent.replace(/\n/g, '<br>');
-
-                    const collapseId = `raw-source-${extractedResults.length}-${Math.random().toString(36).substr(2, 5)}`;
-                    injection.querySelector('.raw-source-toggle').setAttribute('data-bs-target', `#${collapseId}`);
-                    injection.querySelector('.raw-source-collapse').id = collapseId;
-                    injection.querySelector('.raw-source-pre').textContent = rawSourceBlock;
-
-                    displayContent = displayContent.replace(placeholder, injection.outerHTML);
-                    return BenchmarkUI.MessageBubble.create('user', displayContent);
-                }
+                // Replace newlines BEFORE inserting injection HTML
+                displayContent = displayContent.replace(/\n/g, '<br>');
+                // Replace source blocks with the search results card
+                displayContent = displayContent.replace(escapedSourceBlockRegex, injection.outerHTML);
+                return BenchmarkUI.MessageBubble.create('user', displayContent);
             }
         }
         return BenchmarkUI.MessageBubble.create('user', BenchmarkHelpers.escapeHtml(content).replace(/\n/g, '<br>'));

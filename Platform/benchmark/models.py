@@ -149,6 +149,13 @@ class BenchmarkSettings(models.Model):
             }
         }
 
+    def to_safe_snapshot_dict(self):
+        """Return snapshot without sensitive API keys."""
+        snapshot = self.to_snapshot_dict()
+        if snapshot and "llm" in snapshot:
+            snapshot["llm"].pop("llm_api_key", None)
+        return snapshot
+
 class MultiTurnRun(models.Model):
     """
     Represents a group of benchmark sessions, typically from a single pipeline run.

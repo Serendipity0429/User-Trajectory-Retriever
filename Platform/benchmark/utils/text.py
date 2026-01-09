@@ -59,3 +59,11 @@ def extract_query(text):
         return text[last_match.end():].strip().strip('"').strip("'")
     else:
         return text.strip().strip('"').strip("'")
+
+
+def ensure_system_prompt(messages, system_prompt):
+    """Ensure system prompt is first message in conversation."""
+    if not system_prompt:
+        return messages
+    has_system = messages and isinstance(messages[0], dict) and messages[0].get("role") == "system"
+    return messages if has_system else [{"role": "system", "content": system_prompt}] + messages

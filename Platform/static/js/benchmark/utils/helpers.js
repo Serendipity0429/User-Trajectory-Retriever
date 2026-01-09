@@ -29,6 +29,27 @@ window.BenchmarkHelpers.escapeHtml = function(str) {
 }
 
 /**
+ * Normalize ground truths to array format
+ * @param {Array|string} input - Array or comma-separated string
+ * @returns {Array} Normalized array of ground truths
+ */
+window.BenchmarkHelpers.normalizeGroundTruths = function(input) {
+    if (!input) return [];
+    return Array.isArray(input) ? input : input.split(',').map(s => s.trim()).filter(s => s);
+}
+
+/**
+ * Set UI element display states safely
+ * @param {object} elements - Map of element references
+ * @param {object} states - Map of display values (element key -> 'block'|'none'|'inline-block')
+ */
+window.BenchmarkHelpers.setUIState = function(elements, states) {
+    for (const [key, display] of Object.entries(states)) {
+        if (elements[key]) elements[key].style.display = display;
+    }
+}
+
+/**
  * Create an expandable toggle for show more/less functionality
  * @param {HTMLElement} showBtn - The "show more" button
  * @param {HTMLElement} hideBtn - The "show less" button

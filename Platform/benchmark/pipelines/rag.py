@@ -110,7 +110,7 @@ class RagMultiTurnPipeline(BaseMultiTurnPipeline):
                 query_instruction = PROMPTS["rag_query_gen_cot_prompt" if allow_reasoning else "rag_query_gen_prompt"].format(question=session.question)
             else:
                 # Add retry message to history (uses shared prompt for consistency)
-                retry_msg = {"role": "user", "content": PROMPTS["shared_retry_request"]}
+                retry_msg = {"role": "user", "content": PROMPTS["shared_retry_request"].format(question=session.question)}
                 history.append(retry_msg)
                 turn_messages.append(retry_msg)
                 query_instruction = PROMPTS["rag_query_reform_cot_prompt" if allow_reasoning else "rag_query_reform_prompt"]

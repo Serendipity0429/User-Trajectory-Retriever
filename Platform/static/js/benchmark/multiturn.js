@@ -21,71 +21,78 @@ window.BenchmarkUtils.MultiTurnPage = (function() {
     let sessionRetryTimeout = null;
 
     // === Polling ===
+    function stopPolling(trialId) {
+        if (activePolls[trialId]) {
+            clearTimeout(activePolls[trialId]);
+            delete activePolls[trialId];
+        }
+        delete trialState[trialId];
+    }
+
     function startPolling(trialId, pipelineType) {
-        if (activePolls[trialId]) return;
+        // SINGLETON PATTERN: If already polling this trial, don't start another
+        if (activePolls[trialId]) {
+            return;
+        }
 
         const config = BenchmarkPipelineConfig.get(pipelineType);
-        if (!trialState[trialId]) {
-            trialState[trialId] = { renderedCount: 0, backoffDelay: 2000, lastStepWasStreaming: false };
-        }
 
         const poll = () => {
             const trialDiv = document.getElementById(`trial-${trialId}`);
             if (!trialDiv) {
-                delete activePolls[trialId];
-                delete trialState[trialId];
+                stopPolling(trialId);
                 return;
             }
 
-            let currentCount = trialState[trialId].renderedCount;
-            if (trialState[trialId].lastStepWasStreaming) {
-                currentCount = Math.max(0, currentCount - 1);
+            const wrapper = trialDiv.querySelector('.trial-wrapper');
+            if (!wrapper) {
+                stopPolling(trialId);
+                return;
             }
 
-            BenchmarkAPI.get(`/benchmark/api/sessions/get_trial_trace/${trialId}/?cursor=${currentCount}`)
+            // Always fetch full trace (cursor=0) and do a smart diff/replace
+            // This avoids sync issues between DOM state and cursor tracking
+            BenchmarkAPI.get(`/benchmark/api/sessions/get_trial_trace/${trialId}/?cursor=0`)
                 .then(data => {
-                    const newSteps = data.trace || [];
+                    const allSteps = data.trace || [];
                     const trialInfo = data.trial;
-                    const wrapper = trialDiv.querySelector('.trial-wrapper');
+                    const totalSteps = data.total_steps || allSteps.length;
 
-                    // Always remove ALL existing indicators first (prevents duplicates from loadSession re-renders)
-                    // Search in entire trial div, not just wrapper, to catch any stray indicators
-                    trialDiv.querySelectorAll('.trial-processing-indicator').forEach(indicator => {
+                    // Get current bubbles (excluding verdict and indicators)
+                    const existingBubbles = Array.from(wrapper.querySelectorAll('.message-bubble'))
+                        .filter(b => !b.closest('.trial-verdict-container') && !b.querySelector('.trial-processing-indicator'));
+
+                    // Remove processing indicators
+                    wrapper.querySelectorAll('.trial-processing-indicator').forEach(indicator => {
                         const parent = indicator.closest('.message-bubble');
                         if (parent) parent.remove();
                     });
 
-                    if (newSteps.length > 0) {
-                        trialState[trialId].backoffDelay = 2000;
-                        if (wrapper) {
-                            if (currentCount === 0) {
-                                wrapper.querySelectorAll('.message-bubble').forEach(el => el.remove());
-                            }
-                            if (trialState[trialId].lastStepWasStreaming) {
-                                const bubbles = wrapper.querySelectorAll('.message-bubble');
-                                if (bubbles.length > 0) bubbles[bubbles.length - 1].remove();
-                                trialState[trialId].renderedCount--;
-                            }
+                    // Check if we need to update
+                    const lastStep = allSteps.length > 0 ? allSteps[allSteps.length - 1] : null;
+                    const isStreaming = !!(lastStep && lastStep.is_streaming);
 
-                            const verdictContainer = wrapper.querySelector('.trial-verdict-container');
-                            newSteps.forEach((step, idx) => {
-                                const stepEl = BenchmarkUtils.BenchmarkRenderer.renderAgentStep(step, currentCount + idx, trialId, trialInfo ? trialInfo.answer : null);
-                                if (verdictContainer) verdictContainer.insertAdjacentElement('beforebegin', stepEl);
-                                else wrapper.appendChild(stepEl);
-                            });
-                        }
-                        trialState[trialId].renderedCount += newSteps.length;
+                    // Smart update: only re-render if step count changed or last step is streaming
+                    const needsUpdate = allSteps.length !== existingBubbles.length || isStreaming;
 
-                        const lastStep = newSteps[newSteps.length - 1];
-                        trialState[trialId].lastStepWasStreaming = lastStep && lastStep.is_streaming;
-                        if (trialState[trialId].lastStepWasStreaming) trialState[trialId].backoffDelay = 500;
-                    } else {
-                        trialState[trialId].backoffDelay = Math.min(trialState[trialId].backoffDelay * 1.5, 10000);
+                    if (needsUpdate && allSteps.length > 0) {
+                        // Clear existing bubbles (but preserve verdict)
+                        existingBubbles.forEach(b => b.remove());
+
+                        // Render all steps
+                        const verdictContainer = wrapper.querySelector('.trial-verdict-container');
+                        allSteps.forEach((step, idx) => {
+                            const stepEl = BenchmarkUtils.BenchmarkRenderer.renderAgentStep(step, idx, trialId, trialInfo ? trialInfo.answer : null);
+                            if (verdictContainer) verdictContainer.insertAdjacentElement('beforebegin', stepEl);
+                            else wrapper.appendChild(stepEl);
+                        });
                     }
 
-                    // Add indicator AFTER processing steps, only if still processing AND none exists
-                    if (wrapper && trialInfo && trialInfo.status === 'processing') {
-                        // Double-check no indicator exists (防止 race condition)
+                    // Set backoff based on streaming state
+                    const backoffDelay = isStreaming ? 500 : 2000;
+
+                    // Add processing indicator if still processing
+                    if (trialInfo && trialInfo.status === 'processing') {
                         if (!wrapper.querySelector('.trial-processing-indicator')) {
                             const verdictContainer = wrapper.querySelector('.trial-verdict-container');
                             const indicatorEl = BenchmarkUtils.BenchmarkRenderer.createMessageBubble('assistant', `<div class="d-flex align-items-center trial-processing-indicator"><span class="spinner-border spinner-border-sm text-primary me-2"></span>${config.loadingText}</div>`, '', config.icon);
@@ -94,40 +101,40 @@ window.BenchmarkUtils.MultiTurnPage = (function() {
                         }
                     }
 
+                    // Handle completion
                     if (trialInfo && (trialInfo.status === 'completed' || trialInfo.status === 'error')) {
-                        clearTimeout(activePolls[trialId]);
-                        delete activePolls[trialId];
-                        delete trialState[trialId];
+                        stopPolling(trialId);
 
-                        // Remove ALL indicators from entire trial (thorough cleanup)
-                        trialDiv.querySelectorAll('.trial-processing-indicator').forEach(indicator => {
+                        // Final cleanup: remove all processing indicators
+                        wrapper.querySelectorAll('.trial-processing-indicator').forEach(indicator => {
                             const parent = indicator.closest('.message-bubble');
                             if (parent) parent.remove();
                         });
 
-                        const wrapper = trialDiv.querySelector('.trial-wrapper');
-                        if (wrapper && trialInfo.status === 'completed' && !wrapper.querySelector('.trial-verdict-container')) {
+                        // Add verdict if completed and not already present
+                        if (trialInfo.status === 'completed' && !wrapper.querySelector('.trial-verdict-container')) {
                             const verdictContainer = BenchmarkUtils.BenchmarkRenderer.renderTrialVerdict(trialInfo);
                             if (verdictContainer) wrapper.appendChild(verdictContainer);
                         }
                         return;
                     }
+
+                    // Schedule next poll
+                    if (activePolls[trialId]) {
+                        activePolls[trialId] = setTimeout(poll, backoffDelay);
+                    }
                 })
                 .catch(err => {
                     console.error("Polling error:", err);
-                    trialState[trialId].backoffDelay = 10000;
-                })
-                .finally(() => {
-                    if (activePolls[trialId] && document.getElementById(`trial-${trialId}`)) {
-                        activePolls[trialId] = setTimeout(poll, trialState[trialId].backoffDelay);
-                    } else {
-                        delete activePolls[trialId];
-                        delete trialState[trialId];
+                    // Schedule retry with longer backoff
+                    if (activePolls[trialId]) {
+                        activePolls[trialId] = setTimeout(poll, 10000);
                     }
                 });
         };
 
-        activePolls[trialId] = setTimeout(poll, 1000);
+        // Mark as active and start first poll
+        activePolls[trialId] = setTimeout(poll, 500);
     }
 
     // === Session Helpers ===

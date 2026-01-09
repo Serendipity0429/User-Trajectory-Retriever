@@ -443,9 +443,12 @@ class BaseMultiTurnPipeline(BasePipeline):
                     static_trace_msgs.append(SimpleMsg('system', messages[0].get('content')))
             static_trace_msgs.append(SimpleMsg("user", instruction))
 
-            def update_redis_trace(current_full_response):
+            def update_redis_trace(current_full_response, is_streaming=True):
                 temp_trace_msgs = static_trace_msgs + [SimpleMsg("assistant", current_full_response)]
                 trace_data, _ = TraceFormatter.serialize(temp_trace_msgs)
+                # Mark last step as streaming for frontend optimization
+                if is_streaming and trace_data:
+                    trace_data[-1]['is_streaming'] = True
                 redis_client.set(RedisKeys.trial_trace(trial.id), json.dumps(trace_data), ex=RedisKeys.DEFAULT_TTL)
 
             full_response = ""
@@ -455,10 +458,10 @@ class BaseMultiTurnPipeline(BasePipeline):
                 full_response = partial_response
                 chunk_count += 1
                 if chunk_count % 5 == 0: # Update every 5 chunks to reduce overhead
-                    update_redis_trace(full_response)
-            
-            # Final update
-            update_redis_trace(full_response)
+                    update_redis_trace(full_response, is_streaming=True)
+
+            # Final update - mark as not streaming
+            update_redis_trace(full_response, is_streaming=False)
             
             # Extract final answer
             if allow_reasoning:
@@ -485,6 +488,9 @@ class BaseMultiTurnPipeline(BasePipeline):
 
             trial.log = trial.log or {}
             trial.log['messages'] = trial_messages
+            # Store system prompt separately for database fallback when Redis expires
+            if messages and messages[0].get('role') == 'system':
+                trial.log['system_prompt'] = messages[0].get('content', '')
             trial.status = 'completed'
             trial.save()
 
@@ -730,20 +736,27 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
                 current_msg = Msg(name="User", role="user", content=PROMPTS["shared_user_question"].format(question=session.question))
                 turn_start_index = 0
             else:
-                # Retry logic: ensure agent is alive and context is inherited.
+                # Retry logic: ensure agent is alive
                 if not hasattr(self, 'active_agent') or not self.active_agent:
                     self.active_agent = await self._init_agent()
                     await self._populate_agent_memory(session, self.active_agent)
-                
+
+                # Check if we should clear short-term memory (when long-term memory is enabled)
+                if self._should_clear_memory_on_retry():
+                    # Clear short-term memory - agent should use long-term memory for context
+                    await self._clear_short_term_memory()
+                    turn_start_index = 0
+                else:
+                    try:
+                        current_mem = await self.active_agent.memory.get_memory()
+                        turn_start_index = len(current_mem) if current_mem else 0
+                    except: turn_start_index = 0
+
+                # Use shared retry prompt for all baselines
                 last_trial = await sync_to_async(lambda: session.trials.filter(status='completed').last())()
                 feedback = last_trial.feedback if last_trial else "Incorrect"
                 retry_prompt = self._get_retry_prompt_key()
-                current_msg = Msg(name="User", role="user", content=PROMPTS[retry_prompt].format(feedback=feedback))
-                
-                try:
-                    current_mem = await self.active_agent.memory.get_memory()
-                    turn_start_index = len(current_mem) if current_mem else 0
-                except: turn_start_index = 0
+                current_msg = Msg(name="User", role="user", content=PROMPTS[retry_prompt].format(question=session.question))
 
             if not hasattr(self, 'active_agent') or not self.active_agent:
                 self.active_agent = await self._init_agent()
@@ -802,6 +815,31 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
         Default implementation returns the base prompt from PROMPTS dict.
         """
         return PROMPTS[self._get_system_prompt_key()]
+
+    def _should_clear_memory_on_retry(self):
+        """Whether to clear short-term memory on retry trials.
+
+        When True, short-term memory is cleared and agent must use long-term memory.
+        Default is False (naive behavior - inherit full context).
+        Subclasses with long-term memory should override to return True.
+        """
+        return False
+
+    async def _clear_short_term_memory(self):
+        """Clear the agent's short-term memory.
+
+        Called before retry trials when long-term memory is enabled.
+        """
+        if hasattr(self, 'active_agent') and self.active_agent and hasattr(self.active_agent, 'memory'):
+            try:
+                # Clear memory - InMemoryMemory stores messages in a list
+                if hasattr(self.active_agent.memory, 'clear'):
+                    await self.active_agent.memory.clear()
+                elif hasattr(self.active_agent.memory, '_messages'):
+                    self.active_agent.memory._messages = []
+                print_debug("Cleared short-term memory for retry trial")
+            except Exception as e:
+                print_debug(f"Failed to clear short-term memory: {e}")
     
     def _parse_answer(self, response_msg):
         """Extracts text answer from multi-modal or structured responses."""
@@ -822,6 +860,9 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
             if not trace_data or trace_data[0].get('role') != 'system':
                 system_prompt_step = {"role": "system", "content": self._get_actual_system_prompt(), "step_type": "text"}
                 trace_data = [system_prompt_step] + trace_data
+            # Mark last step as streaming for frontend optimization
+            if trace_data:
+                trace_data[-1]['is_streaming'] = True
             key = RedisKeys.trial_trace(trial.id)
             await asyncio.to_thread(redis_client.set, key, json.dumps(trace_data), RedisKeys.DEFAULT_TTL)
         except Exception as e: print_debug(f"Trace update failed: {e}")
@@ -846,6 +887,9 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
         # Store raw messages (authentic agent context)
         trial.log = trial.log or {}
         trial.log['messages'] = [m.to_dict() if hasattr(m, 'to_dict') else m for m in messages]
+
+        # Store system prompt separately for database fallback when Redis expires
+        trial.log['system_prompt'] = self._get_actual_system_prompt()
 
         # Store baseline-specific metadata (e.g., memory operations for agent baselines)
         trial_meta = self._get_trial_meta(trial)

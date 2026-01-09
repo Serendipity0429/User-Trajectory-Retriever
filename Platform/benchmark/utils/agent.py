@@ -1,4 +1,3 @@
-import os
 import json
 import asyncio
 import agentscope
@@ -79,26 +78,13 @@ async def visit_page(url: str):
     except Exception as e:
         return ToolResponse(content=f"Error visiting page: {str(e)}")
 
-def mark_justification(evidence_content: str, source_url: str, reasoning: str):
-    """
-    Mark a specific piece of text from a webpage as evidence for your final answer.
-    You MUST use this tool before providing the final answer to ground your response in the retrieved data.
-    
-    Args:
-        evidence_content (str): The exact text found on the page.
-        source_url (str): The URL where this text was found.
-        reasoning (str): Briefly explain why this evidence is relevant.
-    """
-    return ToolResponse(content="Justification marked.")
-
 def answer_question(answer: str):
     """
     Finalize the task by submitting the answer to the user.
     You MUST use this tool to provide the final response after you have gathered sufficient information.
-    Ensure you have used `mark_justification` to highlight your evidence before calling this.
-    
+
     Args:
-        answer (str): The comprehensive answer to the user's question, citing sources if available.
+        answer (str): The answer to the user's question.
     """
     return ToolResponse(content="Answer submitted successfully.")
 
@@ -238,13 +224,8 @@ class VanillaAgentFactory:
         )
         print_debug(f"VanillaAgent: long_term_memory is {'set' if long_term_memory else 'None'}")
 
-        # Build system prompt - insert memory tools if LTM enabled
+        # Build system prompt (static_control mode auto-handles memory, no need for prompt section)
         sys_prompt = PROMPTS["vanilla_agent_system_prompt"]
-        if long_term_memory is not None:
-            # Insert memory tools before "Instructions:" section
-            memory_tools = PROMPTS["vanilla_agent_memory_tools"]
-            sys_prompt = sys_prompt.replace("\n\nInstructions:", f"\n{memory_tools}\n\nInstructions:")
-            print_debug(f"VanillaAgent: Inserted long-term memory tools into system prompt")
 
         # Build ReActAgent with proper memory parameters per AgentScope docs
         agent_kwargs = {
@@ -258,12 +239,17 @@ class VanillaAgentFactory:
         }
 
         # Only add long-term memory if it was successfully created
-        # Use agent_control mode: agent manages memory via record_to_memory/retrieve_from_memory tools
+        # Use static_control mode: system auto-retrieves before each reply and auto-records after
         if long_term_memory is not None:
             agent_kwargs["long_term_memory"] = long_term_memory
-            agent_kwargs["long_term_memory_mode"] = "agent_control"
+            agent_kwargs["long_term_memory_mode"] = "static_control"
 
         agent = ReActAgent(**agent_kwargs)
+
+        # Debug: Print registered tools
+        if hasattr(agent, 'toolkit') and agent.toolkit:
+            print_debug(f"VanillaAgent registered tools: {list(agent.toolkit.tools.keys())}")
+
         return agent, long_term_memory
 
     @staticmethod
@@ -318,13 +304,8 @@ class BrowserAgentFactory:
         )
         print_debug(f"BrowserAgent: long_term_memory is {'set' if long_term_memory else 'None'}")
 
-        # Build system prompt - insert memory tools if LTM enabled
+        # Build system prompt (static_control mode auto-handles memory, no need for prompt section)
         sys_prompt = PROMPTS["browser_agent_system_prompt"]
-        if long_term_memory is not None:
-            # Insert memory tools before "Instructions:" section
-            memory_tools = PROMPTS["browser_agent_memory_tools"]
-            sys_prompt = sys_prompt.replace("\n\nInstructions:", f"\n{memory_tools}\n\nInstructions:")
-            print_debug(f"BrowserAgent: Inserted long-term memory tools into system prompt")
 
         # Build ReActAgent with proper memory parameters per AgentScope docs
         agent_kwargs = {
@@ -338,12 +319,16 @@ class BrowserAgentFactory:
         }
 
         # Only add long-term memory if it was successfully created
-        # Use agent_control mode: agent manages memory via record_to_memory/retrieve_from_memory tools
+        # Use static_control mode: system auto-retrieves before each reply and auto-records after
         if long_term_memory is not None:
             agent_kwargs["long_term_memory"] = long_term_memory
-            agent_kwargs["long_term_memory_mode"] = "agent_control"
+            agent_kwargs["long_term_memory_mode"] = "static_control"
 
         agent = ReActAgent(**agent_kwargs)
+
+        # Debug: Print registered tools
+        if hasattr(agent, 'toolkit') and agent.toolkit:
+            print_debug(f"BrowserAgent registered tools: {list(agent.toolkit.tools.keys())}")
 
         # Attach client to agent for cleanup
         if mcp_client:

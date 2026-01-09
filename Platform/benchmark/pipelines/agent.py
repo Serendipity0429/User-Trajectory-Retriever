@@ -1,5 +1,3 @@
-import json
-import asyncio
 import inspect
 from asgiref.sync import sync_to_async
 try:
@@ -112,10 +110,10 @@ class VanillaAgentPipeline(BaseAgentPipeline):
         return _AsyncNullContext()
 
     async def _execute_agent(self, msg):
-        """Execute agent with agent_control long-term memory mode.
+        """Execute agent with static_control long-term memory mode.
 
-        The agent manages memory via record_to_memory/retrieve_from_memory tools.
-        Memory operations are automatically tracked via the agent's tool calls.
+        The system automatically retrieves from LTM before each reply
+        and records the full conversation to LTM after reply.
         """
         async with self._get_memory_context():
             response = await self.active_agent(msg)
@@ -124,8 +122,7 @@ class VanillaAgentPipeline(BaseAgentPipeline):
     def _get_trial_meta(self, trial):
         """Return memory-related metadata for this trial.
 
-        With agent_control mode, memory operations are visible in the agent's
-        tool calls (record_to_memory, retrieve_from_memory) within the trace.
+        With static_control mode, memory operations are handled automatically.
         We only record the memory type here for reference.
         """
         meta = {}
@@ -140,10 +137,14 @@ class VanillaAgentPipeline(BaseAgentPipeline):
         return "shared_retry_request"
 
     def _get_actual_system_prompt(self):
-        """Return the actual system prompt from the agent (includes memory tools if enabled)."""
+        """Return the actual system prompt from the agent."""
         if hasattr(self, 'active_agent') and self.active_agent:
             return getattr(self.active_agent, 'sys_prompt', None) or super()._get_actual_system_prompt()
         return super()._get_actual_system_prompt()
+
+    def _should_clear_memory_on_retry(self):
+        """Clear short-term memory on retry when long-term memory is enabled."""
+        return self.long_term_memory is not None
 
 
 class BrowserAgentPipeline(BaseAgentPipeline):
@@ -281,10 +282,10 @@ class BrowserAgentPipeline(BaseAgentPipeline):
         return _AsyncNullContext()
 
     async def _execute_agent(self, msg):
-        """Execute agent with agent_control long-term memory mode.
+        """Execute agent with static_control long-term memory mode.
 
-        The agent manages memory via record_to_memory/retrieve_from_memory tools.
-        Memory operations are automatically tracked via the agent's tool calls.
+        The system automatically retrieves from LTM before each reply
+        and records the full conversation to LTM after reply.
         """
         async with self._get_memory_context():
             # Execute agent (handle async generator for browser agent)
@@ -294,13 +295,13 @@ class BrowserAgentPipeline(BaseAgentPipeline):
                 async for x in response:
                     final_res = x
                 response = final_res
+
             return response
 
     def _get_trial_meta(self, trial):
         """Return memory-related metadata for this trial.
 
-        With agent_control mode, memory operations are visible in the agent's
-        tool calls (record_to_memory, retrieve_from_memory) within the trace.
+        With static_control mode, memory operations are handled automatically.
         We only record the memory type here for reference.
         """
         meta = {}
@@ -315,7 +316,11 @@ class BrowserAgentPipeline(BaseAgentPipeline):
         return "shared_retry_request"
 
     def _get_actual_system_prompt(self):
-        """Return the actual system prompt from the agent (includes memory tools if enabled)."""
+        """Return the actual system prompt from the agent."""
         if hasattr(self, 'active_agent') and self.active_agent:
             return getattr(self.active_agent, 'sys_prompt', None) or super()._get_actual_system_prompt()
         return super()._get_actual_system_prompt()
+
+    def _should_clear_memory_on_retry(self):
+        """Clear short-term memory on retry when long-term memory is enabled."""
+        return self.long_term_memory is not None

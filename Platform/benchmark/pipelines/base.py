@@ -542,6 +542,14 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
                 )
                 await agent.memory.add(msg)
 
+    async def _on_session_start(self, session):
+        """Hook called when a session starts. Override in subclasses for setup."""
+        pass
+
+    async def _on_session_end(self, session):
+        """Hook called when a session ends. Override in subclasses for cleanup."""
+        pass
+
     async def _process_single_session_async(self, group, question_text, ground_truths, existing_session=None):
         """
         Orchestrates the lifecycle of a single question across multiple trials.
@@ -577,6 +585,9 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
                 session = await sync_to_async(self.create_session)(self.llm_settings, question_text, ground_truths, group)
                 trial_number = 1
 
+            # Session lifecycle: setup resources (e.g., browser instance)
+            await self._on_session_start(session)
+
             yield {
                 'is_meta': True, 'type': 'session_created', 'session_id': session.id,
                 'question': question_text, 'group_id': group.id, 'group_name': group.name
@@ -585,52 +596,56 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
             is_session_completed = False
             final_is_correct = False
             final_answer = ""
-            
-            while trial_number <= self.max_retries and not is_session_completed:
-                if not await sync_to_async(self.check_active)():
-                    break
 
-                trial = await sync_to_async(self.create_trial)(session, trial_number)
+            try:
+                while trial_number <= self.max_retries and not is_session_completed:
+                    if not await sync_to_async(self.check_active)():
+                        break
+
+                    trial = await sync_to_async(self.create_trial)(session, trial_number)
+                    yield {
+                        'is_meta': True, 'type': 'trial_started', 'session_id': session.id,
+                        'trial_number': trial_number, 'group_id': group.id
+                    }
+
+                    try:
+                        parsed_answer, is_correct_llm, _ = await self.run_single_turn_async(session, trial)
+                    except Exception as e:
+                        raise e
+
+                    yield {
+                        'is_meta': True, 'type': 'trial_completed', 'session_id': session.id,
+                        'trial_number': trial_number, 'is_correct': is_correct_llm,
+                        'is_correct_llm': is_correct_llm, 'is_correct_rule': trial.is_correct_rule,
+                        'answer': parsed_answer, 'group_id': group.id
+                    }
+
+                    final_answer = parsed_answer
+                    final_is_correct = is_correct_llm
+                    if is_correct_llm: is_session_completed = True
+                    else: trial_number += 1
+
+                session.is_completed = True
+                await sync_to_async(session.save)()
+
+                first_trial = await sync_to_async(lambda: session.trials.order_by('trial_number').first())()
                 yield {
-                    'is_meta': True, 'type': 'trial_started', 'session_id': session.id,
-                    'trial_number': trial_number, 'group_id': group.id
+                    'question': question_text, 'correct': final_is_correct,
+                    'is_correct_llm': final_is_correct, 'is_correct_rule': trial.is_correct_rule,
+                    'trials': trial_number if final_is_correct else (trial_number - 1),
+                    'session_id': session.id, 'final_answer': final_answer,
+                    'ground_truths': ground_truths, 'max_retries': self.max_retries,
+                    'group_name': group.name, 'group_id': group.id,
+                    'initial_correct': first_trial.is_correct_llm if first_trial else None,
+                    'initial_correct_rule': first_trial.is_correct_rule if first_trial else None,
+                    'coherence': await sync_to_async(lambda: (
+                        sum(1 for t in session.trials.all() if t.is_correct_llm == t.is_correct_rule) / session.trials.count()
+                        if session.trials.count() > 0 else 0
+                    ))()
                 }
-
-                try:
-                    parsed_answer, is_correct_llm, _ = await self.run_single_turn_async(session, trial)
-                except Exception as e:
-                    raise e
-                
-                yield {
-                    'is_meta': True, 'type': 'trial_completed', 'session_id': session.id,
-                    'trial_number': trial_number, 'is_correct': is_correct_llm,
-                    'is_correct_llm': is_correct_llm, 'is_correct_rule': trial.is_correct_rule,
-                    'answer': parsed_answer, 'group_id': group.id
-                }
-
-                final_answer = parsed_answer
-                final_is_correct = is_correct_llm
-                if is_correct_llm: is_session_completed = True
-                else: trial_number += 1
-            
-            session.is_completed = True
-            await sync_to_async(session.save)()
-
-            first_trial = await sync_to_async(lambda: session.trials.order_by('trial_number').first())()
-            yield {
-                'question': question_text, 'correct': final_is_correct,
-                'is_correct_llm': final_is_correct, 'is_correct_rule': trial.is_correct_rule,
-                'trials': trial_number if final_is_correct else (trial_number - 1),
-                'session_id': session.id, 'final_answer': final_answer,
-                'ground_truths': ground_truths, 'max_retries': self.max_retries,
-                'group_name': group.name, 'group_id': group.id,
-                'initial_correct': first_trial.is_correct_llm if first_trial else None,
-                'initial_correct_rule': first_trial.is_correct_rule if first_trial else None,
-                'coherence': await sync_to_async(lambda: (
-                    sum(1 for t in session.trials.all() if t.is_correct_llm == t.is_correct_rule) / session.trials.count()
-                    if session.trials.count() > 0 else 0
-                ))()
-            }
+            finally:
+                # Session lifecycle: cleanup resources (e.g., browser instance)
+                await self._on_session_end(session)
         except Exception as e:
             yield {'error': str(e), 'question': question_text}
 

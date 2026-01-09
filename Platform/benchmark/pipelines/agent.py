@@ -11,7 +11,7 @@ from ..utils import (
     VanillaAgentFactory, BrowserAgentFactory,
     clear_trial_cache
 )
-from ..utils.mcp_manager import MCPManager
+from ..utils.mcp_manager import ChromeDevToolsMCPManager
 from .base import BaseAgentPipeline, REDIS_PREFIX_BROWSER_AGENT
 import inspect
 
@@ -105,10 +105,11 @@ class BrowserAgentPipeline(BaseAgentPipeline):
             llm_model=model,
             temperature=0.0 # Default for agent
         )
-        self.agent_model = None # Initialized by async factory
-        self.agent_toolkit = None # Initialized by async factory
-        self.mcp_manager = MCPManager() # Decoupled MCP Manager
-        self.mcp_client = None # Set after connection
+        # These are initialized per-session in _on_session_start
+        self.agent_model = None
+        self.agent_toolkit = None
+        self.mcp_manager = None
+        self.mcp_client = None
         self.redis_prefix = REDIS_PREFIX_BROWSER_AGENT
 
     @classmethod
@@ -154,22 +155,66 @@ class BrowserAgentPipeline(BaseAgentPipeline):
         return trial
 
     async def cleanup(self):
-        await self.mcp_manager.disconnect()
-        self.mcp_client = None
+        """Final cleanup at end of pipeline run."""
+        await self._disconnect_mcp()
+
+    async def _on_session_start(self, session):
+        """
+        Initialize a fresh browser instance for each session.
+        This ensures isolation between different questions.
+        """
+        print_debug(f"BrowserAgentPipeline: Starting session {session.id} with fresh browser instance")
+
+        # Initialize fresh model and toolkit for this session
+        self.agent_model, self.agent_toolkit = await sync_to_async(
+            BrowserAgentFactory.init_agentscope, thread_sensitive=False
+        )(self.temp_settings)
+
+        # Create fresh MCP manager and connect
+        self.mcp_manager = ChromeDevToolsMCPManager()
+        self.mcp_client = await self.mcp_manager.connect(self.agent_toolkit)
+
+        # Reset active agent so it gets recreated with new toolkit
+        if hasattr(self, 'active_agent'):
+            self.active_agent = None
+
+    async def _on_session_end(self, session):
+        """
+        Clean up browser instance when session ends.
+        """
+        print_debug(f"BrowserAgentPipeline: Ending session {session.id}, disconnecting browser")
+        await self._disconnect_mcp()
+
+        # Reset agent state for next session
+        self.active_agent = None
+        self.agent_model = None
+        self.agent_toolkit = None
+
+    async def _disconnect_mcp(self):
+        """Safely disconnect MCP client."""
+        if self.mcp_manager:
+            try:
+                await self.mcp_manager.disconnect()
+            except Exception as e:
+                print_debug(f"Error disconnecting MCP: {e}")
+            finally:
+                self.mcp_manager = None
+                self.mcp_client = None
 
     # Hooks for BaseAgentPipeline template
     async def _init_agent(self):
-        # Ensure model and toolkit are initialized
+        # Model and toolkit should already be initialized in _on_session_start
         if not self.agent_model or not self.agent_toolkit:
-            self.agent_model, self.agent_toolkit = await sync_to_async(BrowserAgentFactory.init_agentscope, thread_sensitive=False)(self.temp_settings)
-        
-        # Lazy init for MCP client
-        if not self.mcp_client:
+            print_debug("Warning: Model/toolkit not initialized, initializing now")
+            self.agent_model, self.agent_toolkit = await sync_to_async(
+                BrowserAgentFactory.init_agentscope, thread_sensitive=False
+            )(self.temp_settings)
+            self.mcp_manager = ChromeDevToolsMCPManager()
             self.mcp_client = await self.mcp_manager.connect(self.agent_toolkit)
 
         return await BrowserAgentFactory.create_agent(
-            self.agent_model, 
-            self.agent_toolkit, 
+            self.agent_model,
+            self.agent_toolkit,
             self.mcp_client
         )
 

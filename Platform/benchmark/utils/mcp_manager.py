@@ -3,7 +3,7 @@ from agentscope.mcp import StdIOStatefulClient
 from agentscope.tool import Toolkit
 from . import print_debug
 
-class MCPManager:
+class ChromeDevToolsMCPManager:
     """
     Manages the connection to the Chrome DevTools MCP server.
     Decouples transport logic from the agent factory.
@@ -17,8 +17,8 @@ class MCPManager:
         """
         try:
             current_dir = os.path.dirname(os.path.abspath(__file__))
-            # Adjust path to match where this file is located relative to the mcp folder
-            mcp_root = os.path.join(current_dir, 'mcp', 'chrome-devtools-mcp')
+            # Go up one level from 'utils' to 'benchmark', then into 'mcp'
+            mcp_root = os.path.join(current_dir, '..', 'mcp', 'chrome-devtools-mcp')
             mcp_script = os.path.join(mcp_root, 'build', 'src', 'index.js')
             mcp_args = [
                 mcp_script,
@@ -47,15 +47,23 @@ class MCPManager:
 
     async def disconnect(self):
         """
-        Safely disconnects the MCP client.
+        Safely disconnects the MCP client and terminates the Chrome browser.
         """
         if self.client:
             try:
-                if hasattr(self.client, 'disconnect'):
-                    await self.client.disconnect()
-                elif hasattr(self.client, 'close'):
+                # Check if connected before closing (close() raises if not connected)
+                if getattr(self.client, 'is_connected', False):
                     await self.client.close()
+                    print_debug("MCP client closed successfully")
+                else:
+                    print_debug("MCP client was not connected, skipping close")
             except Exception as e:
                 print_debug(f"Error disconnecting MCP client: {e}")
+                # Try to forcefully terminate the subprocess if close() failed
+                try:
+                    if hasattr(self.client, 'stack') and self.client.stack:
+                        await self.client.stack.aclose()
+                except Exception as e2:
+                    print_debug(f"Error force-closing MCP stack: {e2}")
             finally:
                 self.client = None

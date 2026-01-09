@@ -206,36 +206,8 @@ window.BenchmarkUtils.BenchmarkRenderer = {
             configDetails.appendChild(item);
         };
 
-        const CONFIG_GROUPS = {
-            'llm': {
-                sources: ['llm', 'llm_settings'],
-                fields: [
-                    { key: 'llm_model', label: 'LLM Model', icon: 'bi-cpu' },
-                    { key: 'llm_judge_model', label: 'Judge Model', icon: 'bi-clipboard-check' },
-                    { key: 'max_retries', label: 'Max Retries', icon: 'bi-arrow-repeat' },
-                    { key: 'temperature', label: 'Temperature', icon: 'bi-thermometer-half' },
-                    { key: 'top_p', label: 'Top P', icon: 'bi-percent' },
-                    { key: 'max_tokens', label: 'Max Tokens', icon: 'bi-text-paragraph' },
-                    { key: 'allow_reasoning', label: 'Reasoning', icon: 'bi-lightbulb', type: 'boolean' },
-                    { key: 'llm_base_url', label: 'Base URL', icon: 'bi-link-45deg' }
-                ]
-            },
-            'search': {
-                sources: ['search', 'search_settings'],
-                fields: [
-                    { key: 'search_provider', label: 'Search Provider', icon: 'bi-globe', formatter: val => val === 'mcp' ? 'MCP Server' : (val === 'serper' ? 'Serper API' : val) },
-                    { key: 'search_limit', label: 'Top-K Limit', icon: 'bi-list-ol' },
-                    { key: 'serper_fetch_full_content', label: 'Full Content', icon: 'bi-file-text', type: 'boolean', domId: 'serper_fetch_full_content' }
-                ]
-            },
-            'agent': {
-                sources: ['agent', 'agent_config'],
-                fields: [
-                    { key: 'memory_type', label: 'Agent Memory', icon: 'bi-memory', map: { 'naive': 'Naive Memory', 'mem0': 'Mem0 Memory', 'reme': 'ReMe Memory' }, domId: 'agent_memory_type' },
-                    { key: 'model_name', label: 'Agent Model', icon: 'bi-robot' }
-                ]
-            }
-        };
+        // Use centralized config
+        const CONFIG_GROUPS = BenchmarkSettingsConfig.groups;
 
         const resolveValue = (groupObj, fieldConfig) => {
             const key = fieldConfig.key;

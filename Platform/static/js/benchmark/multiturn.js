@@ -153,9 +153,7 @@ window.BenchmarkUtils.MultiTurnPage = (function() {
                 BenchmarkSessionUI.renderSession(data.session, data.trials, { sessionTrials: [], pipelineType: sessionPipelineType });
                 window.sessionTrials = data.trials;
 
-                const whitelist = ['llm_model', 'llm_judge_model', 'llm_base_url', 'max_retries', 'allow_reasoning', 'temperature', 'top_p', 'max_tokens'];
-                if (sessionPipelineType.includes('rag')) whitelist.push('search');
-                if (sessionPipelineType.includes('agent')) whitelist.push('agent');
+                const whitelist = BenchmarkSettingsConfig.buildWhitelist(sessionPipelineType);
                 BenchmarkUtils.BenchmarkRenderer.renderRunConfiguration(data.session.settings_snapshot, whitelist);
 
                 document.getElementById('session-container').style.display = 'block';
@@ -255,9 +253,7 @@ window.BenchmarkUtils.MultiTurnPage = (function() {
                 loadSession(sid, null, pipelineType);
             }, pipelineType);
 
-            const whitelist = ['llm_model', 'llm_judge_model', 'llm_base_url', 'max_retries', 'allow_reasoning', 'temperature', 'top_p', 'max_tokens'];
-            if (pipelineType.includes('rag')) whitelist.push('search');
-            if (pipelineType.includes('agent')) whitelist.push('agent');
+            const whitelist = BenchmarkSettingsConfig.buildWhitelist(pipelineType);
             BenchmarkUtils.BenchmarkRenderer.renderRunConfiguration(data.settings, whitelist);
             if (statsContainer) statsContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         });

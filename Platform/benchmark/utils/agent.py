@@ -170,10 +170,14 @@ def create_memory(memory_type, agent_name, user_id, model=None, llm_settings=Non
                 agent_name=agent_name,
                 user_name=effective_user_id,
                 model=model,
-                embedding_model=embedding_model
+                embedding_model=embedding_model,
+                on_disk=False,  # Use in-memory storage to avoid Qdrant conflicts
             )
+            print_debug(f"Successfully initialized Mem0 long-term memory (in-memory)")
         except Exception as e:
             print_debug(f"Failed to init Mem0: {e}")
+    elif memory_type == 'mem0':
+        print_debug(f"Mem0LongTermMemory not available (import failed)")
 
     elif memory_type == 'reme' and ReMePersonalLongTermMemory:
         try:
@@ -183,8 +187,11 @@ def create_memory(memory_type, agent_name, user_id, model=None, llm_settings=Non
                 model=model,
                 embedding_model=embedding_model
             )
+            print_debug(f"Successfully initialized ReMe long-term memory")
         except Exception as e:
             print_debug(f"Failed to init ReMe: {e}")
+    elif memory_type == 'reme':
+        print_debug(f"ReMePersonalLongTermMemory not available (import failed)")
 
     return short_term_memory, long_term_memory
 
@@ -220,6 +227,7 @@ class VanillaAgentFactory:
         toolkit.register_tool_function(answer_question)
 
         settings = BenchmarkSettings.get_effective_settings()
+        print_debug(f"VanillaAgent: Creating agent with memory_type={settings.memory_type}")
         short_term_memory, long_term_memory = create_memory(
             settings.memory_type,
             agent_name="VanillaAgent",
@@ -228,11 +236,20 @@ class VanillaAgentFactory:
             llm_settings=settings,
             run_id=run_id
         )
+        print_debug(f"VanillaAgent: long_term_memory is {'set' if long_term_memory else 'None'}")
+
+        # Build system prompt - insert memory tools if LTM enabled
+        sys_prompt = PROMPTS["vanilla_agent_system_prompt"]
+        if long_term_memory is not None:
+            # Insert memory tools before "Instructions:" section
+            memory_tools = PROMPTS["vanilla_agent_memory_tools"]
+            sys_prompt = sys_prompt.replace("\n\nInstructions:", f"\n{memory_tools}\n\nInstructions:")
+            print_debug(f"VanillaAgent: Inserted long-term memory tools into system prompt")
 
         # Build ReActAgent with proper memory parameters per AgentScope docs
         agent_kwargs = {
             "name": "Assistant",
-            "sys_prompt": PROMPTS["vanilla_agent_system_prompt"],
+            "sys_prompt": sys_prompt,
             "model": model,
             "toolkit": toolkit,
             "memory": short_term_memory,
@@ -241,11 +258,10 @@ class VanillaAgentFactory:
         }
 
         # Only add long-term memory if it was successfully created
-        # Use static_control mode: developer explicitly calls record/retrieve
-        # This is better for QA benchmarks where we want automatic context management
+        # Use agent_control mode: agent manages memory via record_to_memory/retrieve_from_memory tools
         if long_term_memory is not None:
             agent_kwargs["long_term_memory"] = long_term_memory
-            agent_kwargs["long_term_memory_mode"] = "static_control"
+            agent_kwargs["long_term_memory_mode"] = "agent_control"
 
         agent = ReActAgent(**agent_kwargs)
         return agent, long_term_memory
@@ -291,6 +307,7 @@ class BrowserAgentFactory:
         print_debug(f"BrowserAgent Toolkit Tools: {list(toolkit.tools.keys())}")
 
         settings = await sync_to_async(BenchmarkSettings.get_effective_settings)()
+        print_debug(f"BrowserAgent: Creating agent with memory_type={settings.memory_type}")
         short_term_memory, long_term_memory = create_memory(
             settings.memory_type,
             agent_name="BrowserAgent",
@@ -299,11 +316,20 @@ class BrowserAgentFactory:
             llm_settings=settings,
             run_id=run_id
         )
+        print_debug(f"BrowserAgent: long_term_memory is {'set' if long_term_memory else 'None'}")
+
+        # Build system prompt - insert memory tools if LTM enabled
+        sys_prompt = PROMPTS["browser_agent_system_prompt"]
+        if long_term_memory is not None:
+            # Insert memory tools before "Instructions:" section
+            memory_tools = PROMPTS["browser_agent_memory_tools"]
+            sys_prompt = sys_prompt.replace("\n\nInstructions:", f"\n{memory_tools}\n\nInstructions:")
+            print_debug(f"BrowserAgent: Inserted long-term memory tools into system prompt")
 
         # Build ReActAgent with proper memory parameters per AgentScope docs
         agent_kwargs = {
             "name": "BrowserAgent",
-            "sys_prompt": PROMPTS["browser_agent_system_prompt"],
+            "sys_prompt": sys_prompt,
             "model": model,
             "toolkit": toolkit,
             "memory": short_term_memory,
@@ -312,11 +338,10 @@ class BrowserAgentFactory:
         }
 
         # Only add long-term memory if it was successfully created
-        # Use static_control mode: developer explicitly calls record/retrieve
-        # This is better for QA benchmarks where we want automatic context management
+        # Use agent_control mode: agent manages memory via record_to_memory/retrieve_from_memory tools
         if long_term_memory is not None:
             agent_kwargs["long_term_memory"] = long_term_memory
-            agent_kwargs["long_term_memory_mode"] = "static_control"
+            agent_kwargs["long_term_memory_mode"] = "agent_control"
 
         agent = ReActAgent(**agent_kwargs)
 

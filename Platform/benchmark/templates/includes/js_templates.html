@@ -248,7 +248,129 @@
     </div>
 </template>
 
-<!-- 19. User Search Result Injection -->
+<!-- 19. Pipeline Runs Section -->
+<template id="tpl-pipeline-runs-section">
+    <div class="history-section pipeline-runs-section">
+        <details open>
+            <summary class="section-header d-flex align-items-center justify-content-between px-3 py-2 my-0" style="cursor: pointer; background: linear-gradient(135deg, #e8f4fd 0%, #f0f7ff 100%); border-bottom: 1px solid #cce5ff;">
+                <div class="d-flex align-items-center">
+                    <i class="bi bi-collection-fill me-2 text-primary"></i>
+                    <span class="fw-semibold text-primary">Pipeline Runs</span>
+                    <span class="badge bg-primary ms-2 section-count">0</span>
+                </div>
+                <i class="bi bi-chevron-down section-toggle text-primary" style="transition: transform 0.2s;"></i>
+            </summary>
+            <div class="pipeline-runs-container">
+                <div class="select-all-row d-flex align-items-center px-3 py-2" style="background-color: #f8fbff; border-bottom: 1px solid #e9ecef;">
+                    <input class="form-check-input" type="checkbox" id="select-all-pipeline-runs">
+                    <label class="form-check-label ms-2 small text-muted" for="select-all-pipeline-runs">Select all pipeline runs</label>
+                </div>
+            </div>
+        </details>
+    </div>
+</template>
+
+<!-- 20. Single Sessions Section -->
+<template id="tpl-single-sessions-section">
+    <div class="history-section single-sessions-section">
+        <details open>
+            <summary class="section-header d-flex align-items-center justify-content-between px-3 py-2 my-0" style="cursor: pointer; background: linear-gradient(135deg, #f0fdf4 0%, #f7fdf9 100%); border-bottom: 1px solid #bbf7d0;">
+                <div class="d-flex align-items-center">
+                    <i class="bi bi-chat-square-dots-fill me-2 text-success"></i>
+                    <span class="fw-semibold text-success">Single Sessions</span>
+                    <span class="badge bg-success ms-2 section-count">0</span>
+                </div>
+                <i class="bi bi-chevron-down section-toggle text-success" style="transition: transform 0.2s;"></i>
+            </summary>
+            <div class="single-sessions-container">
+                <div class="select-all-row d-flex align-items-center px-3 py-2" style="background-color: #f8fdf9; border-bottom: 1px solid #e9ecef;">
+                    <input class="form-check-input" type="checkbox" id="select-all-single-sessions">
+                    <label class="form-check-label ms-2 small text-muted" for="select-all-single-sessions">Select all single sessions</label>
+                </div>
+            </div>
+        </details>
+    </div>
+</template>
+
+<!-- 21. Pipeline Group Item -->
+<template id="tpl-pipeline-group-item">
+    <div class="group-item" style="border-bottom: 1px solid #e9ecef;">
+        <details open>
+            <summary class="group-header d-block px-3 py-2" style="cursor: pointer; list-style: none;">
+                <div class="d-flex align-items-center mb-2">
+                    <input class="form-check-input group-select-checkbox me-2" type="checkbox">
+                    <i class="bi bi-folder2-open text-warning me-2"></i>
+                    <span class="group-name-display fw-medium"></span>
+                    <span class="badge bg-light text-secondary ms-2 group-session-count">0</span>
+                    <i class="bi bi-chevron-down ms-auto group-toggle text-muted" style="font-size: 0.75rem; transition: transform 0.2s;"></i>
+                </div>
+                <div class="d-flex gap-1 ps-4">
+                    <button class="btn btn-sm btn-outline-info view-group-results-btn" title="View Pipeline Results">
+                        <i class="bi bi-bar-chart-fill me-1"></i>View
+                    </button>
+                    <button class="btn btn-sm btn-outline-primary continue-group-btn" title="Continue Run">
+                        <i class="bi bi-play-fill me-1"></i>Continue
+                    </button>
+                    <button class="btn btn-sm btn-outline-secondary rename-group-btn" title="Rename">
+                        <i class="bi bi-pencil-fill"></i>Rename
+                    </button>
+                    <button class="btn btn-sm btn-outline-danger delete-group-btn" title="Delete">
+                        <i class="bi bi-trash"></i>Delete
+                    </button>
+                </div>
+            </summary>
+            <div class="session-list-inner ps-4" style="background-color: #fafbfc;">
+            </div>
+        </details>
+    </div>
+</template>
+
+<!-- 22. Session Item (with checkbox, for single sessions) -->
+<template id="tpl-session-item-checkbox">
+    <div class="session-item session-item-container d-flex align-items-center px-3 py-2" style="border-bottom: 1px solid #f0f0f0;">
+        <input class="form-check-input session-checkbox me-2" type="checkbox">
+        <div class="flex-grow-1 session-details" style="cursor: pointer;">
+            <div class="d-flex w-100 justify-content-between align-items-center">
+                <span class="small fw-medium text-dark session-id-label"></span>
+                <small class="text-muted session-time" style="font-size: 0.65rem;"></small>
+            </div>
+            <p class="mb-1 small text-muted text-truncate session-question" style="font-size: 0.75rem;"></p>
+            <span class="pipeline-badge-container"></span>
+        </div>
+    </div>
+</template>
+
+<!-- 23. Session Item (without checkbox, for grouped sessions) -->
+<template id="tpl-session-item-plain">
+    <div class="session-item session-item-container session-details d-flex align-items-start px-3 py-2" style="cursor: pointer; border-bottom: 1px solid #f0f0f0;">
+        <div class="flex-grow-1">
+            <div class="d-flex w-100 justify-content-between align-items-center">
+                <span class="small fw-medium text-dark session-id-label"></span>
+                <small class="text-muted session-time" style="font-size: 0.65rem;"></small>
+            </div>
+            <p class="mb-1 small text-muted text-truncate session-question" style="font-size: 0.75rem;"></p>
+            <span class="pipeline-badge-container"></span>
+        </div>
+    </div>
+</template>
+
+<!-- 24. Empty History State -->
+<template id="tpl-empty-history-state">
+    <div class="empty-state text-center py-5">
+        <i class="bi bi-inbox text-muted" style="font-size: 2.5rem;"></i>
+        <p class="text-muted mt-2 mb-0">No sessions found</p>
+        <small class="text-muted">Start a pipeline or single session to begin</small>
+    </div>
+</template>
+
+<!-- 25. Metrics Placeholder -->
+<template id="tpl-metrics-placeholder">
+    <div class="text-center text-muted py-4">
+        <i class="bi bi-info-circle me-2"></i><span class="placeholder-message"></span>
+    </div>
+</template>
+
+<!-- 26. User Search Result Injection -->
 <template id="tpl-user-search-injection">
     <div>
         <div class="d-flex align-items-center justify-content-between p-2 bg-light border rounded mb-2 mt-2">

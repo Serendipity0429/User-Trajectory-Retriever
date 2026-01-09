@@ -60,6 +60,7 @@ window.BenchmarkSessionUI.generatePipelineBadge = function(pipelineType) {
 
 /**
  * Add a new session to the session list UI.
+ * Supports new sectioned layout with Pipeline Runs and Single Sessions sections.
  * @param {string} sessionListId - The ID of the session list container.
  * @param {string} sessionId - The session ID.
  * @param {object} questionData - Data about the question.
@@ -88,90 +89,144 @@ window.BenchmarkSessionUI.addNewSessionToList = function(sessionListId, sessionI
         return;
     }
 
-    // If this is the first session ever, remove "no sessions" and add select-all header
-    if (document.querySelector('.no-sessions')) {
-        const noSessions = document.querySelector('.no-sessions');
-        if (noSessions) noSessions.remove();
-
-        // Only create if it doesn't exist
-        if (!document.getElementById('select-all-container')) {
-            const selectAllContainer = document.createElement('div');
-            selectAllContainer.className = 'list-group-item bg-light';
-            selectAllContainer.id = 'select-all-container';
-            selectAllContainer.innerHTML = `
-                <input class="form-check-input" type="checkbox" id="select-all-checkbox">
-                <label class="form-check-label ms-2" for="select-all-checkbox">Select All</label>`;
-            sessionList.prepend(selectAllContainer);
-            const cb = document.getElementById('select-all-checkbox');
-            if (cb && selectAllHandler) cb.addEventListener('change', selectAllHandler);
-        }
-    }
-
-    const newSessionItem = document.createElement('div');
-    newSessionItem.className = 'list-group-item d-flex align-items-center session-item-container';
-
-    let checkboxHtml = '';
-    let detailsMargin = 'ms-3';
-
-    if (!groupId) {
-        checkboxHtml = `<input class="form-check-input session-checkbox" type="checkbox" value="${sessionId}" data-session-id="${sessionId}">`;
-    } else {
-        detailsMargin = '';
-    }
+    // Remove empty state if present
+    const emptyState = sessionList.querySelector('.empty-state');
+    if (emptyState) emptyState.remove();
 
     const pipelineBadgeHtml = pipelineType ? this.generatePipelineBadge(pipelineType) : '';
 
-    newSessionItem.innerHTML = `
-        ${checkboxHtml}
-        <div class="${detailsMargin} flex-grow-1 session-details" data-session-id="${sessionId}" style="cursor: pointer;">
-            <div class="d-flex w-100 justify-content-between">
-                <h6 class="mb-1 small fw-bold">Session #${sessionId}</h6>
-                <small class="text-muted" style="font-size: 0.7rem;">${statusText}</small>
-            </div>
-            <p class="mb-1 small text-muted text-truncate">${questionData.question || ''}</p>
-            ${pipelineBadgeHtml}
-        </div>`;
-
     if (groupId) {
+        // Add to Pipeline Runs section
+        let pipelineSection = sessionList.querySelector('.pipeline-runs-section');
+        if (!pipelineSection) {
+            pipelineSection = this._createPipelineRunsSection();
+            sessionList.prepend(pipelineSection);
+        }
+
         let groupContainer = document.getElementById(`session-group-${groupId}`);
         if (!groupContainer) {
-            const groupEl = document.createElement('div');
-            groupEl.className = 'list-group-item';
-            groupEl.innerHTML = `
-                <details open>
-                    <summary class="fw-bold" style="cursor: pointer;">
-                        <i class="bi bi-collection me-1"></i>
-                        ${groupName}
-                        <small class="text-muted" id="group-session-count-${groupId}">(1 sessions)</small>
-                    </summary>
-                    <div class="list-group list-group-flush mt-2" id="session-group-${groupId}">
-                    </div>
-                </details>
-            `;
-            const selectAllDiv = document.getElementById('select-all-container');
-            if (selectAllDiv) {
-                selectAllDiv.after(groupEl);
-            } else {
-                sessionList.prepend(groupEl);
-            }
+            const pipelineRunsContainer = pipelineSection.querySelector('.pipeline-runs-container');
+            const groupEl = this._createGroupElement(groupId, groupName, pipelineType);
+            pipelineRunsContainer.appendChild(groupEl);
             groupContainer = document.getElementById(`session-group-${groupId}`);
-        }
-        newSessionItem.classList.add("ps-4");
-        groupContainer.prepend(newSessionItem);
 
-        // Update session count
+            // Update pipeline runs badge count
+            this._updateSectionBadge(pipelineSection, '.pipeline-runs-container > .group-item');
+        }
+
+        const sessionItem = this._createSessionItem(sessionId, questionData, statusText, pipelineBadgeHtml, false);
+        sessionItem.classList.add('session-details');
+        sessionItem.setAttribute('data-session-id', sessionId);
+        groupContainer.prepend(sessionItem);
+
+        // Update session count in group
         const countEl = document.getElementById(`group-session-count-${groupId}`);
         if (countEl) {
             const currentCount = groupContainer.children.length;
-            countEl.textContent = `(${currentCount} sessions)`;
+            countEl.textContent = currentCount;
         }
     } else {
-        const selectAllDiv = document.getElementById('select-all-container');
-        if (selectAllDiv) {
-            selectAllDiv.after(newSessionItem);
-        } else {
-            sessionList.appendChild(newSessionItem);
+        // Add to Single Sessions section
+        let singleSection = sessionList.querySelector('.single-sessions-section');
+        if (!singleSection) {
+            singleSection = this._createSingleSessionsSection();
+            // Insert after pipeline runs section if it exists, otherwise prepend
+            const pipelineSection = sessionList.querySelector('.pipeline-runs-section');
+            if (pipelineSection) {
+                pipelineSection.after(singleSection);
+            } else {
+                sessionList.prepend(singleSection);
+            }
         }
+
+        const singleSessionsContainer = singleSection.querySelector('.single-sessions-container');
+        const selectAllRow = singleSessionsContainer.querySelector('.select-all-row');
+        const sessionItem = this._createSessionItem(sessionId, questionData, statusText, pipelineBadgeHtml, true);
+
+        if (selectAllRow) {
+            selectAllRow.after(sessionItem);
+        } else {
+            singleSessionsContainer.prepend(sessionItem);
+        }
+
+        // Update single sessions badge count
+        this._updateSectionBadge(singleSection, '.single-sessions-container > .session-item');
+    }
+};
+
+/**
+ * Create Pipeline Runs section element using template
+ * @private
+ */
+window.BenchmarkSessionUI._createPipelineRunsSection = function() {
+    return BenchmarkUtils.renderTemplate('tpl-pipeline-runs-section', {});
+};
+
+/**
+ * Create Single Sessions section element using template
+ * @private
+ */
+window.BenchmarkSessionUI._createSingleSessionsSection = function() {
+    return BenchmarkUtils.renderTemplate('tpl-single-sessions-section', {});
+};
+
+/**
+ * Create a group element for pipeline runs using template
+ * @private
+ */
+window.BenchmarkSessionUI._createGroupElement = function(groupId, groupName, pipelineType) {
+    const groupEl = BenchmarkUtils.renderTemplate('tpl-pipeline-group-item', {
+        '.group-select-checkbox': { attrs: { 'data-group-id': groupId } },
+        '.group-name-display': { text: groupName, attrs: { 'data-group-id': groupId } },
+        '.group-session-count': { attrs: { id: `group-session-count-${groupId}` } },
+        '.session-list-inner': { attrs: { id: `session-group-${groupId}` } },
+        '.view-group-results-btn': { attrs: { 'data-group-id': groupId, 'data-pipeline-type': pipelineType || null } },
+        '.continue-group-btn': { attrs: { 'data-group-id': groupId, 'data-pipeline-type': pipelineType || null } },
+        '.rename-group-btn': { attrs: { 'data-group-id': groupId } },
+        '.delete-group-btn': { attrs: { 'data-group-id': groupId } }
+    });
+    return groupEl;
+};
+
+/**
+ * Create a session item element using template
+ * @private
+ */
+window.BenchmarkSessionUI._createSessionItem = function(sessionId, questionData, statusText, pipelineBadgeHtml, hasCheckbox) {
+    const templateId = hasCheckbox ? 'tpl-session-item-checkbox' : 'tpl-session-item-plain';
+    const item = BenchmarkUtils.renderTemplate(templateId, {
+        '.session-id-label': { text: `Session #${sessionId}` },
+        '.session-time': { text: statusText },
+        '.session-question': { text: questionData.question || '' },
+        '.pipeline-badge-container': { html: pipelineBadgeHtml }
+    });
+
+    if (hasCheckbox) {
+        const checkbox = item.querySelector('.session-checkbox');
+        if (checkbox) {
+            checkbox.value = sessionId;
+            checkbox.setAttribute('data-session-id', sessionId);
+        }
+        const details = item.querySelector('.session-details');
+        if (details) {
+            details.setAttribute('data-session-id', sessionId);
+        }
+    } else {
+        item.setAttribute('data-session-id', sessionId);
+    }
+
+    return item;
+};
+
+/**
+ * Update section badge count
+ * @private
+ */
+window.BenchmarkSessionUI._updateSectionBadge = function(section, itemSelector) {
+    const badge = section.querySelector('.section-count');
+    if (badge) {
+        const count = section.querySelectorAll(itemSelector).length;
+        badge.textContent = count;
     }
 };
 
@@ -216,17 +271,17 @@ window.BenchmarkSessionUI.updateStatsUI = function(results, groupName, loadSessi
 };
 
 /**
- * Show placeholder message in metrics container
+ * Show placeholder message in metrics container using template
  * @private
  */
 window.BenchmarkSessionUI._showMetricsPlaceholder = function(message) {
     const container = document.getElementById('metrics-groups-container');
     if (container) {
-        container.innerHTML = `
-            <div class="text-center text-muted py-4">
-                <i class="bi bi-info-circle me-2"></i>${message}
-            </div>
-        `;
+        container.innerHTML = '';
+        const placeholder = BenchmarkUtils.renderTemplate('tpl-metrics-placeholder', {
+            '.placeholder-message': { text: message }
+        });
+        container.appendChild(placeholder);
     }
 };
 

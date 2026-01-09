@@ -145,4 +145,17 @@ Instructions:
 1. You must use `answer_question` to finish.
 2. CRITICAL: You MUST use the `think` tool to explain your reasoning BEFORE using other tools.
 3. Do not output text directly. Use the tools provided.""",
+
+    # =========================================================================
+    # 5. LONG-TERM MEMORY INSTRUCTIONS (Appended when LTM is enabled)
+    # =========================================================================
+
+    # Memory tools to be inserted into "Tools Available" section when LTM is enabled
+    # For vanilla agent (4 existing tools, so these are 5, 6)
+    "vanilla_agent_memory_tools": """5. `retrieve_from_memory(query: str)`: Search your memory for relevant past findings. Use when prior knowledge may help.
+6. `record_to_memory(content: str)`: Save findings you consider valuable for future reference.""",
+
+    # For browser agent (3 existing tools, so these are 4, 5)
+    "browser_agent_memory_tools": """4. `retrieve_from_memory(query: str)`: Search your memory for relevant past findings. Use when prior knowledge may help.
+5. `record_to_memory(content: str)`: Save findings you consider valuable for future reference.""",
 }

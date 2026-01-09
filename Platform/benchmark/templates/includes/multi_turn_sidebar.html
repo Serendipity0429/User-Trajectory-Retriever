@@ -44,75 +44,134 @@
             <h5 class="mb-0"><i class="bi bi-archive me-2"></i>History</h5>
             <button id="delete-selected-btn" class="btn btn-sm btn-danger" style="display: none;"><i class="bi bi-trash me-1"></i>Delete</button>
         </div>
-        <div id="session-list" class="list-group list-group-flush" style="max-height: 50vh; overflow-y: auto;">
-            {% if groups or individual_sessions %}
-            <div class="list-group-item bg-light" id="select-all-container">
-                <input class="form-check-input" type="checkbox" id="select-all-checkbox">
-                <label class="form-check-label ms-2 fw-bold" for="select-all-checkbox">Select All</label>
-            </div>
-            {% endif %}
-            {% for group in groups %}
-            <div class="list-group-item">
+        <div id="session-list" class="list-group list-group-flush">
+            {% if groups %}
+            <div class="history-section pipeline-runs-section">
                 <details open>
-                    {% with group_pipeline_session=group.sessions.all|first %}
-                    <summary class="fw-bold" style="list-style: none;">
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <span>
-                                <input class="form-check-input group-select-checkbox" type="checkbox" data-group-id="{{ group.id }}">
-                                <i class="bi bi-collection me-1 ms-2"></i>
-                                <span class="group-name-display" data-group-id="{{ group.id }}">{{ group.name }}</span>
-                                <small class="text-muted" id="group-session-count-{{ group.id }}">({{ group.sessions.count }} sessions)</small>
-                            </span>
+                    <summary class="section-header d-flex align-items-center justify-content-between px-3 py-2 my-0" style="cursor: pointer; background: linear-gradient(135deg, #e8f4fd 0%, #f0f7ff 100%); border-bottom: 1px solid #cce5ff;">
+                        <div class="d-flex align-items-center">
+                            <i class="bi bi-collection-fill me-2 text-primary"></i>
+                            <span class="fw-semibold text-primary">Pipeline Runs</span>
+                            <span class="badge bg-primary ms-2">{{ groups|length }}</span>
                         </div>
-                        <div class="d-flex gap-1 ms-4">
-                            <button class="btn btn-sm btn-outline-info view-group-results-btn" data-group-id="{{ group.id }}"{% if group_pipeline_session %} data-pipeline-type="{{ group_pipeline_session.pipeline_type }}"{% endif %} title="View Pipeline Results">
-                                <i class="bi bi-bar-chart-fill me-1"></i>View
-                            </button>
-                            <button class="btn btn-sm btn-outline-primary continue-group-btn" data-group-id="{{ group.id }}"{% if group_pipeline_session %} data-pipeline-type="{{ group_pipeline_session.pipeline_type }}"{% endif %} title="Continue Run">
-                                <i class="bi bi-play-fill me-1"></i>Continue
-                            </button>
-                            <button class="btn btn-sm btn-outline-secondary rename-group-btn" data-group-id="{{ group.id }}" title="Rename">
-                                <i class="bi bi-pencil-fill"></i>Rename
-                            </button>
-                            <button class="btn btn-sm btn-outline-danger delete-group-btn" data-group-id="{{ group.id }}" title="Delete">
-                                <i class="bi bi-trash"></i>Delete
-                            </button>
-                        </div>
+                        <i class="bi bi-chevron-down section-toggle text-primary" style="transition: transform 0.2s;"></i>
                     </summary>
-                    {% endwith %}
-                    <div class="list-group list-group-flush mt-2" id="session-group-{{ group.id }}">
-                        {% for session in group.sessions.all %}
-                        <div class="list-group-item session-item-container ps-4 session-details" data-session-id="{{ session.id }}" style="cursor: pointer;">
-                            <div class="d-flex w-100 justify-content-between">
-                                <h6 class="mb-1 small fw-bold">Session #{{ session.id }}</h6>
-                                <small class="text-muted" style="font-size: 0.7rem;">{{ session.created_at|date:"m-d H:i" }}</small>
-                            </div>
-                            <p class="mb-1 small text-muted text-truncate">{{ session.question }}</p>
-                            {% load benchmark_extras %}
-                            {{ session.pipeline_type|pipeline_badge }}
+                    <div class="pipeline-runs-container">
+                        <div class="select-all-row d-flex align-items-center px-3 py-2" style="background-color: #f8fbff; border-bottom: 1px solid #e9ecef;">
+                            <input class="form-check-input" type="checkbox" id="select-all-pipeline-runs">
+                            <label class="form-check-label ms-2 small text-muted" for="select-all-pipeline-runs">Select all pipeline runs</label>
+                        </div>
+                        {% for group in groups %}
+                        <div class="group-item" style="border-bottom: 1px solid #e9ecef;">
+                            <details open>
+                                {% with group_pipeline_session=group.sessions.all|first %}
+                                <summary class="group-header d-block px-3 py-2" style="cursor: pointer; list-style: none;">
+                                    <div class="d-flex align-items-center mb-2">
+                                        <input class="form-check-input group-select-checkbox me-2" type="checkbox" data-group-id="{{ group.id }}">
+                                        <i class="bi bi-folder2-open text-warning me-2"></i>
+                                        <span class="group-name-display fw-medium" data-group-id="{{ group.id }}">{{ group.name }}</span>
+                                        <span class="badge bg-light text-secondary ms-2" id="group-session-count-{{ group.id }}">{{ group.sessions.count }}</span>
+                                        <i class="bi bi-chevron-down ms-auto group-toggle text-muted" style="font-size: 0.75rem; transition: transform 0.2s;"></i>
+                                    </div>
+                                    <div class="d-flex gap-1 ps-4">
+                                        <button class="btn btn-sm btn-outline-info view-group-results-btn" data-group-id="{{ group.id }}"{% if group_pipeline_session %} data-pipeline-type="{{ group_pipeline_session.pipeline_type }}"{% endif %} title="View Pipeline Results">
+                                            <i class="bi bi-bar-chart-fill me-1"></i>View
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-primary continue-group-btn" data-group-id="{{ group.id }}"{% if group_pipeline_session %} data-pipeline-type="{{ group_pipeline_session.pipeline_type }}"{% endif %} title="Continue Run">
+                                            <i class="bi bi-play-fill me-1"></i>Continue
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary rename-group-btn" data-group-id="{{ group.id }}" title="Rename">
+                                            <i class="bi bi-pencil-fill"></i>Rename
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-danger delete-group-btn" data-group-id="{{ group.id }}" title="Delete">
+                                            <i class="bi bi-trash"></i>Delete
+                                        </button>
+                                    </div>
+                                </summary>
+                                {% endwith %}
+                                <div class="session-list-inner ps-4" id="session-group-{{ group.id }}" style="background-color: #fafbfc;">
+                                    {% for session in group.sessions.all %}
+                                    <div class="session-item session-item-container session-details d-flex align-items-start px-3 py-2" data-session-id="{{ session.id }}" style="cursor: pointer; border-bottom: 1px solid #f0f0f0;">
+                                        <div class="flex-grow-1">
+                                            <div class="d-flex w-100 justify-content-between align-items-center">
+                                                <span class="small fw-medium text-dark">Session #{{ session.id }}</span>
+                                                <small class="text-muted" style="font-size: 0.65rem;">{{ session.created_at|date:"m-d H:i" }}</small>
+                                            </div>
+                                            <p class="mb-1 small text-muted text-truncate" style="font-size: 0.75rem;">{{ session.question }}</p>
+                                            {% load benchmark_extras %}
+                                            {{ session.pipeline_type|pipeline_badge }}
+                                        </div>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            </details>
                         </div>
                         {% endfor %}
                     </div>
                 </details>
             </div>
-            {% endfor %}
-            {% for session in individual_sessions %}
-            <div class="list-group-item d-flex align-items-center session-item-container">
-                <input class="form-check-input session-checkbox" type="checkbox" value="{{ session.id }}" data-session-id="{{ session.id }}">
-                <div class="ms-3 flex-grow-1 session-details" data-session-id="{{ session.id }}" style="cursor: pointer;">
-                    <div class="d-flex w-100 justify-content-between">
-                        <h6 class="mb-1 small fw-bold">Session #{{ session.id }}</h6>
-                        <small class="text-muted" style="font-size: 0.7rem;">{{ session.created_at|date:"m-d H:i" }}</small>
+            {% endif %}
+            {% if individual_sessions %}
+            <div class="history-section single-sessions-section">
+                <details open>
+                    <summary class="section-header d-flex align-items-center justify-content-between px-3 py-2 my-0" style="cursor: pointer; background: linear-gradient(135deg, #f0fdf4 0%, #f7fdf9 100%); border-bottom: 1px solid #bbf7d0;">
+                        <div class="d-flex align-items-center">
+                            <i class="bi bi-chat-square-dots-fill me-2 text-success"></i>
+                            <span class="fw-semibold text-success">Single Sessions</span>
+                            <span class="badge bg-success ms-2">{{ individual_sessions|length }}</span>
+                        </div>
+                        <i class="bi bi-chevron-down section-toggle text-success" style="transition: transform 0.2s;"></i>
+                    </summary>
+                    <div class="single-sessions-container">
+                        <div class="select-all-row d-flex align-items-center px-3 py-2" style="background-color: #f8fdf9; border-bottom: 1px solid #e9ecef;">
+                            <input class="form-check-input" type="checkbox" id="select-all-single-sessions">
+                            <label class="form-check-label ms-2 small text-muted" for="select-all-single-sessions">Select all single sessions</label>
+                        </div>
+                        {% for session in individual_sessions %}
+                        <div class="session-item session-item-container d-flex align-items-center px-3 py-2" style="border-bottom: 1px solid #f0f0f0;">
+                            <input class="form-check-input session-checkbox me-2" type="checkbox" value="{{ session.id }}" data-session-id="{{ session.id }}">
+                            <div class="flex-grow-1 session-details" data-session-id="{{ session.id }}" style="cursor: pointer;">
+                                <div class="d-flex w-100 justify-content-between align-items-center">
+                                    <span class="small fw-medium text-dark">Session #{{ session.id }}</span>
+                                    <small class="text-muted" style="font-size: 0.65rem;">{{ session.created_at|date:"m-d H:i" }}</small>
+                                </div>
+                                <p class="mb-1 small text-muted text-truncate" style="font-size: 0.75rem;">{{ session.question }}</p>
+                                {% load benchmark_extras %}
+                                {{ session.pipeline_type|pipeline_badge }}
+                            </div>
+                        </div>
+                        {% endfor %}
                     </div>
-                    <p class="mb-1 small text-muted text-truncate">{{ session.question }}</p>
-                    {% load benchmark_extras %}
-                    {{ session.pipeline_type|pipeline_badge }}
-                </div>
+                </details>
             </div>
-            {% endfor %}
+            {% endif %}
             {% if not groups and not individual_sessions %}
-            <div class="list-group-item no-sessions text-center py-4 text-muted">No sessions found.</div>
+            <div class="empty-state text-center py-5">
+                <i class="bi bi-inbox text-muted" style="font-size: 2.5rem;"></i>
+                <p class="text-muted mt-2 mb-0">No sessions found</p>
+                <small class="text-muted">Start a pipeline or single session to begin</small>
+            </div>
             {% endif %}
         </div>
+        <style>
+            .history-section details[open] > summary .section-toggle { transform: rotate(180deg); }
+            .group-item details[open] > summary .group-toggle { transform: rotate(180deg); }
+            .session-item:hover { background-color: #f8f9fa !important; }
+            .group-header:hover { background-color: #f8f9fa; }
+            .section-header:hover { filter: brightness(0.97); }
+            details > summary { list-style: none; }
+            details > summary::-webkit-details-marker { display: none; }
+            /* Sticky section headers */
+            .history-section > details > summary.section-header {
+                position: sticky;
+                top: 0;
+                z-index: 10;
+            }
+            /* Scrollable content areas */
+            .pipeline-runs-container, .single-sessions-container {
+                max-height: 35vh;
+                overflow-y: auto;
+            }
+        </style>
     </div>
 </div>

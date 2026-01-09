@@ -1,10 +1,7 @@
 import json
 import asyncio
-import threading
-from concurrent import futures
-from datetime import datetime
+import inspect
 from asgiref.sync import sync_to_async
-from agentscope.message import Msg
 try:
     from agentscope.memory import ReMePersonalLongTermMemory
 except ImportError:
@@ -17,7 +14,6 @@ from ..utils import (
 )
 from ..utils.mcp_manager import ChromeDevToolsMCPManager
 from .base import BaseAgentPipeline, REDIS_PREFIX_BROWSER_AGENT
-import inspect
 
 
 class _AsyncNullContext:
@@ -56,10 +52,7 @@ class VanillaAgentPipeline(BaseAgentPipeline):
         self.agent_model = VanillaAgentFactory.init_agentscope(self.temp_settings)
         self.redis_prefix = f"vanilla_agent_pipeline_active"
         self.long_term_memory = None  # Will be set in _init_agent
-        # Memory operation tracking for trial metadata
-        self._last_retrieved_memories = None
-        self._last_recorded_observations = None
-        self._current_run_id = None  # Set when processing starts
+        self._current_run_id = None  # Set when processing starts, used for memory isolation
 
     @classmethod
     async def create(cls, base_url, api_key, model, max_retries, pipeline_id=None, dataset_id=None, group_id=None):
@@ -118,124 +111,24 @@ class VanillaAgentPipeline(BaseAgentPipeline):
             return self.long_term_memory
         return _AsyncNullContext()
 
-    async def _retrieve_memories(self, msg):
-        """Retrieve relevant memories before agent execution (static_control mode)."""
-        if not self.long_term_memory:
-            return None
-        try:
-            # Wrap in sync_to_async to avoid SQLite threading issues
-            # Both Mem0 and ReMe have retrieve() method
-            retrieve_func = sync_to_async(self.long_term_memory.retrieve, thread_sensitive=False)
-            result = await retrieve_func(msg)
-            return result
-        except Exception as e:
-            print_debug(f"Error retrieving from long-term memory: {e}")
-            return None
-
-    async def _record_findings(self, observations):
-        """Record observations to long-term memory after agent execution (static_control mode)."""
-        if not self.long_term_memory or not observations:
-            return
-        try:
-            # Wrap in sync_to_async to avoid SQLite threading issues
-            # Both Mem0 and ReMe have record() method
-            record_func = sync_to_async(self.long_term_memory.record, thread_sensitive=False)
-            await record_func(observations)
-            print_debug(f"Recorded {len(observations)} observations to long-term memory")
-        except Exception as e:
-            print_debug(f"Error recording to long-term memory: {e}")
-
-    async def _extract_observations(self):
-        """Extract tool observations from agent's short-term memory for recording."""
-        if not self.active_agent or not hasattr(self.active_agent, 'memory'):
-            return []
-        try:
-            memory = self.active_agent.memory
-            # Get all messages from short-term memory
-            messages = memory.get_memory()
-            if asyncio.iscoroutine(messages):
-                messages = await messages
-
-            # Filter for observation/tool result messages
-            # These typically have role='assistant' with tool results or specific observation markers
-            observations = []
-            for m in messages:
-                # Check for tool observations (search results, page content)
-                role = getattr(m, 'role', None) or m.get('role', '') if isinstance(m, dict) else ''
-                content = getattr(m, 'content', None) or m.get('content', '') if isinstance(m, dict) else str(m)
-
-                # Record assistant messages that contain tool results (observations)
-                if 'observation' in str(role).lower() or 'tool' in str(role).lower():
-                    observations.append(m)
-                # Also record messages with search results or page content
-                elif content and any(marker in content.lower() for marker in ['search results', 'http://', 'https://']):
-                    observations.append(m)
-
-            return observations
-        except Exception as e:
-            print_debug(f"Error extracting observations: {e}")
-            return []
-
-    def _format_retrieved_context(self, retrieved):
-        """Format retrieved memories for injection into the message."""
-        if not retrieved:
-            return ""
-        if isinstance(retrieved, str):
-            return retrieved
-        if isinstance(retrieved, list):
-            formatted = []
-            for item in retrieved:
-                if hasattr(item, 'content'):
-                    formatted.append(str(item.content))
-                elif isinstance(item, dict) and 'content' in item:
-                    formatted.append(str(item['content']))
-                else:
-                    formatted.append(str(item))
-            return "\n".join(formatted)
-        return str(retrieved)
-
     async def _execute_agent(self, msg):
-        """Execute agent with static long-term memory control."""
-        # Reset tracking for this execution
-        self._last_retrieved_memories = None
-        self._last_recorded_observations = None
+        """Execute agent with agent_control long-term memory mode.
 
+        The agent manages memory via record_to_memory/retrieve_from_memory tools.
+        Memory operations are automatically tracked via the agent's tool calls.
+        """
         async with self._get_memory_context():
-            # 1. Retrieve relevant past findings before execution
-            retrieved = await self._retrieve_memories(msg)
-
-            # 2. Track and inject retrieved context
-            effective_msg = msg
-            if retrieved:
-                context_text = self._format_retrieved_context(retrieved)
-                if context_text.strip():
-                    # Track for metadata
-                    self._last_retrieved_memories = context_text
-                    enhanced_content = f"{msg.content}\n\n[Relevant prior findings from memory:\n{context_text}]"
-                    effective_msg = Msg(role=msg.role, content=enhanced_content, name=getattr(msg, 'name', None))
-                    print_debug(f"Injected {len(context_text)} chars of retrieved context")
-
-            # 3. Execute agent
-            response = await self.active_agent(effective_msg)
-
-            # 4. Record observations to long-term memory for future retrieval
-            observations = await self._extract_observations()
-            if observations:
-                # Track for metadata (serialize observations)
-                self._last_recorded_observations = [
-                    m.to_dict() if hasattr(m, 'to_dict') else str(m) for m in observations
-                ]
-            await self._record_findings(observations)
-
+            response = await self.active_agent(msg)
             return response
 
     def _get_trial_meta(self, trial):
-        """Return memory-related metadata for this trial."""
+        """Return memory-related metadata for this trial.
+
+        With agent_control mode, memory operations are visible in the agent's
+        tool calls (record_to_memory, retrieve_from_memory) within the trace.
+        We only record the memory type here for reference.
+        """
         meta = {}
-        if self._last_retrieved_memories:
-            meta['memory_retrieved'] = self._last_retrieved_memories
-        if self._last_recorded_observations:
-            meta['memory_recorded'] = self._last_recorded_observations
         if self.long_term_memory:
             meta['memory_type'] = type(self.long_term_memory).__name__
         return meta
@@ -263,10 +156,7 @@ class BrowserAgentPipeline(BaseAgentPipeline):
         self.mcp_client = None
         self.redis_prefix = REDIS_PREFIX_BROWSER_AGENT
         self.long_term_memory = None  # Will be set in _init_agent
-        # Memory operation tracking for trial metadata
-        self._last_retrieved_memories = None
-        self._last_recorded_observations = None
-        self._current_run_id = None  # Set when processing starts
+        self._current_run_id = None  # Set when processing starts, used for memory isolation
 
     @classmethod
     async def create(cls, base_url, api_key, model, max_retries, pipeline_id=None, dataset_id=None, group_id=None):
@@ -384,121 +274,30 @@ class BrowserAgentPipeline(BaseAgentPipeline):
             return self.long_term_memory
         return _AsyncNullContext()
 
-    async def _retrieve_memories(self, msg):
-        """Retrieve relevant memories before agent execution (static_control mode)."""
-        if not self.long_term_memory:
-            return None
-        try:
-            # Wrap in sync_to_async to avoid SQLite threading issues
-            retrieve_func = sync_to_async(self.long_term_memory.retrieve, thread_sensitive=False)
-            result = await retrieve_func(msg)
-            return result
-        except Exception as e:
-            print_debug(f"Error retrieving from long-term memory: {e}")
-            return None
-
-    async def _record_findings(self, observations):
-        """Record observations to long-term memory after agent execution (static_control mode)."""
-        if not self.long_term_memory or not observations:
-            return
-        try:
-            # Wrap in sync_to_async to avoid SQLite threading issues
-            record_func = sync_to_async(self.long_term_memory.record, thread_sensitive=False)
-            await record_func(observations)
-            print_debug(f"Recorded {len(observations)} observations to long-term memory")
-        except Exception as e:
-            print_debug(f"Error recording to long-term memory: {e}")
-
-    async def _extract_observations(self):
-        """Extract tool observations from agent's short-term memory for recording."""
-        if not self.active_agent or not hasattr(self.active_agent, 'memory'):
-            return []
-        try:
-            memory = self.active_agent.memory
-            messages = memory.get_memory()
-            if asyncio.iscoroutine(messages):
-                messages = await messages
-
-            observations = []
-            for m in messages:
-                role = getattr(m, 'role', None) or m.get('role', '') if isinstance(m, dict) else ''
-                content = getattr(m, 'content', None) or m.get('content', '') if isinstance(m, dict) else str(m)
-
-                if 'observation' in str(role).lower() or 'tool' in str(role).lower():
-                    observations.append(m)
-                elif content and any(marker in content.lower() for marker in ['search results', 'http://', 'https://']):
-                    observations.append(m)
-
-            return observations
-        except Exception as e:
-            print_debug(f"Error extracting observations: {e}")
-            return []
-
-    def _format_retrieved_context(self, retrieved):
-        """Format retrieved memories for injection into the message."""
-        if not retrieved:
-            return ""
-        if isinstance(retrieved, str):
-            return retrieved
-        if isinstance(retrieved, list):
-            formatted = []
-            for item in retrieved:
-                if hasattr(item, 'content'):
-                    formatted.append(str(item.content))
-                elif isinstance(item, dict) and 'content' in item:
-                    formatted.append(str(item['content']))
-                else:
-                    formatted.append(str(item))
-            return "\n".join(formatted)
-        return str(retrieved)
-
     async def _execute_agent(self, msg):
-        """Execute agent with static long-term memory control."""
-        # Reset tracking for this execution
-        self._last_retrieved_memories = None
-        self._last_recorded_observations = None
+        """Execute agent with agent_control long-term memory mode.
 
+        The agent manages memory via record_to_memory/retrieve_from_memory tools.
+        Memory operations are automatically tracked via the agent's tool calls.
+        """
         async with self._get_memory_context():
-            # 1. Retrieve relevant past findings before execution
-            retrieved = await self._retrieve_memories(msg)
-
-            # 2. Track and inject retrieved context
-            effective_msg = msg
-            if retrieved:
-                context_text = self._format_retrieved_context(retrieved)
-                if context_text.strip():
-                    # Track for metadata
-                    self._last_retrieved_memories = context_text
-                    enhanced_content = f"{msg.content}\n\n[Relevant prior findings from memory:\n{context_text}]"
-                    effective_msg = Msg(role=msg.role, content=enhanced_content, name=getattr(msg, 'name', None))
-                    print_debug(f"Injected {len(context_text)} chars of retrieved context")
-
-            # 3. Execute agent (handle async generator for browser agent)
-            response = await self.active_agent(effective_msg)
+            # Execute agent (handle async generator for browser agent)
+            response = await self.active_agent(msg)
             if inspect.isasyncgen(response):
                 final_res = None
                 async for x in response:
                     final_res = x
                 response = final_res
-
-            # 4. Record observations to long-term memory for future retrieval
-            observations = await self._extract_observations()
-            if observations:
-                # Track for metadata (serialize observations)
-                self._last_recorded_observations = [
-                    m.to_dict() if hasattr(m, 'to_dict') else str(m) for m in observations
-                ]
-            await self._record_findings(observations)
-
             return response
 
     def _get_trial_meta(self, trial):
-        """Return memory-related metadata for this trial."""
+        """Return memory-related metadata for this trial.
+
+        With agent_control mode, memory operations are visible in the agent's
+        tool calls (record_to_memory, retrieve_from_memory) within the trace.
+        We only record the memory type here for reference.
+        """
         meta = {}
-        if self._last_retrieved_memories:
-            meta['memory_retrieved'] = self._last_retrieved_memories
-        if self._last_recorded_observations:
-            meta['memory_recorded'] = self._last_recorded_observations
         if self.long_term_memory:
             meta['memory_type'] = type(self.long_term_memory).__name__
         return meta

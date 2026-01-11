@@ -13,7 +13,7 @@ window.BenchmarkUI.VerdictCards = {
      * Render trial verdict cards for LLM and Rule verdicts
      */
     render: function(trial) {
-        const isCorrectLLM = trial.is_correct_llm !== undefined ? trial.is_correct_llm : trial.is_correct;
+        const isCorrectLLM = trial.is_correct_llm;
         const isCorrectRule = trial.is_correct_rule;
 
         if (isCorrectLLM === undefined && isCorrectRule === undefined) return null;

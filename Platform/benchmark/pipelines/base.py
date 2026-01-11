@@ -330,28 +330,15 @@ class BaseMultiTurnPipeline(BasePipeline):
         try:
             if existing_session:
                 session = existing_session
-                # Clean up stalled/incomplete trials to retry the step
+                # Clean up stalled/incomplete trials
                 session.trials.exclude(status='completed').delete()
-
-                last_completed = session.trials.order_by('trial_number').last()
-
-                if last_completed:
-                    # Check if session is actually finished (correct or reached max retries)
-                    if last_completed.is_correct_llm or last_completed.trial_number >= self.max_retries:
-                        # Session is done, mark as completed and skip
-                        session.is_completed = True
-                        session.save()
-                        return  # Skip processing this session
-                    else:
-                        # Session not finished yet, delete last trial and rerun it
-                        trial_number = last_completed.trial_number
-                        last_completed.delete()
-                else:
-                    # No completed trials, start from trial 1
-                    trial_number = 1
+                # Continue from next trial after completed ones
+                completed_count = session.trials.filter(status='completed').count()
+                trial_number = completed_count + 1
             else:
                 session = self.create_session(self.llm_settings, question_text, ground_truths, group)
                 trial_number = 1
+                completed_count = 0
 
             yield {
                 'is_meta': True,
@@ -363,8 +350,9 @@ class BaseMultiTurnPipeline(BasePipeline):
             }
 
             is_session_completed = False
-            final_is_correct = False
+            final_is_correct_llm = False
             final_answer = ""
+            final_is_correct_llm_rule = False
             session_had_error = False
 
             while trial_number <= self.max_retries and not is_session_completed:
@@ -409,7 +397,6 @@ class BaseMultiTurnPipeline(BasePipeline):
                     'type': 'trial_completed',
                     'session_id': session.id,
                     'trial_number': trial_number,
-                    'is_correct': is_correct_llm,
                     'is_correct_llm': is_correct_llm,
                     'is_correct_rule': trial.is_correct_rule,
                     'answer': parsed_answer,
@@ -417,46 +404,39 @@ class BaseMultiTurnPipeline(BasePipeline):
                 }
 
                 final_answer = parsed_answer
-                final_is_correct = is_correct_llm
+                final_is_correct_llm = is_correct_llm
+                final_is_correct_llm_rule = trial.is_correct_rule
 
                 if is_correct_llm:
                     is_session_completed = True
                 else:
                     trial_number += 1
 
-            # Only mark session as completed if no errors occurred
+            # Determine why the loop exited
+            pipeline_stopped = not self.check_active()
+            total_trials = session.trials.filter(status='completed').count()
+
             if session_had_error:
-                # Session abandoned due to error - yield error summary and move to next question
+                # Error during trial - don't mark completed, yield error summary
                 yield {
-                    'question': question_text,
-                    'correct': False,
-                    'is_correct_llm': False,
-                    'is_correct_rule': False,
-                    'trials': trial_number,
-                    'session_id': session.id,
-                    'final_answer': None,
-                    'ground_truths': ground_truths,
-                    'max_retries': self.max_retries,
-                    'group_name': group.name,
-                    'group_id': group.id,
-                    'session_error': True
+                    'question': question_text, 'is_correct_llm': False, 'is_correct_rule': False,
+                    'trials': total_trials, 'session_id': session.id, 'final_answer': None,
+                    'ground_truths': ground_truths, 'max_retries': self.max_retries,
+                    'group_name': group.name, 'group_id': group.id, 'session_error': True
                 }
+            elif pipeline_stopped:
+                # Pipeline stopped mid-session - don't mark completed, will be resumed later
+                pass
             else:
+                # Success or exhausted retries - mark completed
                 session.is_completed = True
                 session.save()
-
                 yield {
-                    'question': question_text,
-                    'correct': final_is_correct,
-                    'is_correct_llm': final_is_correct,
-                    'is_correct_rule': trial.is_correct_rule,
-                    'trials': trial_number if final_is_correct else (trial_number - 1),
-                    'session_id': session.id,
-                    'final_answer': final_answer,
-                    'ground_truths': ground_truths,
-                    'max_retries': self.max_retries,
-                    'group_name': group.name,
-                    'group_id': group.id
+                    'question': question_text, 'is_correct_llm': final_is_correct_llm,
+                    'is_correct_rule': final_is_correct_llm_rule,
+                    'trials': total_trials, 'session_id': session.id, 'final_answer': final_answer,
+                    'ground_truths': ground_truths, 'max_retries': self.max_retries,
+                    'group_name': group.name, 'group_id': group.id
                 }
 
         except Exception as e:
@@ -464,37 +444,43 @@ class BaseMultiTurnPipeline(BasePipeline):
 
     def run(self):
         completed_questions = set()
-        incomplete_sessions = {}
-        
+        incomplete_sessions = []
+
         if self.group_id:
             try:
                 group = MultiTurnRun.objects.get(pk=self.group_id)
-                
-                # Identify completed questions
+
+                # Collect incomplete sessions + fix any incorrectly completed ones
+                incomplete_sessions = list(group.sessions.filter(is_completed=False).prefetch_related('trials'))
+
+                for session in group.sessions.filter(is_completed=True).prefetch_related('trials'):
+                    completed_trials = list(session.trials.filter(status='completed'))
+                    has_success = any(t.is_correct_llm for t in completed_trials)
+                    if not has_success and len(completed_trials) < self.max_retries:
+                        session.is_completed = False
+                        session.save()
+                        incomplete_sessions.append(session)
+                        print_debug(f"Reset incorrectly completed session #{session.id} ({len(completed_trials)} trials, no success)")
+
+                # Identify truly completed questions (succeeded or exhausted retries)
                 completed_questions = set(
-                    group.sessions.filter(is_completed=True).values_list('question', flat=True)
+                    s.question for s in group.sessions.filter(is_completed=True)
                 )
-                
-                # Map incomplete sessions: question -> session object
-                # We use a dict to quickly look up if an incomplete session exists for a question
-                incomplete_qs = group.sessions.filter(is_completed=False)
-                for s in incomplete_qs:
-                    incomplete_sessions[s.question] = s
-                    
+
             except MultiTurnRun.DoesNotExist:
                 yield {'error': f"Group with ID {self.group_id} not found."}
                 return
         else:
-            group_name = f"{str(self)}- {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}" 
+            group_name = f"{str(self)}- {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
             # Create a new settings instance for this run
             new_settings = self.llm_settings.clone()
             new_settings.save()
             group = MultiTurnRun.objects.create(name=group_name, settings=new_settings)
-        
+
         try:
             total_questions = 0
             questions_iterator = None
-            
+
             try:
                 total_questions = self.get_total_questions()
                 questions_iterator = self.load_questions()
@@ -504,22 +490,35 @@ class BaseMultiTurnPipeline(BasePipeline):
 
             yield {'is_meta': True, 'type': 'total_count', 'count': total_questions}
 
+            # PHASE 1: Resume ALL incomplete sessions first
+            for session in incomplete_sessions:
+                if not self.check_active():
+                    break
+
+                # Add to completed set so we don't process again in phase 2
+                completed_questions.add(session.question)
+
+                yield from self._process_single_session(
+                    group,
+                    session.question,
+                    session.ground_truths,
+                    existing_session=session
+                )
+
+            # PHASE 2: Process new questions from dataset
             for data in questions_iterator:
                 if not self.check_active():
                     break
 
                 question_text = data['question']
-                
-                # Resume Logic: Skip if completed
+
+                # Skip if already completed or processed in phase 1
                 if question_text in completed_questions:
                     continue
-                
-                ground_truths = data.get('ground_truths', [])
-                
-                # Check for existing incomplete session
-                existing_session = incomplete_sessions.get(question_text)
 
-                yield from self._process_single_session(group, question_text, ground_truths, existing_session)
+                ground_truths = data.get('ground_truths', [])
+
+                yield from self._process_single_session(group, question_text, ground_truths, existing_session=None)
         except Exception as e:
             yield {'error': str(e)}
         finally:
@@ -743,29 +742,12 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
         try:
             if existing_session:
                 session = existing_session
-                # Resumption logic: clean up stalled trials and find where we left off.
-                def cleanup_and_check():
+                # Clean up stalled/incomplete trials
+                def cleanup():
                     session.trials.exclude(status='completed').delete()
-                    last_completed = session.trials.order_by('trial_number').last()
-
-                    if last_completed:
-                        # Check if session is actually finished (correct or reached max retries)
-                        if last_completed.is_correct_llm or last_completed.trial_number >= self.max_retries:
-                            # Session is done, mark as completed and return None to signal skip
-                            session.is_completed = True
-                            session.save()
-                            return None
-                        else:
-                            # Session not finished yet, delete last trial and rerun it
-                            trial_num = last_completed.trial_number
-                            last_completed.delete()
-                            return trial_num
-                    else:
-                        return 1
-
-                trial_number = await sync_to_async(cleanup_and_check)()
-                if trial_number is None:
-                    return  # Skip processing this session
+                    return session.trials.filter(status='completed').count()
+                completed_count = await sync_to_async(cleanup)()
+                trial_number = completed_count + 1
             else:
                 session = await sync_to_async(self.create_session)(self.llm_settings, question_text, ground_truths, group)
                 trial_number = 1
@@ -774,8 +756,9 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
             await self._on_session_start(session)
 
             is_session_completed = False
-            final_is_correct = False
+            final_is_correct_llm = False
             final_answer = ""
+            final_is_correct_llm_rule = False
             session_had_error = False
 
             try:
@@ -810,36 +793,40 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
 
                     yield {
                         'is_meta': True, 'type': 'trial_completed', 'session_id': session.id,
-                        'trial_number': trial_number, 'is_correct': is_correct_llm,
-                        'is_correct_llm': is_correct_llm, 'is_correct_rule': trial.is_correct_rule,
-                        'answer': parsed_answer, 'group_id': group.id
+                        'trial_number': trial_number, 'is_correct_llm': is_correct_llm,
+                        'is_correct_rule': trial.is_correct_rule, 'answer': parsed_answer,
+                        'group_id': group.id
                     }
 
                     final_answer = parsed_answer
-                    final_is_correct = is_correct_llm
+                    final_is_correct_llm = is_correct_llm
+                    final_is_correct_llm_rule = trial.is_correct_rule
                     if is_correct_llm: is_session_completed = True
                     else: trial_number += 1
 
-                # Only mark session as completed if no errors occurred
+                # Determine why the loop exited
+                pipeline_stopped = not await sync_to_async(self.check_active)()
+                total_trials = await sync_to_async(lambda: session.trials.filter(status='completed').count())()
+
                 if session_had_error:
-                    # Session abandoned due to error - yield error summary and move to next question
+                    # Error during trial - don't mark completed, yield error summary
                     yield {
-                        'question': question_text, 'correct': False,
-                        'is_correct_llm': False, 'is_correct_rule': False,
-                        'trials': trial_number, 'session_id': session.id,
-                        'final_answer': None, 'ground_truths': ground_truths,
-                        'max_retries': self.max_retries, 'group_name': group.name,
-                        'group_id': group.id, 'session_error': True
+                        'question': question_text, 'is_correct_llm': False, 'is_correct_rule': False,
+                        'trials': total_trials, 'session_id': session.id, 'final_answer': None,
+                        'ground_truths': ground_truths, 'max_retries': self.max_retries,
+                        'group_name': group.name, 'group_id': group.id, 'session_error': True
                     }
+                elif pipeline_stopped:
+                    # Pipeline stopped mid-session - don't mark completed, will be resumed later
+                    pass
                 else:
+                    # Success or exhausted retries - mark completed
                     session.is_completed = True
                     await sync_to_async(session.save)()
-
                     yield {
-                        'question': question_text, 'correct': final_is_correct,
-                        'is_correct_llm': final_is_correct, 'is_correct_rule': trial.is_correct_rule,
-                        'trials': trial_number if final_is_correct else (trial_number - 1),
-                        'session_id': session.id, 'final_answer': final_answer,
+                        'question': question_text, 'is_correct_llm': final_is_correct_llm,
+                        'is_correct_rule': final_is_correct_llm_rule,
+                        'trials': total_trials, 'session_id': session.id, 'final_answer': final_answer,
                         'ground_truths': ground_truths, 'max_retries': self.max_retries,
                         'group_name': group.name, 'group_id': group.id
                     }
@@ -855,24 +842,35 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
         in a dataset, supporting run resumption and stop signals.
         """
         def create_run_obj():
-            name = f"{str(self)}- {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}" 
+            name = f"{str(self)}- {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
             new_settings = self.llm_settings.clone()
             new_settings.save()
             return MultiTurnRun.objects.create(name=name, settings=new_settings)
 
         completed_questions = set()
-        incomplete_sessions = {}
+        incomplete_sessions = []
 
         if self.group_id:
             try:
                 group = await sync_to_async(MultiTurnRun.objects.get)(pk=self.group_id)
-                completed_questions = set(await sync_to_async(lambda: list(group.sessions.filter(is_completed=True).values_list('question', flat=True)))())
-                def get_incomplete_map():
-                    mapping = {}
-                    qs = group.sessions.filter(is_completed=False)
-                    for s in qs: mapping[s.question] = s
-                    return mapping
-                incomplete_sessions = await sync_to_async(get_incomplete_map)()
+
+                def collect_sessions_to_process():
+                    # Collect incomplete sessions + fix any incorrectly completed ones
+                    sessions_to_process = list(group.sessions.filter(is_completed=False).prefetch_related('trials'))
+
+                    for session in group.sessions.filter(is_completed=True).prefetch_related('trials'):
+                        completed_trials = list(session.trials.filter(status='completed'))
+                        has_success = any(t.is_correct_llm for t in completed_trials)
+                        if not has_success and len(completed_trials) < self.max_retries:
+                            session.is_completed = False
+                            session.save()
+                            sessions_to_process.append(session)
+                            print_debug(f"Reset incorrectly completed session #{session.id} ({len(completed_trials)} trials, no success)")
+
+                    completed_qs = set(s.question for s in group.sessions.filter(is_completed=True))
+                    return sessions_to_process, completed_qs
+
+                incomplete_sessions, completed_questions = await sync_to_async(collect_sessions_to_process)()
             except MultiTurnRun.DoesNotExist:
                  yield {'error': f"Group with ID {self.group_id} not found."}
                  return
@@ -886,27 +884,46 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
         file_path = await sync_to_async(self.get_questions_file_path)()
         total_questions = await sync_to_async(count_questions_in_file)(file_path)
         yield {'is_meta': True, 'type': 'total_count', 'count': total_questions}
-        
+
+        # PHASE 1: Resume ALL incomplete sessions first
+        for session in incomplete_sessions:
+            if not await sync_to_async(self.check_active)():
+                break
+
+            # Add to completed set so we don't process again in phase 2
+            completed_questions.add(session.question)
+
+            async for event in self._process_single_session_async(
+                group,
+                session.question,
+                session.ground_truths,
+                existing_session=session
+            ):
+                yield event
+
+        # PHASE 2: Process new questions from dataset
         from .agent import question_file_iterator
         questions_iterator = question_file_iterator(file_path)
-        
-        count = 0
+
         while True:
-            if not await sync_to_async(self.check_active)(): break
+            if not await sync_to_async(self.check_active)():
+                break
             try:
                 data = await sync_to_async(next)(questions_iterator)
-                count += 1
-            except StopIteration: break
-            
+            except StopIteration:
+                break
+
             question_text = data['question']
-            if question_text in completed_questions: continue
-            
+
+            # Skip if already completed or processed in phase 1
+            if question_text in completed_questions:
+                continue
+
             ground_truths = data.get('ground_truths', [])
-            existing_session = incomplete_sessions.get(question_text)
-            
-            async for event in self._process_single_session_async(group, question_text, ground_truths, existing_session):
+
+            async for event in self._process_single_session_async(group, question_text, ground_truths, existing_session=None):
                 yield event
-        
+
         await self.cleanup()
         await sync_to_async(self.stop_token)()
 

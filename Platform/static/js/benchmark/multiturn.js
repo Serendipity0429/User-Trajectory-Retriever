@@ -209,7 +209,7 @@ window.BenchmarkUtils.MultiTurnPage = (function() {
                     executeTrial(initialTrialId, sessionId, sessionPipelineType);
                 } else {
                     const lastTrial = data.trials[data.trials.length - 1];
-                    if (lastTrial?.status === 'completed' && lastTrial.is_correct === false && !data.session.is_completed) {
+                    if (lastTrial?.status === 'completed' && lastTrial.is_correct_llm === false && !data.session.is_completed) {
                         if (data.trials.length < data.session.max_retries && sessionAbortController && !sessionAbortController.signal.aborted) {
                             sessionRetryTimeout = setTimeout(() => {
                                 if (sessionAbortController && !sessionAbortController.signal.aborted) {

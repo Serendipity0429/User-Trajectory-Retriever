@@ -38,7 +38,6 @@ class TrialService:
                             "status": db_trial.status,
                             "answer": db_trial.answer,
                             "feedback": db_trial.feedback,
-                            "is_correct": db_trial.is_correct_llm,
                             "is_correct_llm": db_trial.is_correct_llm,
                             "is_correct_rule": db_trial.is_correct_rule,
                             "full_response": db_trial.full_response if db_trial.status != 'processing' else None
@@ -58,7 +57,6 @@ class TrialService:
                         "status": trial.status,
                         "answer": trial.answer,
                         "feedback": trial.feedback,
-                        "is_correct": trial.is_correct_llm,
                         "is_correct_llm": trial.is_correct_llm,
                         "is_correct_rule": trial.is_correct_rule,
                         "full_response": trial.full_response if trial.status != 'processing' else None

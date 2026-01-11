@@ -92,9 +92,9 @@ window.BenchmarkUtils.BenchmarkRenderer = {
         const llmVerdictDiv = statusCol.querySelector('.llm-verdict');
         const ruleVerdictDiv = statusCol.querySelector('.rule-verdict');
 
-        if (result.correct === true) {
+        if (result.is_correct_llm === true) {
             llmVerdictDiv.appendChild(this.createBadge('LLM: Correct', true));
-        } else if (result.correct === false) {
+        } else if (result.is_correct_llm === false) {
             llmVerdictDiv.appendChild(this.createBadge('LLM: Incorrect', false));
         } else {
             const span = document.createElement('span');

@@ -769,7 +769,6 @@ def run_trial(request, trial_id):
     return JsonResponse({
         "answer": answer,
         "trial_id": trial.id,
-        "is_correct": is_correct_llm,
         "is_correct_llm": is_correct_llm,
         "is_correct_rule": trial.is_correct_rule,
         "num_docs_used": num_docs_used,

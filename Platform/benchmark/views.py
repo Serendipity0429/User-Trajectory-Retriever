@@ -784,11 +784,16 @@ def retry_session(request, trial_id):
         is_correct = data.get("is_correct")
         original_trial = get_object_or_404(MultiTurnTrial.objects.select_related("session", "session__run"), pk=trial_id)
 
+        session = original_trial.session
+
         original_trial.feedback = feedback
         original_trial.is_correct_llm = is_correct
+        # Also update rule-based evaluation for consistency
+        if original_trial.answer:
+            original_trial.is_correct_rule = check_answer_rule(
+                session.question, session.ground_truths, original_trial.answer
+            )
         original_trial.save()
-
-        session = original_trial.session
         settings = get_session_settings(session)
         max_retries = settings.max_retries
 

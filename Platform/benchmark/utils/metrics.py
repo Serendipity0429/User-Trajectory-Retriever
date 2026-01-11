@@ -344,13 +344,6 @@ METRIC_DEFINITIONS: Dict[str, MetricDefinition] = {
         group="behavioral",
         priority=5,
     ),
-    "error_rate": MetricDefinition(
-        key="error_rate",
-        label="Error Rate",
-        description="Sessions with errors",
-        group="behavioral",
-        priority=6,
-    ),
 
     # Search & Retrieval Group (conditional - only for RAG/Agent)
     "search_count": MetricDefinition(
@@ -805,16 +798,19 @@ def extract_session_metrics(session) -> Dict[str, Any]:
         'question': get_attr(session, 'question'),
         'ground_truths': get_attr(session, 'ground_truths'),
         'trials': len(trials),
-        'correct': get_attr(last_trial, 'is_correct_llm'),
         'is_correct_llm': get_attr(last_trial, 'is_correct_llm'),
         'is_correct_rule': get_attr(last_trial, 'is_correct_rule'),
         'final_answer': get_attr(last_trial, 'answer'),
         'initial_correct': get_attr(first_trial, 'is_correct_llm'),
-        'initial_correct_rule': get_attr(first_trial, 'is_correct_rule'),
     }
 
     # Calculate coherence (LLM vs Rule agreement)
-    completed_trials = [t for t in trials if get_attr(t, 'is_correct_llm') is not None]
+    # Only include trials where BOTH is_correct_llm and is_correct_rule are set
+    completed_trials = [
+        t for t in trials
+        if get_attr(t, 'is_correct_llm') is not None
+        and get_attr(t, 'is_correct_rule') is not None
+    ]
     if completed_trials:
         matches = sum(
             1 for t in completed_trials
@@ -859,7 +855,7 @@ def calculate_accuracy(results: List[Dict]) -> Dict[str, Any]:
     if total == 0:
         return _build_metric(METRIC_DEFINITIONS["accuracy"], 0.0)
 
-    correct = sum(1 for r in results if r.get("correct") is True)
+    correct = sum(1 for r in results if r.get("is_correct_llm") is True)
     accuracy = (correct / total) * 100
     return _build_metric(METRIC_DEFINITIONS["accuracy"], accuracy)
 
@@ -889,19 +885,19 @@ def calculate_coherence(results: List[Dict]) -> Dict[str, Any]:
 
 def calculate_correct_count(results: List[Dict]) -> Dict[str, Any]:
     """Calculate count of correct sessions."""
-    correct = sum(1 for r in results if r.get("correct") is True)
+    correct = sum(1 for r in results if r.get("is_correct_llm") is True)
     return _build_metric(METRIC_DEFINITIONS["correct_count"], correct)
 
 
 def calculate_incorrect_count(results: List[Dict]) -> Dict[str, Any]:
     """Calculate count of incorrect sessions."""
-    incorrect = sum(1 for r in results if r.get("correct") is False)
+    incorrect = sum(1 for r in results if r.get("is_correct_llm") is False)
     return _build_metric(METRIC_DEFINITIONS["incorrect_count"], incorrect)
 
 
 def calculate_error_count(results: List[Dict]) -> Dict[str, Any]:
     """Calculate count of error sessions."""
-    error = sum(1 for r in results if r.get("correct") not in (True, False))
+    error = sum(1 for r in results if r.get("is_correct_llm") not in (True, False))
     return _build_metric(METRIC_DEFINITIONS["error_count"], error)
 
 
@@ -918,7 +914,7 @@ def calculate_avg_trials(results: List[Dict]) -> Dict[str, Any]:
 
 def calculate_avg_success_trials(results: List[Dict]) -> Dict[str, Any]:
     """Calculate average number of trials for successful sessions."""
-    success_results = [r for r in results if r.get("correct") is True]
+    success_results = [r for r in results if r.get("is_correct_llm") is True]
     if not success_results:
         return _build_metric(METRIC_DEFINITIONS["avg_success_trials"], 0.0)
 
@@ -944,7 +940,7 @@ def calculate_recovery_rate(results: List[Dict]) -> Dict[str, Any]:
     if not initial_failures:
         return _build_metric(METRIC_DEFINITIONS["recovery_rate"], 0.0)
 
-    self_corrected = [r for r in initial_failures if r.get("correct") is True]
+    self_corrected = [r for r in initial_failures if r.get("is_correct_llm") is True]
     recovery_rate = (len(self_corrected) / len(initial_failures)) * 100
     return _build_metric(METRIC_DEFINITIONS["recovery_rate"], recovery_rate)
 
@@ -955,7 +951,7 @@ def calculate_correction_gain(results: List[Dict]) -> Dict[str, Any]:
     if total == 0:
         return _build_metric(METRIC_DEFINITIONS["correction_gain"], 0.0)
 
-    correct = sum(1 for r in results if r.get("correct") is True)
+    correct = sum(1 for r in results if r.get("is_correct_llm") is True)
     accuracy = (correct / total) * 100
 
     first_try_success = sum(1 for r in results if r.get("initial_correct") is True)
@@ -971,20 +967,9 @@ def calculate_give_up_rate(results: List[Dict]) -> Dict[str, Any]:
     if total == 0:
         return _build_metric(METRIC_DEFINITIONS["give_up_rate"], 0.0)
 
-    incorrect = sum(1 for r in results if r.get("correct") is False)
+    incorrect = sum(1 for r in results if r.get("is_correct_llm") is False)
     give_up_rate = (incorrect / total) * 100
     return _build_metric(METRIC_DEFINITIONS["give_up_rate"], give_up_rate)
-
-
-def calculate_error_rate(results: List[Dict]) -> Dict[str, Any]:
-    """Calculate error rate."""
-    total = len(results)
-    if total == 0:
-        return _build_metric(METRIC_DEFINITIONS["error_rate"], 0.0)
-
-    error = sum(1 for r in results if r.get("correct") not in (True, False))
-    error_rate = (error / total) * 100
-    return _build_metric(METRIC_DEFINITIONS["error_rate"], error_rate)
 
 
 def calculate_stubbornness(results: List[Dict]) -> Optional[Dict[str, Any]]:
@@ -1266,7 +1251,6 @@ def calculate_aggregate_metrics(results: List[Dict[str, Any]], pipeline_type: st
         metrics["recovery_rate"] = calculate_recovery_rate(results)
         metrics["correction_gain"] = calculate_correction_gain(results)
         metrics["give_up_rate"] = calculate_give_up_rate(results)
-        metrics["error_rate"] = calculate_error_rate(results)
         stubbornness = calculate_stubbornness(results)
         if stubbornness:
             metrics["stubbornness"] = stubbornness

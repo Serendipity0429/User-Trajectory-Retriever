@@ -6,7 +6,10 @@ _RULES = """## Answer Format Rules
 **Example:**
 - Question: What is the capital of France?
 - Correct: Paris
-- Incorrect: "The capital of France is Paris." (extra words)
+- Incorrect: The capital of France is Paris (contains extra words)
+- Incorrect: Paris is the capital of France (contains extra words)
+- Incorrect: Paris. (contains punctuation)
+- Incorrect: **Paris** (contains markdown formatting)
 """
 
 PROMPTS = {
@@ -27,14 +30,7 @@ Final Answer: <final answer only> """,
     "shared_retry_request": "Your previous answer was incorrect. Please reflect on the conversation, re-examine the question, and try again.\n\nThe question is: {question}",
 
     "shared_retry_reasoning_prompt": """Your previous answer was incorrect. Please reflect on the conversation, re-examine the question, and try again.
-
 The question is: {question}
-
-Format your response as follows:
-<think>
-(step-by-step reasoning...)
-</think>
-Final Answer: <final answer only>
 """,
 
     # =========================================================================

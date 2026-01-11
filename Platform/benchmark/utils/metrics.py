@@ -531,6 +531,15 @@ METRIC_DEFINITIONS: Dict[str, MetricDefinition] = {
         precision=0,
         priority=4,
     ),
+    "avg_tokens_per_session": MetricDefinition(
+        key="avg_tokens_per_session",
+        label="Avg Tokens/Session",
+        description="Average tokens consumed per session",
+        group="token_usage",
+        format_type="number",
+        precision=0,
+        priority=5,
+    ),
 }
 
 
@@ -868,12 +877,13 @@ def calculate_rule_accuracy(results: List[Dict]) -> Dict[str, Any]:
 
 def calculate_coherence(results: List[Dict]) -> Dict[str, Any]:
     """Calculate average coherence (LLM vs Rule agreement)."""
-    total = len(results)
-    if total == 0:
+    # Only count sessions that have coherence data (excludes error sessions)
+    sessions_with_coherence = [r for r in results if r.get("coherence") is not None]
+    if not sessions_with_coherence:
         return _build_metric(METRIC_DEFINITIONS["coherence"], 0.0)
 
-    coherence_sum = sum(r.get("coherence", 0) or 0 for r in results)
-    avg_coherence = (coherence_sum / total) * 100
+    coherence_sum = sum(r.get("coherence", 0) for r in sessions_with_coherence)
+    avg_coherence = (coherence_sum / len(sessions_with_coherence)) * 100
     return _build_metric(METRIC_DEFINITIONS["coherence"], avg_coherence)
 
 
@@ -1195,6 +1205,16 @@ def calculate_avg_tokens_per_trial(results: List[Dict]) -> Optional[Dict[str, An
     return _build_metric(METRIC_DEFINITIONS["avg_tokens_per_trial"], avg)
 
 
+def calculate_avg_tokens_per_session(results: List[Dict]) -> Optional[Dict[str, Any]]:
+    """Calculate average tokens per session."""
+    total_tokens = sum(r.get("token_usage", {}).get("total_tokens", 0) for r in results)
+    total_sessions = len(results)
+    if total_sessions == 0 or total_tokens == 0:
+        return None
+    avg = total_tokens / total_sessions
+    return _build_metric(METRIC_DEFINITIONS["avg_tokens_per_session"], avg)
+
+
 # ==========================================
 # Aggregate Metrics Calculation
 # ==========================================
@@ -1317,6 +1337,9 @@ def calculate_aggregate_metrics(results: List[Dict[str, Any]], pipeline_type: st
         avg_tokens = calculate_avg_tokens_per_trial(results)
         if avg_tokens:
             metrics["avg_tokens_per_trial"] = avg_tokens
+        avg_tokens_session = calculate_avg_tokens_per_session(results)
+        if avg_tokens_session:
+            metrics["avg_tokens_per_session"] = avg_tokens_session
 
     # Build summary
     summary = {

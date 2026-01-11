@@ -687,7 +687,27 @@ window.BenchmarkUtils.MultiTurnPage = (function() {
             initSessionListHandlers(pipelineType);
             initRetryAndDelete(pipelineType);
             initExports();
+
+            // Initialize leaderboard (fixed to this pipeline type)
+            if (window.BenchmarkLeaderboard) {
+                BenchmarkLeaderboard.init(pipelineType);
+            }
+
+            // Check for run_id query parameter (from home page leaderboard click)
+            const urlParams = new URLSearchParams(window.location.search);
+            const runIdParam = urlParams.get('run_id');
+            if (runIdParam) {
+                // Auto-load the run after a short delay to ensure everything is initialized
+                setTimeout(() => {
+                    loadRun(runIdParam, pipelineType);
+                    // Clean up the URL
+                    window.history.replaceState({}, document.title, window.location.pathname);
+                }, 100);
+            }
         },
+
+        // Expose loadRun for leaderboard integration
+        loadRun: loadRun,
 
         startPolling: startPolling,
 

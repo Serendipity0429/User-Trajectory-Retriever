@@ -7,6 +7,7 @@
         <h1 class="h2"><i class="bi bi-speedometer2 me-2"></i>Benchmark Dashboard</h1>
         <p class="text-muted mb-0">Select a baseline to run or configure LLM settings.</p>
     </div>
+
     <div class="row">
         <!-- Benchmark Types -->
         <div class="col-md-6">
@@ -15,14 +16,12 @@
                     <h5 class="mb-0"><i class="bi bi-list-task me-2"></i>Baseline Types</h5>
                 </div>
                 <div class="list-group list-group-flush">
-
                     <a href="{% url 'benchmark:vanilla_llm' %}" class="list-group-item list-group-item-action">
                         <div class="d-flex w-100 justify-content-between">
                             <h6 class="mb-1">Multi-Turn LLM Baseline</h6>
                         </div>
                         <p class="mb-1 small text-muted">Evaluate model performance over multiple turns with corrective feedback.</p>
                     </a>
-
                     <a href="{% url 'benchmark:rag' %}" class="list-group-item list-group-item-action">
                         <div class="d-flex w-100 justify-content-between">
                             <h6 class="mb-1">Multi-Turn RAG Baseline</h6>
@@ -58,14 +57,123 @@
                     </button>
                 </div>
             </div>
-            
+
             <!-- Dataset Manager -->
             {% include 'includes/dataset_manager.html' %}
+        </div>
+    </div>
+
+    <!-- Global Leaderboard -->
+    <div class="row mt-2">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <h5 class="mb-0"><i class="bi bi-trophy-fill me-2 text-warning"></i>Leaderboard</h5>
+                    <div class="d-flex gap-2 align-items-center flex-wrap">
+                        <select id="leaderboard-pipeline-filter" class="form-select form-select-sm" style="width: auto;">
+                            <option value="">All Pipelines</option>
+                            <option value="vanilla_llm">LLM</option>
+                            <option value="rag">RAG</option>
+                            <option value="vanilla_agent">Agent</option>
+                            <option value="browser_agent">Browser</option>
+                        </select>
+                        <select id="leaderboard-sort" class="form-select form-select-sm" style="width: auto;">
+                            <option value="accuracy">Sort: Accuracy</option>
+                            <option value="avg_trials">Sort: Trials</option>
+                            <option value="total_tokens">Sort: Tokens</option>
+                            <option value="created_at">Sort: Date</option>
+                        </select>
+                        <div class="form-check mb-0">
+                            <input class="form-check-input" type="checkbox" id="leaderboard-complete-only">
+                            <label class="form-check-label small" for="leaderboard-complete-only">Complete only</label>
+                        </div>
+                        <button id="refresh-leaderboard-btn" class="btn btn-sm btn-outline-secondary" title="Refresh">
+                            <i class="bi bi-arrow-clockwise"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0" id="leaderboard-table">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="text-center" style="width: 60px;">Rank</th>
+                                    <th>Run Name</th>
+                                    <th>Pipeline</th>
+                                    <th>Model</th>
+                                    <th class="text-center">Questions</th>
+                                    <th class="text-center">Accuracy</th>
+                                    <th class="text-center">Avg Trials</th>
+                                    <th class="text-end">Tokens</th>
+                                    <th class="text-end" style="width: 100px;">Date</th>
+                                </tr>
+                            </thead>
+                            <tbody id="leaderboard-entries">
+                                <tr>
+                                    <td colspan="9" class="text-center text-muted py-4">
+                                        <span class="spinner-border spinner-border-sm me-2"></span>Loading leaderboard...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>
 
 {% include 'includes/settings_modal.html' with show_retries=True %}
 
+<style>
+    #leaderboard-table tbody tr {
+        cursor: pointer;
+        transition: background-color 0.15s;
+    }
+    #leaderboard-table tbody tr:hover {
+        background-color: #f8f9fa;
+    }
+    #leaderboard-table tbody tr.active {
+        background-color: #e7f1ff;
+    }
+    .leaderboard-rank-badge {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 600;
+        font-size: 0.8rem;
+    }
+    .leaderboard-rank-badge.gold { background: linear-gradient(135deg, #ffd700, #ffec8b); color: #8b6914; }
+    .leaderboard-rank-badge.silver { background: linear-gradient(135deg, #c0c0c0, #e8e8e8); color: #5a5a5a; }
+    .leaderboard-rank-badge.bronze { background: linear-gradient(135deg, #cd7f32, #daa06d); color: #5c3d1e; }
+    .leaderboard-rank-badge.default { background-color: #e9ecef; color: #6c757d; }
+    .accuracy-high { color: #198754; font-weight: 600; }
+    .accuracy-medium { color: #fd7e14; font-weight: 600; }
+    .accuracy-low { color: #dc3545; font-weight: 600; }
+    .pipeline-badge {
+        font-size: 0.7rem;
+        padding: 0.25rem 0.5rem;
+    }
+    .model-text {
+        font-size: 0.85rem;
+        color: #495057;
+        max-width: 150px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+</style>
+
 <script src="{% static 'js/benchmark/dashboard.js' %}"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialize leaderboard on home page (global mode - no fixed pipeline filter)
+        if (window.BenchmarkLeaderboard) {
+            BenchmarkLeaderboard.init(null);  // null = global leaderboard
+        }
+    });
+</script>
 {% endblock %}

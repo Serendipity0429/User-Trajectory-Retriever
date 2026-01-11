@@ -33,6 +33,11 @@ urlpatterns = [
     path("api/metrics/schema/", views.get_metric_schema, name="get_metric_schema"),
 
     # ==========================================
+    # 3.2. API - Leaderboard
+    # ==========================================
+    path("api/leaderboard/", views.get_leaderboard, name="get_leaderboard"),
+
+    # ==========================================
     # 4. API - Datasets
     # ==========================================
     path('api/datasets/list/', views.dataset_list, name='dataset_list'),

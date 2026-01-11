@@ -20,6 +20,15 @@ window.BenchmarkUrls = {
         schema: `${API_PREFIX}/metrics/schema/`
     },
 
+    // Leaderboard
+    leaderboard: {
+        get: `${API_PREFIX}/leaderboard/`,
+        getFiltered: (params) => {
+            const queryString = new URLSearchParams(params).toString();
+            return `${API_PREFIX}/leaderboard/${queryString ? '?' + queryString : ''}`;
+        }
+    },
+
     // Datasets
     datasets: {
         sync: `${API_PREFIX}/datasets/sync/`,

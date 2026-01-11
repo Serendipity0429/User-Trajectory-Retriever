@@ -39,6 +39,75 @@
             </div>
         </div>
     </div>
+    <div class="card shadow-sm mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center py-2">
+            <h6 class="mb-0"><i class="bi bi-trophy-fill me-2 text-warning"></i>Leaderboard</h6>
+            <button id="refresh-leaderboard-btn" class="btn btn-sm btn-outline-secondary py-0 px-1" title="Refresh">
+                <i class="bi bi-arrow-clockwise"></i>
+            </button>
+        </div>
+        <div id="leaderboard-container">
+            <div class="leaderboard-controls px-2 py-1 d-flex gap-2 align-items-center" style="background-color: #f8f9fa; border-bottom: 1px solid #e9ecef;">
+                <select id="leaderboard-sort" class="form-select form-select-sm py-0" style="width: auto; font-size: 0.75rem;">
+                    <option value="accuracy">Accuracy</option>
+                    <option value="avg_trials">Trials</option>
+                    <option value="total_tokens">Tokens</option>
+                    <option value="created_at">Date</option>
+                </select>
+                <div class="form-check mb-0">
+                    <input class="form-check-input" type="checkbox" id="leaderboard-complete-only" style="width: 0.875rem; height: 0.875rem;">
+                    <label class="form-check-label" for="leaderboard-complete-only" style="font-size: 0.7rem;">Full</label>
+                </div>
+            </div>
+            <div id="leaderboard-entries" style="max-height: 220px; overflow-y: auto;">
+                <div class="text-center text-muted py-3">
+                    <span class="spinner-border spinner-border-sm me-2"></span>Loading...
+                </div>
+            </div>
+        </div>
+        <style>
+            .leaderboard-entry {
+                padding: 0.5rem 0.75rem;
+                border-bottom: 1px solid #f0f0f0;
+                cursor: pointer;
+                transition: background-color 0.15s;
+            }
+            .leaderboard-entry:hover {
+                background-color: #f8f9fa;
+            }
+            .leaderboard-entry.active {
+                background-color: #e7f1ff;
+                border-left: 3px solid #0d6efd;
+                padding-left: calc(0.75rem - 3px);
+            }
+            .leaderboard-entry:last-child {
+                border-bottom: none;
+            }
+            .leaderboard-rank {
+                width: 24px;
+                height: 24px;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-weight: 600;
+                font-size: 0.7rem;
+                flex-shrink: 0;
+            }
+            .leaderboard-rank.gold { background: linear-gradient(135deg, #ffd700, #ffec8b); color: #8b6914; }
+            .leaderboard-rank.silver { background: linear-gradient(135deg, #c0c0c0, #e8e8e8); color: #5a5a5a; }
+            .leaderboard-rank.bronze { background: linear-gradient(135deg, #cd7f32, #daa06d); color: #5c3d1e; }
+            .leaderboard-rank.default { background-color: #e9ecef; color: #6c757d; }
+            .leaderboard-accuracy {
+                font-size: 0.95rem;
+                font-weight: 600;
+            }
+            .leaderboard-accuracy.high { color: #198754; }
+            .leaderboard-accuracy.medium { color: #fd7e14; }
+            .leaderboard-accuracy.low { color: #dc3545; }
+            .min-width-0 { min-width: 0; }
+        </style>
+    </div>
     <div class="card shadow-sm">
         <div class="card-header d-flex justify-content-between align-items-center">
             <h5 class="mb-0"><i class="bi bi-archive me-2"></i>History</h5>

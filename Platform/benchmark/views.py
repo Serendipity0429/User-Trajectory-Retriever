@@ -153,8 +153,162 @@ def get_metric_schema(request):
 
 
 # ==========================================
+# Leaderboard API
+# ==========================================
+
+@admin_required
+def get_leaderboard(request):
+    """
+    Get leaderboard data for finished runs.
+
+    A run is considered "finished" if it has at least one session and is not ad-hoc.
+    Optionally filter by dataset to show only runs that completed all questions.
+
+    Query params:
+    - dataset_id: Optional. Filter to runs matching this dataset's question count.
+    - pipeline_type: Optional. Filter by pipeline type (vanilla_llm, rag, vanilla_agent, browser_agent).
+    - sort_by: Optional. Sort by metric (default: accuracy). Options: accuracy, created_at, avg_trials, total_tokens.
+    - order: Optional. Sort order (default: desc). Options: asc, desc.
+
+    Returns:
+    - runs: List of runs with aggregate metrics
+    - dataset: Active dataset info (if filtering by dataset)
+    """
+    try:
+        dataset_id = request.GET.get('dataset_id')
+        pipeline_type = request.GET.get('pipeline_type')
+        sort_by = request.GET.get('sort_by', 'accuracy')
+        order = request.GET.get('order', 'desc')
+
+        # Get active dataset for question count comparison
+        active_dataset = None
+        target_question_count = None
+
+        if dataset_id:
+            try:
+                active_dataset = BenchmarkDataset.objects.get(pk=dataset_id)
+                target_question_count = active_dataset.question_count
+            except BenchmarkDataset.DoesNotExist:
+                pass
+        else:
+            # Try to get the active dataset
+            active_dataset = BenchmarkDataset.objects.filter(is_active=True).first()
+            if active_dataset:
+                target_question_count = active_dataset.question_count
+
+        # Build base query for runs
+        runs_query = MultiTurnRun.objects.filter(is_ad_hoc=False).prefetch_related('sessions__trials')
+
+        # Filter by pipeline type if specified
+        if pipeline_type:
+            runs_query = runs_query.filter(sessions__pipeline_type=pipeline_type).distinct()
+
+        # Annotate with session count
+        runs_query = runs_query.annotate(session_count=models.Count('sessions'))
+
+        # Filter to only runs with sessions
+        runs_query = runs_query.filter(session_count__gt=0)
+
+        # If we have a target question count, filter to "finished" runs
+        if target_question_count:
+            runs_query = runs_query.filter(session_count__gte=target_question_count)
+
+        leaderboard_entries = []
+
+        for run in runs_query:
+            # Get pipeline type from first session
+            first_session = run.sessions.first()
+            run_pipeline_type = first_session.pipeline_type if first_session else 'unknown'
+
+            # Get sessions for this run
+            sessions = run.sessions.all()
+            if pipeline_type:
+                sessions = sessions.filter(pipeline_type=pipeline_type)
+
+            # Build results list for metric calculation
+            results = []
+            for session in sessions:
+                enriched = extract_session_metrics(session)
+                if enriched.get('trials', 0) > 0:
+                    enriched['pipeline_type'] = session.pipeline_type
+                    results.append(enriched)
+
+            if not results:
+                continue
+
+            # Calculate aggregate metrics
+            metrics_data = calculate_aggregate_metrics(results, run_pipeline_type)
+            metrics = metrics_data.get('metrics', {})
+
+            # Extract key metrics for the leaderboard
+            accuracy = metrics.get('accuracy', {}).get('value', 0)
+            rule_accuracy = metrics.get('rule_accuracy', {}).get('value', 0)
+            avg_trials = metrics.get('avg_trials', {}).get('value', 0)
+            total_tokens = metrics.get('total_tokens', {}).get('value', 0)
+            correct_count = metrics.get('correct_count', {}).get('value', 0)
+            incorrect_count = metrics.get('incorrect_count', {}).get('value', 0)
+            error_count = metrics.get('error_count', {}).get('value', 0)
+
+            # Get model info from settings
+            model_name = 'Unknown'
+            if run.settings:
+                model_name = run.settings.llm_model or 'Unknown'
+
+            entry = {
+                'run_id': run.id,
+                'name': run.name,
+                'created_at': run.created_at.isoformat() if run.created_at else None,
+                'pipeline_type': run_pipeline_type,
+                'model': model_name,
+                'session_count': len(results),
+                'accuracy': accuracy,
+                'rule_accuracy': rule_accuracy,
+                'avg_trials': avg_trials,
+                'total_tokens': total_tokens,
+                'correct_count': int(correct_count),
+                'incorrect_count': int(incorrect_count),
+                'error_count': int(error_count),
+                'is_complete': target_question_count is not None and len(results) >= target_question_count,
+                'metrics': metrics,  # Full metrics for detailed view
+            }
+            leaderboard_entries.append(entry)
+
+        # Sort entries
+        reverse = order == 'desc'
+        if sort_by == 'created_at':
+            leaderboard_entries.sort(key=lambda x: x.get('created_at') or '', reverse=reverse)
+        elif sort_by == 'avg_trials':
+            leaderboard_entries.sort(key=lambda x: x.get('avg_trials', 0), reverse=not reverse)  # Lower is better
+        elif sort_by == 'total_tokens':
+            leaderboard_entries.sort(key=lambda x: x.get('total_tokens', 0), reverse=not reverse)  # Lower is better
+        else:  # accuracy (default)
+            leaderboard_entries.sort(key=lambda x: x.get('accuracy', 0), reverse=reverse)
+
+        response_data = {
+            'status': 'ok',
+            'runs': leaderboard_entries,
+            'total': len(leaderboard_entries),
+        }
+
+        if active_dataset:
+            response_data['dataset'] = {
+                'id': active_dataset.id,
+                'name': active_dataset.name,
+                'question_count': active_dataset.question_count,
+            }
+
+        return JsonResponse(response_data)
+
+    except Exception as e:
+        return JsonResponse({
+            'status': 'error',
+            'message': str(e)
+        }, status=500)
+
+
+# ==========================================
 # Core UI Views
-# ========================================== 
+# ==========================================
 
 @admin_required
 def home(request):

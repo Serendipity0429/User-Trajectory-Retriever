@@ -189,7 +189,6 @@ window.BenchmarkSettings.restoreDefaults = function() {
                 BenchmarkState.config.lastSavedBaseUrl = baseUrlEl.value;
                 BenchmarkSettings.testConnection(
                     BenchmarkUrls.testLlmConnection,
-                    document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
                     {
                         llm_base_url: baseUrlEl.value,
                         llm_api_key: document.getElementById('llm_api_key').value,

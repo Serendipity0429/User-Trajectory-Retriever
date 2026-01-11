@@ -76,6 +76,7 @@
                             <option value="rag">RAG</option>
                             <option value="vanilla_agent">Agent</option>
                             <option value="browser_agent">Browser</option>
+                            <option value="human">Human</option>
                         </select>
                         <select id="leaderboard-sort" class="form-select form-select-sm" style="width: auto;">
                             <option value="accuracy">Sort: Accuracy</option>
@@ -164,6 +165,14 @@
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
+    }
+    .human-baseline-row {
+        background-color: #f8f9fa !important;
+        border-left: 3px solid #212529;
+    }
+    .human-baseline-row:hover {
+        background-color: #e9ecef !important;
+        cursor: default;
     }
 </style>
 

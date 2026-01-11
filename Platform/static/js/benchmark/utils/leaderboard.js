@@ -175,6 +175,7 @@ window.BenchmarkLeaderboard = (function() {
      * Render a table row for global mode (home page)
      */
     function renderTableRow(run, rank) {
+        const isHuman = run.is_human || run.pipeline_type === 'human';
         const rankClass = rank === 1 ? 'gold' : rank === 2 ? 'silver' : rank === 3 ? 'bronze' : 'default';
         const accuracyClass = run.accuracy >= 70 ? 'accuracy-high' : run.accuracy >= 40 ? 'accuracy-medium' : 'accuracy-low';
 
@@ -182,7 +183,8 @@ window.BenchmarkLeaderboard = (function() {
             'vanilla_llm': { text: 'LLM', class: 'bg-primary' },
             'rag': { text: 'RAG', class: 'bg-success' },
             'vanilla_agent': { text: 'Agent', class: 'bg-info' },
-            'browser_agent': { text: 'Browser', class: 'bg-warning text-dark' }
+            'browser_agent': { text: 'Browser', class: 'bg-warning text-dark' },
+            'human': { text: 'Human', class: 'bg-dark' }
         };
         const badge = pipelineBadges[run.pipeline_type] || { text: run.pipeline_type, class: 'bg-secondary' };
 
@@ -192,18 +194,21 @@ window.BenchmarkLeaderboard = (function() {
         const formatTokens = (tokens) => {
             if (tokens >= 1000000) return (tokens / 1000000).toFixed(1) + 'M';
             if (tokens >= 1000) return Math.round(tokens / 1000) + 'K';
-            return tokens;
+            return tokens || '-';
         };
 
         const isActive = activeRunId === run.run_id;
+        const rowClass = isHuman ? 'table-light human-baseline-row' : '';
 
         return `
-            <tr data-run-id="${run.run_id}" data-pipeline-type="${run.pipeline_type}" class="${isActive ? 'active' : ''}">
+            <tr data-run-id="${run.run_id}" data-pipeline-type="${run.pipeline_type}" class="${isActive ? 'active' : ''} ${rowClass}">
                 <td class="text-center">
                     <span class="leaderboard-rank-badge ${rankClass}">${rank}</span>
                 </td>
                 <td>
-                    <span class="fw-medium" title="${BenchmarkHelpers.escapeHtml(run.name)}">${BenchmarkHelpers.escapeHtml(run.name)}</span>
+                    <span class="fw-medium" title="${BenchmarkHelpers.escapeHtml(run.name)}">
+                        ${isHuman ? '<i class="bi bi-person-fill me-1"></i>' : ''}${BenchmarkHelpers.escapeHtml(run.name)}
+                    </span>
                 </td>
                 <td>
                     <span class="badge pipeline-badge ${badge.class}">${badge.text}</span>
@@ -213,7 +218,7 @@ window.BenchmarkLeaderboard = (function() {
                 </td>
                 <td class="text-center">${run.session_count}</td>
                 <td class="text-center ${accuracyClass}">${run.accuracy.toFixed(1)}%</td>
-                <td class="text-center">${run.avg_trials.toFixed(1)}</td>
+                <td class="text-center">${run.avg_trials ? run.avg_trials.toFixed(1) : '-'}</td>
                 <td class="text-end text-muted">${formatTokens(run.total_tokens)}</td>
                 <td class="text-end text-muted small">${date}</td>
             </tr>
@@ -265,6 +270,11 @@ window.BenchmarkLeaderboard = (function() {
      * Select a run to view its details
      */
     function selectRun(runId, pipelineType) {
+        // Human baselines are not clickable (no detailed view)
+        if (pipelineType === 'human' || String(runId).startsWith('human_')) {
+            return;
+        }
+
         activeRunId = parseInt(runId);
 
         // Update active state in UI

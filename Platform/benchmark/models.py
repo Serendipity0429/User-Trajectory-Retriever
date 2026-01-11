@@ -225,3 +225,5 @@ class MultiTurnTrial(models.Model):
 
     def __str__(self):
         return f"Trial {self.trial_number} for Session {self.session.id}"
+
+

@@ -156,6 +156,20 @@ def get_metric_schema(request):
 # Leaderboard API
 # ==========================================
 
+def _calculate_human_baseline_from_tasks():
+    """
+    Calculate human baseline metrics directly from task_manager records.
+    Uses shared helper from dashboard.utils for consistency.
+    Returns a leaderboard entry dict or None if no completed tasks.
+    """
+    try:
+        from dashboard.utils import get_human_baseline_for_leaderboard
+        return get_human_baseline_for_leaderboard()
+    except Exception as e:
+        print_debug(f"Error calculating human baseline: {e}")
+        return None
+
+
 @admin_required
 def get_leaderboard(request):
     """
@@ -272,6 +286,12 @@ def get_leaderboard(request):
                 'metrics': metrics,  # Full metrics for detailed view
             }
             leaderboard_entries.append(entry)
+
+        # Add human baseline calculated from task_manager if not filtering by a specific pipeline type (or if filtering by 'human')
+        if not pipeline_type or pipeline_type == 'human':
+            human_entry = _calculate_human_baseline_from_tasks()
+            if human_entry:
+                leaderboard_entries.append(human_entry)
 
         # Sort entries
         reverse = order == 'desc'

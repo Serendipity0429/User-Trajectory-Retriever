@@ -41,27 +41,35 @@
     </div>
     <div class="card shadow-sm mb-4">
         <div class="card-header d-flex justify-content-between align-items-center py-2">
-            <h6 class="mb-0"><i class="bi bi-trophy-fill me-2 text-warning"></i>Leaderboard</h6>
-            <button id="refresh-leaderboard-btn" class="btn btn-sm btn-outline-secondary py-0 px-1" title="Refresh">
+            <h6 class="mb-0"><i class="bi bi-trophy-fill me-2"></i>Leaderboard</h6>
+            <button id="refresh-leaderboard-btn" class="btn btn-sm btn-link text-secondary p-0" title="Refresh">
                 <i class="bi bi-arrow-clockwise"></i>
             </button>
         </div>
-        <div id="leaderboard-container">
-            <div class="leaderboard-controls px-2 py-1 d-flex gap-2 align-items-center" style="background-color: #f8f9fa; border-bottom: 1px solid #e9ecef;">
-                <select id="leaderboard-sort" class="form-select form-select-sm py-0" style="width: auto; font-size: 0.75rem;">
-                    <option value="accuracy">Accuracy</option>
-                    <option value="avg_trials">Trials</option>
-                    <option value="total_tokens">Tokens</option>
-                    <option value="created_at">Date</option>
-                </select>
-                <div class="form-check mb-0">
-                    <input class="form-check-input" type="checkbox" id="leaderboard-complete-only" style="width: 0.875rem; height: 0.875rem;">
-                    <label class="form-check-label" for="leaderboard-complete-only" style="font-size: 0.7rem;">Full</label>
+        <div id="leaderboard-container" class="bg-white">
+            <div class="leaderboard-controls px-3 py-2 border-bottom">
+                <div class="d-flex align-items-center gap-2">
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text bg-white border-end-0 text-muted px-2"><i class="bi bi-sort-down"></i></span>
+                        <select id="leaderboard-sort" class="form-select form-select-sm border-start-0 ps-0" style="font-size: 0.75rem;">
+                            <option value="accuracy">Accuracy</option>
+                            <option value="avg_trials">Trials</option>
+                            <option value="total_tokens">Tokens</option>
+                            <option value="created_at">Date</option>
+                        </select>
+                    </div>
+                    <div class="btn-group btn-group-sm" role="group">
+                        <input type="checkbox" class="btn-check" id="leaderboard-complete-only" autocomplete="off">
+                        <label class="btn btn-outline-secondary px-2 d-flex align-items-center" for="leaderboard-complete-only" title="Show only completed runs">
+                            <i class="bi bi-check-circle me-1"></i>Full
+                        </label>
+                    </div>
                 </div>
             </div>
-            <div id="leaderboard-entries" style="max-height: 220px; overflow-y: auto;">
-                <div class="text-center text-muted py-3">
-                    <span class="spinner-border spinner-border-sm me-2"></span>Loading...
+            <div id="leaderboard-entries" style="max-height: 250px; overflow-y: auto;">
+                <div class="text-center text-muted py-4">
+                    <div class="spinner-border spinner-border-sm text-primary mb-2" role="status"></div>
+                    <div class="small">Loading...</div>
                 </div>
             </div>
         </div>
@@ -70,10 +78,11 @@
                 padding: 0.5rem 0.75rem;
                 border-bottom: 1px solid #f0f0f0;
                 cursor: pointer;
-                transition: background-color 0.15s;
+                transition: all 0.2s;
             }
             .leaderboard-entry:hover {
                 background-color: #f8f9fa;
+                transform: translateX(2px);
             }
             .leaderboard-entry.active {
                 background-color: #e7f1ff;
@@ -90,21 +99,22 @@
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                font-weight: 600;
+                font-weight: 700;
                 font-size: 0.7rem;
                 flex-shrink: 0;
+                box-shadow: 0 1px 2px rgba(0,0,0,0.1);
             }
-            .leaderboard-rank.gold { background: linear-gradient(135deg, #ffd700, #ffec8b); color: #8b6914; }
-            .leaderboard-rank.silver { background: linear-gradient(135deg, #c0c0c0, #e8e8e8); color: #5a5a5a; }
-            .leaderboard-rank.bronze { background: linear-gradient(135deg, #cd7f32, #daa06d); color: #5c3d1e; }
-            .leaderboard-rank.default { background-color: #e9ecef; color: #6c757d; }
+            .leaderboard-rank.gold { background: linear-gradient(135deg, #ffd700, #ffec8b); color: #8b6914; border: 1px solid #eec900; }
+            .leaderboard-rank.silver { background: linear-gradient(135deg, #e0e0e0, #f5f5f5); color: #616161; border: 1px solid #dcdcdc; }
+            .leaderboard-rank.bronze { background: linear-gradient(135deg, #cd7f32, #daa06d); color: #5c3d1e; border: 1px solid #c77a2e; }
+            .leaderboard-rank.default { background-color: #f8f9fa; color: #6c757d; border: 1px solid #dee2e6; }
+            
             .leaderboard-accuracy {
-                font-size: 0.95rem;
+                font-size: 0.75rem;
                 font-weight: 600;
+                min-width: 36px;
+                text-align: center;
             }
-            .leaderboard-accuracy.high { color: #198754; }
-            .leaderboard-accuracy.medium { color: #fd7e14; }
-            .leaderboard-accuracy.low { color: #dc3545; }
             .min-width-0 { min-width: 0; }
         </style>
     </div>

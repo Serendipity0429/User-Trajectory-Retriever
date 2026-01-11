@@ -68,14 +68,14 @@
         <div class="col-12">
             <div class="card shadow-sm">
                 <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
-                    <h5 class="mb-0"><i class="bi bi-trophy-fill me-2 text-warning"></i>Leaderboard</h5>
+                    <h5 class="mb-0"><i class="bi bi-trophy-fill me-2"></i>Leaderboard</h5>
                     <div class="d-flex gap-2 align-items-center flex-wrap">
                         <select id="leaderboard-pipeline-filter" class="form-select form-select-sm" style="width: auto;">
                             <option value="">All Pipelines</option>
-                            <option value="vanilla_llm">LLM</option>
-                            <option value="rag">RAG</option>
-                            <option value="vanilla_agent">Agent</option>
-                            <option value="browser_agent">Browser</option>
+                            <option value="vanilla_llm">LLM Baseline</option>
+                            <option value="rag">RAG Baseline</option>
+                            <option value="vanilla_agent">Vanilla Agent</option>
+                            <option value="browser_agent">Browser Agent</option>
                             <option value="human">Human</option>
                         </select>
                         <select id="leaderboard-sort" class="form-select form-select-sm" style="width: auto;">
@@ -84,9 +84,9 @@
                             <option value="total_tokens">Sort: Tokens</option>
                             <option value="created_at">Sort: Date</option>
                         </select>
-                        <div class="form-check mb-0">
-                            <input class="form-check-input" type="checkbox" id="leaderboard-complete-only">
-                            <label class="form-check-label small" for="leaderboard-complete-only">Complete only</label>
+                        <div class="form-check mb-0 d-flex align-items-center">
+                            <input class="form-check-input me-1" type="checkbox" id="leaderboard-complete-only">
+                            <label class="form-check-label small text-nowrap" for="leaderboard-complete-only">Complete only</label>
                         </div>
                         <button id="refresh-leaderboard-btn" class="btn btn-sm btn-outline-secondary" title="Refresh">
                             <i class="bi bi-arrow-clockwise"></i>
@@ -96,23 +96,26 @@
                 <div class="card-body p-0">
                     <div class="table-responsive">
                         <table class="table table-hover align-middle mb-0" id="leaderboard-table">
-                            <thead class="table-light">
+                            <thead class="bg-light text-uppercase small text-muted">
                                 <tr>
-                                    <th class="text-center" style="width: 60px;">Rank</th>
-                                    <th>Run Name</th>
-                                    <th>Pipeline</th>
-                                    <th>Model</th>
-                                    <th class="text-center">Questions</th>
-                                    <th class="text-center">Accuracy</th>
-                                    <th class="text-center">Avg Trials</th>
-                                    <th class="text-end">Tokens</th>
-                                    <th class="text-end" style="width: 100px;">Date</th>
+                                    <th class="text-center py-3" style="width: 60px;">Rank</th>
+                                    <th class="py-3" style="width: 25%;">Run Name</th>
+                                    <th class="text-center py-3" style="width: 120px;">Pipeline</th>
+                                    <th class="py-3" style="width: 15%;">Model</th>
+                                    <th class="text-center py-3" style="width: 100px;">#Question</th>
+                                    <th class="text-center py-3" style="width: 120px;">Accuracy</th>
+                                    <th class="text-center py-3" style="width: 100px;">Avg Trials</th>
+                                    <th class="text-center py-3" style="width: 100px;">Tokens</th>
+                                    <th class="text-center py-3" style="width: 110px;">Date</th>
                                 </tr>
                             </thead>
                             <tbody id="leaderboard-entries">
                                 <tr>
-                                    <td colspan="9" class="text-center text-muted py-4">
-                                        <span class="spinner-border spinner-border-sm me-2"></span>Loading leaderboard...
+                                    <td colspan="9" class="text-center text-muted py-5">
+                                        <div class="spinner-border text-primary" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
+                                        <p class="mt-2 mb-0 small text-muted">Loading leaderboard data...</p>
                                     </td>
                                 </tr>
                             </tbody>

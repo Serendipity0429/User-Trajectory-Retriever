@@ -166,7 +166,12 @@ window.BenchmarkLeaderboard = (function() {
     function renderTableRow(run, rank) {
         const isHuman = run.is_human || run.pipeline_type === 'human';
         const rankClass = rank === 1 ? 'gold' : rank === 2 ? 'silver' : rank === 3 ? 'bronze' : 'default';
-        const accuracyClass = run.accuracy >= 70 ? 'accuracy-high' : run.accuracy >= 40 ? 'accuracy-medium' : 'accuracy-low';
+        
+        // Accuracy colors
+        let accuracyClass = 'accuracy-low';
+        if (run.accuracy >= 70) accuracyClass = 'accuracy-high';
+        else if (run.accuracy >= 40) accuracyClass = 'accuracy-medium';
+
         const badge = PIPELINE_BADGES[run.pipeline_type] || { text: run.pipeline_type, class: 'bg-secondary' };
         const modelName = run.model || 'Unknown';
         const date = run.created_at ? new Date(run.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '-';
@@ -201,7 +206,7 @@ window.BenchmarkLeaderboard = (function() {
                 attrs: { title: modelName }
             },
             '.session-count': { text: run.session_count },
-            '.accuracy-cell': {
+            '.accuracy-text': {
                 text: run.accuracy.toFixed(1) + '%',
                 addClass: accuracyClass
             },
@@ -224,7 +229,12 @@ window.BenchmarkLeaderboard = (function() {
     function renderCompactCard(run, rank) {
         const isHuman = run.is_human || run.pipeline_type === 'human';
         const rankClass = rank === 1 ? 'gold' : rank === 2 ? 'silver' : rank === 3 ? 'bronze' : 'default';
-        const accuracyClass = run.accuracy >= 70 ? 'high' : run.accuracy >= 40 ? 'medium' : 'low';
+        
+        // Accuracy colors
+        let accuracyClass = 'accuracy-low';
+        if (run.accuracy >= 70) accuracyClass = 'accuracy-high';
+        else if (run.accuracy >= 40) accuracyClass = 'accuracy-medium';
+
         const modelName = run.model || 'Unknown';
         const shortModel = modelName.length > 15 ? modelName.substring(0, 13) + '...' : modelName;
         const date = run.created_at ? new Date(run.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
@@ -232,10 +242,8 @@ window.BenchmarkLeaderboard = (function() {
 
         // Build details HTML
         const detailsHtml = `
-            <span title="${BenchmarkHelpers.escapeHtml(modelName)}">${BenchmarkHelpers.escapeHtml(shortModel)}</span>
-            <span>${run.session_count}Q</span>
-            <span>${run.avg_trials ? run.avg_trials.toFixed(1) : '-'}t</span>
-            <span>${formatTokens(run.total_tokens)}</span>
+            <span class="text-secondary" title="Model: ${BenchmarkHelpers.escapeHtml(modelName)}">${BenchmarkHelpers.escapeHtml(shortModel)}</span>
+            <span class="text-secondary ms-2" title="Questions">• ${run.session_count}</span>
         `;
 
         const card = BenchmarkUtils.renderTemplate('tpl-leaderboard-compact-card', {

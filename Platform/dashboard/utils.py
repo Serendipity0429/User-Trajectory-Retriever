@@ -223,7 +223,7 @@ def get_human_baseline_for_leaderboard():
     task_stats = _get_task_based_stats()
     if task_stats:
         entries.append(_make_human_baseline_entry(
-            'human_avg', 'Average Human Performance',
+            'human_avg', 'Average Human',
             f'{task_stats["finished"]} tasks', num_questions,
             task_stats['accuracy'], task_stats['avg_trials'],
             task_stats['successful']
@@ -237,13 +237,13 @@ def get_human_baseline_for_leaderboard():
         user_count = len(user_data)
 
         entries.append(_make_human_baseline_entry(
-            'human_best', 'Best Human Performance',
+            'human_best', 'Best Human',
             f'from {user_count} users (≥90% tasks)', num_questions,
             best_user['accuracy'], best_user['avg_trials'],
             best_user['successful'], user_count
         ))
         entries.append(_make_human_baseline_entry(
-            'human_worst', 'Worst Human Performance',
+            'human_worst', 'Worst Human',
             f'from {user_count} users (≥90% tasks)', num_questions,
             worst_user['accuracy'], worst_user['avg_trials'],
             worst_user['successful'], user_count

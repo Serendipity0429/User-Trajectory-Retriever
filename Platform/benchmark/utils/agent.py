@@ -26,6 +26,77 @@ from core.utils import print_debug
 from asgiref.sync import sync_to_async
 
 
+class UsageTrackingModelWrapper:
+    """
+    Wrapper around AgentScope model that tracks cumulative token usage.
+
+    Intercepts all model calls and accumulates usage from ChatResponse.usage.
+    Usage can be retrieved via get_usage() and reset via reset_usage().
+    """
+
+    def __init__(self, model):
+        self._model = model
+        self._usage = {
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "call_count": 0,
+            "calls": []
+        }
+
+    def __call__(self, *args, **kwargs):
+        """Synchronous call - intercepts and tracks usage."""
+        response = self._model(*args, **kwargs)
+        self._track_usage(response)
+        return response
+
+    async def __acall__(self, *args, **kwargs):
+        """Async call - intercepts and tracks usage."""
+        response = await self._model(*args, **kwargs)
+        self._track_usage(response)
+        return response
+
+    def _track_usage(self, response):
+        """Extract and accumulate usage from ChatResponse."""
+        if hasattr(response, 'usage') and response.usage:
+            usage = response.usage
+            input_tokens = getattr(usage, 'input_tokens', 0)
+            output_tokens = getattr(usage, 'output_tokens', 0)
+            time_taken = getattr(usage, 'time', None)
+
+            self._usage["input_tokens"] += input_tokens
+            self._usage["output_tokens"] += output_tokens
+            self._usage["total_tokens"] += input_tokens + output_tokens
+            self._usage["call_count"] += 1
+
+            call_detail = {
+                "input_tokens": input_tokens,
+                "output_tokens": output_tokens,
+                "total_tokens": input_tokens + output_tokens,
+            }
+            if time_taken is not None:
+                call_detail["time"] = time_taken
+            self._usage["calls"].append(call_detail)
+
+    def get_usage(self):
+        """Return a copy of the accumulated usage."""
+        return self._usage.copy()
+
+    def reset_usage(self):
+        """Reset usage tracking for next trial."""
+        self._usage = {
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "call_count": 0,
+            "calls": []
+        }
+
+    def __getattr__(self, name):
+        """Delegate all other attribute access to the wrapped model."""
+        return getattr(self._model, name)
+
+
 @sync_to_async
 def get_search_engine_safe(fetch_full_content=None):
     return get_search_engine(fetch_full_content=fetch_full_content)
@@ -205,6 +276,9 @@ class VanillaAgentFactory:
         Returns:
             tuple: (agent, long_term_memory) where long_term_memory may be None
         """
+        # Wrap model for token usage tracking
+        wrapped_model = UsageTrackingModelWrapper(model)
+
         # Create Toolkit and register tool
         toolkit = Toolkit()
         toolkit.register_tool_function(think)
@@ -218,7 +292,7 @@ class VanillaAgentFactory:
             settings.memory_type,
             agent_name="VanillaAgent",
             user_id="vanilla_agent_user",
-            model=model,
+            model=wrapped_model,  # Use wrapped model for memory operations too
             llm_settings=settings,
             run_id=run_id
         )
@@ -231,11 +305,11 @@ class VanillaAgentFactory:
         agent_kwargs = {
             "name": "ReActAgent",
             "sys_prompt": sys_prompt,
-            "model": model,
+            "model": wrapped_model,  # Use wrapped model
             "toolkit": toolkit,
             "memory": short_term_memory,
             "formatter": OpenAIChatFormatter(),
-            "max_iters": 30,
+            "max_iters": settings.agent_max_iters,
         }
 
         # Only add long-term memory if it was successfully created
@@ -245,6 +319,9 @@ class VanillaAgentFactory:
             agent_kwargs["long_term_memory_mode"] = "static_control"
 
         agent = ReActAgent(**agent_kwargs)
+
+        # Store reference to usage tracker for retrieval by pipeline
+        agent._usage_tracker = wrapped_model
 
         # Debug: Print registered tools
         if hasattr(agent, 'toolkit') and agent.toolkit:
@@ -289,6 +366,9 @@ class BrowserAgentFactory:
         Returns:
             tuple: (agent, long_term_memory) where long_term_memory may be None
         """
+        # Wrap model for token usage tracking
+        wrapped_model = UsageTrackingModelWrapper(model)
+
         # DEBUG: Print all registered tools
         print_debug(f"BrowserAgent Toolkit Tools: {list(toolkit.tools.keys())}")
 
@@ -298,7 +378,7 @@ class BrowserAgentFactory:
             settings.memory_type,
             agent_name="BrowserAgent",
             user_id="browser_agent_user",
-            model=model,
+            model=wrapped_model,  # Use wrapped model for memory operations too
             llm_settings=settings,
             run_id=run_id
         )
@@ -311,11 +391,11 @@ class BrowserAgentFactory:
         agent_kwargs = {
             "name": "BrowserAgent",
             "sys_prompt": sys_prompt,
-            "model": model,
+            "model": wrapped_model,  # Use wrapped model
             "toolkit": toolkit,
             "memory": short_term_memory,
             "formatter": OpenAIChatFormatter(),
-            "max_iters": 30,
+            "max_iters": settings.agent_max_iters,
         }
 
         # Only add long-term memory if it was successfully created
@@ -325,6 +405,9 @@ class BrowserAgentFactory:
             agent_kwargs["long_term_memory_mode"] = "static_control"
 
         agent = ReActAgent(**agent_kwargs)
+
+        # Store reference to usage tracker for retrieval by pipeline
+        agent._usage_tracker = wrapped_model
 
         # Debug: Print registered tools
         if hasattr(agent, 'toolkit') and agent.toolkit:

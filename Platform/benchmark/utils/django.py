@@ -41,6 +41,20 @@ def handle_async_api_error(view_func):
     return _wrapped_view
 
 
+def _update_trial_on_error(trial, exc_type, exc_val, partial_trace=None):
+    """
+    Shared logic for updating trial on error.
+    Updates trial status, log, and returns error status payload.
+    """
+    trial.status = 'error'
+    trial.log = trial.log or {}
+    trial.log["error"] = str(exc_val)
+    trial.log["error_type"] = exc_type.__name__ if exc_type else "Unknown"
+    if partial_trace:
+        trial.log["trace"] = partial_trace
+    return json.dumps({"status": "error", "error": str(exc_val)})
+
+
 class TrialGuard:
     """
     Context manager to handle trial errors and update Redis status (Sync).
@@ -63,17 +77,14 @@ class TrialGuard:
             except Exception:
                 pass
 
-            self.trial.status = 'error'
-            self.trial.log = self.trial.log or {}
-            if partial_trace:
-                self.trial.log["trace"] = partial_trace
+            status_payload = _update_trial_on_error(self.trial, exc_type, exc_val, partial_trace)
             self.trial.save()
 
             try:
                 from task_manager.utils import redis_client
                 redis_client.set(
                     RedisKeys.trial_status(self.trial.id),
-                    json.dumps({"status": "error", "error": str(exc_val)}),
+                    status_payload,
                     ex=RedisKeys.DEFAULT_TTL
                 )
             except Exception as e:
@@ -105,11 +116,7 @@ class AsyncTrialGuard:
             except Exception:
                 pass
 
-            self.trial.status = 'error'
-            if not self.trial.log:
-                self.trial.log = {}
-            if partial_trace:
-                self.trial.log["trace"] = partial_trace
+            status_payload = _update_trial_on_error(self.trial, exc_type, exc_val, partial_trace)
             await sync_to_async(self.trial.save)()
 
             try:
@@ -117,7 +124,7 @@ class AsyncTrialGuard:
                 await asyncio.to_thread(
                     redis_client.set,
                     RedisKeys.trial_status(self.trial.id),
-                    json.dumps({"status": "error", "error": str(exc_val)}),
+                    status_payload,
                     RedisKeys.DEFAULT_TTL
                 )
             except Exception as e:

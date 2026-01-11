@@ -2,11 +2,10 @@ import json
 from task_manager.utils import check_answer_rule, check_answer_llm, redis_client
 from ..utils import (
     get_search_engine, print_debug, extract_final_answer, extract_query,
-    RedisKeys, PipelinePrefix, TraceFormatter, SimpleMsg, PROMPTS, TrialGuard,
-    clear_trial_cache
+    RedisKeys, PipelinePrefix, TraceFormatter, SimpleMsg, PROMPTS, TrialGuard
 )
 from ..models import (
-    BenchmarkSettings, MultiTurnSession, MultiTurnTrial
+    BenchmarkSettings, MultiTurnSession
 )
 from .base import BaseMultiTurnPipeline
 
@@ -20,15 +19,16 @@ class RagMultiTurnPipeline(BaseMultiTurnPipeline):
     def __str__(self):
         return "RAG Multi-Turn Pipeline"
 
-    def get_settings_snapshot(self):
+    def _get_pipeline_settings(self):
+        """Returns RAG-specific settings (search configuration)."""
         settings = BenchmarkSettings.get_effective_settings()
-        snapshot = super().get_settings_snapshot()
-        snapshot['search'] = {
-            'search_provider': settings.search_provider,
-            'search_limit': settings.search_limit,
-            'serper_fetch_full_content': settings.fetch_full_content
+        return {
+            'search': {
+                'search_provider': settings.search_provider,
+                'search_limit': settings.search_limit,
+                'serper_fetch_full_content': settings.fetch_full_content
+            }
         }
-        return snapshot
 
     def create_session(self, settings, question_text, ground_truths, group):
         return MultiTurnSession.objects.create(
@@ -38,16 +38,6 @@ class RagMultiTurnPipeline(BaseMultiTurnPipeline):
             run_tag=self.pipeline_id,
             pipeline_type='rag'
         )
-
-    def create_trial(self, session, trial_number):
-        trial = MultiTurnTrial.objects.create(
-            session=session,
-            trial_number=trial_number,
-            status='processing'
-        )
-        # Clear any stale Redis cache for this trial ID (prevents data leakage from reused IDs)
-        clear_trial_cache(trial.id)
-        return trial
 
     def _construct_messages(self, session, trial, completed_trials=None):
         """
@@ -109,18 +99,19 @@ class RagMultiTurnPipeline(BaseMultiTurnPipeline):
             if trial.trial_number == 1:
                 query_instruction = PROMPTS["rag_query_gen_cot_prompt" if allow_reasoning else "rag_query_gen_prompt"].format(question=session.question)
             else:
-                # Add retry message to history (uses shared prompt for consistency)
+                # Add retry message to turn_messages only (not history, to avoid duplication in final_messages)
                 retry_msg = {"role": "user", "content": PROMPTS["shared_retry_request"].format(question=session.question)}
-                history.append(retry_msg)
                 turn_messages.append(retry_msg)
                 query_instruction = PROMPTS["rag_query_reform_cot_prompt" if allow_reasoning else "rag_query_reform_prompt"]
 
             # Add query instruction
             query_instruction_msg = {"role": "user", "content": query_instruction}
-            query_messages = history + [query_instruction_msg]
+            query_messages = history + turn_messages + [query_instruction_msg]
 
-            # Get query from LLM
-            raw_query_response, _ = self.get_llm_response(query_messages, temperature=0.0, allow_reasoning=False)
+            # Get query from LLM (track token usage)
+            trial_usage = None
+            raw_query_response, _, query_usage = self.get_llm_response(query_messages, temperature=0.0, allow_reasoning=False)
+            trial_usage = self._accumulate_usage(trial_usage, query_usage, "query_generation")
 
             if allow_reasoning:
                 search_query = extract_query(raw_query_response)
@@ -153,11 +144,13 @@ class RagMultiTurnPipeline(BaseMultiTurnPipeline):
             # Update trace before streaming
             update_redis_trace(answer_messages)
 
-            # Stream the answer
+            # Stream the answer (track token usage)
             full_response = ""
             chunk_count = 0
-            for partial_response in self.get_llm_response_stream(answer_messages):
+            for partial_response, usage in self.get_llm_response_stream(answer_messages):
                 full_response = partial_response
+                if usage:  # Usage is provided in final yield
+                    trial_usage = self._accumulate_usage(trial_usage, usage, "answer_synthesis")
                 chunk_count += 1
                 if chunk_count % 5 == 0:
                     update_redis_trace(answer_messages + [{"role": "assistant", "content": full_response}])
@@ -187,6 +180,9 @@ class RagMultiTurnPipeline(BaseMultiTurnPipeline):
             # Store only this turn's messages (not full history) for clean reconstruction
             trial.log["messages"] = turn_messages
             trial.log["meta"] = self._get_trial_meta(trial)
+            # Store token usage
+            if trial_usage:
+                trial.log["token_usage"] = trial_usage
             trial.save()
 
             # Cache status for UI

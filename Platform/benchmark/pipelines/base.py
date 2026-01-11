@@ -9,7 +9,7 @@ from task_manager.utils import redis_client, check_answer_rule, check_answer_llm
 from ..utils import (
     print_debug, extract_final_answer, count_questions_in_file,
     TrialGuard, RedisKeys, PipelinePrefix,
-    TraceFormatter, SimpleMsg, PROMPTS
+    TraceFormatter, SimpleMsg, PROMPTS, clear_trial_cache
 )
 from ..models import (
     BenchmarkSettings, BenchmarkDataset,
@@ -22,6 +22,7 @@ from agentscope.message import Msg
 REDIS_PREFIX_ACTIVE = PipelinePrefix.ACTIVE
 REDIS_PREFIX_MULTI_TURN = PipelinePrefix.MULTI_TURN
 REDIS_PREFIX_VANILLA_MULTI_TURN = PipelinePrefix.VANILLA
+REDIS_PREFIX_VANILLA_AGENT = PipelinePrefix.VANILLA_AGENT
 REDIS_PREFIX_BROWSER_AGENT = PipelinePrefix.BROWSER_AGENT
 
 HARD_QUESTIONS_PATH = os.path.join(os.path.dirname(__file__), '..', '..', 'data', 'hard_questions_refined.jsonl')
@@ -41,8 +42,11 @@ async def serialize_events_async(generator):
         yield json.dumps(event) + "\n"
 
 class BasePipeline:
+    # Timeout for LLM API calls (60 seconds)
+    LLM_TIMEOUT = 60.0
+
     def __init__(self, base_url, api_key, model, pipeline_id=None, dataset_id=None):
-        self.client = openai.OpenAI(base_url=base_url, api_key=api_key)
+        self.client = openai.OpenAI(base_url=base_url, api_key=api_key, timeout=self.LLM_TIMEOUT)
         self.model = model
         self.pipeline_id = pipeline_id
         self.dataset_id = dataset_id
@@ -111,14 +115,16 @@ class BasePipeline:
     def get_llm_response(self, messages, temperature=None, allow_reasoning=None):
         """
         Sends messages to LLM and parses the response based on current settings.
-        Returns: (parsed_answer, full_response)
+        Returns: (parsed_answer, full_response, usage)
+
+        Usage dict contains: input_tokens, output_tokens, total_tokens (or None if unavailable)
         """
         if temperature is None:
             temperature = getattr(self.llm_settings, 'temperature', 0.0)
-            
+
         top_p = getattr(self.llm_settings, 'top_p', 1.0)
         max_tokens = getattr(self.llm_settings, 'max_tokens', None)
-        
+
         # Determine whether to extract final answer
         should_extract = allow_reasoning if allow_reasoning is not None else getattr(self.llm_settings, 'allow_reasoning', False)
 
@@ -138,13 +144,22 @@ class BasePipeline:
             try:
                 response = self.client.chat.completions.create(**kwargs)
                 full_response = response.choices[0].message.content
-                
+
+                # Extract token usage from response
+                usage = None
+                if hasattr(response, 'usage') and response.usage:
+                    usage = {
+                        "input_tokens": getattr(response.usage, 'prompt_tokens', 0),
+                        "output_tokens": getattr(response.usage, 'completion_tokens', 0),
+                        "total_tokens": getattr(response.usage, 'total_tokens', 0),
+                    }
+
                 if should_extract:
                     answer = extract_final_answer(full_response)
                 else:
                     answer = full_response
-                    
-                return answer, full_response
+
+                return answer, full_response, usage
 
             except Exception as e:
                 last_exception = e
@@ -157,34 +172,49 @@ class BasePipeline:
 
     def get_llm_response_stream(self, messages, temperature=None):
         """
-        Sends messages to LLM and yields the full response as it grows.
+        Sends messages to LLM and yields (full_response, usage) tuples as response grows.
+
+        Usage is None during streaming and populated in the final yield when available.
+        Callers should handle: for response, usage in self.get_llm_response_stream(...)
         """
         if temperature is None:
             temperature = getattr(self.llm_settings, 'temperature', 0.0)
-            
+
         top_p = getattr(self.llm_settings, 'top_p', 1.0)
         max_tokens = getattr(self.llm_settings, 'max_tokens', None)
-        
+
         kwargs = {
             "model": self.model,
             "messages": messages,
             "temperature": temperature,
             "top_p": top_p,
-            "stream": True
+            "stream": True,
+            "stream_options": {"include_usage": True}  # Request usage in stream
         }
         if max_tokens:
             kwargs['max_tokens'] = max_tokens
 
         full_response = ""
+        usage = None
         try:
             response = self.client.chat.completions.create(**kwargs)
             for chunk in response:
+                # Check for usage in chunk (typically in final chunk with stream_options)
+                if hasattr(chunk, 'usage') and chunk.usage:
+                    usage = {
+                        "input_tokens": getattr(chunk.usage, 'prompt_tokens', 0),
+                        "output_tokens": getattr(chunk.usage, 'completion_tokens', 0),
+                        "total_tokens": getattr(chunk.usage, 'total_tokens', 0),
+                    }
                 if not chunk.choices:
                     continue
                 content = chunk.choices[0].delta.content
                 if content:
                     full_response += content
-                    yield full_response
+                    yield full_response, None  # Yield tuple during streaming
+            # Final yield with usage (if we have content)
+            if full_response:
+                yield full_response, usage
         except Exception as e:
             print_debug(f"LLM API stream failed: {e}")
             raise e
@@ -194,15 +224,15 @@ class BasePipeline:
         
     def get_settings_snapshot(self):
         """
-        Returns the base settings snapshot with LLM settings.
-        Subclasses can extend this.
+        Returns the settings snapshot with LLM settings and pipeline-specific settings.
+        Uses hook pattern: subclasses override _get_pipeline_settings() to add their settings.
         """
-        return {
+        snapshot = {
             'llm': {
                 'llm_base_url': self.llm_settings.llm_base_url,
                 'llm_model': self.llm_settings.llm_model,
                 'llm_judge_model': getattr(self.llm_settings, 'llm_judge_model', '') or self.llm_settings.llm_model,
-                'max_retries': getattr(self.llm_settings, 'max_retries', 3), # Handle defaults safely
+                'max_retries': getattr(self.llm_settings, 'max_retries', 3),
                 'allow_reasoning': getattr(self.llm_settings, 'allow_reasoning', False),
                 'temperature': getattr(self.llm_settings, 'temperature', 0.0),
                 'top_p': getattr(self.llm_settings, 'top_p', 1.0),
@@ -210,6 +240,53 @@ class BasePipeline:
                 'llm_api_key': self.llm_settings.llm_api_key
             }
         }
+        # Hook: let subclasses add pipeline-specific settings
+        pipeline_settings = self._get_pipeline_settings()
+        if pipeline_settings:
+            snapshot.update(pipeline_settings)
+        return snapshot
+
+    def _get_pipeline_settings(self):
+        """
+        Hook for subclasses to provide pipeline-specific settings.
+        Override this to add settings like 'search', 'agent', 'pipeline_type', etc.
+        Returns a dict to merge into the settings snapshot, or None.
+        """
+        return None
+
+    def _accumulate_usage(self, existing_usage, new_usage, purpose=None):
+        """
+        Accumulate token usage from multiple LLM calls within a trial.
+
+        Args:
+            existing_usage: Current accumulated usage dict or None
+            new_usage: New usage dict from an LLM call
+            purpose: Optional label for the call (e.g., 'query_generation', 'answer_synthesis')
+
+        Returns:
+            Updated usage dict with accumulated totals
+        """
+        if not existing_usage:
+            existing_usage = {
+                "input_tokens": 0,
+                "output_tokens": 0,
+                "total_tokens": 0,
+                "call_count": 0,
+                "calls": []
+            }
+
+        if new_usage:
+            existing_usage["input_tokens"] += new_usage.get("input_tokens", 0)
+            existing_usage["output_tokens"] += new_usage.get("output_tokens", 0)
+            existing_usage["total_tokens"] += new_usage.get("total_tokens", 0)
+            existing_usage["call_count"] += 1
+
+            call_detail = {**new_usage}
+            if purpose:
+                call_detail["purpose"] = purpose
+            existing_usage["calls"].append(call_detail)
+
+        return existing_usage
 
 
 class BaseMultiTurnPipeline(BasePipeline):
@@ -223,7 +300,17 @@ class BaseMultiTurnPipeline(BasePipeline):
         raise NotImplementedError("Subclasses must implement create_session")
 
     def create_trial(self, session, trial_number):
-        raise NotImplementedError("Subclasses must implement create_trial")
+        """
+        Creates a trial for the given session. This is identical across all pipelines.
+        """
+        trial = MultiTurnTrial.objects.create(
+            session=session,
+            trial_number=trial_number,
+            status='processing'
+        )
+        # Clear any stale Redis cache for this trial ID (prevents data leakage from reused IDs)
+        clear_trial_cache(trial.id)
+        return trial
     
     def _construct_messages(self, session, trial, completed_trials):
         raise NotImplementedError("Subclasses must implement _construct_messages")
@@ -278,6 +365,7 @@ class BaseMultiTurnPipeline(BasePipeline):
             is_session_completed = False
             final_is_correct = False
             final_answer = ""
+            session_had_error = False
 
             while trial_number <= self.max_retries and not is_session_completed:
                 if not self.check_active():
@@ -299,7 +387,20 @@ class BaseMultiTurnPipeline(BasePipeline):
                     # or used as-is (VanillaLLM, RAG)
                     parsed_answer, is_correct_llm, _ = self.run_single_turn(session, trial)
                 except Exception as e:
-                    raise e
+                    # TrialGuard already marked the trial as 'error' and saved partial trace
+                    # Yield error event and abandon session, move to next question
+                    print_debug(f"Trial {trial_number} failed with error: {e}")
+                    yield {
+                        'is_meta': True,
+                        'type': 'trial_error',
+                        'session_id': session.id,
+                        'trial_number': trial_number,
+                        'error': str(e),
+                        'group_id': group.id
+                    }
+                    # Mark that session had an error (don't mark as completed)
+                    session_had_error = True
+                    break
 
                 # run_single_turn handles saving the trial
 
@@ -322,29 +423,41 @@ class BaseMultiTurnPipeline(BasePipeline):
                     is_session_completed = True
                 else:
                     trial_number += 1
-            session.is_completed = True
-            session.save()
 
-            first_trial = session.trials.order_by('trial_number').first()
-            yield {
-                'question': question_text,
-                'correct': final_is_correct,
-                'is_correct_llm': final_is_correct, # For consistency
-                'is_correct_rule': trial.is_correct_rule,
-                'trials': trial_number if final_is_correct else (trial_number - 1),
-                'session_id': session.id,
-                'final_answer': final_answer,
-                'ground_truths': ground_truths,
-                'max_retries': self.max_retries,
-                'group_name': group.name,
-                'group_id': group.id,
-                'initial_correct': first_trial.is_correct_llm if first_trial else None,
-                'initial_correct_rule': first_trial.is_correct_rule if first_trial else None,
-                'coherence': (
-                    sum(1 for t in session.trials.all() if t.is_correct_llm == t.is_correct_rule) / session.trials.count()
-                    if session.trials.count() > 0 else 0
-                )
-            }
+            # Only mark session as completed if no errors occurred
+            if session_had_error:
+                # Session abandoned due to error - yield error summary and move to next question
+                yield {
+                    'question': question_text,
+                    'correct': False,
+                    'is_correct_llm': False,
+                    'is_correct_rule': False,
+                    'trials': trial_number,
+                    'session_id': session.id,
+                    'final_answer': None,
+                    'ground_truths': ground_truths,
+                    'max_retries': self.max_retries,
+                    'group_name': group.name,
+                    'group_id': group.id,
+                    'session_error': True
+                }
+            else:
+                session.is_completed = True
+                session.save()
+
+                yield {
+                    'question': question_text,
+                    'correct': final_is_correct,
+                    'is_correct_llm': final_is_correct,
+                    'is_correct_rule': trial.is_correct_rule,
+                    'trials': trial_number if final_is_correct else (trial_number - 1),
+                    'session_id': session.id,
+                    'final_answer': final_answer,
+                    'ground_truths': ground_truths,
+                    'max_retries': self.max_retries,
+                    'group_name': group.name,
+                    'group_id': group.id
+                }
 
         except Exception as e:
             yield {'error': str(e), 'question': question_text, 'session_id': session.id if 'session' in locals() else None}
@@ -449,16 +562,18 @@ class BaseMultiTurnPipeline(BasePipeline):
                 # Mark last step as streaming for frontend optimization
                 if is_streaming and trace_data:
                     trace_data[-1]['is_streaming'] = True
-                print_debug(f"[VanillaLLM Trace Update] Trial {trial.id}: {len(trace_data)} steps, streaming={is_streaming}")
                 redis_client.set(RedisKeys.trial_trace(trial.id), json.dumps(trace_data), ex=RedisKeys.DEFAULT_TTL)
 
             full_response = ""
+            trial_usage = None
             # 1. Stream the response and update Redis periodically
             chunk_count = 0
-            for partial_response in self.get_llm_response_stream(messages):
+            for partial_response, usage in self.get_llm_response_stream(messages):
                 full_response = partial_response
+                if usage:  # Usage is provided in final yield
+                    trial_usage = self._accumulate_usage(trial_usage, usage, "generation")
                 chunk_count += 1
-                if chunk_count % 5 == 0: # Update every 5 chunks to reduce overhead
+                if chunk_count % 5 == 0:  # Update every 5 chunks to reduce overhead
                     update_redis_trace(full_response, is_streaming=True)
 
             # Final update - mark as not streaming
@@ -492,6 +607,9 @@ class BaseMultiTurnPipeline(BasePipeline):
             # Store system prompt separately for database fallback when Redis expires
             if messages and messages[0].get('role') == 'system':
                 trial.log['system_prompt'] = messages[0].get('content', '')
+            # Store token usage
+            if trial_usage:
+                trial.log['token_usage'] = trial_usage
             trial.status = 'completed'
             trial.save()
 
@@ -525,12 +643,61 @@ class BaseMultiTurnPipeline(BasePipeline):
             return answer, is_correct_llm, []
 
 
+class _AsyncNullContext:
+    """Async null context manager for non-ReMe memories."""
+    async def __aenter__(self):
+        return None
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        return None
+
+
 class BaseAgentPipeline(BaseMultiTurnPipeline):
     """
     Base class for Agent pipelines (Vanilla and Browser) using the Template Method pattern.
     It centralizes the heavy lifting of async session management and state persistence,
     allowing subclasses to focus purely on agent initialization and execution.
     """
+
+    # Reference to long-term memory, set by subclasses in _init_agent()
+    long_term_memory = None
+
+    def _get_pipeline_settings(self):
+        """
+        Returns agent-specific settings. Subclasses should call super() and extend.
+        """
+        settings = BenchmarkSettings.get_effective_settings()
+        base_settings = {
+            'agent': {
+                'model_name': self._get_agent_model_name(),
+                'memory_type': settings.memory_type
+            }
+        }
+        # Add pipeline_type from subclass hook
+        pipeline_type = self._get_pipeline_type()
+        if pipeline_type:
+            base_settings['pipeline_type'] = pipeline_type
+        return base_settings
+
+    def _get_agent_model_name(self):
+        """Hook for subclasses to provide the agent model name."""
+        if hasattr(self, 'agent_model') and self.agent_model and hasattr(self.agent_model, 'model_name'):
+            return self.agent_model.model_name
+        return 'unknown'
+
+    def _get_pipeline_type(self):
+        """Hook for subclasses to provide their pipeline type string."""
+        return None
+
+    def _get_memory_context(self):
+        """Returns async context manager for long-term memory (ReMe needs it, others don't)."""
+        try:
+            from agentscope.memory import ReMePersonalLongTermMemory
+            if ReMePersonalLongTermMemory and isinstance(self.long_term_memory, ReMePersonalLongTermMemory):
+                return self.long_term_memory
+        except ImportError:
+            pass
+        return _AsyncNullContext()
+
     def _serialize_trace(self, trace_msgs):
         return TraceFormatter.serialize(trace_msgs)
 
@@ -609,6 +776,7 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
             is_session_completed = False
             final_is_correct = False
             final_answer = ""
+            session_had_error = False
 
             try:
                 yield {
@@ -629,7 +797,16 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
                     try:
                         parsed_answer, is_correct_llm, _ = await self.run_single_turn_async(session, trial)
                     except Exception as e:
-                        raise e
+                        # AsyncTrialGuard already marked the trial as 'error' and saved partial trace
+                        # Yield error event and abandon session, move to next question
+                        print_debug(f"Trial {trial_number} failed with error: {e}")
+                        yield {
+                            'is_meta': True, 'type': 'trial_error', 'session_id': session.id,
+                            'trial_number': trial_number, 'error': str(e), 'group_id': group.id
+                        }
+                        # Mark that session had an error (don't mark as completed)
+                        session_had_error = True
+                        break
 
                     yield {
                         'is_meta': True, 'type': 'trial_completed', 'session_id': session.id,
@@ -643,24 +820,29 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
                     if is_correct_llm: is_session_completed = True
                     else: trial_number += 1
 
-                session.is_completed = True
-                await sync_to_async(session.save)()
+                # Only mark session as completed if no errors occurred
+                if session_had_error:
+                    # Session abandoned due to error - yield error summary and move to next question
+                    yield {
+                        'question': question_text, 'correct': False,
+                        'is_correct_llm': False, 'is_correct_rule': False,
+                        'trials': trial_number, 'session_id': session.id,
+                        'final_answer': None, 'ground_truths': ground_truths,
+                        'max_retries': self.max_retries, 'group_name': group.name,
+                        'group_id': group.id, 'session_error': True
+                    }
+                else:
+                    session.is_completed = True
+                    await sync_to_async(session.save)()
 
-                first_trial = await sync_to_async(lambda: session.trials.order_by('trial_number').first())()
-                yield {
-                    'question': question_text, 'correct': final_is_correct,
-                    'is_correct_llm': final_is_correct, 'is_correct_rule': trial.is_correct_rule,
-                    'trials': trial_number if final_is_correct else (trial_number - 1),
-                    'session_id': session.id, 'final_answer': final_answer,
-                    'ground_truths': ground_truths, 'max_retries': self.max_retries,
-                    'group_name': group.name, 'group_id': group.id,
-                    'initial_correct': first_trial.is_correct_llm if first_trial else None,
-                    'initial_correct_rule': first_trial.is_correct_rule if first_trial else None,
-                    'coherence': await sync_to_async(lambda: (
-                        sum(1 for t in session.trials.all() if t.is_correct_llm == t.is_correct_rule) / session.trials.count()
-                        if session.trials.count() > 0 else 0
-                    ))()
-                }
+                    yield {
+                        'question': question_text, 'correct': final_is_correct,
+                        'is_correct_llm': final_is_correct, 'is_correct_rule': trial.is_correct_rule,
+                        'trials': trial_number if final_is_correct else (trial_number - 1),
+                        'session_id': session.id, 'final_answer': final_answer,
+                        'ground_truths': ground_truths, 'max_retries': self.max_retries,
+                        'group_name': group.name, 'group_id': group.id
+                    }
             finally:
                 # Session lifecycle: cleanup resources (e.g., browser instance)
                 await self._on_session_end(session)
@@ -886,7 +1068,6 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
             if trace_data:
                 trace_data[-1]['is_streaming'] = True
             key = RedisKeys.trial_trace(trial.id)
-            print_debug(f"[Trace Update] Trial {trial.id}: {len(trace_data)} steps, turn_start={turn_start_index}")
             await asyncio.to_thread(lambda: redis_client.set(key, json.dumps(trace_data), ex=RedisKeys.DEFAULT_TTL))
         except Exception as e: print_debug(f"Trace update failed: {e}")
 
@@ -918,6 +1099,14 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
         trial_meta = self._get_trial_meta(trial)
         if trial_meta:
             trial.log['meta'] = trial_meta
+
+        # Extract and store token usage from agent's model wrapper
+        if hasattr(self, 'active_agent') and hasattr(self.active_agent, '_usage_tracker'):
+            usage = self.active_agent._usage_tracker.get_usage()
+            if usage and usage.get('call_count', 0) > 0:
+                trial.log['token_usage'] = usage
+            # Reset tracker for next trial
+            self.active_agent._usage_tracker.reset_usage()
 
         trial.status = 'completed'
         trial.save()

@@ -17,11 +17,13 @@ from core.utils import print_debug, redis_client
 import httpx
 from task_manager.utils import check_answer_rule, check_answer_llm
 from .utils import (
-    get_search_engine, count_questions_in_file, ensure_system_prompt,
+    get_search_engine, count_questions_in_file,
     handle_api_error, handle_async_api_error, get_session_settings,
     print_debug, RedisKeys, PipelinePrefix, clear_trial_cache,
     TraceFormatter, SimpleMsg,
     apply_trial_metadata, is_rag_pipeline,
+    extract_session_metrics, format_trials_for_export,
+    enhance_export_data, auto_import, ImportValidationError,
 )
 from .models import (
     BenchmarkSettings,
@@ -33,7 +35,6 @@ from .models import (
 from .forms import BenchmarkDatasetForm
 
 from datetime import datetime
-from difflib import SequenceMatcher
 from django.core.files.base import ContentFile
 
 # Import from the new pipelines module
@@ -42,280 +43,9 @@ from .pipelines.base import (
     serialize_events,
     serialize_events_async,
 )
-from .pipelines.vanilla import (
-    VanillaLLMMultiTurnPipeline,
-)
-from .pipelines.rag import (
-    RagMultiTurnPipeline,
-)
-from .pipelines.agent import (
-    VanillaAgentPipeline,
-    BrowserAgentPipeline,
-)
-from .utils.pipeline_manager import PipelineManager
+from .utils.pipeline_manager import PipelineManager, PipelineRegistry
 from .services import TrialService
 from benchmark.utils import PROMPTS
-
-PIPELINE_CLASS_MAP = {
-    'vanilla_llm': VanillaLLMMultiTurnPipeline,
-    'rag': RagMultiTurnPipeline,
-    'vanilla_agent': VanillaAgentPipeline,
-    'browser_agent': BrowserAgentPipeline,
-}
-
-# ========================================== 
-# Metrics & Analytics Helpers
-# ========================================== 
-
-def _calculate_stubbornness(trial_list):
-    """
-    Computes the stubbornness score based on answer similarity across incorrect trials.
-    """
-    total_stubbornness = 0.0
-    incorrect_transitions = 0
-    
-    for i in range(len(trial_list) - 1):
-        if trial_list[i].is_correct_llm is False:
-            ans1 = trial_list[i].answer or ""
-            ans2 = trial_list[i+1].answer or ""
-            similarity_a = SequenceMatcher(None, ans1, ans2).ratio()
-            total_stubbornness += similarity_a
-            incorrect_transitions += 1
-
-    if incorrect_transitions > 0:
-        return total_stubbornness / incorrect_transitions
-    return 0.0
-
-def _calculate_query_metrics(trial_list, is_rag=False, is_agent=False, original_question=None):
-    """
-    Computes comprehensive query diversity metrics from session logs.
-
-    Returns a dict with all query metrics:
-    - query_shift: Average dissimilarity between consecutive queries
-    - search_count: Total number of search queries
-    - query_uniqueness: Ratio of unique queries (0-1)
-    - query_repetition: Count of duplicate queries
-    - avg_query_length: Mean word count per query
-    - first_query_success: 1 if first trial was correct, 0 otherwise (or None)
-    - query_drift: Average deviation from original question (0-1)
-    - query_convergence: Diversity trend (negative = converging)
-    """
-    search_count = 0
-    all_queries = []
-    first_trial_correct = None
-
-    for i, t in enumerate(trial_list):
-        t_log = t.log or {}
-
-        # Track first trial correctness for first_query_success
-        if i == 0:
-            first_trial_correct = t.is_correct_llm
-
-        if is_agent:
-            t_queries = t_log.get("search_queries", [])
-            all_queries.extend(t_queries)
-            search_count += t_log.get("query_count", len(t_queries))
-        elif is_rag:
-            q = t_log.get("search_query")
-            if not q:
-                # Try to extract from trace
-                for msg in t_log.get("trace", []):
-                     if msg.get("role") == "assistant" and "Search Query:" in msg.get("content", ""):
-                        q = msg.get("content").replace("Search Query:", "").strip()
-                        break
-            if q:
-                all_queries.append(q)
-                search_count += 1
-
-    # Initialize result dict with defaults
-    result = {
-        'query_shift': 0.0,
-        'search_count': search_count,
-        'query_uniqueness': None,
-        'query_repetition': None,
-        'avg_query_length': None,
-        'first_query_success': None,
-        'query_drift': None,
-        'query_convergence': None,
-    }
-
-    # Return early if no queries
-    if len(all_queries) == 0:
-        return result
-
-    # Basic metrics (valid for >= 1 query)
-    unique_queries = set(all_queries)
-    unique_count = len(unique_queries)
-    result['query_uniqueness'] = unique_count / len(all_queries)
-    result['query_repetition'] = len(all_queries) - unique_count
-    result['avg_query_length'] = sum(len(q.split()) for q in all_queries) / len(all_queries)
-
-    # First query success (valid for >= 1 query with first trial result)
-    if first_trial_correct is not None:
-        result['first_query_success'] = 1 if first_trial_correct else 0
-
-    # Query drift from original question (valid for >= 1 query with original_question)
-    if original_question and len(all_queries) >= 1:
-        total_drift = 0.0
-        for q in all_queries:
-            similarity = SequenceMatcher(None, original_question.lower(), q.lower()).ratio()
-            total_drift += (1.0 - similarity)
-        result['query_drift'] = total_drift / len(all_queries)
-
-    # Query shift (consecutive diversity, valid for >= 2 queries)
-    if len(all_queries) > 1:
-        shift_count = 0
-        total_query_shift = 0.0
-        for i in range(len(all_queries) - 1):
-            q1, q2 = all_queries[i], all_queries[i+1]
-            if q1 and q2:
-                similarity = SequenceMatcher(None, q1, q2).ratio()
-                total_query_shift += (1.0 - similarity)
-                shift_count += 1
-        if shift_count > 0:
-            result['query_shift'] = total_query_shift / shift_count
-
-    # Query convergence (diversity trend, valid for >= 3 queries)
-    if len(all_queries) >= 3:
-        mid = len(all_queries) // 2
-        first_half_shifts = []
-        second_half_shifts = []
-        for i in range(len(all_queries) - 1):
-            q1, q2 = all_queries[i], all_queries[i+1]
-            if q1 and q2:
-                sim = SequenceMatcher(None, q1, q2).ratio()
-                shift = 1.0 - sim
-                if i < mid:
-                    first_half_shifts.append(shift)
-                else:
-                    second_half_shifts.append(shift)
-        if first_half_shifts and second_half_shifts:
-            first_avg = sum(first_half_shifts) / len(first_half_shifts)
-            second_avg = sum(second_half_shifts) / len(second_half_shifts)
-            result['query_convergence'] = second_avg - first_avg  # Negative = converging
-
-    return result
-
-
-def _calculate_session_metrics(trial_list, is_rag=False, is_agent=False, original_question=None):
-    """
-    Computes stubbornness and comprehensive query metrics for a session trajectory.
-
-    Returns: (stubborn_score, query_metrics_dict)
-    """
-    if not isinstance(trial_list, list):
-        trial_list = list(trial_list)
-
-    if len(trial_list) == 0:
-        return 0.0, {
-            'query_shift': None,
-            'search_count': 0,
-            'query_uniqueness': None,
-            'query_repetition': None,
-            'avg_query_length': None,
-            'first_query_success': None,
-            'query_drift': None,
-            'query_convergence': None,
-        }
-
-    stubborn_score = _calculate_stubbornness(trial_list)
-    query_metrics = _calculate_query_metrics(trial_list, is_rag, is_agent, original_question)
-
-    # Set query_shift to None for non-RAG/Agent pipelines
-    if not (is_rag or is_agent):
-        query_metrics['query_shift'] = None
-
-    return stubborn_score, query_metrics
-
-
-def _calculate_dynamics_metrics(trial_list, ground_truths=None, is_rag=False, is_agent=False):
-    """
-    Computes multi-turn dynamics metrics for a session trajectory.
-
-    Returns dict with:
-    - oscillation_count, oscillation_opportunities: For A→B→A pattern detection
-    - near_miss_count, incorrect_count: For near-miss rate calculation
-    - recovery_stuck, recovery_wasted, recovery_random, recovery_effective, recovery_total: Recovery strategy breakdown
-    """
-    if not isinstance(trial_list, list):
-        trial_list = list(trial_list)
-
-    result = {
-        'oscillation_count': 0,
-        'oscillation_opportunities': 0,
-        'near_miss_count': 0,
-        'incorrect_count': 0,
-        'recovery_stuck': 0,
-        'recovery_wasted': 0,
-        'recovery_random': 0,
-        'recovery_effective': 0,
-        'recovery_total': 0,
-    }
-
-    if len(trial_list) == 0:
-        return result
-
-    answers = [t.answer for t in trial_list if t.answer]
-
-    # 1. Answer Oscillation Detection (A→B→A patterns)
-    if len(answers) >= 3:
-        for i in range(2, len(answers)):
-            result['oscillation_opportunities'] += 1
-            sim_to_prev = SequenceMatcher(None, answers[i], answers[i-1]).ratio()
-            sim_to_two_back = SequenceMatcher(None, answers[i], answers[i-2]).ratio()
-            # Oscillation: similar to 2 steps back (>0.6), different from 1 step back (<0.4)
-            if sim_to_two_back > 0.6 and sim_to_prev < 0.4:
-                result['oscillation_count'] += 1
-
-    # 2. Near-Miss Detection (incorrect answers >50% similar to ground truth)
-    if ground_truths:
-        for t in trial_list:
-            if t.is_correct_llm is False and t.answer:
-                result['incorrect_count'] += 1
-                answer_lower = t.answer.lower().strip()
-                max_sim = 0.0
-                for gt in ground_truths:
-                    sim = SequenceMatcher(None, answer_lower, gt.lower()).ratio()
-                    max_sim = max(max_sim, sim)
-                if max_sim > 0.5:
-                    result['near_miss_count'] += 1
-
-    # 3. Recovery Strategy Analysis (only for RAG/Agent with queries)
-    if (is_rag or is_agent) and len(trial_list) >= 2:
-        for i in range(len(trial_list) - 1):
-            t1, t2 = trial_list[i], trial_list[i+1]
-            # Only analyze recovery attempts (after incorrect trial)
-            if t1.is_correct_llm is False:
-                a1 = t1.answer or ""
-                a2 = t2.answer or ""
-                log1 = t1.log or {}
-                log2 = t2.log or {}
-
-                # Get queries
-                if is_agent:
-                    q1 = " ".join(log1.get("search_queries", []))
-                    q2 = " ".join(log2.get("search_queries", []))
-                else:  # RAG
-                    q1 = log1.get("search_query", "")
-                    q2 = log2.get("search_query", "")
-
-                if a1 and a2 and q1 and q2:
-                    result['recovery_total'] += 1
-                    query_change = 1 - SequenceMatcher(None, q1, q2).ratio()
-                    answer_change = 1 - SequenceMatcher(None, a1, a2).ratio()
-
-                    # Categorize recovery strategy (threshold: 0.3)
-                    if query_change < 0.3 and answer_change < 0.3:
-                        result['recovery_stuck'] += 1
-                    elif query_change >= 0.3 and answer_change < 0.3:
-                        result['recovery_wasted'] += 1
-                    elif query_change < 0.3 and answer_change >= 0.3:
-                        result['recovery_random'] += 1
-                    else:
-                        result['recovery_effective'] += 1
-
-    return result
-
 
 # ==========================================
 # Aggregate Metrics API
@@ -571,6 +301,7 @@ def save_settings(request):
             'temperature': (float, 0.0), 'top_p': (float, 1.0),
             'search_provider': (str, None), 'serper_api_key': (str, None),
             'search_limit': (int, None), 'memory_type': (str, None),
+            'agent_max_iters': (int, 30),
         }
         for key, (conv, default) in field_map.items():
             if key in data:
@@ -842,11 +573,9 @@ def run_trial(request, trial_id):
     common_kwargs = {"base_url": base_url, "api_key": api_key, "model": model, "max_retries": 1}
     pipeline_type = session.pipeline_type
 
-    if pipeline_type in ['browser_agent', 'vanilla_agent']:
+    if PipelineRegistry.is_async_pipeline(pipeline_type):
         factory_kwargs = {**common_kwargs, "pipeline_id": session.run_tag}
-        PipelineClass = PIPELINE_CLASS_MAP.get(pipeline_type)
-        if not PipelineClass:
-            raise Exception(f"Unknown pipeline type: {pipeline_type}")
+        PipelineClass = PipelineRegistry.get_pipeline_class(pipeline_type)
 
         answer, is_correct_llm, search_results, error_msg = PipelineManager.get_instance().run_trial(
             session.id, trial.id, factory_kwargs, PipelineClass
@@ -854,7 +583,7 @@ def run_trial(request, trial_id):
         if error_msg:
             raise Exception(error_msg)
     else:
-        PipelineClass = PIPELINE_CLASS_MAP.get(pipeline_type, VanillaLLMMultiTurnPipeline)
+        PipelineClass = PipelineRegistry.get_pipeline_class(pipeline_type)
         pipeline = PipelineClass(**common_kwargs)
         answer, is_correct_llm, search_results = pipeline.run_single_turn(session, trial)
 
@@ -1039,8 +768,9 @@ def _run_pipeline_generic(request, pipeline_class, redis_prefix_template, **kwar
         "base_url": base_url, "api_key": api_key, "model": model,
         "pipeline_id": pipeline_id, "dataset_id": dataset_id, "group_id": group_id,
     }
-    if issubclass(pipeline_class, (BaseMultiTurnPipeline, VanillaAgentPipeline)):
-            constructor_args["max_retries"] = max_retries
+    # All pipelines inherit from BaseMultiTurnPipeline and accept max_retries
+    if issubclass(pipeline_class, BaseMultiTurnPipeline):
+        constructor_args["max_retries"] = max_retries
     constructor_args.update(kwargs)
     pipeline = pipeline_class(**constructor_args)
     return StreamingHttpResponse(serialize_events(pipeline.run()), content_type="application/json")
@@ -1056,30 +786,24 @@ def _stop_pipeline_generic(request, redis_prefix_template):
 @admin_required
 @require_POST
 def pipeline_start(request, pipeline_type):
-    if pipeline_type == 'vanilla_llm':
-        return _run_pipeline_generic(request, VanillaLLMMultiTurnPipeline, "vanilla_llm_pipeline_active")
-    elif pipeline_type == 'rag':
-        return _run_pipeline_generic(request, RagMultiTurnPipeline, "rag_pipeline_active")
-    elif pipeline_type == 'vanilla_agent':
-        return _run_pipeline_generic_async_wrapper(request, VanillaAgentPipeline, "vanilla_agent_pipeline_active")
-    elif pipeline_type == 'browser_agent':
-        return _run_pipeline_generic_async_wrapper(request, BrowserAgentPipeline, "browser_agent_pipeline_active")
-    else:
+    if not PipelineRegistry.is_valid_type(pipeline_type):
         return JsonResponse({"status": "error", "message": f"Unknown pipeline type: {pipeline_type}"}, status=400)
+
+    PipelineClass = PipelineRegistry.get_pipeline_class(pipeline_type)
+    redis_prefix = PipelineRegistry.get_redis_prefix(pipeline_type)
+
+    if PipelineRegistry.is_async_pipeline(pipeline_type):
+        return _run_pipeline_generic_async_wrapper(request, PipelineClass, redis_prefix)
+    else:
+        return _run_pipeline_generic(request, PipelineClass, redis_prefix)
 
 @admin_required
 @require_POST
 def pipeline_stop(request, pipeline_type):
-    redis_prefix_map = {
-        'vanilla_llm': "vanilla_llm_pipeline_active",
-        'rag': "rag_pipeline_active",
-        'vanilla_agent': "vanilla_agent_pipeline_active",
-        'browser_agent': "browser_agent_pipeline_active",
-    }
-    prefix = redis_prefix_map.get(pipeline_type)
-    if prefix:
-        return _stop_pipeline_generic(request, prefix)
-    return JsonResponse({"status": "error", "message": f"Unknown pipeline type: {pipeline_type}"}, status=400)
+    if not PipelineRegistry.is_valid_type(pipeline_type):
+        return JsonResponse({"status": "error", "message": f"Unknown pipeline type: {pipeline_type}"}, status=400)
+    prefix = PipelineRegistry.get_redis_prefix(pipeline_type)
+    return _stop_pipeline_generic(request, prefix)
 
 def sync_iterator_from_async(async_gen):
     loop = asyncio.new_event_loop()
@@ -1184,64 +908,31 @@ def get_session(request, session_id):
     })
 
 def _get_run_results(group_id, pipeline_types):
+    """Get run results with comprehensive metrics using extract_session_metrics."""
     group = get_object_or_404(MultiTurnRun, pk=group_id)
     if isinstance(pipeline_types, str):
         pipeline_types = [pipeline_types]
-        
+
     sessions = group.sessions.filter(pipeline_type__in=pipeline_types).prefetch_related("trials")
-    results = []
     settings = group.settings if group.settings else BenchmarkSettings.get_effective_settings()
     snapshot = settings.to_snapshot_dict()
     max_retries = settings.max_retries
 
+    results = []
     for session in sessions:
-        trials = list(session.trials.all().order_by('trial_number'))
-        if not trials: continue
-            
-        first_trial, last_trial = trials[0], trials[-1]
-        session_coherence, matches, evaluated_trials = 0.0, 0, 0
-        for t in trials:
-            if t.is_correct_llm is not None and t.is_correct_rule is not None:
-                evaluated_trials += 1
-                if t.is_correct_llm == t.is_correct_rule: matches += 1
-        if evaluated_trials > 0: session_coherence = matches / evaluated_trials
+        # Use centralized metric extraction from metrics.py
+        enriched = extract_session_metrics(session)
 
-        ptype = session.pipeline_type
-        is_agent, is_rag = ptype in ['vanilla_agent', 'browser_agent'], 'rag' in ptype
-        stubborn_score, query_metrics = _calculate_session_metrics(
-            trials, is_rag=is_rag, is_agent=is_agent, original_question=session.question
-        )
-        dynamics_metrics = _calculate_dynamics_metrics(
-            trials, ground_truths=session.ground_truths, is_rag=is_rag, is_agent=is_agent
-        )
+        # Skip sessions with no trials
+        if enriched.get('trials', 0) == 0:
+            continue
 
-        results.append({
-            "question": session.question, "correct": last_trial.is_correct_llm,
-            "is_correct_llm": last_trial.is_correct_llm, "is_correct_rule": last_trial.is_correct_rule,
-            "coherence": session_coherence, "trials": len(trials), "session_id": session.id,
-            "final_answer": last_trial.answer, "ground_truths": session.ground_truths, "max_retries": max_retries,
-            "initial_correct": first_trial.is_correct_llm, "initial_correct_rule": first_trial.is_correct_rule,
-            "pipeline_type": session.pipeline_type, "stubborn_score": stubborn_score,
-            # Flatten query metrics into result
-            "query_shift": query_metrics.get('query_shift'),
-            "search_count": query_metrics.get('search_count'),
-            "query_uniqueness": query_metrics.get('query_uniqueness'),
-            "query_repetition": query_metrics.get('query_repetition'),
-            "avg_query_length": query_metrics.get('avg_query_length'),
-            "first_query_success": query_metrics.get('first_query_success'),
-            "query_drift": query_metrics.get('query_drift'),
-            "query_convergence": query_metrics.get('query_convergence'),
-            # Flatten dynamics metrics into result
-            "oscillation_count": dynamics_metrics.get('oscillation_count'),
-            "oscillation_opportunities": dynamics_metrics.get('oscillation_opportunities'),
-            "near_miss_count": dynamics_metrics.get('near_miss_count'),
-            "incorrect_count": dynamics_metrics.get('incorrect_count'),
-            "recovery_stuck": dynamics_metrics.get('recovery_stuck'),
-            "recovery_wasted": dynamics_metrics.get('recovery_wasted'),
-            "recovery_random": dynamics_metrics.get('recovery_random'),
-            "recovery_effective": dynamics_metrics.get('recovery_effective'),
-            "recovery_total": dynamics_metrics.get('recovery_total'),
-        })
+        # Add fields not in enriched dict (settings-level, not session-level)
+        enriched['max_retries'] = max_retries
+        enriched['pipeline_type'] = session.pipeline_type
+
+        results.append(enriched)
+
     return JsonResponse({"results": results, "group_name": group.name, "settings": snapshot})
 
 @admin_required
@@ -1261,26 +952,18 @@ def export_session(request, session_id):
         session = MultiTurnSession.objects.select_related("run").get(pk=session_id)
     except MultiTurnSession.DoesNotExist:
         return HttpResponse("Session not found", status=404)
-    
+
     pipeline_type = session.pipeline_type
     settings = get_session_settings(session)
     snapshot = settings.to_safe_snapshot_dict()
     max_retries = settings.max_retries
 
-    trials = list(session.trials.values(
+    # Use centralized trial formatting from metadata.py
+    trials_qs = list(session.trials.values(
         "trial_number", "answer", "feedback", "is_correct_llm", "is_correct_rule",
         "created_at", "log"
     ))
-
-    for trial in trials:
-        if trial.get("created_at"): trial["created_at"] = trial["created_at"].isoformat()
-        log = trial.pop("log", {}) or {}
-
-        # Export raw messages with system prompt
-        trial["messages"] = ensure_system_prompt(log.get("messages", []), log.get("system_prompt"))
-
-        # Apply pipeline-specific metadata (search data for RAG, memory data for agents)
-        apply_trial_metadata(trial, log, pipeline_type)
+    trials = format_trials_for_export(trials_qs, pipeline_type)
 
     export_format = request.GET.get("format", "json")
     if export_format == "csv":
@@ -1288,15 +971,29 @@ def export_session(request, session_id):
         response["Content-Disposition"] = f'attachment; filename="benchmark_session_{session_id}.csv"'
         writer = csv.writer(response)
         headers = ["Session ID", "Question", "Ground Truths", "Pipeline Type", "Session Created At", "Trial Number", "Answer", "Feedback", "Is Correct (LLM)", "Is Correct (Rule)", "Trial Created At"]
-        if is_rag_pipeline(pipeline_type): headers.extend(["Search Query", "Search Results"])
+        if is_rag_pipeline(pipeline_type):
+            headers.extend(["Search Query", "Search Results"])
         writer.writerow(headers)
         for trial in trials:
             row = [session.id, session.question, session.ground_truths, pipeline_type, session.created_at.isoformat(), trial.get("trial_number"), trial.get("answer"), trial.get("feedback"), trial.get("is_correct_llm"), trial.get("is_correct_rule"), trial.get("created_at")]
-            if is_rag_pipeline(pipeline_type): row.extend([trial.get("search_query"), trial.get("search_results")])
+            if is_rag_pipeline(pipeline_type):
+                row.extend([trial.get("search_query"), trial.get("search_results")])
             writer.writerow(row)
         return response
     else:
-        export_data = {"session_id": session.id, "question": session.question, "ground_truths": session.ground_truths, "is_completed": session.is_completed, "pipeline_type": pipeline_type, "created_at": session.created_at.isoformat(), "max_retries": max_retries, "settings": snapshot, "trials": trials}
+        export_data = {
+            "session_id": session.id,
+            "question": session.question,
+            "ground_truths": session.ground_truths,
+            "is_completed": session.is_completed,
+            "pipeline_type": pipeline_type,
+            "created_at": session.created_at.isoformat(),
+            "max_retries": max_retries,
+            "settings": snapshot,
+            "trials": trials
+        }
+        # Add checksum and export metadata
+        export_data = enhance_export_data(export_data, export_type='session')
         response = HttpResponse(json.dumps(export_data, indent=2), content_type="application/json")
         response["Content-Disposition"] = f'attachment; filename="benchmark_session_{session_id}.json"'
         return response
@@ -1306,34 +1003,23 @@ def export_run(request, group_id):
     try:
         group = get_object_or_404(MultiTurnRun, pk=group_id)
         sessions = group.sessions.all().order_by('id')
-        
+
         export_data = {
             "group_id": group.id,
             "group_name": group.name,
             "created_at": group.created_at.isoformat() if group.created_at else None,
-            "settings": None,
+            "settings": group.settings.to_safe_snapshot_dict() if group.settings else None,
             "sessions": []
         }
-        
-        # Get settings from the run
-        settings = group.settings
-        if settings:
-            export_data["settings"] = settings.to_safe_snapshot_dict()
 
         sessions_data = []
         for session in sessions:
-            trials = list(session.trials.values(
+            # Use centralized trial formatting from metadata.py
+            trials_qs = list(session.trials.values(
                 "trial_number", "answer", "feedback", "is_correct_llm", "is_correct_rule",
                 "created_at", "log"
             ))
-
-            session_pipeline_type = session.pipeline_type or ''
-
-            for trial in trials:
-                if trial.get("created_at"): trial["created_at"] = trial.get("created_at").isoformat()
-                log = trial.pop("log", {}) or {}
-                trial["messages"] = ensure_system_prompt(log.get("messages", []), log.get("system_prompt"))
-                apply_trial_metadata(trial, log, session_pipeline_type)
+            trials = format_trials_for_export(trials_qs, session.pipeline_type or '')
 
             sessions_data.append({
                 "session_id": session.id,
@@ -1344,16 +1030,195 @@ def export_run(request, group_id):
                 "created_at": session.created_at.isoformat() if session.created_at else None,
                 "trials": trials
             })
-        
+
         export_data["sessions"] = sessions_data
 
+        # Add checksum and export metadata
+        export_data = enhance_export_data(export_data, export_type='run')
         response = HttpResponse(json.dumps(export_data, indent=2), content_type="application/json")
         response["Content-Disposition"] = f'attachment; filename="benchmark_run_{group_id}.json"'
         return response
     except Exception as e:
         return JsonResponse({"status": "error", "message": str(e)}, status=500)
 
-# ========================================== 
+
+@admin_required
+@require_POST
+def import_data(request):
+    """
+    Import benchmark data from JSON file or raw JSON.
+
+    Accepts:
+    - File upload via 'file' field (multipart/form-data)
+    - Raw JSON via request body (application/json)
+
+    Auto-detects whether it's a session or run export and imports accordingly.
+    Validates checksum if present for data integrity.
+
+    Returns:
+        JSON response with import status and details
+    """
+    try:
+        # Try to get data from file upload first
+        uploaded_file = request.FILES.get('file')
+        if uploaded_file:
+            try:
+                content = uploaded_file.read().decode('utf-8')
+                data = json.loads(content)
+            except json.JSONDecodeError as e:
+                return JsonResponse({
+                    "status": "error",
+                    "message": f"Invalid JSON in uploaded file: {str(e)}"
+                }, status=400)
+            except UnicodeDecodeError as e:
+                return JsonResponse({
+                    "status": "error",
+                    "message": f"File encoding error: {str(e)}. Please use UTF-8 encoding."
+                }, status=400)
+        else:
+            # Try to get data from request body
+            try:
+                data = json.loads(request.body)
+            except json.JSONDecodeError as e:
+                return JsonResponse({
+                    "status": "error",
+                    "message": f"Invalid JSON in request body: {str(e)}"
+                }, status=400)
+
+        # Perform the import
+        imported_obj, stats = auto_import(data)
+
+        # Determine what was imported
+        export_metadata = data.get('export_metadata', {})
+        export_type = export_metadata.get('export_type', 'unknown')
+
+        # Build response based on what was imported
+        if export_type == 'run' or hasattr(imported_obj, 'sessions'):
+            # It's a run
+            response_data = {
+                "status": "success",
+                "message": "Run imported successfully",
+                "import_type": "run",
+                "run_id": imported_obj.id,
+                "run_name": imported_obj.name,
+                "stats": stats,
+            }
+        else:
+            # It's a session
+            response_data = {
+                "status": "success",
+                "message": "Session imported successfully",
+                "import_type": "session",
+                "session_id": imported_obj.id,
+                "run_id": imported_obj.run.id,
+                "stats": stats,
+            }
+
+        return JsonResponse(response_data)
+
+    except ImportValidationError as e:
+        return JsonResponse({
+            "status": "error",
+            "message": str(e),
+            "error_type": "validation"
+        }, status=400)
+    except Exception as e:
+        return JsonResponse({
+            "status": "error",
+            "message": f"Import failed: {str(e)}",
+            "error_type": "internal"
+        }, status=500)
+
+
+@admin_required
+@require_POST
+def validate_import(request):
+    """
+    Validate import data without actually importing.
+
+    Useful for checking data integrity and compatibility before import.
+
+    Returns:
+        JSON response with validation results
+    """
+    try:
+        # Try to get data from file upload first
+        uploaded_file = request.FILES.get('file')
+        if uploaded_file:
+            try:
+                content = uploaded_file.read().decode('utf-8')
+                data = json.loads(content)
+            except json.JSONDecodeError as e:
+                return JsonResponse({
+                    "status": "error",
+                    "is_valid": False,
+                    "errors": [f"Invalid JSON: {str(e)}"]
+                }, status=400)
+        else:
+            # Try to get data from request body
+            try:
+                data = json.loads(request.body)
+            except json.JSONDecodeError as e:
+                return JsonResponse({
+                    "status": "error",
+                    "is_valid": False,
+                    "errors": [f"Invalid JSON: {str(e)}"]
+                }, status=400)
+
+        # Import validation function
+        from .utils import validate_import_data, validate_checksum
+
+        # Validate the data
+        is_valid, errors = validate_import_data(data)
+
+        # Get additional info
+        export_metadata = data.get('export_metadata', {})
+
+        # Check checksum separately for detailed feedback
+        checksum_valid = True
+        checksum_message = "No checksum present"
+        if export_metadata.get('checksum'):
+            checksum_valid, checksum_message = validate_checksum(data)
+
+        response_data = {
+            "status": "success" if is_valid else "error",
+            "is_valid": is_valid,
+            "errors": errors if errors else [],
+            "export_metadata": {
+                "version": export_metadata.get('version', 'unknown'),
+                "export_type": export_metadata.get('export_type', 'auto-detect'),
+                "exported_at": export_metadata.get('exported_at'),
+            },
+            "checksum": {
+                "valid": checksum_valid,
+                "message": checksum_message,
+            }
+        }
+
+        # Add summary info
+        if 'sessions' in data:
+            response_data['summary'] = {
+                'type': 'run',
+                'session_count': len(data.get('sessions', [])),
+                'total_trials': sum(len(s.get('trials', [])) for s in data.get('sessions', []))
+            }
+        elif 'trials' in data:
+            response_data['summary'] = {
+                'type': 'session',
+                'trial_count': len(data.get('trials', []))
+            }
+
+        return JsonResponse(response_data)
+
+    except Exception as e:
+        return JsonResponse({
+            "status": "error",
+            "is_valid": False,
+            "errors": [f"Validation error: {str(e)}"]
+        }, status=500)
+
+
+# ==========================================
 # Debug & Interaction Utilities
 # ========================================== 
 
@@ -1374,7 +1239,7 @@ def get_trial_prompt(request, trial_id):
     if pipeline_type not in ['vanilla_llm', 'rag']:
         return JsonResponse({"error": "Prompt reconstruction only supported for Vanilla and RAG baselines."}, status=400)
     try:
-        PipelineClass = PIPELINE_CLASS_MAP.get(pipeline_type)
+        PipelineClass = PipelineRegistry.get_pipeline_class(pipeline_type)
         pipeline = PipelineClass(base_url="", api_key="", model="", max_retries=1)
         completed_trials = list(session.trials.filter(trial_number__lt=trial.trial_number, status='completed').order_by('trial_number'))
         messages = pipeline._construct_messages(session, trial, completed_trials)

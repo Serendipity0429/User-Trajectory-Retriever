@@ -75,8 +75,7 @@ window.BenchmarkUI.ToolCards = {
         listContainer.className = 'list-group list-group-flush';
 
         visibleItems.forEach((item, idx) => {
-            let snippet = item.snippet || '';
-            if (snippet.length > 120) snippet = snippet.substring(0, 120) + '...';
+            const snippet = BenchmarkHelpers.truncateText(item.snippet, 120);
 
             const itemEl = BenchmarkUtils.renderTemplate('tpl-tool-search-result-item', {
                 '.result-index': { text: idx + 1 },
@@ -89,17 +88,12 @@ window.BenchmarkUI.ToolCards = {
 
         const remaining = Math.max(0, parsedData.length - displayLimit);
         const remainingText = remaining > 0 ? ` (+${remaining} more)` : '';
-        const dataId = 'search-data-' + Math.random().toString(36).substr(2, 9);
-
-        // Store data globally for onclick access
-        window._benchmarkSearchData = window._benchmarkSearchData || {};
-        window._benchmarkSearchData[dataId] = parsedData;
 
         const footer = BenchmarkUtils.renderTemplate('tpl-tool-search-results-footer', {
             '.results-count': { html: `<i class="bi bi-check-all me-1"></i>Found ${parsedData.length} results` },
             '.view-full-btn': {
                 text: `View Full Details${remainingText}`,
-                attrs: { onclick: `window.BenchmarkUI.SearchResults.showInModal(window._benchmarkSearchData['${dataId}'])` }
+                attrs: { onclick: BenchmarkHelpers.storeSearchData(parsedData) }
             }
         });
 

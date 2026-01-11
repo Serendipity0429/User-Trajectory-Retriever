@@ -424,7 +424,7 @@ def check_answer_llm(question, authentic_answers, user_answer, client = None, mo
 1.  **Correctness Criteria:** The `User's Answer` is correct if it is semantically equivalent to **any one** of the answers in the `Authentic Answers` list.
 2.  **Tolerances:** Your comparison must be case-insensitive. You should ignore minor differences in punctuation (e.g., commas, periods) and whitespace. For example, "New York NY" should be considered a match for "New York, NY".
 3.  **Completeness:** The user's answer must not be missing essential information. For example, if an authentic answer is "Michael Jordan", "Jordan" would be considered incorrect because it is incomplete.
-4.  **Conciseness & Precision:** The `User's Answer` must be the direct, precise answer. It should NOT be a long explanation, a paragraph of deduction, or contain extraneous/irrelevant information. If the answer contains irrelevant text appended to it, or is buried in a long text, judge it as **incorrect**, even if the correct information is technically present.
+4.  **Conciseness & Precision:** The `User's Answer` must be the direct, precise answer in plain text. It should NOT be a long explanation, a paragraph of deduction, contain extraneous/irrelevant information, or contain markdown formatting. If the answer violates any of these criteria, judge it as **incorrect**, even if the correct information is technically present.
 5.  **Strict Adherence:** Base your judgment *only* on the provided text. Do not use external knowledge.
 6.  **Output Format:** Your response must be a single word: `yes` or `no`. Do not provide any explanation or markdown formatting.
 

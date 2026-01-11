@@ -29,6 +29,60 @@ window.BenchmarkHelpers.escapeHtml = function(str) {
 }
 
 /**
+ * Escape HTML and convert newlines to <br> tags
+ * @param {string} str - String to escape and format
+ * @returns {string} Escaped string with <br> tags
+ */
+window.BenchmarkHelpers.escapeAndFormatContent = function(str) {
+    return this.escapeHtml(str).replace(/\n/g, '<br>');
+}
+
+/**
+ * Truncate text to a maximum length with ellipsis
+ * @param {string} text - Text to truncate
+ * @param {number} maxLength - Maximum length (default 120)
+ * @returns {string} Truncated text
+ */
+window.BenchmarkHelpers.truncateText = function(text, maxLength = 120) {
+    if (!text || text.length <= maxLength) return text || '';
+    return text.substring(0, maxLength) + '...';
+}
+
+/**
+ * Safely parse JSON with fallback
+ * @param {string|object} str - String to parse or object to return
+ * @param {*} defaultValue - Default value if parsing fails
+ * @returns {*} Parsed object or default value
+ */
+window.BenchmarkHelpers.safeJsonParse = function(str, defaultValue = null) {
+    if (typeof str !== 'string') return str;
+    try {
+        return JSON.parse(str);
+    } catch (e) {
+        return defaultValue;
+    }
+}
+
+/**
+ * Clear an element's content safely
+ * @param {HTMLElement} element - Element to clear
+ */
+window.BenchmarkHelpers.clearElement = function(element) {
+    if (element) element.innerHTML = '';
+}
+
+/**
+ * Show a Bootstrap modal by ID
+ * @param {string} modalId - The modal element ID
+ */
+window.BenchmarkHelpers.showModal = function(modalId) {
+    const modalEl = document.getElementById(modalId);
+    if (modalEl) {
+        bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    }
+}
+
+/**
  * Normalize ground truths to array format
  * @param {Array|string} input - Array or comma-separated string
  * @returns {Array} Normalized array of ground truths
@@ -47,6 +101,18 @@ window.BenchmarkHelpers.setUIState = function(elements, states) {
     for (const [key, display] of Object.entries(states)) {
         if (elements[key]) elements[key].style.display = display;
     }
+}
+
+/**
+ * Store search data and return onclick handler string
+ * @param {Array} data - Search results data
+ * @returns {string} onclick attribute value
+ */
+window.BenchmarkHelpers.storeSearchData = function(data) {
+    const dataId = 'search-' + Math.random().toString(36).substring(2, 11);
+    window._benchmarkSearchData = window._benchmarkSearchData || {};
+    window._benchmarkSearchData[dataId] = data;
+    return `window.BenchmarkUI.SearchResults.showInModal(window._benchmarkSearchData['${dataId}'])`;
 }
 
 /**

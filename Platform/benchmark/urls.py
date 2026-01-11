@@ -55,6 +55,8 @@ urlpatterns = [
     path('api/sessions/rename_session_group/<int:group_id>/', views.rename_session_group, name='rename_session_group'),
     path('api/sessions/export_session/<int:session_id>/', views.export_session, name='export_session'),
     path('api/sessions/export_run/<int:group_id>/', views.export_run, name='export_run'),
+    path('api/sessions/import/', views.import_data, name='import_data'),
+    path('api/sessions/validate_import/', views.validate_import, name='validate_import'),
     
     # Trial Execution
     path("api/sessions/run_trial/<int:trial_id>/", views.run_trial, name="run_trial"),

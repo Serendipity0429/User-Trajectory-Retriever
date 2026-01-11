@@ -1,25 +1,14 @@
 import inspect
+import json
 from asgiref.sync import sync_to_async
-try:
-    from agentscope.memory import ReMePersonalLongTermMemory
-except ImportError:
-    ReMePersonalLongTermMemory = None
-from ..models import BenchmarkSettings, MultiTurnRun, MultiTurnSession, MultiTurnTrial
+from ..models import BenchmarkSettings, MultiTurnRun, MultiTurnSession
 from ..utils import (
     print_debug,
-    VanillaAgentFactory, BrowserAgentFactory,
-    clear_trial_cache
+    VanillaAgentFactory, BrowserAgentFactory
 )
 from ..utils.mcp_manager import ChromeDevToolsMCPManager
-from .base import BaseAgentPipeline, REDIS_PREFIX_BROWSER_AGENT
+from .base import BaseAgentPipeline, REDIS_PREFIX_VANILLA_AGENT, REDIS_PREFIX_BROWSER_AGENT
 
-
-class _AsyncNullContext:
-    """Async null context manager for non-ReMe memories."""
-    async def __aenter__(self):
-        return None
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        return None
 
 # Helper for reading questions file safely in chunks/lines without DB access
 def question_file_iterator(file_path):
@@ -48,7 +37,7 @@ class VanillaAgentPipeline(BaseAgentPipeline):
             temperature=0.0
         )
         self.agent_model = VanillaAgentFactory.init_agentscope(self.temp_settings)
-        self.redis_prefix = f"vanilla_agent_pipeline_active"
+        self.redis_prefix = REDIS_PREFIX_VANILLA_AGENT
         self.long_term_memory = None  # Will be set in _init_agent
         self._current_run_id = None  # Set when processing starts, used for memory isolation
 
@@ -64,15 +53,8 @@ class VanillaAgentPipeline(BaseAgentPipeline):
     def __str__(self):
         return "Vanilla Agent Pipeline"
 
-    def get_settings_snapshot(self):
-        settings = BenchmarkSettings.get_effective_settings()
-        snapshot = super().get_settings_snapshot()
-        snapshot['pipeline_type'] = 'vanilla_agent'
-        snapshot['agent'] = {
-            'model_name': self.agent_model.model_name if hasattr(self.agent_model, 'model_name') else 'unknown',
-            'memory_type': settings.memory_type
-        }
-        return snapshot
+    def _get_pipeline_type(self):
+        return 'vanilla_agent'
 
     def create_session(self, settings, question_text, ground_truths, group):
         return MultiTurnSession.objects.create(
@@ -83,16 +65,6 @@ class VanillaAgentPipeline(BaseAgentPipeline):
             pipeline_type='vanilla_agent'
         )
 
-    def create_trial(self, session, trial_number):
-        trial = MultiTurnTrial.objects.create(
-            session=session,
-            trial_number=trial_number,
-            status='processing'
-        )
-        # Clear any stale Redis cache for this trial ID (prevents data leakage from reused IDs)
-        clear_trial_cache(trial.id)
-        return trial
-
     # Hooks for BaseAgentPipeline template
     async def _init_agent(self):
         # Pass run_id for memory isolation (set by base pipeline before agent creation)
@@ -102,12 +74,6 @@ class VanillaAgentPipeline(BaseAgentPipeline):
         )
         self.long_term_memory = long_term_memory
         return agent
-
-    def _get_memory_context(self):
-        """Returns async context manager for long-term memory (ReMe needs it, others don't)."""
-        if ReMePersonalLongTermMemory and isinstance(self.long_term_memory, ReMePersonalLongTermMemory):
-            return self.long_term_memory
-        return _AsyncNullContext()
 
     async def _execute_agent(self, msg):
         """Execute agent with static_control long-term memory mode.
@@ -178,15 +144,8 @@ class BrowserAgentPipeline(BaseAgentPipeline):
     def __str__(self):
         return "Browser Agent Pipeline"
 
-    def get_settings_snapshot(self):
-        settings = BenchmarkSettings.get_effective_settings()
-        snapshot = super().get_settings_snapshot()
-        snapshot['pipeline_type'] = 'browser_agent'
-        snapshot['agent'] = {
-            'model_name': self.agent_model.model_name if hasattr(self, 'agent_model') and self.agent_model and hasattr(self.agent_model, 'model_name') else 'unknown',
-            'memory_type': settings.memory_type
-        }
-        return snapshot
+    def _get_pipeline_type(self):
+        return 'browser_agent'
 
     def create_session(self, settings, question_text, ground_truths, group):
         return MultiTurnSession.objects.create(
@@ -196,16 +155,6 @@ class BrowserAgentPipeline(BaseAgentPipeline):
             run_tag=self.pipeline_id,
             pipeline_type='browser_agent'
         )
-
-    def create_trial(self, session, trial_number):
-        trial = MultiTurnTrial.objects.create(
-            session=session,
-            trial_number=trial_number,
-            status='processing'
-        )
-        # Clear any stale Redis cache for this trial ID (prevents data leakage from reused IDs)
-        clear_trial_cache(trial.id)
-        return trial
 
     async def cleanup(self):
         """Final cleanup at end of pipeline run."""
@@ -274,12 +223,6 @@ class BrowserAgentPipeline(BaseAgentPipeline):
         )
         self.long_term_memory = long_term_memory
         return agent
-
-    def _get_memory_context(self):
-        """Returns async context manager for long-term memory (ReMe needs it, others don't)."""
-        if ReMePersonalLongTermMemory and isinstance(self.long_term_memory, ReMePersonalLongTermMemory):
-            return self.long_term_memory
-        return _AsyncNullContext()
 
     async def _execute_agent(self, msg):
         """Execute agent with static_control long-term memory mode.

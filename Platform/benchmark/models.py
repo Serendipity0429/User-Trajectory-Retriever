@@ -73,6 +73,7 @@ class BenchmarkSettings(models.Model):
         ('reme', 'ReMe Memory'),
     ]
     memory_type = models.CharField(max_length=50, choices=MEMORY_TYPE_CHOICES, default='naive', help_text="Select the long-term memory mechanism.")
+    agent_max_iters = models.PositiveIntegerField(default=30, validators=[MinValueValidator(1), MaxValueValidator(100)], help_text="Maximum iterations for agent reasoning loops.")
 
     def __str__(self):
         return f"Benchmark Settings ({'Template' if self.is_template else 'Run Instance'}) - {self.pk}"
@@ -121,7 +122,8 @@ class BenchmarkSettings(models.Model):
             serper_api_key=self.serper_api_key,
             search_limit=self.search_limit,
             fetch_full_content=self.fetch_full_content,
-            memory_type=self.memory_type
+            memory_type=self.memory_type,
+            agent_max_iters=self.agent_max_iters
         )
         return new_settings
 
@@ -145,7 +147,8 @@ class BenchmarkSettings(models.Model):
                 "serper_fetch_full_content": self.fetch_full_content,
             },
             "agent": {
-                "memory_type": self.memory_type
+                "memory_type": self.memory_type,
+                "max_iters": self.agent_max_iters
             }
         }
 

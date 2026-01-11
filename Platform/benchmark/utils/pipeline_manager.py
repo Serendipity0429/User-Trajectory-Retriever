@@ -1,8 +1,73 @@
 import asyncio
 import threading
 from asgiref.sync import sync_to_async
-from ..pipelines.agent import BrowserAgentPipeline
 from ..models import MultiTurnSession, MultiTurnTrial
+
+
+class PipelineRegistry:
+    """
+    Centralized registry for pipeline type mappings.
+    Eliminates scattered if-elif chains and duplicate mapping definitions.
+    """
+
+    # Lazy-loaded pipeline classes to avoid circular imports
+    _pipeline_classes = None
+
+    @classmethod
+    def _get_pipeline_classes(cls):
+        """Lazy-load pipeline classes to avoid circular imports."""
+        if cls._pipeline_classes is None:
+            from ..pipelines.vanilla import VanillaLLMMultiTurnPipeline
+            from ..pipelines.rag import RagMultiTurnPipeline
+            from ..pipelines.agent import VanillaAgentPipeline, BrowserAgentPipeline
+            cls._pipeline_classes = {
+                'vanilla_llm': VanillaLLMMultiTurnPipeline,
+                'rag': RagMultiTurnPipeline,
+                'vanilla_agent': VanillaAgentPipeline,
+                'browser_agent': BrowserAgentPipeline,
+            }
+        return cls._pipeline_classes
+
+    # Redis prefix mappings for pipeline control signals
+    REDIS_PREFIXES = {
+        'vanilla_llm': 'vanilla_llm_pipeline_active',
+        'rag': 'rag_pipeline_active',
+        'vanilla_agent': 'vanilla_agent_pipeline_active',
+        'browser_agent': 'browser_agent_pipeline_active',
+    }
+
+    # Async pipeline types (require async wrapper)
+    ASYNC_PIPELINE_TYPES = {'vanilla_agent', 'browser_agent'}
+
+    @classmethod
+    def get_pipeline_class(cls, pipeline_type):
+        """Get the pipeline class for a given type."""
+        classes = cls._get_pipeline_classes()
+        if pipeline_type not in classes:
+            raise ValueError(f"Unknown pipeline type: {pipeline_type}")
+        return classes[pipeline_type]
+
+    @classmethod
+    def get_redis_prefix(cls, pipeline_type):
+        """Get the Redis prefix for a given pipeline type."""
+        if pipeline_type not in cls.REDIS_PREFIXES:
+            raise ValueError(f"Unknown pipeline type: {pipeline_type}")
+        return cls.REDIS_PREFIXES[pipeline_type]
+
+    @classmethod
+    def is_async_pipeline(cls, pipeline_type):
+        """Check if a pipeline type requires async handling."""
+        return pipeline_type in cls.ASYNC_PIPELINE_TYPES
+
+    @classmethod
+    def get_all_types(cls):
+        """Get all registered pipeline types."""
+        return list(cls.REDIS_PREFIXES.keys())
+
+    @classmethod
+    def is_valid_type(cls, pipeline_type):
+        """Check if a pipeline type is valid."""
+        return pipeline_type in cls.REDIS_PREFIXES
 
 class PipelineManager:
     _instance = None

@@ -42,6 +42,7 @@ class PipelinePrefix:
     MULTI_TURN = "multi_turn_pipeline_active"
     VANILLA = "vanilla_llm_pipeline_active"
     RAG = "rag_pipeline_active"
+    VANILLA_AGENT = "vanilla_agent_pipeline_active"
     BROWSER_AGENT = "browser_agent_pipeline_active"
 
 

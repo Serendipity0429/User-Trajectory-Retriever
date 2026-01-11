@@ -1,8 +1,13 @@
 """
 Metrics calculation module for benchmark results.
 
-This module centralizes all metrics calculations that were previously done in the frontend,
-providing a consistent API for computing and styling benchmark metrics.
+This module is the single source of truth for all metric calculations:
+1. Per-Session Extraction: Extract metrics from trials within a session
+2. Cross-Session Aggregation: Aggregate metrics across multiple sessions
+
+Architecture:
+- extract_session_metrics(session) → Dict with per-session metrics
+- calculate_aggregate_metrics(results) → Dict with aggregated metrics for display
 
 Each metric has its own calculation function for better maintainability.
 Groups and priorities are defined here to ensure frontend consistency.
@@ -11,6 +16,7 @@ Groups and priorities are defined here to ensure frontend consistency.
 import hashlib
 from typing import List, Dict, Any, Optional
 from dataclasses import dataclass
+from difflib import SequenceMatcher
 
 
 # ==========================================
@@ -123,10 +129,10 @@ def get_metric_color(metric_name: str) -> Dict[str, str]:
 # ==========================================
 
 PIPELINE_METRIC_GROUPS: Dict[str, List[str]] = {
-    "vanilla_llm": ["core", "outcome", "efficiency", "behavioral", "dynamics"],
-    "rag": ["core", "outcome", "efficiency", "behavioral", "search", "dynamics"],
-    "vanilla_agent": ["core", "outcome", "efficiency", "behavioral", "search", "dynamics"],
-    "browser_agent": ["core", "outcome", "efficiency", "behavioral", "search", "dynamics"],
+    "vanilla_llm": ["core", "outcome", "efficiency", "behavioral", "dynamics", "token_usage"],
+    "rag": ["core", "outcome", "efficiency", "behavioral", "search", "dynamics", "token_usage"],
+    "vanilla_agent": ["core", "outcome", "efficiency", "behavioral", "search", "dynamics", "token_usage"],
+    "browser_agent": ["core", "outcome", "efficiency", "behavioral", "search", "dynamics", "token_usage"],
 }
 
 
@@ -218,6 +224,12 @@ METRIC_GROUPS: Dict[str, MetricGroup] = {
         label="Multi-Turn Dynamics",
         priority=6,
         description="Answer stability and recovery patterns"
+    ),
+    "token_usage": MetricGroup(
+        key="token_usage",
+        label="Token Usage",
+        priority=7,
+        description="LLM token consumption metrics"
     ),
 }
 
@@ -485,6 +497,40 @@ METRIC_DEFINITIONS: Dict[str, MetricDefinition] = {
         is_conditional=True,
         priority=6,
     ),
+    # Token Usage Group
+    "total_input_tokens": MetricDefinition(
+        key="total_input_tokens",
+        label="Total Input Tokens",
+        description="Total prompt tokens across all trials",
+        group="token_usage",
+        format_type="count",
+        priority=1,
+    ),
+    "total_output_tokens": MetricDefinition(
+        key="total_output_tokens",
+        label="Total Output Tokens",
+        description="Total completion tokens across all trials",
+        group="token_usage",
+        format_type="count",
+        priority=2,
+    ),
+    "total_tokens": MetricDefinition(
+        key="total_tokens",
+        label="Total Tokens",
+        description="Total tokens (input + output)",
+        group="token_usage",
+        format_type="count",
+        priority=3,
+    ),
+    "avg_tokens_per_trial": MetricDefinition(
+        key="avg_tokens_per_trial",
+        label="Avg Tokens/Trial",
+        description="Average tokens consumed per trial",
+        group="token_usage",
+        format_type="number",
+        precision=0,
+        priority=4,
+    ),
 }
 
 
@@ -517,8 +563,286 @@ def _build_metric(definition: MetricDefinition, value: float) -> Dict[str, Any]:
 
 
 # ==========================================
-# Individual Metric Calculation Functions
+# Per-Session Metric Extraction
 # ==========================================
+# These functions extract metrics from trials within a single session.
+# They are called by extract_session_metrics() to build per-session data.
+
+def _session_aggregate_token_usage(trials: list) -> Dict[str, int]:
+    """Aggregate token usage across all trials in a session."""
+    usage = {
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "total_tokens": 0,
+        "call_count": 0,
+    }
+    for trial in trials:
+        log = trial.log if hasattr(trial, 'log') else trial.get('log', {})
+        if not log:
+            continue
+        trial_usage = log.get('token_usage', {})
+        usage["input_tokens"] += trial_usage.get("input_tokens", 0)
+        usage["output_tokens"] += trial_usage.get("output_tokens", 0)
+        usage["total_tokens"] += trial_usage.get("total_tokens", 0)
+        usage["call_count"] += trial_usage.get("call_count", 0)
+    return usage
+
+
+def _session_extract_search_metrics(result: Dict, trials: list, original_question: str = None) -> None:
+    """
+    Extract search/query metrics from trial logs within a session.
+    Mutates `result` dict to add search-related fields.
+    """
+    all_queries = []
+
+    for i, trial in enumerate(trials):
+        log = trial.log if hasattr(trial, 'log') else trial.get('log', {})
+        if not log:
+            continue
+
+        # Agent pipelines store queries in search_queries
+        if 'search_queries' in log:
+            all_queries.extend(log.get('search_queries', []))
+        # RAG pipelines store single query in search_query
+        elif 'search_query' in log:
+            q = log.get('search_query')
+            if q:
+                all_queries.append(q)
+
+    if not all_queries:
+        return
+
+    # Basic metrics
+    unique_queries = set(all_queries)
+    result['search_count'] = len(all_queries)
+    result['query_uniqueness'] = len(unique_queries) / len(all_queries)
+    result['query_repetition'] = len(all_queries) - len(unique_queries)
+    result['avg_query_length'] = sum(len(q.split()) for q in all_queries) / len(all_queries)
+
+    # First query success (did first trial succeed?)
+    if trials and hasattr(trials[0], 'is_correct_llm'):
+        first_correct = trials[0].is_correct_llm
+    else:
+        first_correct = trials[0].get('is_correct_llm') if trials else None
+    if first_correct is not None:
+        result['first_query_success'] = 1 if first_correct else 0
+
+    # Query drift from original question
+    if original_question and all_queries:
+        total_drift = sum(
+            1.0 - SequenceMatcher(None, original_question.lower(), q.lower()).ratio()
+            for q in all_queries
+        )
+        result['query_drift'] = total_drift / len(all_queries)
+
+    # Query shift (consecutive query diversity)
+    if len(all_queries) > 1:
+        shifts = []
+        for i in range(len(all_queries) - 1):
+            sim = SequenceMatcher(None, all_queries[i], all_queries[i + 1]).ratio()
+            shifts.append(1.0 - sim)
+        result['query_shift'] = sum(shifts) / len(shifts)
+
+    # Query convergence (diversity trend)
+    if len(all_queries) >= 3:
+        mid = len(all_queries) // 2
+        first_half_shifts = []
+        second_half_shifts = []
+        for i in range(len(all_queries) - 1):
+            sim = SequenceMatcher(None, all_queries[i], all_queries[i + 1]).ratio()
+            shift = 1.0 - sim
+            if i < mid:
+                first_half_shifts.append(shift)
+            else:
+                second_half_shifts.append(shift)
+        if first_half_shifts and second_half_shifts:
+            first_avg = sum(first_half_shifts) / len(first_half_shifts)
+            second_avg = sum(second_half_shifts) / len(second_half_shifts)
+            result['query_convergence'] = second_avg - first_avg
+
+
+def _session_extract_dynamics_metrics(result: Dict, trials: list, ground_truths: list = None) -> None:
+    """
+    Extract multi-turn dynamics metrics from trials within a session.
+    Mutates `result` dict to add dynamics-related fields.
+    """
+    if len(trials) < 2:
+        return
+
+    # Helper to get trial attributes
+    def get_attr(trial, attr):
+        return getattr(trial, attr, None) if hasattr(trial, attr) else trial.get(attr)
+
+    answers = [get_attr(t, 'answer') for t in trials if get_attr(t, 'answer')]
+
+    # Oscillation detection (A→B→A patterns)
+    if len(answers) >= 3:
+        oscillation_count = 0
+        oscillation_opportunities = len(answers) - 2
+        for i in range(2, len(answers)):
+            sim_prev = SequenceMatcher(None, answers[i], answers[i - 1]).ratio()
+            sim_two_back = SequenceMatcher(None, answers[i], answers[i - 2]).ratio()
+            if sim_two_back > 0.6 and sim_prev < 0.4:
+                oscillation_count += 1
+        result['oscillation_count'] = oscillation_count
+        result['oscillation_opportunities'] = oscillation_opportunities
+
+    # Near-miss detection and stubbornness
+    if ground_truths:
+        near_miss_count = 0
+        incorrect_count = 0
+        stubborn_transitions = 0
+        stubborn_total = 0.0
+
+        for i, trial in enumerate(trials):
+            is_correct = get_attr(trial, 'is_correct_llm')
+            answer = get_attr(trial, 'answer')
+
+            if is_correct is False and answer:
+                incorrect_count += 1
+                # Near-miss: >50% similar to any ground truth
+                max_sim = max(
+                    SequenceMatcher(None, answer.lower().strip(), gt.lower()).ratio()
+                    for gt in ground_truths
+                ) if ground_truths else 0
+                if max_sim > 0.5:
+                    near_miss_count += 1
+
+                # Stubbornness: similarity to next answer after failure
+                if i < len(trials) - 1:
+                    next_answer = get_attr(trials[i + 1], 'answer') or ""
+                    if next_answer:
+                        stubborn_total += SequenceMatcher(None, answer, next_answer).ratio()
+                        stubborn_transitions += 1
+
+        result['near_miss_count'] = near_miss_count
+        result['incorrect_count'] = incorrect_count
+        if stubborn_transitions > 0:
+            result['stubborn_score'] = stubborn_total / stubborn_transitions
+
+    # Recovery strategy analysis
+    recovery_total = 0
+    recovery_stuck = 0
+    recovery_wasted = 0
+    recovery_random = 0
+    recovery_effective = 0
+
+    for i in range(len(trials) - 1):
+        t1, t2 = trials[i], trials[i + 1]
+        if get_attr(t1, 'is_correct_llm') is not False:
+            continue  # Only analyze after failures
+
+        a1 = get_attr(t1, 'answer') or ""
+        a2 = get_attr(t2, 'answer') or ""
+        log1 = get_attr(t1, 'log') or {}
+        log2 = get_attr(t2, 'log') or {}
+
+        # Get queries
+        q1 = " ".join(log1.get("search_queries", [])) or log1.get("search_query", "")
+        q2 = " ".join(log2.get("search_queries", [])) or log2.get("search_query", "")
+
+        if a1 and a2 and q1 and q2:
+            recovery_total += 1
+            query_change = 1 - SequenceMatcher(None, q1, q2).ratio()
+            answer_change = 1 - SequenceMatcher(None, a1, a2).ratio()
+
+            if query_change < 0.3 and answer_change < 0.3:
+                recovery_stuck += 1
+            elif query_change >= 0.3 and answer_change < 0.3:
+                recovery_wasted += 1
+            elif query_change < 0.3 and answer_change >= 0.3:
+                recovery_random += 1
+            else:
+                recovery_effective += 1
+
+    if recovery_total > 0:
+        result['recovery_total'] = recovery_total
+        result['recovery_stuck'] = recovery_stuck
+        result['recovery_wasted'] = recovery_wasted
+        result['recovery_random'] = recovery_random
+        result['recovery_effective'] = recovery_effective
+
+
+def extract_session_metrics(session) -> Dict[str, Any]:
+    """
+    Extract all metrics for a single session from its trials.
+
+    This is the main entry point for per-session metric extraction.
+    Returns a dict with all session-level metrics ready for aggregation.
+    """
+    # Helper to get attributes from ORM objects or dicts
+    def get_attr(obj, attr):
+        return getattr(obj, attr, None) if hasattr(obj, attr) else obj.get(attr) if isinstance(obj, dict) else None
+
+    # Get trials (handle both ORM objects and dicts)
+    if hasattr(session, 'trials'):
+        trials = list(session.trials.all().order_by('trial_number'))
+    else:
+        trials = session.get('trials', [])
+
+    if not trials:
+        return {
+            'session_id': get_attr(session, 'id'),
+            'question': get_attr(session, 'question'),
+            'ground_truths': get_attr(session, 'ground_truths'),
+            'trials': 0,
+        }
+
+    first_trial = trials[0]
+    last_trial = trials[-1]
+
+    result = {
+        'session_id': get_attr(session, 'id'),
+        'question': get_attr(session, 'question'),
+        'ground_truths': get_attr(session, 'ground_truths'),
+        'trials': len(trials),
+        'correct': get_attr(last_trial, 'is_correct_llm'),
+        'is_correct_llm': get_attr(last_trial, 'is_correct_llm'),
+        'is_correct_rule': get_attr(last_trial, 'is_correct_rule'),
+        'final_answer': get_attr(last_trial, 'answer'),
+        'initial_correct': get_attr(first_trial, 'is_correct_llm'),
+        'initial_correct_rule': get_attr(first_trial, 'is_correct_rule'),
+    }
+
+    # Calculate coherence (LLM vs Rule agreement)
+    completed_trials = [t for t in trials if get_attr(t, 'is_correct_llm') is not None]
+    if completed_trials:
+        matches = sum(
+            1 for t in completed_trials
+            if get_attr(t, 'is_correct_llm') == get_attr(t, 'is_correct_rule')
+        )
+        result['coherence'] = matches / len(completed_trials)
+
+    # Token usage
+    token_usage = _session_aggregate_token_usage(trials)
+    if token_usage.get('total_tokens', 0) > 0:
+        result['token_usage'] = token_usage
+
+    # Search/query metrics
+    question = get_attr(session, 'question')
+    _session_extract_search_metrics(result, trials, original_question=question)
+
+    # Dynamics metrics
+    ground_truths = get_attr(session, 'ground_truths')
+    _session_extract_dynamics_metrics(result, trials, ground_truths=ground_truths)
+
+    return result
+
+
+def extract_sessions_metrics(sessions) -> List[Dict[str, Any]]:
+    """
+    Extract metrics for multiple sessions.
+    Convenience wrapper around extract_session_metrics().
+    """
+    return [extract_session_metrics(session) for session in sessions]
+
+
+# ==========================================
+# Cross-Session Aggregate Calculation
+# ==========================================
+# These functions aggregate metrics across multiple sessions.
+# They take a list of session results (from extract_session_metrics)
+# and compute run-level statistics.
 
 def calculate_accuracy(results: List[Dict]) -> Dict[str, Any]:
     """Calculate accuracy based on LLM judge results."""
@@ -834,6 +1158,44 @@ def calculate_recovery_effective(results: List[Dict]) -> Optional[Dict[str, Any]
 
 
 # ==========================================
+# Token Usage Calculation Functions
+# ==========================================
+
+def calculate_total_input_tokens(results: List[Dict]) -> Optional[Dict[str, Any]]:
+    """Calculate total input tokens across all sessions."""
+    total = sum(r.get("token_usage", {}).get("input_tokens", 0) for r in results)
+    if total == 0:
+        return None
+    return _build_metric(METRIC_DEFINITIONS["total_input_tokens"], total)
+
+
+def calculate_total_output_tokens(results: List[Dict]) -> Optional[Dict[str, Any]]:
+    """Calculate total output tokens across all sessions."""
+    total = sum(r.get("token_usage", {}).get("output_tokens", 0) for r in results)
+    if total == 0:
+        return None
+    return _build_metric(METRIC_DEFINITIONS["total_output_tokens"], total)
+
+
+def calculate_total_tokens(results: List[Dict]) -> Optional[Dict[str, Any]]:
+    """Calculate total tokens across all sessions."""
+    total = sum(r.get("token_usage", {}).get("total_tokens", 0) for r in results)
+    if total == 0:
+        return None
+    return _build_metric(METRIC_DEFINITIONS["total_tokens"], total)
+
+
+def calculate_avg_tokens_per_trial(results: List[Dict]) -> Optional[Dict[str, Any]]:
+    """Calculate average tokens per trial across all sessions."""
+    total_tokens = sum(r.get("token_usage", {}).get("total_tokens", 0) for r in results)
+    total_trials = sum(r.get("trials", 0) for r in results)
+    if total_trials == 0:
+        return None
+    avg = total_tokens / total_trials
+    return _build_metric(METRIC_DEFINITIONS["avg_tokens_per_trial"], avg)
+
+
+# ==========================================
 # Aggregate Metrics Calculation
 # ==========================================
 
@@ -940,6 +1302,21 @@ def calculate_aggregate_metrics(results: List[Dict[str, Any]], pipeline_type: st
         recovery_effective = calculate_recovery_effective(results)
         if recovery_effective:
             metrics["recovery_effective"] = recovery_effective
+
+    # Token Usage metrics (all pipelines)
+    if "token_usage" in applicable_groups:
+        total_input = calculate_total_input_tokens(results)
+        if total_input:
+            metrics["total_input_tokens"] = total_input
+        total_output = calculate_total_output_tokens(results)
+        if total_output:
+            metrics["total_output_tokens"] = total_output
+        total_tokens = calculate_total_tokens(results)
+        if total_tokens:
+            metrics["total_tokens"] = total_tokens
+        avg_tokens = calculate_avg_tokens_per_trial(results)
+        if avg_tokens:
+            metrics["avg_tokens_per_trial"] = avg_tokens
 
     # Build summary
     summary = {

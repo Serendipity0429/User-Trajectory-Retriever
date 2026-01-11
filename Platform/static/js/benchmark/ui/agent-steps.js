@@ -5,8 +5,28 @@
 
 window.BenchmarkUI.AgentSteps = {
     _parseContent: function(str) {
-        if (typeof str !== 'string') return str;
-        try { return JSON.parse(str); } catch (e) { return null; }
+        return BenchmarkHelpers.safeJsonParse(str);
+    },
+
+    /**
+     * Parse source tags from content string
+     * Extracts structured search results from <source N>...</source N> format
+     * @param {string} content - Content containing source tags
+     * @returns {Array|null} Array of {title, snippet, content} or null if none found
+     */
+    _parseSourceTagsFromContent: function(content) {
+        if (typeof content !== 'string') return null;
+        const sourceRegex = /<source (\d+)>\s*(.*?)\n([\s\S]*?)<\/source \1>/g;
+        let match;
+        const extractedResults = [];
+        while ((match = sourceRegex.exec(content)) !== null) {
+            extractedResults.push({
+                title: match[2].trim(),
+                snippet: BenchmarkHelpers.truncateText(match[3].trim(), 300),
+                content: match[3].trim()
+            });
+        }
+        return extractedResults.length > 0 ? extractedResults : null;
     },
 
     /**
@@ -27,7 +47,7 @@ window.BenchmarkUI.AgentSteps = {
         if (role === 'user') return this._renderUserInput(content);
 
         if (typeof content === 'string') {
-            content = BenchmarkHelpers.escapeHtml(content).replace(/\n/g, '<br>');
+            content = BenchmarkHelpers.escapeAndFormatContent(content);
         }
         return BenchmarkUI.MessageBubble.create('assistant', content, '', 'bi-chat-left-dots');
     },
@@ -155,17 +175,8 @@ window.BenchmarkUI.AgentSteps = {
             const extractedJson = JSON.parse(displayContent);
             if (Array.isArray(extractedJson)) return extractedJson;
         } catch (e) {
-            const sourceRegex = /<source (\d+)>\s*(.*?)\n([\s\S]*?)<\/source \1>/g;
-            let match;
-            const extractedResults = [];
-            while ((match = sourceRegex.exec(displayContent)) !== null) {
-                extractedResults.push({
-                    title: match[2].trim(),
-                    snippet: match[3].trim().substring(0, 300) + (match[3].length > 300 ? '...' : ''),
-                    content: match[3].trim()
-                });
-            }
-            if (extractedResults.length > 0) return extractedResults;
+            // Try parsing source tags format
+            return this._parseSourceTagsFromContent(displayContent);
         }
         return null;
     },
@@ -182,35 +193,20 @@ window.BenchmarkUI.AgentSteps = {
             console.error('Failed to render system prompt template:', e);
         }
         // Fallback: render as simple text if template fails
-        const escapedContent = BenchmarkHelpers.escapeHtml(content).replace(/\n/g, '<br>');
+        const escapedContent = BenchmarkHelpers.escapeAndFormatContent(content);
         const fallbackHtml = `<div><div class="d-flex align-items-center mb-2 pb-2 border-bottom border-secondary border-opacity-25"><i class="bi bi-gear text-secondary me-2"></i><span class="text-uppercase fw-bold text-secondary small">System Prompt</span></div><div class="font-monospace text-muted small" style="white-space: pre-wrap;">${escapedContent}</div></div>`;
         return BenchmarkUI.MessageBubble.create('system', fallbackHtml, 'bg-light border-secondary border-opacity-10 shadow-none');
     },
 
     _renderUserInput: function(content) {
         if (typeof content === 'string' && content.includes('<source')) {
-            const sourceRegex = /<source (\d+)>\s*(.*?)\n([\s\S]*?)<\/source \1>/g;
-            let match;
-            const extractedResults = [];
-            while ((match = sourceRegex.exec(content)) !== null) {
-                extractedResults.push({
-                    title: match[2].trim(),
-                    snippet: match[3].trim().substring(0, 300) + (match[3].length > 300 ? '...' : ''),
-                    content: match[3].trim()
-                });
-            }
+            const extractedResults = this._parseSourceTagsFromContent(content);
 
-            if (extractedResults.length > 0) {
-                const dataId = 'search-data-' + Math.random().toString(36).substr(2, 9);
-
-                // Store data globally for onclick access
-                window._benchmarkSearchData = window._benchmarkSearchData || {};
-                window._benchmarkSearchData[dataId] = extractedResults;
-
+            if (extractedResults) {
                 const injection = BenchmarkUtils.renderTemplate('tpl-user-search-injection', {
                     '.docs-count-text': { text: `${extractedResults.length} search results` },
                     '.view-search-results-btn': {
-                        attrs: { onclick: `window.BenchmarkUI.SearchResults.showInModal(window._benchmarkSearchData['${dataId}'])` }
+                        attrs: { onclick: BenchmarkHelpers.storeSearchData(extractedResults) }
                     }
                 });
 
@@ -224,6 +220,6 @@ window.BenchmarkUI.AgentSteps = {
                 return BenchmarkUI.MessageBubble.create('user', displayContent);
             }
         }
-        return BenchmarkUI.MessageBubble.create('user', BenchmarkHelpers.escapeHtml(content).replace(/\n/g, '<br>'));
+        return BenchmarkUI.MessageBubble.create('user', BenchmarkHelpers.escapeAndFormatContent(content));
     }
 };

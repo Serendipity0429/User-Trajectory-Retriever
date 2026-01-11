@@ -656,7 +656,7 @@ window.BenchmarkUtils.MultiTurnPage = (function() {
         });
     }
 
-    function initExports(csvPrefix) {
+    function initExports() {
         document.getElementById('export-session-json-btn')?.addEventListener('click', () => {
             if (activeSessionId) window.location.href = BenchmarkUrls.multiTurn.exportSession(activeSessionId) + '?format=json';
         });
@@ -667,22 +667,12 @@ window.BenchmarkUtils.MultiTurnPage = (function() {
             if (activeGroupId) window.location.href = BenchmarkUrls.multiTurn.exportRun(activeGroupId);
             else alert("No run loaded to export.");
         });
-        document.getElementById('export-results-btn')?.addEventListener('click', () => {
-            BenchmarkExport.exportToCSV(currentPipelineResults, csvPrefix,
-                ["#", "Question", "Final Answer", "Ground Truths", "Result", "Trials"],
-                (result, index) => [
-                    index + 1, result.question, result.final_answer || 'N/A',
-                    Array.isArray(result.ground_truths) ? result.ground_truths.join('; ') : result.ground_truths,
-                    result.correct === true ? 'Correct' : (result.correct === false ? 'Incorrect' : 'Error'),
-                    result.trials
-                ]);
-        });
     }
 
     // === Public API ===
     return {
         init: function(config) {
-            const { pipelineType, csvPrefix = 'multiturn-results', questionsDataId = 'questions-data', buildFormData } = config;
+            const { pipelineType, questionsDataId = 'questions-data', buildFormData } = config;
 
             currentRunPipelineType = pipelineType;
             if (buildFormData) window.buildPipelineFormData = buildFormData;
@@ -696,7 +686,7 @@ window.BenchmarkUtils.MultiTurnPage = (function() {
             initPipelineControls(pipelineType);
             initSessionListHandlers(pipelineType);
             initRetryAndDelete(pipelineType);
-            initExports(csvPrefix);
+            initExports();
         },
 
         startPolling: startPolling,

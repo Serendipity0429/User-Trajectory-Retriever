@@ -228,6 +228,16 @@
                                 </div>
                             </div>
                         </div>
+                        <div class="card border-0 shadow-sm">
+                            <div class="card-body bg-light rounded-3">
+                                <h6 class="text-primary fw-bold mb-3"><i class="bi bi-gear me-2"></i>Agent Behavior</h6>
+                                <div class="mb-3">
+                                    <label for="agent_max_iters" class="form-label small text-muted fw-bold">Max Iterations</label>
+                                    <input type="number" class="form-control form-control-sm" id="agent_max_iters" min="1" max="100" value="{{ agent_settings.agent_max_iters|default:30 }}">
+                                    <div class="form-text small text-muted mt-2"><i class="bi bi-info-circle me-1"></i> Maximum reasoning loop iterations before the agent stops.</div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>

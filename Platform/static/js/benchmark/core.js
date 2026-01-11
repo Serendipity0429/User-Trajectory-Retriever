@@ -4,7 +4,7 @@
  *
  * Dependencies (loaded via separate script tags):
  * - config/urls.js, config/state.js, config/pipeline-config.js
- * - utils/helpers.js, utils/api.js, utils/export.js, utils/settings.js
+ * - utils/helpers.js, utils/api.js, utils/settings.js
  * - utils/batch_selection.js, utils/session_ui.js, utils/pipeline_runner.js
  */
 
@@ -63,44 +63,48 @@ window.BenchmarkUtils = {
     },
 
     /**
-     * Create a styled metric card (legacy, uses Bootstrap color names).
-     * @param {object} config - { value, label, description, color }
+     * Create a styled metric card.
+     * Supports both Bootstrap color classes (legacy) and dynamic colors from API.
+     *
+     * @param {object} config - Metric configuration
+     * @param {string} config.value|config.formatted - The value to display
+     * @param {string} config.label - The metric label
+     * @param {string} config.description - The metric description
+     * @param {string|object} config.color - Either a Bootstrap color name (string) or
+     *                                       an object { border, text, bg } for dynamic colors
      * @returns {HTMLElement} The metric card element
      */
     createMetricCard: function(config) {
         const col = document.createElement('div');
         col.className = 'col-lg-3 col-md-6';
-        col.innerHTML = `
-            <div class="metric-card border-top-${config.color}">
-                <div class="card-body">
-                    <div class="metric-label">${config.label}</div>
-                    <div class="metric-value text-${config.color}-emphasis">${config.value}</div>
-                    <div class="small text-muted">${config.description}</div>
-                </div>
-            </div>`;
-        return col;
-    },
 
-    /**
-     * Create a styled metric card with dynamic colors from API.
-     * Uses inline styles for consistent color rendering based on metric name hash.
-     * @param {object} metric - Metric object from API with { formatted, label, description, color }
-     * @returns {HTMLElement} The metric card element
-     */
-    createMetricCardWithColor: function(metric) {
-        const col = document.createElement('div');
-        col.className = 'col-lg-3 col-md-6';
+        const value = config.formatted || config.value;
+        const color = config.color;
 
-        const color = metric.color || { border: '#6c757d', text: '#495057', bg: '#f8f9fa' };
-
-        col.innerHTML = `
-            <div class="metric-card" style="border-top: 4px solid ${color.border}; background: ${color.bg};">
-                <div class="card-body">
-                    <div class="metric-label" style="color: ${color.text};">${metric.label}</div>
-                    <div class="metric-value" style="color: ${color.text};">${metric.formatted}</div>
-                    <div class="small text-muted">${metric.description}</div>
-                </div>
-            </div>`;
+        // Check if color is a dynamic object or Bootstrap class name
+        if (color && typeof color === 'object') {
+            // Dynamic colors from API
+            const colorObj = { border: '#6c757d', text: '#495057', bg: '#f8f9fa', ...color };
+            col.innerHTML = `
+                <div class="metric-card" style="border-top: 4px solid ${colorObj.border}; background: ${colorObj.bg};">
+                    <div class="card-body">
+                        <div class="metric-label" style="color: ${colorObj.text};">${config.label}</div>
+                        <div class="metric-value" style="color: ${colorObj.text};">${value}</div>
+                        <div class="small text-muted">${config.description}</div>
+                    </div>
+                </div>`;
+        } else {
+            // Bootstrap color class (legacy)
+            const colorClass = color || 'secondary';
+            col.innerHTML = `
+                <div class="metric-card border-top-${colorClass}">
+                    <div class="card-body">
+                        <div class="metric-label">${config.label}</div>
+                        <div class="metric-value text-${colorClass}-emphasis">${value}</div>
+                        <div class="small text-muted">${config.description}</div>
+                    </div>
+                </div>`;
+        }
         return col;
     }
 };

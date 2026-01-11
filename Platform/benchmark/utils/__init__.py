@@ -5,7 +5,6 @@ Consolidates all utility functions and classes for the benchmark app.
 
 # Re-export from submodules for convenient imports
 from .redis import RedisKeys, PipelinePrefix, clear_trial_cache
-from .config import PipelineConfig
 from .trace_formatter import TraceFormatter, SimpleMsg
 from .prompts import PROMPTS
 from .text import count_questions_in_file, extract_final_answer, extract_query, ensure_system_prompt
@@ -18,15 +17,33 @@ from .django import (
 )
 from .search import get_search_engine, WebCrawler
 from .agent import VanillaAgentFactory, BrowserAgentFactory
+from .pipeline_manager import PipelineRegistry
 from .metadata import (
     get_pipeline_category,
     is_rag_pipeline,
     is_agent_pipeline,
     is_vanilla_pipeline,
     format_trial_for_export,
+    format_trials_for_export,
     format_session_for_export,
     format_trial_metadata,
     apply_trial_metadata,
+)
+from .metrics import (
+    extract_session_metrics,
+    extract_sessions_metrics,
+    calculate_aggregate_metrics,
+)
+from .import_export import (
+    EXPORT_VERSION,
+    generate_checksum,
+    validate_checksum,
+    enhance_export_data,
+    validate_import_data,
+    import_session,
+    import_run,
+    auto_import,
+    ImportValidationError,
 )
 
 # Re-export print_debug for convenience
@@ -37,8 +54,6 @@ __all__ = [
     'RedisKeys',
     'PipelinePrefix',
     'clear_trial_cache',
-    # Config
-    'PipelineConfig',
     # Trace
     'TraceFormatter',
     'SimpleMsg',
@@ -61,15 +76,32 @@ __all__ = [
     # Agent
     'VanillaAgentFactory',
     'BrowserAgentFactory',
-    # Metadata
+    # Pipeline Registry
+    'PipelineRegistry',
+    # Metadata (formatting/export)
     'get_pipeline_category',
     'is_rag_pipeline',
     'is_agent_pipeline',
     'is_vanilla_pipeline',
     'format_trial_for_export',
+    'format_trials_for_export',
     'format_session_for_export',
     'format_trial_metadata',
     'apply_trial_metadata',
+    # Metrics (calculations)
+    'extract_session_metrics',
+    'extract_sessions_metrics',
+    'calculate_aggregate_metrics',
+    # Import/Export
+    'EXPORT_VERSION',
+    'generate_checksum',
+    'validate_checksum',
+    'enhance_export_data',
+    'validate_import_data',
+    'import_session',
+    'import_run',
+    'auto_import',
+    'ImportValidationError',
     # Debug
     'print_debug',
 ]

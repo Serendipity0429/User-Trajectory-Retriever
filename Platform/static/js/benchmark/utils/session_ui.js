@@ -365,14 +365,6 @@ window.BenchmarkSessionUI._renderAllMetricsFromAPI = function(metrics, groups, s
  * @private
  */
 window.BenchmarkSessionUI._createMetricCardElement = function(metric, groupKey) {
-    return BenchmarkUtils.createMetricCardWithColor(metric);
+    return BenchmarkUtils.createMetricCard(metric);
 };
 
-/**
- * Helper to set element text content
- * @private
- */
-window.BenchmarkSessionUI._setElementText = function(id, text) {
-    const el = document.getElementById(id);
-    if (el) el.textContent = text;
-};

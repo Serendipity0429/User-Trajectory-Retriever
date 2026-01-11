@@ -34,6 +34,7 @@ window.BenchmarkSettingsConfig = {
             sources: ['agent'],
             fields: [
                 { key: 'memory_type', label: 'Agent Memory', icon: 'bi-memory', map: { 'naive': 'Naive Memory', 'mem0': 'Mem0 Memory', 'reme': 'ReMe Memory' }, domId: 'agent_memory_type' },
+                { key: 'max_iters', label: 'Max Iterations', icon: 'bi-arrow-repeat', domId: 'agent_max_iters' },
                 { key: 'model_name', label: 'Agent Model', icon: 'bi-robot' }
             ]
         }

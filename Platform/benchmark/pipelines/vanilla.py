@@ -1,7 +1,7 @@
 from datetime import datetime
 from task_manager.utils import check_answer_rule, check_answer_llm
-from ..utils import PROMPTS, clear_trial_cache
-from ..models import MultiTurnSession, MultiTurnTrial
+from ..utils import PROMPTS
+from ..models import MultiTurnSession
 from .base import (
     BaseMultiTurnPipeline,
     REDIS_PREFIX_VANILLA_MULTI_TURN
@@ -19,20 +19,10 @@ class VanillaLLMMultiTurnPipeline(BaseMultiTurnPipeline):
         return MultiTurnSession.objects.create(
             question=question_text,
             ground_truths=ground_truths,
-            run=group, 
+            run=group,
             run_tag=self.pipeline_id,
             pipeline_type='vanilla_llm'
         )
-
-    def create_trial(self, session, trial_number):
-        trial = MultiTurnTrial.objects.create(
-            session=session,
-            trial_number=trial_number,
-            status='processing'
-        )
-        # Clear any stale Redis cache for this trial ID (prevents data leakage from reused IDs)
-        clear_trial_cache(trial.id)
-        return trial
 
     def _construct_messages(self, session, trial, completed_trials):
         messages = []

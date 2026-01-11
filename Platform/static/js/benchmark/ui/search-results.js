@@ -5,10 +5,21 @@
 
 window.BenchmarkUI.SearchResults = {
     /**
+     * Create an alert div with specified type and message
+     * @private
+     */
+    _createAlert: function(type, message) {
+        const alertDiv = document.createElement('div');
+        alertDiv.className = `alert alert-${type}`;
+        alertDiv.textContent = message;
+        return alertDiv;
+    },
+
+    /**
      * Render search results into a list element
      */
     render: function(results, resultsListElement) {
-        resultsListElement.innerHTML = '';
+        BenchmarkHelpers.clearElement(resultsListElement);
         if (results && results.length > 0) {
             results.forEach((res, index) => {
                 const item = BenchmarkUtils.renderTemplate('tpl-search-result-item', {
@@ -28,22 +39,16 @@ window.BenchmarkUI.SearchResults = {
      * Render empty state for no results
      */
     renderEmpty: function(resultsListElement) {
-        resultsListElement.innerHTML = '';
-        const alertDiv = document.createElement('div');
-        alertDiv.className = 'alert alert-info';
-        alertDiv.textContent = 'No results found.';
-        resultsListElement.appendChild(alertDiv);
+        BenchmarkHelpers.clearElement(resultsListElement);
+        resultsListElement.appendChild(this._createAlert('info', 'No results found.'));
     },
 
     /**
      * Render error state for search
      */
     renderError: function(resultsListElement, errorMessage) {
-        resultsListElement.innerHTML = '';
-        const alertDiv = document.createElement('div');
-        alertDiv.className = 'alert alert-danger';
-        alertDiv.textContent = errorMessage;
-        resultsListElement.appendChild(alertDiv);
+        BenchmarkHelpers.clearElement(resultsListElement);
+        resultsListElement.appendChild(this._createAlert('danger', errorMessage));
     },
 
     /**
@@ -52,7 +57,7 @@ window.BenchmarkUI.SearchResults = {
     renderModal: function(results, container, modalId = 'benchmarkGenericModal') {
         const modalTitle = document.getElementById(modalId + 'Label');
         if (modalTitle) modalTitle.textContent = 'Search Results';
-        container.innerHTML = '';
+        BenchmarkHelpers.clearElement(container);
 
         if (results && results.length > 0) {
             results.forEach((res, idx) => {
@@ -81,7 +86,7 @@ window.BenchmarkUI.SearchResults = {
 
                 // Handle Full Content Collapse
                 if (fullContent && fullContent !== snippet) {
-                    const collapseId = `content-collapse-${idx}-${Math.random().toString(36).substr(2, 9)}`;
+                    const collapseId = `content-collapse-${idx}-${Math.random().toString(36).substring(2, 11)}`;
                     const contentContainer = itemElement.querySelector('.content-container');
                     const toggleBtn = itemElement.querySelector('.toggle-content-btn');
                     const collapseDiv = itemElement.querySelector('.content-collapse');
@@ -123,6 +128,6 @@ window.BenchmarkUI.SearchResults = {
         if (!container) return;
 
         this.renderModal(results, container, modalId);
-        bootstrap.Modal.getOrCreateInstance(document.getElementById(modalId)).show();
+        BenchmarkHelpers.showModal(modalId);
     }
 };

@@ -43,8 +43,14 @@ window.BenchmarkSessionUI.renderSession = function(session, trials, options = {}
         const existing = document.getElementById(`trial-${trial.id}`);
         const needsDivider = idx < trials.length - 1;
         const hasDivider = existing?.parentElement !== trialsContainer; // wrapped in container = has divider
-        // Skip only if completed AND divider state unchanged
-        if (existing && trial.status === 'completed' && needsDivider === hasDivider) return;
+        // Skip if completed or processing AND divider state unchanged (processing trials are updated via polling)
+        if (existing && (trial.status === 'completed' || trial.status === 'processing') && needsDivider === hasDivider) {
+            // For processing trials, ensure polling is still running (in case page was reloaded)
+            if (trial.status === 'processing' && window.BenchmarkUtils?.MultiTurnPage?.startPolling) {
+                window.BenchmarkUtils.MultiTurnPage.startPolling(trial.id, pipelineType);
+            }
+            return;
+        }
         // Remove existing (and its container if any)
         if (existing) {
             const toRemove = existing.parentElement === trialsContainer ? existing : existing.parentElement;

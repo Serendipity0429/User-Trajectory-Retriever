@@ -77,21 +77,33 @@ class RagMultiTurnPipeline(BaseMultiTurnPipeline):
         with TrialGuard(trial):
             allow_reasoning = session.run.settings.allow_reasoning if session.run and session.run.settings else False
 
-            # Build base history from past trials
+            # Build base history from past trials (same pattern as vanilla_llm)
+            if completed_trials is None:
+                completed_trials = list(session.trials.filter(
+                    trial_number__lt=trial.trial_number,
+                    status='completed'
+                ).order_by('trial_number'))
             history = self._construct_messages(session, trial, completed_trials)
 
             trial.log = trial.log or {}
             turn_messages = []  # Messages added during this turn
 
-            # Helper for trace updates
-            def build_trace_msgs(all_messages):
+            # Extract system prompt for trace (same pattern as vanilla_llm)
+            system_prompt = history[0].get('content', '') if history and history[0].get('role') == 'system' else ''
+
+            # Helper for trace updates - includes system prompt + current turn messages
+            def build_trace_msgs(messages):
                 trace_msgs = []
-                for m in all_messages:
+                for m in messages:
                     trace_msgs.append(SimpleMsg(m["role"], m["content"]))
                 return trace_msgs
 
-            def update_redis_trace(all_messages):
-                trace_msgs = build_trace_msgs(all_messages)
+            def update_redis_trace(current_turn_messages):
+                # Include system prompt + current turn messages (matches vanilla_llm pattern)
+                trace_msgs = []
+                if system_prompt:
+                    trace_msgs.append(SimpleMsg("system", system_prompt))
+                trace_msgs.extend(build_trace_msgs(current_turn_messages))
                 trace_data, _ = TraceFormatter.serialize(trace_msgs)
                 redis_client.set(RedisKeys.trial_trace(trial.id), json.dumps(trace_data), ex=RedisKeys.DEFAULT_TTL)
 
@@ -138,11 +150,11 @@ class RagMultiTurnPipeline(BaseMultiTurnPipeline):
             results_msg = {"role": "user", "content": results_instruction}
             turn_messages.append(results_msg)
 
-            # Build full message list for answer generation
+            # Build full message list for answer generation (includes history for LLM context)
             answer_messages = history + turn_messages
 
-            # Update trace before streaming
-            update_redis_trace(answer_messages)
+            # Update trace before streaming (only current turn's messages)
+            update_redis_trace(turn_messages)
 
             # Stream the answer (track token usage)
             full_response = ""
@@ -153,13 +165,13 @@ class RagMultiTurnPipeline(BaseMultiTurnPipeline):
                     trial_usage = self._accumulate_usage(trial_usage, usage, "answer_synthesis")
                 chunk_count += 1
                 if chunk_count % 5 == 0:
-                    update_redis_trace(answer_messages + [{"role": "assistant", "content": full_response}])
+                    # Show current turn messages + streaming response
+                    update_redis_trace(turn_messages + [{"role": "assistant", "content": full_response}])
 
-            # Final trace update
+            # Final trace update (current turn only)
             assistant_msg = {"role": "assistant", "content": full_response}
             turn_messages.append(assistant_msg)
-            final_messages = history + turn_messages
-            update_redis_trace(final_messages)
+            update_redis_trace(turn_messages)
 
             # Extract answer
             if allow_reasoning:
@@ -177,17 +189,24 @@ class RagMultiTurnPipeline(BaseMultiTurnPipeline):
             trial.feedback = "Correct" if is_correct_llm else "Incorrect"
             trial.status = 'completed'
 
-            # Store only this turn's messages (not full history) for clean reconstruction
-            trial.log["messages"] = turn_messages
+            # Store system prompt + this turn's messages (matches vanilla_llm pattern for DB reconstruction)
+            trial_messages = []
+            if system_prompt:
+                trial_messages.append({"role": "system", "content": system_prompt})
+            trial_messages.extend(turn_messages)
+            trial.log["messages"] = trial_messages
             trial.log["meta"] = self._get_trial_meta(trial)
             # Store token usage
             if trial_usage:
                 trial.log["token_usage"] = trial_usage
             trial.save()
 
-            # Cache status for UI
+            # Cache status for UI (system prompt + current turn's messages)
             try:
-                trace_msgs = build_trace_msgs(final_messages)
+                trace_msgs = []
+                if system_prompt:
+                    trace_msgs.append(SimpleMsg("system", system_prompt))
+                trace_msgs.extend(build_trace_msgs(turn_messages))
                 trace, _ = TraceFormatter.serialize(trace_msgs)
                 status_data = {
                     "id": trial.id, "status": "completed", "answer": answer, "feedback": trial.feedback,

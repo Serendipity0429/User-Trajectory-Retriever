@@ -9,7 +9,8 @@ from task_manager.utils import redis_client, check_answer_rule, check_answer_llm
 from ..utils import (
     print_debug, extract_final_answer, count_questions_in_file,
     TrialGuard, RedisKeys, PipelinePrefix,
-    TraceFormatter, SimpleMsg, PROMPTS, clear_trial_cache
+    TraceFormatter, SimpleMsg, PROMPTS, clear_trial_cache,
+    extract_session_metrics
 )
 from ..models import (
     BenchmarkSettings, BenchmarkDataset,
@@ -431,13 +432,16 @@ class BaseMultiTurnPipeline(BasePipeline):
                 # Success or exhausted retries - mark completed
                 session.is_completed = True
                 session.save()
-                yield {
-                    'question': question_text, 'is_correct_llm': final_is_correct_llm,
-                    'is_correct_rule': final_is_correct_llm_rule,
-                    'trials': total_trials, 'session_id': session.id, 'final_answer': final_answer,
-                    'ground_truths': ground_truths, 'max_retries': self.max_retries,
-                    'group_name': group.name, 'group_id': group.id
-                }
+                # Refresh session to get updated trials for full metrics
+                session.refresh_from_db()
+                # Extract full session metrics for live dashboard display
+                enriched = extract_session_metrics(session)
+                enriched.update({
+                    'max_retries': self.max_retries,
+                    'group_name': group.name,
+                    'group_id': group.id
+                })
+                yield enriched
 
         except Exception as e:
             yield {'error': str(e), 'question': question_text, 'session_id': session.id if 'session' in locals() else None}
@@ -823,13 +827,16 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
                     # Success or exhausted retries - mark completed
                     session.is_completed = True
                     await sync_to_async(session.save)()
-                    yield {
-                        'question': question_text, 'is_correct_llm': final_is_correct_llm,
-                        'is_correct_rule': final_is_correct_llm_rule,
-                        'trials': total_trials, 'session_id': session.id, 'final_answer': final_answer,
-                        'ground_truths': ground_truths, 'max_retries': self.max_retries,
-                        'group_name': group.name, 'group_id': group.id
-                    }
+                    # Refresh session to get updated trials for full metrics
+                    await sync_to_async(session.refresh_from_db)()
+                    # Extract full session metrics for live dashboard display
+                    enriched = await sync_to_async(extract_session_metrics)(session)
+                    enriched.update({
+                        'max_retries': self.max_retries,
+                        'group_name': group.name,
+                        'group_id': group.id
+                    })
+                    yield enriched
             finally:
                 # Session lifecycle: cleanup resources (e.g., browser instance)
                 await self._on_session_end(session)

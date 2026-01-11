@@ -30,17 +30,20 @@ def calculate_task_success_metrics(task_queryset=None):
 
     Args:
         task_queryset: Optional queryset of tasks to analyze.
-                       If None, uses all valid completed (non-cancelled) tasks.
+                       If None, uses all valid finished tasks (both completed and cancelled).
 
     Returns:
         dict with success rates, counts, and timing metrics.
+        Note: Cancelled tasks count as failures in success rate calculation.
     """
     if task_queryset is None:
-        task_queryset = Task.valid_objects.filter(active=False, cancelled=False)
+        # Include ALL finished tasks - cancelled ones count as failures
+        task_queryset = Task.valid_objects.filter(active=False)
 
     tasks = task_queryset.prefetch_related('tasktrial_set')
 
-    total_completed = 0
+    total_finished = 0
+    total_cancelled = 0
     successful_count = 0
     first_try_success_count = 0
     self_corrected_count = 0
@@ -49,42 +52,51 @@ def calculate_task_success_metrics(task_queryset=None):
     tasks_with_time = 0
 
     for task in tasks:
-        total_completed += 1
+        total_finished += 1
         trials = list(task.tasktrial_set.all().order_by('start_timestamp'))
 
         if trials:
             total_trials += len(trials)
-            has_success = False
-            first_trial_correct = False
 
-            for idx, trial in enumerate(trials):
-                if trial.is_correct:
-                    has_success = True
-                    if idx == 0:
-                        first_trial_correct = True
-                    break
+        # Cancelled tasks count as failures
+        if task.cancelled:
+            total_cancelled += 1
+            continue
 
-            if has_success:
-                successful_count += 1
-                if first_trial_correct:
-                    first_try_success_count += 1
-                else:
-                    self_corrected_count += 1
+        # Check for success in non-cancelled tasks
+        has_success = False
+        first_trial_correct = False
+
+        for idx, trial in enumerate(trials):
+            if trial.is_correct:
+                has_success = True
+                if idx == 0:
+                    first_trial_correct = True
+                break
+
+        if has_success:
+            successful_count += 1
+            if first_trial_correct:
+                first_try_success_count += 1
+            else:
+                self_corrected_count += 1
 
         if task.end_timestamp and task.start_timestamp:
             duration = (task.end_timestamp - task.start_timestamp).total_seconds()
             total_time_seconds += duration
             tasks_with_time += 1
 
-    total_cancelled = Task.valid_objects.filter(active=False, cancelled=True).count()
-
-    success_rate = (successful_count / total_completed * 100) if total_completed > 0 else 0
+    # Success rate: successful / all finished (cancelled = failures)
+    success_rate = (successful_count / total_finished * 100) if total_finished > 0 else 0
     first_try_success_rate = (first_try_success_count / successful_count * 100) if successful_count > 0 else 0
     self_correction_rate = (self_corrected_count / successful_count * 100) if successful_count > 0 else 0
-    avg_trials = total_trials / total_completed if total_completed > 0 else 0
+    avg_trials = total_trials / total_finished if total_finished > 0 else 0
     avg_time_seconds = total_time_seconds / tasks_with_time if tasks_with_time > 0 else None
 
+    total_completed = total_finished - total_cancelled  # Non-cancelled finished tasks
+
     return {
+        'total_finished': total_finished,
         'total_completed': total_completed,
         'total_cancelled': total_cancelled,
         'successful_count': successful_count,
@@ -98,49 +110,146 @@ def calculate_task_success_metrics(task_queryset=None):
     }
 
 
-def get_human_baseline_for_leaderboard():
+def _get_per_user_task_stats(num_questions, min_completion_ratio=0.9):
     """
-    Get human baseline metrics formatted for the benchmark leaderboard.
+    Calculate per-user task statistics for users who completed >= min_completion_ratio of tasks.
 
-    Note: Finished tasks include both completed and cancelled tasks.
-    Cancelled tasks are counted as failures.
+    Returns:
+        List of dicts with accuracy, avg_trials, successful, finished for each qualifying user.
     """
-    metrics = calculate_task_success_metrics()
+    all_tasks = Task.valid_objects.filter(active=False).prefetch_related('tasktrial_set')
+    user_stats = defaultdict(lambda: {'finished': 0, 'successful': 0, 'total_trials': 0})
 
-    # Total finished = completed (successful + unsuccessful) + cancelled
-    total_finished = metrics['total_completed'] + metrics['total_cancelled']
+    for task in all_tasks:
+        user_id = task.user_id
+        user_stats[user_id]['finished'] += 1
+        trials = list(task.tasktrial_set.all())
+        user_stats[user_id]['total_trials'] += len(trials)
+
+        if not task.cancelled:
+            for trial in trials:
+                if trial.is_correct:
+                    user_stats[user_id]['successful'] += 1
+                    break
+
+    # Filter to users who completed >= 90% of tasks
+    min_tasks = int(num_questions * min_completion_ratio)
+    user_data = []
+    for user_id, stats in user_stats.items():
+        if stats['finished'] >= min_tasks:
+            user_data.append({
+                'accuracy': (stats['successful'] / stats['finished']) * 100,
+                'avg_trials': stats['total_trials'] / stats['finished'],
+                'successful': stats['successful'],
+                'finished': stats['finished'],
+            })
+
+    return user_data
+
+
+def _get_task_based_stats():
+    """Calculate task-based statistics across ALL finished tasks."""
+    all_tasks = Task.valid_objects.filter(active=False).prefetch_related('tasktrial_set')
+
+    total_finished = 0
+    total_successful = 0
+    total_trials = 0
+
+    for task in all_tasks:
+        total_finished += 1
+        trials = list(task.tasktrial_set.all())
+        total_trials += len(trials)
+
+        if not task.cancelled:
+            for trial in trials:
+                if trial.is_correct:
+                    total_successful += 1
+                    break
 
     if total_finished == 0:
         return None
 
-    # Accuracy based on all finished tasks (cancelled = failed)
-    accuracy = (metrics['successful_count'] / total_finished * 100) if total_finished > 0 else 0
-
-    # Incorrect = unsuccessful completed + all cancelled
-    incorrect_count = (metrics['total_completed'] - metrics['successful_count']) + metrics['total_cancelled']
-
     return {
-        'run_id': 'human_baseline',
-        'name': 'Human Participants',
+        'accuracy': (total_successful / total_finished) * 100,
+        'avg_trials': total_trials / total_finished,
+        'successful': total_successful,
+        'finished': total_finished,
+    }
+
+
+def _make_human_baseline_entry(run_id, name, model, num_questions, accuracy, avg_trials, correct_count, user_count=None):
+    """Create a human baseline leaderboard entry."""
+    entry = {
+        'run_id': run_id,
+        'name': name,
         'created_at': None,
         'pipeline_type': 'human',
-        'model': 'Human',
-        'session_count': total_finished,
+        'model': model,
+        'session_count': num_questions,
         'accuracy': round(accuracy, 1),
         'rule_accuracy': round(accuracy, 1),
-        'avg_trials': metrics['avg_trials'],
+        'avg_trials': round(avg_trials, 2),
         'total_tokens': 0,
-        'correct_count': metrics['successful_count'],
-        'incorrect_count': incorrect_count,
+        'correct_count': correct_count,
+        'incorrect_count': num_questions - correct_count,
         'error_count': 0,
         'is_complete': True,
         'is_human': True,
-        'metrics': {
-            'first_try_rate': metrics['first_try_success_rate'],
-            'self_correction_rate': metrics['self_correction_rate'],
-            'avg_time_seconds': metrics['avg_time_seconds'],
-        },
     }
+    if user_count is not None:
+        entry['user_count'] = user_count
+    return entry
+
+
+def get_human_baseline_for_leaderboard():
+    """
+    Get human baseline metrics formatted for the benchmark leaderboard.
+
+    Returns:
+    - Average Human Performance: Task-based accuracy across ALL finished tasks
+    - Best/Worst Human Performance: Per-user accuracy for users who completed ≥90% of tasks
+    """
+    from benchmark.models import BenchmarkDataset
+
+    # Get question count from active dataset
+    active_dataset = BenchmarkDataset.objects.filter(is_active=True).first()
+    if not active_dataset:
+        return []
+    num_questions = active_dataset.question_count
+
+    entries = []
+
+    # Task-based average (across ALL tasks)
+    task_stats = _get_task_based_stats()
+    if task_stats:
+        entries.append(_make_human_baseline_entry(
+            'human_avg', 'Average Human Performance',
+            f'{task_stats["finished"]} tasks', num_questions,
+            task_stats['accuracy'], task_stats['avg_trials'],
+            task_stats['successful']
+        ))
+
+    # User-based best/worst (users who completed ≥90% of tasks)
+    user_data = _get_per_user_task_stats(num_questions, min_completion_ratio=0.9)
+    if user_data:
+        user_data_sorted = sorted(user_data, key=lambda x: x['accuracy'], reverse=True)
+        best_user, worst_user = user_data_sorted[0], user_data_sorted[-1]
+        user_count = len(user_data)
+
+        entries.append(_make_human_baseline_entry(
+            'human_best', 'Best Human Performance',
+            f'from {user_count} users (≥90% tasks)', num_questions,
+            best_user['accuracy'], best_user['avg_trials'],
+            best_user['successful'], user_count
+        ))
+        entries.append(_make_human_baseline_entry(
+            'human_worst', 'Worst Human Performance',
+            f'from {user_count} users (≥90% tasks)', num_questions,
+            worst_user['accuracy'], worst_user['avg_trials'],
+            worst_user['successful'], user_count
+        ))
+
+    return entries
 
 
 # =============================================================================

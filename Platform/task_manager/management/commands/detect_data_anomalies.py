@@ -107,7 +107,7 @@ class Command(BaseCommand):
             if problematic_tasks:
                 self.stdout.write(self.style.MIGRATE_HEADING(f"\nDeleting {len(problematic_tasks)} problematic tasks..."))
                 deleted_count, _ = Task.objects.filter(id__in=problematic_tasks).delete()
-                self.stdout.write(self.style.SUCCESS(f"Successfully deleted {deleted_count} tasks (including related data)."))
+                self.stdout.write(self.style.SUCCESS(f"Successfully deleted {deleted_count} entries (including related data)."))
             else:
                 self.stdout.write(self.style.SUCCESS("\nNo problematic tasks to delete."))
 

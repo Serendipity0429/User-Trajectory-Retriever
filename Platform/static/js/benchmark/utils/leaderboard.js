@@ -14,6 +14,15 @@ window.BenchmarkLeaderboard = (function() {
     let leaderboardData = [];
     let activeRunId = null;
 
+    // Pipeline badge configuration
+    const PIPELINE_BADGES = {
+        'vanilla_llm': { text: 'LLM', class: 'bg-primary' },
+        'rag': { text: 'RAG', class: 'bg-success' },
+        'vanilla_agent': { text: 'Agent', class: 'bg-info' },
+        'browser_agent': { text: 'Browser', class: 'bg-warning text-dark' },
+        'human': { text: 'Human', class: 'bg-dark' }
+    };
+
     /**
      * Initialize the leaderboard
      * @param {string|null} pipelineType - If set, locks to this pipeline type (baseline pages)
@@ -60,6 +69,15 @@ window.BenchmarkLeaderboard = (function() {
     }
 
     /**
+     * Format token count for display
+     */
+    function formatTokens(tokens) {
+        if (tokens >= 1000000) return (tokens / 1000000).toFixed(1) + 'M';
+        if (tokens >= 1000) return Math.round(tokens / 1000) + 'K';
+        return tokens || '-';
+    }
+
+    /**
      * Load leaderboard data from API
      */
     function loadLeaderboard() {
@@ -68,22 +86,11 @@ window.BenchmarkLeaderboard = (function() {
 
         if (!entriesContainer) return;
 
-        // Show loading state
-        if (isGlobalMode) {
-            entriesContainer.innerHTML = `
-                <tr>
-                    <td colspan="9" class="text-center text-muted py-4">
-                        <span class="spinner-border spinner-border-sm me-2"></span>Loading...
-                    </td>
-                </tr>
-            `;
-        } else {
-            entriesContainer.innerHTML = `
-                <div class="text-center text-muted py-3">
-                    <span class="spinner-border spinner-border-sm me-2"></span>Loading...
-                </div>
-            `;
-        }
+        // Show loading state using template
+        entriesContainer.innerHTML = '';
+        const loadingTpl = isGlobalMode ? 'tpl-leaderboard-loading-table' : 'tpl-leaderboard-loading-card';
+        const loadingEl = BenchmarkUtils.renderTemplate(loadingTpl, {});
+        entriesContainer.appendChild(loadingEl);
 
         const params = {
             sort_by: sortSelect ? sortSelect.value : 'accuracy',
@@ -130,43 +137,25 @@ window.BenchmarkLeaderboard = (function() {
             filteredData = leaderboardData.filter(run => run.is_complete);
         }
 
+        // Clear container
+        entriesContainer.innerHTML = '';
+
         if (filteredData.length === 0) {
-            if (isGlobalMode) {
-                entriesContainer.innerHTML = `
-                    <tr>
-                        <td colspan="9" class="text-center text-muted py-5">
-                            <i class="bi bi-trophy" style="font-size: 2rem; opacity: 0.5;"></i>
-                            <p class="mt-2 mb-0">No completed runs found</p>
-                            <p class="text-muted small">Run a full pipeline to see results here</p>
-                        </td>
-                    </tr>
-                `;
-            } else {
-                entriesContainer.innerHTML = `
-                    <div class="text-center text-muted py-3">
-                        <i class="bi bi-trophy" style="font-size: 1.25rem; opacity: 0.5;"></i>
-                        <p class="mt-1 mb-0 small">No runs found</p>
-                    </div>
-                `;
-            }
+            const emptyTpl = isGlobalMode ? 'tpl-leaderboard-empty-table' : 'tpl-leaderboard-empty-card';
+            const emptyEl = BenchmarkUtils.renderTemplate(emptyTpl, {});
+            entriesContainer.appendChild(emptyEl);
             return;
         }
 
         if (isGlobalMode) {
-            entriesContainer.innerHTML = filteredData.map((run, index) => renderTableRow(run, index + 1)).join('');
-            // Add click handlers for table rows
-            entriesContainer.querySelectorAll('tr[data-run-id]').forEach(row => {
-                row.addEventListener('click', () => {
-                    selectRun(row.dataset.runId, row.dataset.pipelineType);
-                });
+            filteredData.forEach((run, index) => {
+                const row = renderTableRow(run, index + 1);
+                entriesContainer.appendChild(row);
             });
         } else {
-            entriesContainer.innerHTML = filteredData.map((run, index) => renderCompactCard(run, index + 1)).join('');
-            // Add click handlers for cards
-            entriesContainer.querySelectorAll('.leaderboard-entry').forEach(entry => {
-                entry.addEventListener('click', () => {
-                    selectRun(entry.dataset.runId, entry.dataset.pipelineType);
-                });
+            filteredData.forEach((run, index) => {
+                const card = renderCompactCard(run, index + 1);
+                entriesContainer.appendChild(card);
             });
         }
     }
@@ -178,92 +167,107 @@ window.BenchmarkLeaderboard = (function() {
         const isHuman = run.is_human || run.pipeline_type === 'human';
         const rankClass = rank === 1 ? 'gold' : rank === 2 ? 'silver' : rank === 3 ? 'bronze' : 'default';
         const accuracyClass = run.accuracy >= 70 ? 'accuracy-high' : run.accuracy >= 40 ? 'accuracy-medium' : 'accuracy-low';
-
-        const pipelineBadges = {
-            'vanilla_llm': { text: 'LLM', class: 'bg-primary' },
-            'rag': { text: 'RAG', class: 'bg-success' },
-            'vanilla_agent': { text: 'Agent', class: 'bg-info' },
-            'browser_agent': { text: 'Browser', class: 'bg-warning text-dark' },
-            'human': { text: 'Human', class: 'bg-dark' }
-        };
-        const badge = pipelineBadges[run.pipeline_type] || { text: run.pipeline_type, class: 'bg-secondary' };
-
+        const badge = PIPELINE_BADGES[run.pipeline_type] || { text: run.pipeline_type, class: 'bg-secondary' };
         const modelName = run.model || 'Unknown';
         const date = run.created_at ? new Date(run.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '-';
-
-        const formatTokens = (tokens) => {
-            if (tokens >= 1000000) return (tokens / 1000000).toFixed(1) + 'M';
-            if (tokens >= 1000) return Math.round(tokens / 1000) + 'K';
-            return tokens || '-';
-        };
-
         const isActive = activeRunId === run.run_id;
-        const rowClass = isHuman ? 'table-light human-baseline-row' : '';
 
-        return `
-            <tr data-run-id="${run.run_id}" data-pipeline-type="${run.pipeline_type}" class="${isActive ? 'active' : ''} ${rowClass}">
-                <td class="text-center">
-                    <span class="leaderboard-rank-badge ${rankClass}">${rank}</span>
-                </td>
-                <td>
-                    <span class="fw-medium" title="${BenchmarkHelpers.escapeHtml(run.name)}">
-                        ${isHuman ? '<i class="bi bi-person-fill me-1"></i>' : ''}${BenchmarkHelpers.escapeHtml(run.name)}
-                    </span>
-                </td>
-                <td>
-                    <span class="badge pipeline-badge ${badge.class}">${badge.text}</span>
-                </td>
-                <td>
-                    <span class="model-text" title="${BenchmarkHelpers.escapeHtml(modelName)}">${BenchmarkHelpers.escapeHtml(modelName)}</span>
-                </td>
-                <td class="text-center">${run.session_count}</td>
-                <td class="text-center ${accuracyClass}">${run.accuracy.toFixed(1)}%</td>
-                <td class="text-center">${run.avg_trials ? run.avg_trials.toFixed(1) : '-'}</td>
-                <td class="text-end text-muted">${formatTokens(run.total_tokens)}</td>
-                <td class="text-end text-muted small">${date}</td>
-            </tr>
-        `;
+        const rowClasses = [];
+        if (isActive) rowClasses.push('active');
+        if (isHuman) rowClasses.push('table-light', 'human-baseline-row');
+
+        const row = BenchmarkUtils.renderTemplate('tpl-leaderboard-table-row', {
+            '.leaderboard-row': {
+                attrs: {
+                    'data-run-id': run.run_id,
+                    'data-pipeline-type': run.pipeline_type
+                },
+                addClass: rowClasses.join(' ')
+            },
+            '.leaderboard-rank-badge': {
+                text: rank,
+                addClass: rankClass
+            },
+            '.run-name': {
+                html: (isHuman ? '<i class="bi bi-person-fill me-1"></i>' : '') + BenchmarkHelpers.escapeHtml(run.name),
+                attrs: { title: run.name }
+            },
+            '.pipeline-badge': {
+                text: badge.text,
+                addClass: badge.class
+            },
+            '.model-text': {
+                text: modelName,
+                attrs: { title: modelName }
+            },
+            '.session-count': { text: run.session_count },
+            '.accuracy-cell': {
+                text: run.accuracy.toFixed(1) + '%',
+                addClass: accuracyClass
+            },
+            '.avg-trials': { text: run.avg_trials ? run.avg_trials.toFixed(1) : '-' },
+            '.tokens-cell': { text: formatTokens(run.total_tokens) },
+            '.date-cell': { text: date }
+        });
+
+        // Add click handler
+        row.addEventListener('click', () => {
+            selectRun(run.run_id, run.pipeline_type);
+        });
+
+        return row;
     }
 
     /**
      * Render a compact card for sidebar (baseline pages)
      */
     function renderCompactCard(run, rank) {
+        const isHuman = run.is_human || run.pipeline_type === 'human';
         const rankClass = rank === 1 ? 'gold' : rank === 2 ? 'silver' : rank === 3 ? 'bronze' : 'default';
         const accuracyClass = run.accuracy >= 70 ? 'high' : run.accuracy >= 40 ? 'medium' : 'low';
-
         const modelName = run.model || 'Unknown';
         const shortModel = modelName.length > 15 ? modelName.substring(0, 13) + '...' : modelName;
         const date = run.created_at ? new Date(run.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
-
-        const formatTokens = (tokens) => {
-            if (tokens >= 1000000) return (tokens / 1000000).toFixed(1) + 'M';
-            if (tokens >= 1000) return Math.round(tokens / 1000) + 'K';
-            return tokens;
-        };
-
         const isActive = activeRunId === run.run_id;
 
-        return `
-            <div class="leaderboard-entry${isActive ? ' active' : ''}" data-run-id="${run.run_id}" data-pipeline-type="${run.pipeline_type}">
-                <div class="d-flex align-items-center gap-2">
-                    <div class="leaderboard-rank ${rankClass}">${rank}</div>
-                    <div class="flex-grow-1 min-width-0">
-                        <div class="fw-medium small text-truncate" title="${BenchmarkHelpers.escapeHtml(run.name)}">${BenchmarkHelpers.escapeHtml(run.name)}</div>
-                        <div class="d-flex align-items-center gap-2 text-muted" style="font-size: 0.7rem;">
-                            <span title="${BenchmarkHelpers.escapeHtml(modelName)}">${BenchmarkHelpers.escapeHtml(shortModel)}</span>
-                            <span>${run.session_count}Q</span>
-                            <span>${run.avg_trials.toFixed(1)}t</span>
-                            <span>${formatTokens(run.total_tokens)}</span>
-                        </div>
-                    </div>
-                    <div class="text-end">
-                        <div class="leaderboard-accuracy ${accuracyClass}">${run.accuracy.toFixed(0)}%</div>
-                        <div style="font-size: 0.65rem; color: #999;">${date}</div>
-                    </div>
-                </div>
-            </div>
+        // Build details HTML
+        const detailsHtml = `
+            <span title="${BenchmarkHelpers.escapeHtml(modelName)}">${BenchmarkHelpers.escapeHtml(shortModel)}</span>
+            <span>${run.session_count}Q</span>
+            <span>${run.avg_trials ? run.avg_trials.toFixed(1) : '-'}t</span>
+            <span>${formatTokens(run.total_tokens)}</span>
         `;
+
+        const card = BenchmarkUtils.renderTemplate('tpl-leaderboard-compact-card', {
+            '.leaderboard-entry': {
+                attrs: {
+                    'data-run-id': run.run_id,
+                    'data-pipeline-type': run.pipeline_type
+                },
+                addClass: isActive ? 'active' : ''
+            },
+            '.leaderboard-rank': {
+                text: rank,
+                addClass: rankClass
+            },
+            '.run-name': {
+                text: run.name,
+                attrs: { title: run.name }
+            },
+            '.run-details': { html: detailsHtml },
+            '.leaderboard-accuracy': {
+                text: run.accuracy.toFixed(0) + '%',
+                addClass: accuracyClass
+            },
+            '.run-date': { text: date }
+        });
+
+        // Add click handler
+        card.addEventListener('click', () => {
+            selectRun(run.run_id, run.pipeline_type);
+        });
+
+        return card;
     }
 
     /**
@@ -319,21 +323,12 @@ window.BenchmarkLeaderboard = (function() {
         const entriesContainer = document.getElementById('leaderboard-entries');
         if (!entriesContainer) return;
 
-        if (isGlobalMode) {
-            entriesContainer.innerHTML = `
-                <tr>
-                    <td colspan="9" class="text-center text-danger py-4">
-                        <i class="bi bi-exclamation-circle me-2"></i>${BenchmarkHelpers.escapeHtml(message)}
-                    </td>
-                </tr>
-            `;
-        } else {
-            entriesContainer.innerHTML = `
-                <div class="text-center text-danger py-3 small">
-                    <i class="bi bi-exclamation-circle me-1"></i>${BenchmarkHelpers.escapeHtml(message)}
-                </div>
-            `;
-        }
+        entriesContainer.innerHTML = '';
+        const errorTpl = isGlobalMode ? 'tpl-leaderboard-error-table' : 'tpl-leaderboard-error-card';
+        const errorEl = BenchmarkUtils.renderTemplate(errorTpl, {
+            '.error-message': { text: message }
+        });
+        entriesContainer.appendChild(errorEl);
     }
 
     /**

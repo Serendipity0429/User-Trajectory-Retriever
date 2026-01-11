@@ -16,7 +16,7 @@ PROMPTS = {
 
     "shared_reasoning_instruction_no_agent": """Please think step-by-step to arrive at the answer. Format your response as follows:
 <think>
-<step-by-step reasoning>
+(step-by-step reasoning...)
 </think>
 Final Answer: <final answer only> """,
 
@@ -32,7 +32,7 @@ The question is: {question}
 
 Format your response as follows:
 <think>
-<step-by-step reasoning>
+(step-by-step reasoning...)
 </think>
 Final Answer: <final answer only>
 """,

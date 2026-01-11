@@ -160,14 +160,14 @@ def _calculate_human_baseline_from_tasks():
     """
     Calculate human baseline metrics directly from task_manager records.
     Uses shared helper from dashboard.utils for consistency.
-    Returns a leaderboard entry dict or None if no completed tasks.
+    Returns a list of leaderboard entries (min, max, median, mean) or empty list.
     """
     try:
         from dashboard.utils import get_human_baseline_for_leaderboard
         return get_human_baseline_for_leaderboard()
     except Exception as e:
         print_debug(f"Error calculating human baseline: {e}")
-        return None
+        return []
 
 
 @admin_required
@@ -287,11 +287,11 @@ def get_leaderboard(request):
             }
             leaderboard_entries.append(entry)
 
-        # Add human baseline calculated from task_manager if not filtering by a specific pipeline type (or if filtering by 'human')
+        # Add human baseline entries calculated from task_manager if not filtering by a specific pipeline type (or if filtering by 'human')
         if not pipeline_type or pipeline_type == 'human':
-            human_entry = _calculate_human_baseline_from_tasks()
-            if human_entry:
-                leaderboard_entries.append(human_entry)
+            human_entries = _calculate_human_baseline_from_tasks()
+            if human_entries:
+                leaderboard_entries.extend(human_entries)
 
         # Sort entries
         reverse = order == 'desc'

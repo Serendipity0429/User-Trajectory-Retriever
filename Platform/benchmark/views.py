@@ -223,10 +223,6 @@ def get_leaderboard(request):
         # Filter to only runs with sessions
         runs_query = runs_query.filter(session_count__gt=0)
 
-        # If we have a target question count, filter to "finished" runs
-        if target_question_count:
-            runs_query = runs_query.filter(session_count__gte=target_question_count)
-
         leaderboard_entries = []
 
         for run in runs_query:

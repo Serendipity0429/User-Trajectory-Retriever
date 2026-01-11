@@ -155,8 +155,11 @@ class BenchmarkSettings(models.Model):
     def to_safe_snapshot_dict(self):
         """Return snapshot without sensitive API keys."""
         snapshot = self.to_snapshot_dict()
-        if snapshot and "llm" in snapshot:
-            snapshot["llm"].pop("llm_api_key", None)
+        if snapshot:
+            if "llm" in snapshot:
+                snapshot["llm"].pop("llm_api_key", None)
+            if "search" in snapshot:
+                snapshot["search"].pop("serper_api_key", None)
         return snapshot
 
 class MultiTurnRun(models.Model):

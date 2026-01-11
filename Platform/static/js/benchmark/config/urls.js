@@ -51,6 +51,8 @@ window.BenchmarkUrls = {
         stopSession: `${API_PREFIX}/sessions/stop_session/`,
         exportSession: (id) => `${API_PREFIX}/sessions/export_session/${id}/`,
         exportRun: (id) => `${API_PREFIX}/sessions/export_run/${id}/`,
+        importData: `${API_PREFIX}/sessions/import/`,
+        validateImport: `${API_PREFIX}/sessions/validate_import/`,
         getTrialPrompt: (id) => `${API_PREFIX}/sessions/get_trial_prompt/${id}/`,
     },
 

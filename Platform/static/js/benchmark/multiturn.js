@@ -669,6 +669,69 @@ window.BenchmarkUtils.MultiTurnPage = (function() {
         });
     }
 
+    function initImports() {
+        const importBtn = document.getElementById('import-data-btn');
+        const importFileInput = document.getElementById('import-file-input');
+
+        if (!importBtn || !importFileInput) return;
+
+        importBtn.addEventListener('click', () => {
+            importFileInput.click();
+        });
+
+        importFileInput.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            // Reset input so same file can be selected again
+            importFileInput.value = '';
+
+            // Show loading state
+            const originalHtml = importBtn.innerHTML;
+            importBtn.disabled = true;
+            importBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Importing...';
+
+            try {
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('csrfmiddlewaretoken', BenchmarkAPI.getCSRFToken());
+
+                const response = await fetch(BenchmarkUrls.multiTurn.importData, {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-CSRFToken': BenchmarkAPI.getCSRFToken()
+                    }
+                });
+
+                const data = await response.json();
+
+                if (data.status === 'success') {
+                    const importType = data.import_type === 'run' ? 'Pipeline Run' : 'Session';
+                    const stats = data.stats || {};
+                    let message = `${importType} imported successfully!`;
+                    if (stats.sessions_imported) {
+                        message += `\n- Sessions: ${stats.sessions_imported}`;
+                    }
+                    if (stats.trials_imported) {
+                        message += `\n- Trials: ${stats.trials_imported}`;
+                    }
+                    alert(message);
+                    // Reload the page to show imported data
+                    window.location.reload();
+                } else {
+                    alert(`Import failed: ${data.message || 'Unknown error'}`);
+                }
+            } catch (err) {
+                console.error('Import error:', err);
+                alert(`Import failed: ${err.message || 'Network error'}`);
+            } finally {
+                importBtn.disabled = false;
+                importBtn.innerHTML = originalHtml;
+            }
+        });
+    }
+
     // === Public API ===
     return {
         init: function(config) {
@@ -687,6 +750,7 @@ window.BenchmarkUtils.MultiTurnPage = (function() {
             initSessionListHandlers(pipelineType);
             initRetryAndDelete(pipelineType);
             initExports();
+            initImports();
 
             // Initialize leaderboard (fixed to this pipeline type)
             if (window.BenchmarkLeaderboard) {

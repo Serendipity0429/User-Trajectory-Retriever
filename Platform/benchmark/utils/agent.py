@@ -129,7 +129,7 @@ class UsageTrackingModelWrapper:
         return getattr(self._model, name)
 
 
-@sync_to_async
+@sync_to_async(thread_sensitive=False)
 def get_search_engine_safe(fetch_full_content=None):
     """Get search engine in a sync-safe wrapper for async context."""
     return get_search_engine(fetch_full_content=fetch_full_content)
@@ -149,7 +149,7 @@ async def web_search_tool(query: str):
     try:
         # Force fetch_full_content=False to simulate human behavior (snippets only)
         engine = await get_search_engine_safe(fetch_full_content=False)
-        results = await sync_to_async(engine.search)(query)
+        results = await sync_to_async(engine.search, thread_sensitive=False)(query)
 
         if not results:
              return ToolResponse(content="No results found. Please try again with a different or more specific query.")
@@ -173,7 +173,7 @@ async def visit_page(url: str):
     try:
         crawler = WebCrawler()
         # WebCrawler.extract is synchronous, run it in a thread
-        content = await sync_to_async(crawler.extract)(url)
+        content = await sync_to_async(crawler.extract, thread_sensitive=False)(url)
 
         if not content:
             return ToolResponse(content="Could not extract content from the page. It might be empty or inaccessible.")
@@ -390,7 +390,7 @@ class BrowserAgentFactory:
         # DEBUG: Print all registered tools
         print_debug(f"BrowserAgent Toolkit Tools: {list(toolkit.tools.keys())}")
 
-        settings = await sync_to_async(BenchmarkSettings.get_effective_settings)()
+        settings = await sync_to_async(BenchmarkSettings.get_effective_settings, thread_sensitive=False)()
         print_debug(f"BrowserAgent: Creating agent with memory_type={settings.memory_type}")
         short_term_memory, long_term_memory = create_memory(
             settings.memory_type,

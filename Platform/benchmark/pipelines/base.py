@@ -886,7 +886,7 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
         """
         completed_trials = await sync_to_async(lambda: list(session.trials.filter(
             status='completed'
-        ).order_by('trial_number')))()
+        ).order_by('trial_number')), thread_sensitive=False)()
 
         for t in completed_trials:
             messages = t.log.get('messages', [])
@@ -937,7 +937,7 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
                         for trial in session.trials.all():
                             clear_trial_cache(trial.id)
                         session.trials.all().delete()
-                    await sync_to_async(full_cleanup)()
+                    await sync_to_async(full_cleanup, thread_sensitive=False)()
                     trial_number = 1
                     print_debug(f"Session {session.id}: Full restart - cleared all trials and Redis cache")
                 else:
@@ -948,14 +948,18 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
                             clear_trial_cache(trial.id)
                         session.trials.exclude(status='completed').delete()
                         return session.trials.filter(status='completed').count()
-                    completed_count = await sync_to_async(cleanup)()
+                    completed_count = await sync_to_async(cleanup, thread_sensitive=False)()
                     trial_number = completed_count + 1
             else:
-                session = await sync_to_async(self.create_session)(self.llm_settings, question_text, ground_truths, group)
+                print_debug(f"Creating new session for question: {question_text[:50]}...")
+                session = await sync_to_async(self.create_session, thread_sensitive=False)(self.llm_settings, question_text, ground_truths, group)
+                print_debug(f"Session created: {session.id}")
                 trial_number = 1
 
             # Session lifecycle: setup resources (e.g., browser instance)
+            print_debug(f"Calling _on_session_start for session {session.id}")
             await self._on_session_start(session)
+            print_debug(f"_on_session_start completed for session {session.id}")
 
             is_session_completed = False
             final_is_correct_llm = False
@@ -975,10 +979,10 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
 
                 print_debug(f"Session {session.id}: Starting trial loop (max_retries={self.max_retries}, trial_number={trial_number})")
                 while trial_number <= self.max_retries and not is_session_completed:
-                    if not await sync_to_async(self.check_active)():
+                    if not await sync_to_async(self.check_active, thread_sensitive=False)():
                         break
 
-                    trial = await sync_to_async(self.create_trial)(session, trial_number)
+                    trial = await sync_to_async(self.create_trial, thread_sensitive=False)(session, trial_number)
                     yield {
                         'is_meta': True, 'type': 'trial_started', 'session_id': session.id,
                         'trial_number': trial_number, 'group_id': group.id
@@ -1013,8 +1017,8 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
                     else: trial_number += 1
 
                 # Determine why the loop exited
-                pipeline_stopped = not await sync_to_async(self.check_active)()
-                total_trials = await sync_to_async(lambda: session.trials.filter(status='completed').count())()
+                pipeline_stopped = not await sync_to_async(self.check_active, thread_sensitive=False)()
+                total_trials = await sync_to_async(lambda: session.trials.filter(status='completed').count(), thread_sensitive=False)()
                 print_debug(f"Session {session.id}: Trial loop exited - is_session_completed={is_session_completed}, session_had_error={session_had_error}, pipeline_stopped={pipeline_stopped}, total_trials={total_trials}")
 
                 if session_had_error:
@@ -1031,16 +1035,16 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
                 else:
                     # Success or exhausted retries - mark completed
                     session.is_completed = True
-                    await sync_to_async(session.save)()
+                    await sync_to_async(session.save, thread_sensitive=False)()
 
                     # Reload session with prefetched trials to ensure fresh data for metrics
                     # This is critical: session.refresh_from_db() does NOT refresh related objects
                     def reload_session_with_trials():
                         return MultiTurnSession.objects.prefetch_related('trials').get(pk=session.id)
-                    fresh_session = await sync_to_async(reload_session_with_trials)()
+                    fresh_session = await sync_to_async(reload_session_with_trials, thread_sensitive=False)()
 
                     # Extract full session metrics for live dashboard display
-                    enriched = await sync_to_async(extract_session_metrics)(fresh_session)
+                    enriched = await sync_to_async(extract_session_metrics, thread_sensitive=False)(fresh_session)
                     enriched.update({
                         'max_retries': self.max_retries,
                         'group_name': group.name,
@@ -1051,6 +1055,9 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
                 # Session lifecycle: cleanup resources (e.g., browser instance)
                 await self._on_session_end(session)
         except Exception as e:
+            import traceback
+            print_debug(f"CRITICAL ERROR in _process_single_session_async: {e}")
+            print_debug(f"Traceback: {traceback.format_exc()}")
             yield {'error': str(e), 'question': question_text}
 
     async def run(self):
@@ -1069,27 +1076,27 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
 
         if self.group_id:
             try:
-                group = await sync_to_async(MultiTurnRun.objects.get)(pk=self.group_id)
+                group = await sync_to_async(MultiTurnRun.objects.get, thread_sensitive=False)(pk=self.group_id)
 
-                incomplete_sessions, completed_questions = await sync_to_async(collect_sessions_to_resume)(group, self.max_retries)
+                incomplete_sessions, completed_questions = await sync_to_async(collect_sessions_to_resume, thread_sensitive=False)(group, self.max_retries)
             except MultiTurnRun.DoesNotExist:
                  yield {'error': f"Group with ID {self.group_id} not found."}
                  return
         else:
-            group = await sync_to_async(create_run_obj)()
+            group = await sync_to_async(create_run_obj, thread_sensitive=False)()
 
         # Set run_id for memory isolation (used by agent pipelines)
         if hasattr(self, '_current_run_id'):
             self._current_run_id = group.id
 
-        file_path = await sync_to_async(self.get_questions_file_path)()
-        total_questions = await sync_to_async(count_questions_in_file)(file_path)
+        file_path = await sync_to_async(self.get_questions_file_path, thread_sensitive=False)()
+        total_questions = await sync_to_async(count_questions_in_file, thread_sensitive=False)(file_path)
         yield {'is_meta': True, 'type': 'total_count', 'count': total_questions}
 
         # PHASE 1: Resume ALL incomplete sessions first
         print_debug(f"PHASE 1: {len(incomplete_sessions)} incomplete sessions to resume")
         for session in incomplete_sessions:
-            if not await sync_to_async(self.check_active)():
+            if not await sync_to_async(self.check_active, thread_sensitive=False)():
                 print_debug("PHASE 1: check_active returned False, breaking")
                 break
 
@@ -1111,11 +1118,11 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
         questions_iterator = question_file_iterator(file_path)
 
         while True:
-            if not await sync_to_async(self.check_active)():
+            if not await sync_to_async(self.check_active, thread_sensitive=False)():
                 print_debug("PHASE 2: check_active returned False, breaking")
                 break
             try:
-                data = await sync_to_async(next)(questions_iterator)
+                data = await sync_to_async(next, thread_sensitive=False)(questions_iterator)
             except StopIteration:
                 print_debug("PHASE 2: StopIteration - all questions processed")
                 break
@@ -1136,7 +1143,7 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
 
         print_debug("Pipeline run loop completed, cleaning up...")
         await self.cleanup()
-        await sync_to_async(self.stop_token)()
+        await sync_to_async(self.stop_token, thread_sensitive=False)()
         print_debug("Pipeline finished")
 
     async def cleanup(self):
@@ -1176,7 +1183,7 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
                     except: turn_start_index = 0
 
                 # Use shared retry prompt for all baselines
-                last_trial = await sync_to_async(lambda: session.trials.filter(status='completed').last())()
+                last_trial = await sync_to_async(lambda: session.trials.filter(status='completed').last(), thread_sensitive=False)()
                 feedback = last_trial.feedback if last_trial else "Incorrect"
                 retry_prompt = self._get_retry_prompt_key()
                 current_msg = Msg(name="User", role="user", content=PROMPTS[retry_prompt].format(question=session.question))

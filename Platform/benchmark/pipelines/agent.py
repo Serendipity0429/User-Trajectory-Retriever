@@ -44,7 +44,7 @@ class VanillaAgentPipeline(BaseAgentPipeline):
     @classmethod
     async def create(cls, base_url, api_key, model, max_retries, pipeline_id=None, dataset_id=None, group_id=None):
         try:
-            instance = await sync_to_async(cls)(base_url, api_key, model, max_retries, pipeline_id, dataset_id, group_id)
+            instance = await sync_to_async(cls, thread_sensitive=False)(base_url, api_key, model, max_retries, pipeline_id, dataset_id, group_id)
             return instance
         except Exception as e:
             print_debug(f"VanillaAgentPipeline: Error in create: {e}")
@@ -67,7 +67,7 @@ class VanillaAgentPipeline(BaseAgentPipeline):
     # Hooks for BaseAgentPipeline template
     async def _init_agent(self):
         # Pass run_id for memory isolation (set by base pipeline before agent creation)
-        agent, long_term_memory = await sync_to_async(VanillaAgentFactory.create_agent)(
+        agent, long_term_memory = await sync_to_async(VanillaAgentFactory.create_agent, thread_sensitive=False)(
             self.agent_model,
             run_id=self._current_run_id
         )
@@ -134,7 +134,7 @@ class BrowserAgentPipeline(BaseAgentPipeline):
     async def create(cls, base_url, api_key, model, max_retries, pipeline_id=None, dataset_id=None, group_id=None):
         try:
             print_debug("BrowserAgentPipeline: Creating instance (lightweight)...")
-            instance = await sync_to_async(cls)(base_url, api_key, model, max_retries, pipeline_id, dataset_id, group_id)
+            instance = await sync_to_async(cls, thread_sensitive=False)(base_url, api_key, model, max_retries, pipeline_id, dataset_id, group_id)
             return instance
         except Exception as e:
             print_debug(f"BrowserAgentPipeline: Error in create: {e}")

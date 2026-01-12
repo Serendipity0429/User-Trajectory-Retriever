@@ -1,7 +1,6 @@
-{% extends 'base.html' %}
-{% load discussion_extras %}
+{% extends 'discussion_base.html' %}
 
-{% block content %}
+{% block discussion_content %}
 <div class="container discussion-page">
     <h1 class="mt-4">Edit Post</h1>
 
@@ -137,9 +136,9 @@
         </div>
     </form>
 </div>
-{% endblock %}
+{% endblock discussion_content %}
 
-{% block scripts %}
+{% block discussion_scripts %}
 <script>
 const easyMDE = initializeEasyMDE({
     elementId: "{{ form.content.auto_id }}",
@@ -327,4 +326,4 @@ $(function() {
     }
 });
 </script>
-{% endblock %}
+{% endblock discussion_scripts %}

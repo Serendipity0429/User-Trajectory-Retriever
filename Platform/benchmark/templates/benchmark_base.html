@@ -3,6 +3,10 @@
 
 {% block title %}{% block benchmark_title %}Benchmark{% endblock benchmark_title %} - User Trajectory Platform{% endblock title %}
 
+{% block css %}
+    <link href="{% static 'css/benchmark.css' %}" rel="stylesheet">
+{% endblock css %}
+
 {% block content %}
     <main class="container-fluid my-4">
         {% block benchmark_content %}{% endblock benchmark_content %}

@@ -1,6 +1,6 @@
-{% extends 'base.html' %}
+{% extends 'discussion_base.html' %}
 
-{% block content %}
+{% block discussion_content %}
 <div class="container discussion-page">
     <a href="{% url 'bulletin_detail' bulletin.pk %}" class="btn btn-outline-secondary mt-3 mb-3">&laquo; Back to Bulletin</a>
     <h2 class="mt-4">Read Status for "{{ bulletin.title }}"</h2>
@@ -40,4 +40,4 @@
         </div>
     </div>
 </div>
-{% endblock %}
+{% endblock discussion_content %}

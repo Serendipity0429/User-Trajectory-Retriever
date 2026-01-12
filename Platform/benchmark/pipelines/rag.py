@@ -4,7 +4,7 @@ from ..utils import (
     get_search_engine, extract_final_answer, extract_query,
     RedisKeys, PipelinePrefix, TraceFormatter, SimpleMsg, PROMPTS, TrialGuard
 )
-from ..models import BenchmarkSettings
+from ..models import BenchmarkSettings, MultiTurnSession
 from .base import BaseMultiTurnPipeline
 
 
@@ -16,6 +16,15 @@ class RagMultiTurnPipeline(BaseMultiTurnPipeline):
 
     def __str__(self):
         return "RAG Multi-Turn Pipeline"
+
+    def create_session(self, settings, question_text, ground_truths, group):
+        return MultiTurnSession.objects.create(
+            question=question_text,
+            ground_truths=ground_truths,
+            run=group,
+            run_tag=self.pipeline_id,
+            pipeline_type='rag'
+        )
 
     def _get_pipeline_settings(self):
         """Returns RAG-specific settings (search configuration)."""

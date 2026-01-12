@@ -1,7 +1,6 @@
-{% extends 'base.html' %}
-{% load discussion_extras %}
+{% extends 'discussion_base.html' %}
 
-{% block content %}
+{% block discussion_content %}
 <div class="container discussion-page">
     <div class="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center">
         <h1 class="mt-4">Discussion Forum</h1>
@@ -132,9 +131,9 @@
         </div>
     </div>
 </div>
-{% endblock %}
+{% endblock discussion_content %}
 
-{% block scripts %}
+{% block discussion_scripts %}
 <script>
 $(document).ready(function() {
     function fetchPosts(url) {
@@ -182,4 +181,4 @@ $(document).ready(function() {
     });
 });
 </script>
-{% endblock %}
+{% endblock discussion_scripts %}

@@ -286,6 +286,6 @@
 }
 
 .table-responsive thead th {
-    background-color: #f8f9fa !important;
+    background-color: #f8f9fa;
     box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.1);
 }

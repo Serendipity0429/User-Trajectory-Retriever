@@ -1,0 +1,15 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load discussion_extras %}
+
+{% block css %}
+    <link href="{% static 'css/discussion.css' %}" rel="stylesheet">
+{% endblock css %}
+
+{% block content %}
+    {% block discussion_content %}{% endblock discussion_content %}
+{% endblock content %}
+
+{% block scripts %}
+    {% block discussion_scripts %}{% endblock discussion_scripts %}
+{% endblock scripts %}

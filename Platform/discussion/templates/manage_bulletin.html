@@ -1,7 +1,6 @@
-{% extends 'base.html' %}
-{% load discussion_extras %}
+{% extends 'discussion_base.html' %}
 
-{% block content %}
+{% block discussion_content %}
 <div class="container discussion-page">
     <a href="{% url 'discussion_home' %}" class="btn btn-outline-secondary mt-3">&laquo; Back to Forum</a>
     <h1 class="mt-4">Manage Bulletin</h1>
@@ -185,9 +184,9 @@
         </div>
     </div>
 </div>
-{% endblock %}
+{% endblock discussion_content %}
 
-{% block scripts %}
+{% block discussion_scripts %}
 <script>
 const easyMDE = initializeEasyMDE({
     elementId: "{{ form.content.auto_id }}",
@@ -348,4 +347,4 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 </script>
-{% endblock %}
+{% endblock discussion_scripts %}

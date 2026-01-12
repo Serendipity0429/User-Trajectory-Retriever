@@ -1,7 +1,6 @@
-{% extends 'base.html' %}
-{% load discussion_extras %}
+{% extends 'discussion_base.html' %}
 
-{% block content %}
+{% block discussion_content %}
 <div class="container discussion-page">
     <a href="{% url 'discussion_home' %}" class="btn btn-outline-secondary mt-3 mb-3">&laquo; Back to Forum</a>
     <div class="card my-4 shadow-sm">
@@ -90,4 +89,4 @@
         {% endif %}
     </div>
 </div>
-{% endblock %}
+{% endblock discussion_content %}

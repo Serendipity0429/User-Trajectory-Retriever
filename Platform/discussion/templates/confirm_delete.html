@@ -1,6 +1,6 @@
-{% extends 'base.html' %}
+{% extends 'discussion_base.html' %}
 
-{% block content %}
+{% block discussion_content %}
 <div class="container">
     <h2>Confirm Deletion</h2>
     <p>Are you sure you want to delete "{{ object.title|default:object }}"?</p>
@@ -12,4 +12,4 @@
         </div>
     </form>
 </div>
-{% endblock %}
+{% endblock discussion_content %}

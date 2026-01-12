@@ -328,6 +328,143 @@ class BaseMultiTurnPipeline(BasePipeline):
         """
         return {}
 
+    def _evaluate_trial(self, session, answer):
+        """
+        Evaluates answer correctness using both LLM judge and rule-based checking.
+        Returns: (is_correct_llm, is_correct_rule)
+        """
+        is_correct_llm = check_answer_llm(
+            session.question, session.ground_truths, answer,
+            client=self.judge_client, model=self.judge_model
+        )
+        is_correct_rule = check_answer_rule(session.question, session.ground_truths, answer)
+        return is_correct_llm, is_correct_rule
+
+    def _finalize_trial(self, trial, answer, is_correct_llm, is_correct_rule,
+                        messages=None, system_prompt=None, token_usage=None, extra_log=None):
+        """
+        Finalizes a trial by setting result fields and saving to DB.
+
+        Args:
+            trial: The trial object to finalize
+            answer: The extracted answer
+            is_correct_llm: LLM judge result
+            is_correct_rule: Rule-based result
+            messages: List of message dicts to store in trial.log['messages']
+            system_prompt: System prompt to store separately for DB fallback
+            token_usage: Token usage dict to store
+            extra_log: Additional log data to merge (e.g., search_query, search_results)
+        """
+        trial.answer = answer
+        trial.is_correct_llm = is_correct_llm
+        trial.is_correct_rule = is_correct_rule
+        trial.feedback = "Correct" if is_correct_llm else "Incorrect"
+        trial.status = 'completed'
+
+        trial.log = trial.log or {}
+        if messages:
+            trial.log['messages'] = messages
+        if system_prompt:
+            trial.log['system_prompt'] = system_prompt
+        if token_usage:
+            trial.log['token_usage'] = token_usage
+
+        # Add baseline-specific metadata
+        trial_meta = self._get_trial_meta(trial)
+        if trial_meta:
+            trial.log['meta'] = trial_meta
+
+        # Merge any extra log data (e.g., search queries, search results)
+        if extra_log:
+            trial.log.update(extra_log)
+
+        trial.save()
+
+    def _cache_trial_to_redis(self, trial, trace_data):
+        """
+        Caches trial status and trace to Redis for live UI polling.
+
+        Args:
+            trial: The completed trial object
+            trace_data: Formatted trace list for UI rendering
+        """
+        try:
+            status_data = {
+                "id": trial.id,
+                "status": "completed",
+                "answer": trial.answer,
+                "feedback": trial.feedback,
+                "is_correct_llm": trial.is_correct_llm,
+                "is_correct_rule": trial.is_correct_rule,
+            }
+            redis_client.set(RedisKeys.trial_status(trial.id), json.dumps(status_data), ex=RedisKeys.DEFAULT_TTL)
+            redis_client.set(RedisKeys.trial_trace(trial.id), json.dumps(trace_data), ex=RedisKeys.DEFAULT_TTL)
+        except Exception as e:
+            print_debug(f"Failed to cache trial to Redis: {e}")
+
+    async def _evaluate_trial_async(self, session, answer):
+        """
+        Async version of _evaluate_trial for agent pipelines.
+        Evaluates answer correctness using both LLM judge and rule-based checking.
+        Returns: (is_correct_llm, is_correct_rule)
+        """
+        is_correct_llm = await sync_to_async(check_answer_llm)(
+            session.question, session.ground_truths, answer,
+            client=self.judge_client, model=self.judge_model
+        )
+        is_correct_rule = check_answer_rule(session.question, session.ground_truths, answer)
+        return is_correct_llm, is_correct_rule
+
+    async def _finalize_trial_async(self, trial, answer, is_correct_llm, is_correct_rule,
+                                     messages=None, system_prompt=None, token_usage=None, extra_log=None):
+        """
+        Async version of _finalize_trial for agent pipelines.
+        Finalizes a trial by setting result fields and saving to DB.
+        """
+        trial.answer = answer
+        trial.is_correct_llm = is_correct_llm
+        trial.is_correct_rule = is_correct_rule
+        trial.feedback = "Correct" if is_correct_llm else "Incorrect"
+        trial.status = 'completed'
+
+        trial.log = trial.log or {}
+        if messages:
+            trial.log['messages'] = messages
+        if system_prompt:
+            trial.log['system_prompt'] = system_prompt
+        if token_usage:
+            trial.log['token_usage'] = token_usage
+
+        # Add baseline-specific metadata
+        trial_meta = self._get_trial_meta(trial)
+        if trial_meta:
+            trial.log['meta'] = trial_meta
+
+        # Merge any extra log data
+        if extra_log:
+            trial.log.update(extra_log)
+
+        await trial.asave()
+
+    async def _cache_trial_to_redis_async(self, trial, trace_data):
+        """
+        Async version of _cache_trial_to_redis for agent pipelines.
+        Caches trial status and trace to Redis for live UI polling.
+        """
+        try:
+            status_data = {
+                "id": trial.id,
+                "status": "completed",
+                "answer": trial.answer,
+                "feedback": trial.feedback,
+                "is_correct_llm": trial.is_correct_llm,
+                "is_correct_rule": trial.is_correct_rule,
+            }
+            await sync_to_async(redis_client.set)(RedisKeys.trial_status(trial.id), json.dumps(status_data), ex=RedisKeys.DEFAULT_TTL)
+            await sync_to_async(redis_client.set)(RedisKeys.trial_trace(trial.id), json.dumps(trace_data), ex=RedisKeys.DEFAULT_TTL)
+        except Exception as e:
+            print_debug(f"Failed to cache trial to Redis: {e}")
+
     def _process_single_session(self, group, question_text, ground_truths, existing_session=None):
         """
         Process a single question session, including retries.
@@ -593,61 +730,35 @@ class BaseMultiTurnPipeline(BasePipeline):
             else:
                 answer = full_response
 
-            # Logic for checking answer (uses judge client/model, not generation model)
-            is_correct_llm = check_answer_llm(session.question, session.ground_truths, answer, client=self.judge_client, model=self.judge_model)
-            is_correct_rule = check_answer_rule(session.question, session.ground_truths, answer)
+            # Evaluate answer using shared helper
+            is_correct_llm, is_correct_rule = self._evaluate_trial(session, answer)
 
-            # Store only this trial's messages (delta), not full conversation history
-            # This matches the trace structure: system prompt + current user input + response
+            # Build trial messages (delta for this turn only)
             trial_messages = []
+            system_prompt = None
             if messages and messages[0].get('role') == 'system':
-                trial_messages.append({"role": "system", "content": messages[0].get("content", "")})
+                system_prompt = messages[0].get('content', '')
+                trial_messages.append({"role": "system", "content": system_prompt})
             trial_messages.append({"role": "user", "content": instruction})
             trial_messages.append({"role": "assistant", "content": full_response})
 
-            trial.answer = answer
-            trial.is_correct_llm = is_correct_llm
-            trial.is_correct_rule = is_correct_rule
-            trial.feedback = "Correct" if is_correct_llm else "Incorrect"
+            # Finalize trial using shared helper
+            self._finalize_trial(
+                trial, answer, is_correct_llm, is_correct_rule,
+                messages=trial_messages,
+                system_prompt=system_prompt,
+                token_usage=trial_usage
+            )
 
-            trial.log = trial.log or {}
-            trial.log['messages'] = trial_messages
-            # Store system prompt separately for database fallback when Redis expires
-            if messages and messages[0].get('role') == 'system':
-                trial.log['system_prompt'] = messages[0].get('content', '')
-            # Store token usage
-            if trial_usage:
-                trial.log['token_usage'] = trial_usage
-            trial.status = 'completed'
-            trial.save()
+            # Build trace and cache to Redis using shared helper
+            trace, _ = TraceFormatter.serialize([SimpleMsg(m["role"], m["content"]) for m in trial_messages])
+            # Ensure system prompt is at top of trace
+            if not trace or trace[0].get('role') != 'system':
+                if system_prompt:
+                    system_prompt_step = {"role": "system", "content": system_prompt, "step_type": "text"}
+                    trace = [system_prompt_step] + trace
+            self._cache_trial_to_redis(trial, trace)
 
-            # Cache completion status in Redis for efficient polling (parse trace for UI)
-            try:
-                trace, _ = TraceFormatter.serialize([SimpleMsg(m["role"], m["content"]) for m in trial_messages])
-
-                # Ensure system prompt is at top of trace
-                if not trace or trace[0].get('role') != 'system':
-                    # Get system prompt from messages or construct it
-                    system_prompt = None
-                    if messages and messages[0].get('role') == 'system':
-                        system_prompt = messages[0].get('content', '')
-                    if system_prompt:
-                        system_prompt_step = {"role": "system", "content": system_prompt, "step_type": "text"}
-                        trace = [system_prompt_step] + trace
-
-                status_data = {
-                    "id": trial.id,
-                    "status": "completed",
-                    "answer": trial.answer,
-                    "feedback": trial.feedback,
-                    "is_correct_llm": trial.is_correct_llm,
-                    "is_correct_rule": trial.is_correct_rule,
-                }
-                redis_client.set(RedisKeys.trial_status(trial.id), json.dumps(status_data), ex=RedisKeys.DEFAULT_TTL)
-                redis_client.set(RedisKeys.trial_trace(trial.id), json.dumps(trace), ex=RedisKeys.DEFAULT_TTL)
-            except Exception as e:
-                print_debug(f"Failed to cache trial status/trace: {e}")
-            
             return answer, is_correct_llm, []
 
 
@@ -1109,55 +1220,30 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
             trace_data: Parsed trace for UI rendering
         Returns: (answer, is_correct_llm)
         """
-        # Uses judge client/model, not generation model (sync operation, wrap it)
-        is_correct_llm = await sync_to_async(check_answer_llm)(
-            session.question, session.ground_truths, answer,
-            client=self.judge_client, model=self.judge_model
-        )
-        is_correct_rule = check_answer_rule(session.question, session.ground_truths, answer)
+        # Evaluate using shared async helper
+        is_correct_llm, is_correct_rule = await self._evaluate_trial_async(session, answer)
 
-        trial.answer = answer
-        trial.is_correct_llm = is_correct_llm
-        trial.is_correct_rule = is_correct_rule
-        trial.feedback = "Correct" if is_correct_llm else "Incorrect"
+        # Prepare messages (convert Msg objects to dicts)
+        serialized_messages = [m.to_dict() if hasattr(m, 'to_dict') else m for m in messages]
 
-        # Store raw messages (authentic agent context)
-        trial.log = trial.log or {}
-        trial.log['messages'] = [m.to_dict() if hasattr(m, 'to_dict') else m for m in messages]
-
-        # Store system prompt separately for database fallback when Redis expires
-        trial.log['system_prompt'] = self._get_actual_system_prompt()
-
-        # Store baseline-specific metadata (e.g., memory operations for agent baselines)
-        trial_meta = self._get_trial_meta(trial)
-        if trial_meta:
-            trial.log['meta'] = trial_meta
-
-        # Extract and store token usage from agent's model wrapper
+        # Extract token usage from agent's model wrapper
+        token_usage = None
         if hasattr(self, 'active_agent') and hasattr(self.active_agent, '_usage_tracker'):
             usage = self.active_agent._usage_tracker.get_usage()
             if usage and usage.get('call_count', 0) > 0:
-                trial.log['token_usage'] = usage
+                token_usage = usage
             # Reset tracker for next trial
             self.active_agent._usage_tracker.reset_usage()
 
-        trial.status = 'completed'
-        await trial.asave()  # Use Django's native async save
+        # Finalize trial using shared async helper
+        await self._finalize_trial_async(
+            trial, answer, is_correct_llm, is_correct_rule,
+            messages=serialized_messages,
+            system_prompt=self._get_actual_system_prompt(),
+            token_usage=token_usage
+        )
 
-        # Cache completion status in Redis (with trace for live UI)
-        try:
-            status_data = {
-                "id": trial.id,
-                "status": "completed",
-                "answer": trial.answer,
-                "feedback": trial.feedback,
-                "is_correct_llm": trial.is_correct_llm,
-                "is_correct_rule": trial.is_correct_rule,
-            }
-            await sync_to_async(redis_client.set)(RedisKeys.trial_status(trial.id), json.dumps(status_data), ex=RedisKeys.DEFAULT_TTL)
-            # Cache trace separately for live UI rendering
-            await sync_to_async(redis_client.set)(RedisKeys.trial_trace(trial.id), json.dumps(trace_data), ex=RedisKeys.DEFAULT_TTL)
-        except Exception as e:
-            print_debug(f"Failed to cache agent trial status: {e}")
+        # Cache to Redis using shared async helper
+        await self._cache_trial_to_redis_async(trial, trace_data)
 
         return answer, is_correct_llm

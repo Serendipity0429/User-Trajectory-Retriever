@@ -1,7 +1,6 @@
-{% extends 'base.html' %}
-{% load discussion_extras %}
+{% extends 'discussion_base.html' %}
 
-{% block content %}
+{% block discussion_content %}
 <div class="container discussion-page">
     <a href="{% url 'discussion_home' %}" class="btn btn-outline-secondary mt-3 mb-3">&laquo; Back to Forum</a>
     <h1 class="mb-4">Create a New Post</h1>
@@ -147,9 +146,9 @@
         </div>
     </form>
 </div>
-{% endblock %}
+{% endblock discussion_content %}
 
-{% block scripts %}
+{% block discussion_scripts %}
 <script>
 const easyMDE = initializeEasyMDE({
     elementId: "{{ form.content.auto_id }}",
@@ -325,4 +324,4 @@ $(function() {
     }
 });
 </script>
-{% endblock %}
+{% endblock discussion_scripts %}

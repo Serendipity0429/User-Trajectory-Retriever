@@ -441,6 +441,11 @@ class Command(BaseCommand):
             self.stdout.write(self.style.SUCCESS('Success Pattern Analysis: Identifying High-Value Training Trajectories'))
             self.stdout.write('=' * 70)
             self.stdout.write('')
+            self.stdout.write(self.style.ERROR('⚠ METHODOLOGICAL CAVEAT:'))
+            self.stdout.write('  Success/failure comparisons here CONFLATE user skill and task difficulty.')
+            self.stdout.write('  A trajectory fails because: (a) user struggled OR (b) task was hard.')
+            self.stdout.write('  For UNCONFOUNDED analysis, use: analyze_controlled_comparison')
+            self.stdout.write('')
             self.stdout.write(self.style.WARNING('RESEARCH GAPS ADDRESSED:'))
             self.stdout.write('  1. Human-Agent Capability Transfer (Son et al. 2024)')
             self.stdout.write('     - Humans: knowledge updating, ambiguity handling, failure investigation')
@@ -458,7 +463,7 @@ class Command(BaseCommand):
 
         # Get tasks
         task_ids = list(
-            Task.objects.filter(webpage__isnull=False)
+            Task.objects.filter(webpage__isnull=False).exclude(content__belong_dataset__name='tutorial')
             .values_list('id', flat=True)
             .distinct()
         )

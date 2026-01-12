@@ -453,7 +453,7 @@ class Command(BaseCommand):
 
         # Get tasks
         task_ids = list(
-            Task.objects.filter(webpage__isnull=False)
+            Task.objects.filter(webpage__isnull=False).exclude(content__belong_dataset__name='tutorial')
             .values_list('id', flat=True)
             .distinct()
         )

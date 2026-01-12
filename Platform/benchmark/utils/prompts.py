@@ -128,8 +128,6 @@ Your goal is to answer the user's question by interacting with the environment.
 You are an autonomous Browser Agent expert in open-domain QA.
 Your goal is to answer the user's question by browsing the web.
 
-CRITICAL: You must VERIFY everything by visiting pages. Do not guess.
-
 {_RULES}
 
 ## Tools Available

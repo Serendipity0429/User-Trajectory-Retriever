@@ -26,50 +26,12 @@ from core.utils import print_debug
 from asgiref.sync import sync_to_async
 
 
-# === Constants ===
-LLM_API_TIMEOUT = 30.0  # Timeout in seconds for LLM API calls (30s limit before marking as error)
-
-
-# === Shared Model Initialization ===
-
-def _init_agentscope_once():
-    """Initialize AgentScope environment (idempotent)."""
-    try:
-        agentscope.init(logging_level="INFO", use_monitor=False)
-    except TypeError:
-        agentscope.init(logging_level="INFO")
-
-
-def create_openai_model(llm_settings: 'BenchmarkSettings'):
-    """
-    Create an OpenAIChatModel with settings from BenchmarkSettings.
-
-    This is the single source of truth for model creation, used by all agent factories.
-    Includes timeout protection to prevent hangs on context overflow or network issues.
-    """
-    _init_agentscope_once()
-
-    model = OpenAIChatModel(
-        model_name=llm_settings.llm_model,
-        api_key=llm_settings.llm_api_key,
-        client_kwargs={
-            "base_url": llm_settings.llm_base_url,
-            "timeout": LLM_API_TIMEOUT,
-        },
-        stream=False
-    )
-    return model
-
-
 class UsageTrackingModelWrapper:
     """
     Wrapper around AgentScope model that tracks cumulative token usage.
 
     Intercepts all model calls and accumulates usage from ChatResponse.usage.
     Usage can be retrieved via get_usage() and reset via reset_usage().
-
-    Note: AgentScope's OpenAIChatModel.__call__ is async, so our __call__
-    must also be async to properly intercept and track usage.
     """
 
     def __init__(self, model):
@@ -82,8 +44,14 @@ class UsageTrackingModelWrapper:
             "calls": []
         }
 
-    async def __call__(self, *args, **kwargs):
-        """Async call - intercepts and tracks usage from the underlying model."""
+    def __call__(self, *args, **kwargs):
+        """Synchronous call - intercepts and tracks usage."""
+        response = self._model(*args, **kwargs)
+        self._track_usage(response)
+        return response
+
+    async def __acall__(self, *args, **kwargs):
+        """Async call - intercepts and tracks usage."""
         response = await self._model(*args, **kwargs)
         self._track_usage(response)
         return response
@@ -129,31 +97,30 @@ class UsageTrackingModelWrapper:
         return getattr(self._model, name)
 
 
-@sync_to_async(thread_sensitive=False)
+@sync_to_async
 def get_search_engine_safe(fetch_full_content=None):
-    """Get search engine in a sync-safe wrapper for async context."""
     return get_search_engine(fetch_full_content=fetch_full_content)
 
 async def web_search_tool(query: str):
     """
-    Perform a web search to retrieve up-to-date information.
+    Perform a web search to retrieve up-to-date information. 
     The output will be a list of search results containing titles, links, and snippets.
     To see the full content of a result, use the `visit_page` tool with the link.
-
+    
     Args:
         query (str): The specific search query string. Be precise.
-
+        
     Returns:
         ToolResponse: The search results in JSON format.
     """
     try:
         # Force fetch_full_content=False to simulate human behavior (snippets only)
         engine = await get_search_engine_safe(fetch_full_content=False)
-        results = await sync_to_async(engine.search, thread_sensitive=False)(query)
-
+        results = await sync_to_async(engine.search)(query)
+        
         if not results:
              return ToolResponse(content="No results found. Please try again with a different or more specific query.")
-
+        
         # Check for error dict
         if isinstance(results, list) and len(results) > 0 and isinstance(results[0], dict) and results[0].get('error'):
             return ToolResponse(content=f"Search Error: {results[0].get('error')}")
@@ -166,18 +133,18 @@ async def visit_page(url: str):
     """
     Visit a web page to read its full content.
     Use this tool to get detailed information from a search result URL.
-
+    
     Args:
         url (str): The URL of the page to visit.
     """
     try:
         crawler = WebCrawler()
         # WebCrawler.extract is synchronous, run it in a thread
-        content = await sync_to_async(crawler.extract, thread_sensitive=False)(url)
-
+        content = await sync_to_async(crawler.extract)(url)
+        
         if not content:
             return ToolResponse(content="Could not extract content from the page. It might be empty or inaccessible.")
-
+            
         return ToolResponse(content=content)
     except Exception as e:
         return ToolResponse(content=f"Error visiting page: {str(e)}")
@@ -364,10 +331,25 @@ class VanillaAgentFactory:
 
     @staticmethod
     def init_agentscope(llm_settings: BenchmarkSettings):
-        """Initialize AgentScope and create model with settings."""
-        return create_openai_model(llm_settings)
-
-
+        """
+        Initialize AgentScope with the project's LLM settings.
+        """
+        # Initialize basic agentscope environment (logging, etc.)
+        try:
+            agentscope.init(logging_level="INFO", use_monitor=False)
+        except TypeError:
+            agentscope.init(logging_level="INFO")
+        
+        # Create model instance directly
+        model = OpenAIChatModel(
+            model_name=llm_settings.llm_model,
+            api_key=llm_settings.llm_api_key,
+            client_kwargs={
+                "base_url": llm_settings.llm_base_url,
+            },
+            stream=False 
+        )
+        return model
 class BrowserAgentFactory:
     @staticmethod
     async def create_agent(model, toolkit: Toolkit, mcp_client: StdIOStatefulClient, verbose: bool = False, run_id=None):
@@ -390,13 +372,13 @@ class BrowserAgentFactory:
         # DEBUG: Print all registered tools
         print_debug(f"BrowserAgent Toolkit Tools: {list(toolkit.tools.keys())}")
 
-        settings = await sync_to_async(BenchmarkSettings.get_effective_settings, thread_sensitive=False)()
+        settings = await sync_to_async(BenchmarkSettings.get_effective_settings)()
         print_debug(f"BrowserAgent: Creating agent with memory_type={settings.memory_type}")
         short_term_memory, long_term_memory = create_memory(
             settings.memory_type,
             agent_name="BrowserAgent",
             user_id="browser_agent_user",
-            model=wrapped_model,
+            model=wrapped_model,  # Use wrapped model for memory operations too
             llm_settings=settings,
             run_id=run_id
         )
@@ -440,11 +422,23 @@ class BrowserAgentFactory:
     @staticmethod
     def init_agentscope(llm_settings: BenchmarkSettings):
         """
-        Initialize AgentScope and create model with toolkit.
-        Returns (model, toolkit). MCP connection is handled externally.
+        Initialize AgentScope with the project's LLM settings.
+        Returns model and toolkit. MCP connection is handled externally.
         """
-        model = create_openai_model(llm_settings)
+        try:
+            agentscope.init(logging_level="INFO", use_monitor=False)
+        except TypeError:
+            agentscope.init(logging_level="INFO")
 
+        model = OpenAIChatModel(
+            model_name=llm_settings.llm_model,
+            api_key=llm_settings.llm_api_key,
+            client_kwargs={
+                "base_url": llm_settings.llm_base_url,
+            },
+            stream=False 
+        )
+        
         toolkit = Toolkit()
         toolkit.register_tool_function(think)
         toolkit.register_tool_function(answer_question)

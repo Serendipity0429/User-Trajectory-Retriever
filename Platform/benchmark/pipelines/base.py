@@ -28,77 +28,6 @@ REDIS_PREFIX_BROWSER_AGENT = PipelinePrefix.BROWSER_AGENT
 
 HARD_QUESTIONS_PATH = os.path.join(os.path.dirname(__file__), '..', '..', 'data', 'hard_questions_refined.jsonl')
 
-
-def should_reset_session(session, max_retries):
-    """
-    Determine if a session should be reset for retry.
-
-    Returns True ONLY if:
-    - Session has error trials (need to retry due to errors)
-
-    Returns False if:
-    - Session has a successful trial (is_correct_llm=True)
-    - Session exhausted all retries (even if all incorrect)
-    - Session is marked completed with valid trials
-    """
-    all_trials = list(session.trials.all())
-    completed_trials = [t for t in all_trials if t.status == 'completed']
-    error_trials = [t for t in all_trials if t.status == 'error']
-
-    # If there are error trials, session needs reset
-    if len(error_trials) > 0:
-        print_debug(f"Session {session.id}: has {len(error_trials)} error trials, should reset")
-        return True
-
-    # If session has a successful trial, don't reset
-    has_success = any(t.is_correct_llm is True for t in completed_trials)
-    if has_success:
-        print_debug(f"Session {session.id}: has successful trial, should NOT reset")
-        return False
-
-    # If session exhausted retries (all incorrect but no errors), don't reset
-    if len(completed_trials) >= max_retries:
-        print_debug(f"Session {session.id}: exhausted {len(completed_trials)}/{max_retries} retries, should NOT reset")
-        return False
-
-    # Session didn't exhaust retries and has no success - might need more attempts
-    # But if session is marked complete, respect that
-    if session.is_completed:
-        print_debug(f"Session {session.id}: marked complete with {len(completed_trials)} trials, should NOT reset")
-        return False
-
-    print_debug(f"Session {session.id}: incomplete with {len(completed_trials)}/{max_retries} trials, should reset")
-    return True
-
-
-def collect_sessions_to_resume(group, max_retries):
-    """
-    Collect sessions that need to be resumed and fix incorrectly completed ones.
-
-    Returns:
-        tuple: (sessions_to_process, completed_questions)
-    """
-    # Start with explicitly incomplete sessions
-    sessions_to_process = list(group.sessions.filter(is_completed=False).prefetch_related('trials'))
-
-    # Check completed sessions for errors or incorrect completion
-    for session in group.sessions.filter(is_completed=True).prefetch_related('trials'):
-        if should_reset_session(session, max_retries):
-            session.is_completed = False
-            session.save()
-            sessions_to_process.append(session)
-
-            all_trials = list(session.trials.all())
-            completed = len([t for t in all_trials if t.status == 'completed'])
-            errors = len([t for t in all_trials if t.status == 'error'])
-            print_debug(f"Reset session #{session.id} (completed={completed}, errors={errors})")
-
-    # Get truly completed questions (after resets)
-    completed_questions = set(s.question for s in group.sessions.filter(is_completed=True))
-
-    return sessions_to_process, completed_questions
-
-
 def serialize_events(generator):
     """
     Helper function to serialize events from the pipeline generator.
@@ -114,8 +43,8 @@ async def serialize_events_async(generator):
         yield json.dumps(event) + "\n"
 
 class BasePipeline:
-    # Timeout for LLM API calls (30 seconds)
-    LLM_TIMEOUT = 30.0
+    # Timeout for LLM API calls (60 seconds)
+    LLM_TIMEOUT = 60.0
 
     def __init__(self, base_url, api_key, model, pipeline_id=None, dataset_id=None):
         self.client = openai.OpenAI(base_url=base_url, api_key=api_key, timeout=self.LLM_TIMEOUT)
@@ -369,21 +298,7 @@ class BaseMultiTurnPipeline(BasePipeline):
         self.group_id = group_id
 
     def create_session(self, settings, question_text, ground_truths, group):
-        """
-        Creates a session for the given question. Shared across all pipelines.
-        Pipeline type is determined by get_pipeline_type_name() hook.
-        """
-        return MultiTurnSession.objects.create(
-            question=question_text,
-            ground_truths=ground_truths,
-            run=group,
-            run_tag=self.pipeline_id,
-            pipeline_type=self.get_pipeline_type_name()
-        )
-
-    def get_pipeline_type_name(self):
-        """Returns the pipeline type identifier. Override in subclasses."""
-        raise NotImplementedError("Subclasses must implement get_pipeline_type_name()")
+        raise NotImplementedError("Subclasses must implement create_session")
 
     def create_trial(self, session, trial_number):
         """
@@ -407,82 +322,6 @@ class BaseMultiTurnPipeline(BasePipeline):
         This data is stored in trial.log['meta'] separate from conversation messages.
         """
         return {}
-
-    # === Shared Trial Finalization Helpers ===
-
-    def _evaluate_trial(self, session, answer):
-        """
-        Evaluates answer correctness using both LLM judge and rule-based checking.
-        Returns: (is_correct_llm, is_correct_rule)
-        """
-        is_correct_llm = check_answer_llm(
-            session.question, session.ground_truths, answer,
-            client=self.judge_client, model=self.judge_model
-        )
-        is_correct_rule = check_answer_rule(session.question, session.ground_truths, answer)
-        return is_correct_llm, is_correct_rule
-
-    def _finalize_trial(self, trial, answer, is_correct_llm, is_correct_rule,
-                        messages=None, system_prompt=None, token_usage=None, extra_log=None):
-        """
-        Finalizes a trial by setting result fields and saving to DB.
-
-        Args:
-            trial: The trial object to finalize
-            answer: The extracted answer
-            is_correct_llm: LLM judge result
-            is_correct_rule: Rule-based result
-            messages: List of message dicts to store in trial.log['messages']
-            system_prompt: System prompt to store separately for DB fallback
-            token_usage: Token usage dict to store
-            extra_log: Additional log data to merge (e.g., search_query, search_results)
-        """
-        trial.answer = answer
-        trial.is_correct_llm = is_correct_llm
-        trial.is_correct_rule = is_correct_rule
-        trial.feedback = "Correct" if is_correct_llm else "Incorrect"
-        trial.status = 'completed'
-
-        trial.log = trial.log or {}
-        if messages:
-            trial.log['messages'] = messages
-        if system_prompt:
-            trial.log['system_prompt'] = system_prompt
-        if token_usage:
-            trial.log['token_usage'] = token_usage
-
-        # Add baseline-specific metadata
-        trial_meta = self._get_trial_meta(trial)
-        if trial_meta:
-            trial.log['meta'] = trial_meta
-
-        # Merge any extra log data (e.g., search queries, search results)
-        if extra_log:
-            trial.log.update(extra_log)
-
-        trial.save()
-
-    def _cache_trial_to_redis(self, trial, trace_data):
-        """
-        Caches trial status and trace to Redis for live UI polling.
-
-        Args:
-            trial: The completed trial object
-            trace_data: Formatted trace list for UI rendering
-        """
-        try:
-            status_data = {
-                "id": trial.id,
-                "status": "completed",
-                "answer": trial.answer,
-                "feedback": trial.feedback,
-                "is_correct_llm": trial.is_correct_llm,
-                "is_correct_rule": trial.is_correct_rule,
-            }
-            redis_client.set(RedisKeys.trial_status(trial.id), json.dumps(status_data), ex=RedisKeys.DEFAULT_TTL)
-            redis_client.set(RedisKeys.trial_trace(trial.id), json.dumps(trace_data), ex=RedisKeys.DEFAULT_TTL)
-        except Exception as e:
-            print_debug(f"Failed to cache trial to Redis: {e}")
 
     def _process_single_session(self, group, question_text, ground_truths, existing_session=None):
         """
@@ -544,7 +383,6 @@ class BaseMultiTurnPipeline(BasePipeline):
                         'is_meta': True,
                         'type': 'trial_error',
                         'session_id': session.id,
-                        'trial_id': trial.id,
                         'trial_number': trial_number,
                         'error': str(e),
                         'group_id': group.id
@@ -580,9 +418,9 @@ class BaseMultiTurnPipeline(BasePipeline):
             total_trials = session.trials.filter(status='completed').count()
 
             if session_had_error:
-                # Error during trial - keep is_completed=False so resume can retry
+                # Error during trial - don't mark completed, yield error summary
                 yield {
-                    'question': question_text, 'is_correct_llm': None, 'is_correct_rule': None,
+                    'question': question_text, 'is_correct_llm': False, 'is_correct_rule': False,
                     'trials': total_trials, 'session_id': session.id, 'final_answer': None,
                     'ground_truths': ground_truths, 'max_retries': self.max_retries,
                     'group_name': group.name, 'group_id': group.id, 'session_error': True
@@ -594,13 +432,10 @@ class BaseMultiTurnPipeline(BasePipeline):
                 # Success or exhausted retries - mark completed
                 session.is_completed = True
                 session.save()
-
-                # Reload session with prefetched trials to ensure fresh data for metrics
-                # This is critical: session.refresh_from_db() does NOT refresh related objects
-                fresh_session = MultiTurnSession.objects.prefetch_related('trials').get(pk=session.id)
-
+                # Refresh session to get updated trials for full metrics
+                session.refresh_from_db()
                 # Extract full session metrics for live dashboard display
-                enriched = extract_session_metrics(fresh_session)
+                enriched = extract_session_metrics(session)
                 enriched.update({
                     'max_retries': self.max_retries,
                     'group_name': group.name,
@@ -620,7 +455,21 @@ class BaseMultiTurnPipeline(BasePipeline):
                 group = MultiTurnRun.objects.get(pk=self.group_id)
 
                 # Collect incomplete sessions + fix any incorrectly completed ones
-                incomplete_sessions, completed_questions = collect_sessions_to_resume(group, self.max_retries)
+                incomplete_sessions = list(group.sessions.filter(is_completed=False).prefetch_related('trials'))
+
+                for session in group.sessions.filter(is_completed=True).prefetch_related('trials'):
+                    completed_trials = list(session.trials.filter(status='completed'))
+                    has_success = any(t.is_correct_llm for t in completed_trials)
+                    if not has_success and len(completed_trials) < self.max_retries:
+                        session.is_completed = False
+                        session.save()
+                        incomplete_sessions.append(session)
+                        print_debug(f"Reset incorrectly completed session #{session.id} ({len(completed_trials)} trials, no success)")
+
+                # Identify truly completed questions (succeeded or exhausted retries)
+                completed_questions = set(
+                    s.question for s in group.sessions.filter(is_completed=True)
+                )
 
             except MultiTurnRun.DoesNotExist:
                 yield {'error': f"Group with ID {self.group_id} not found."}
@@ -739,36 +588,61 @@ class BaseMultiTurnPipeline(BasePipeline):
             else:
                 answer = full_response
 
-            # Evaluate using shared helper
-            is_correct_llm, is_correct_rule = self._evaluate_trial(session, answer)
+            # Logic for checking answer (uses judge client/model, not generation model)
+            is_correct_llm = check_answer_llm(session.question, session.ground_truths, answer, client=self.judge_client, model=self.judge_model)
+            is_correct_rule = check_answer_rule(session.question, session.ground_truths, answer)
 
-            # Build trial messages (delta only: system + user instruction + response)
+            # Store only this trial's messages (delta), not full conversation history
+            # This matches the trace structure: system prompt + current user input + response
             trial_messages = []
-            system_prompt = None
             if messages and messages[0].get('role') == 'system':
-                system_prompt = messages[0].get('content', '')
-                trial_messages.append({"role": "system", "content": system_prompt})
+                trial_messages.append({"role": "system", "content": messages[0].get("content", "")})
             trial_messages.append({"role": "user", "content": instruction})
             trial_messages.append({"role": "assistant", "content": full_response})
 
-            # Finalize trial using shared helper
-            self._finalize_trial(
-                trial, answer, is_correct_llm, is_correct_rule,
-                messages=trial_messages,
-                system_prompt=system_prompt,
-                token_usage=trial_usage
-            )
+            trial.answer = answer
+            trial.is_correct_llm = is_correct_llm
+            trial.is_correct_rule = is_correct_rule
+            trial.feedback = "Correct" if is_correct_llm else "Incorrect"
 
-            # Build trace for Redis caching
-            trace, _ = TraceFormatter.serialize([SimpleMsg(m["role"], m["content"]) for m in trial_messages])
-            # Ensure system prompt is at top of trace
-            if system_prompt and (not trace or trace[0].get('role') != 'system'):
-                system_prompt_step = {"role": "system", "content": system_prompt, "step_type": "text"}
-                trace = [system_prompt_step] + trace
+            trial.log = trial.log or {}
+            trial.log['messages'] = trial_messages
+            # Store system prompt separately for database fallback when Redis expires
+            if messages and messages[0].get('role') == 'system':
+                trial.log['system_prompt'] = messages[0].get('content', '')
+            # Store token usage
+            if trial_usage:
+                trial.log['token_usage'] = trial_usage
+            trial.status = 'completed'
+            trial.save()
 
-            # Cache to Redis using shared helper
-            self._cache_trial_to_redis(trial, trace)
+            # Cache completion status in Redis for efficient polling (parse trace for UI)
+            try:
+                trace, _ = TraceFormatter.serialize([SimpleMsg(m["role"], m["content"]) for m in trial_messages])
 
+                # Ensure system prompt is at top of trace
+                if not trace or trace[0].get('role') != 'system':
+                    # Get system prompt from messages or construct it
+                    system_prompt = None
+                    if messages and messages[0].get('role') == 'system':
+                        system_prompt = messages[0].get('content', '')
+                    if system_prompt:
+                        system_prompt_step = {"role": "system", "content": system_prompt, "step_type": "text"}
+                        trace = [system_prompt_step] + trace
+
+                status_data = {
+                    "id": trial.id,
+                    "status": "completed",
+                    "answer": trial.answer,
+                    "feedback": trial.feedback,
+                    "is_correct_llm": trial.is_correct_llm,
+                    "is_correct_rule": trial.is_correct_rule,
+                }
+                redis_client.set(RedisKeys.trial_status(trial.id), json.dumps(status_data), ex=RedisKeys.DEFAULT_TTL)
+                redis_client.set(RedisKeys.trial_trace(trial.id), json.dumps(trace), ex=RedisKeys.DEFAULT_TTL)
+            except Exception as e:
+                print_debug(f"Failed to cache trial status/trace: {e}")
+            
             return answer, is_correct_llm, []
 
 
@@ -802,7 +676,7 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
             }
         }
         # Add pipeline_type from subclass hook
-        pipeline_type = self.get_pipeline_type_name()
+        pipeline_type = self._get_pipeline_type()
         if pipeline_type:
             base_settings['pipeline_type'] = pipeline_type
         return base_settings
@@ -812,6 +686,10 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
         if hasattr(self, 'agent_model') and self.agent_model and hasattr(self.agent_model, 'model_name'):
             return self.agent_model.model_name
         return 'unknown'
+
+    def _get_pipeline_type(self):
+        """Hook for subclasses to provide their pipeline type string."""
+        return None
 
     def _get_memory_context(self):
         """Returns async context manager for long-term memory (ReMe needs it, others don't)."""
@@ -826,56 +704,6 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
     def _serialize_trace(self, trace_msgs):
         return TraceFormatter.serialize(trace_msgs)
 
-    def _extract_search_queries_from_trace(self, trace_data):
-        """
-        Extract search queries from agent trace data.
-
-        Looks for web_search_tool actions in the trace and extracts the query parameters.
-        Returns a list of search query strings.
-        """
-        queries = []
-        if not trace_data:
-            return queries
-
-        for step in trace_data:
-            # Look for action steps that contain web_search_tool calls
-            if step.get('step_type') == 'action':
-                content = step.get('content', '')
-                if isinstance(content, str) and 'web_search_tool' in content:
-                    try:
-                        # Try to parse as JSON to extract the query
-                        import json
-                        data = json.loads(content)
-                        # Handle both list format (tool_calls) and dict format (single tool)
-                        if isinstance(data, list):
-                            for item in data:
-                                if item.get('name') == 'web_search_tool':
-                                    query = self._extract_query_from_tool_call(item)
-                                    if query:
-                                        queries.append(query)
-                        elif isinstance(data, dict):
-                            if data.get('name') == 'web_search_tool':
-                                query = self._extract_query_from_tool_call(data)
-                                if query:
-                                    queries.append(query)
-                    except (json.JSONDecodeError, TypeError):
-                        pass
-        return queries
-
-    def _extract_query_from_tool_call(self, tool_call):
-        """Extract query string from a web_search_tool tool call dict."""
-        # Handle different input formats
-        input_data = tool_call.get('input') or tool_call.get('arguments') or tool_call.get('function', {}).get('arguments')
-        if isinstance(input_data, str):
-            try:
-                import json
-                input_data = json.loads(input_data)
-            except (json.JSONDecodeError, TypeError):
-                return input_data  # Might be the query string directly
-        if isinstance(input_data, dict):
-            return input_data.get('query')
-        return None
-
     async def _populate_agent_memory(self, session, agent):
         """
         Reconstructs the agent's internal state from database messages of previous trials.
@@ -886,7 +714,7 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
         """
         completed_trials = await sync_to_async(lambda: list(session.trials.filter(
             status='completed'
-        ).order_by('trial_number')), thread_sensitive=False)()
+        ).order_by('trial_number')))()
 
         for t in completed_trials:
             messages = t.log.get('messages', [])
@@ -910,17 +738,6 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
         """Hook called when a session ends. Override in subclasses for cleanup."""
         pass
 
-    def _requires_full_session_restart(self):
-        """
-        Hook to indicate whether resuming a session requires restarting from trial 1.
-
-        Override to return True for pipelines with ephemeral state (e.g., browser agent)
-        where the state from previous trials cannot be reconstructed.
-
-        Default: False (continue from last completed trial)
-        """
-        return False
-
     async def _process_single_session_async(self, group, question_text, ground_truths, existing_session=None):
         """
         Orchestrates the lifecycle of a single question across multiple trials.
@@ -929,37 +746,18 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
         try:
             if existing_session:
                 session = existing_session
-
-                if self._requires_full_session_restart():
-                    # Pipeline has ephemeral state - must restart entire session
-                    def full_cleanup():
-                        # Clear Redis cache for all trials before deleting
-                        for trial in session.trials.all():
-                            clear_trial_cache(trial.id)
-                        session.trials.all().delete()
-                    await sync_to_async(full_cleanup, thread_sensitive=False)()
-                    trial_number = 1
-                    print_debug(f"Session {session.id}: Full restart - cleared all trials and Redis cache")
-                else:
-                    # Can continue from last completed trial
-                    def cleanup():
-                        # Clear Redis cache for non-completed trials before deleting
-                        for trial in session.trials.exclude(status='completed'):
-                            clear_trial_cache(trial.id)
-                        session.trials.exclude(status='completed').delete()
-                        return session.trials.filter(status='completed').count()
-                    completed_count = await sync_to_async(cleanup, thread_sensitive=False)()
-                    trial_number = completed_count + 1
+                # Clean up stalled/incomplete trials
+                def cleanup():
+                    session.trials.exclude(status='completed').delete()
+                    return session.trials.filter(status='completed').count()
+                completed_count = await sync_to_async(cleanup)()
+                trial_number = completed_count + 1
             else:
-                print_debug(f"Creating new session for question: {question_text[:50]}...")
-                session = await sync_to_async(self.create_session, thread_sensitive=False)(self.llm_settings, question_text, ground_truths, group)
-                print_debug(f"Session created: {session.id}")
+                session = await sync_to_async(self.create_session)(self.llm_settings, question_text, ground_truths, group)
                 trial_number = 1
 
             # Session lifecycle: setup resources (e.g., browser instance)
-            print_debug(f"Calling _on_session_start for session {session.id}")
             await self._on_session_start(session)
-            print_debug(f"_on_session_start completed for session {session.id}")
 
             is_session_completed = False
             final_is_correct_llm = False
@@ -967,22 +765,17 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
             final_is_correct_llm_rule = False
             session_had_error = False
 
-            is_resumed = existing_session is not None
             try:
-                print_debug(f"Session {session.id}: {'Resumed' if is_resumed else 'Created'}, yielding session event")
                 yield {
-                    'is_meta': True, 'type': 'session_resumed' if is_resumed else 'session_created',
-                    'session_id': session.id,
-                    'question': question_text, 'group_id': group.id, 'group_name': group.name,
-                    'is_resumed': is_resumed
+                    'is_meta': True, 'type': 'session_created', 'session_id': session.id,
+                    'question': question_text, 'group_id': group.id, 'group_name': group.name
                 }
 
-                print_debug(f"Session {session.id}: Starting trial loop (max_retries={self.max_retries}, trial_number={trial_number})")
                 while trial_number <= self.max_retries and not is_session_completed:
-                    if not await sync_to_async(self.check_active, thread_sensitive=False)():
+                    if not await sync_to_async(self.check_active)():
                         break
 
-                    trial = await sync_to_async(self.create_trial, thread_sensitive=False)(session, trial_number)
+                    trial = await sync_to_async(self.create_trial)(session, trial_number)
                     yield {
                         'is_meta': True, 'type': 'trial_started', 'session_id': session.id,
                         'trial_number': trial_number, 'group_id': group.id
@@ -996,8 +789,7 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
                         print_debug(f"Trial {trial_number} failed with error: {e}")
                         yield {
                             'is_meta': True, 'type': 'trial_error', 'session_id': session.id,
-                            'trial_id': trial.id, 'trial_number': trial_number,
-                            'error': str(e), 'group_id': group.id
+                            'trial_number': trial_number, 'error': str(e), 'group_id': group.id
                         }
                         # Mark that session had an error (don't mark as completed)
                         session_had_error = True
@@ -1017,14 +809,13 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
                     else: trial_number += 1
 
                 # Determine why the loop exited
-                pipeline_stopped = not await sync_to_async(self.check_active, thread_sensitive=False)()
-                total_trials = await sync_to_async(lambda: session.trials.filter(status='completed').count(), thread_sensitive=False)()
-                print_debug(f"Session {session.id}: Trial loop exited - is_session_completed={is_session_completed}, session_had_error={session_had_error}, pipeline_stopped={pipeline_stopped}, total_trials={total_trials}")
+                pipeline_stopped = not await sync_to_async(self.check_active)()
+                total_trials = await sync_to_async(lambda: session.trials.filter(status='completed').count())()
 
                 if session_had_error:
-                    # Error during trial - keep is_completed=False so resume can retry
+                    # Error during trial - don't mark completed, yield error summary
                     yield {
-                        'question': question_text, 'is_correct_llm': None, 'is_correct_rule': None,
+                        'question': question_text, 'is_correct_llm': False, 'is_correct_rule': False,
                         'trials': total_trials, 'session_id': session.id, 'final_answer': None,
                         'ground_truths': ground_truths, 'max_retries': self.max_retries,
                         'group_name': group.name, 'group_id': group.id, 'session_error': True
@@ -1035,16 +826,11 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
                 else:
                     # Success or exhausted retries - mark completed
                     session.is_completed = True
-                    await sync_to_async(session.save, thread_sensitive=False)()
-
-                    # Reload session with prefetched trials to ensure fresh data for metrics
-                    # This is critical: session.refresh_from_db() does NOT refresh related objects
-                    def reload_session_with_trials():
-                        return MultiTurnSession.objects.prefetch_related('trials').get(pk=session.id)
-                    fresh_session = await sync_to_async(reload_session_with_trials, thread_sensitive=False)()
-
+                    await sync_to_async(session.save)()
+                    # Refresh session to get updated trials for full metrics
+                    await sync_to_async(session.refresh_from_db)()
                     # Extract full session metrics for live dashboard display
-                    enriched = await sync_to_async(extract_session_metrics, thread_sensitive=False)(fresh_session)
+                    enriched = await sync_to_async(extract_session_metrics)(session)
                     enriched.update({
                         'max_retries': self.max_retries,
                         'group_name': group.name,
@@ -1055,9 +841,6 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
                 # Session lifecycle: cleanup resources (e.g., browser instance)
                 await self._on_session_end(session)
         except Exception as e:
-            import traceback
-            print_debug(f"CRITICAL ERROR in _process_single_session_async: {e}")
-            print_debug(f"Traceback: {traceback.format_exc()}")
             yield {'error': str(e), 'question': question_text}
 
     async def run(self):
@@ -1076,33 +859,46 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
 
         if self.group_id:
             try:
-                group = await sync_to_async(MultiTurnRun.objects.get, thread_sensitive=False)(pk=self.group_id)
+                group = await sync_to_async(MultiTurnRun.objects.get)(pk=self.group_id)
 
-                incomplete_sessions, completed_questions = await sync_to_async(collect_sessions_to_resume, thread_sensitive=False)(group, self.max_retries)
+                def collect_sessions_to_process():
+                    # Collect incomplete sessions + fix any incorrectly completed ones
+                    sessions_to_process = list(group.sessions.filter(is_completed=False).prefetch_related('trials'))
+
+                    for session in group.sessions.filter(is_completed=True).prefetch_related('trials'):
+                        completed_trials = list(session.trials.filter(status='completed'))
+                        has_success = any(t.is_correct_llm for t in completed_trials)
+                        if not has_success and len(completed_trials) < self.max_retries:
+                            session.is_completed = False
+                            session.save()
+                            sessions_to_process.append(session)
+                            print_debug(f"Reset incorrectly completed session #{session.id} ({len(completed_trials)} trials, no success)")
+
+                    completed_qs = set(s.question for s in group.sessions.filter(is_completed=True))
+                    return sessions_to_process, completed_qs
+
+                incomplete_sessions, completed_questions = await sync_to_async(collect_sessions_to_process)()
             except MultiTurnRun.DoesNotExist:
                  yield {'error': f"Group with ID {self.group_id} not found."}
                  return
         else:
-            group = await sync_to_async(create_run_obj, thread_sensitive=False)()
+            group = await sync_to_async(create_run_obj)()
 
         # Set run_id for memory isolation (used by agent pipelines)
         if hasattr(self, '_current_run_id'):
             self._current_run_id = group.id
 
-        file_path = await sync_to_async(self.get_questions_file_path, thread_sensitive=False)()
-        total_questions = await sync_to_async(count_questions_in_file, thread_sensitive=False)(file_path)
+        file_path = await sync_to_async(self.get_questions_file_path)()
+        total_questions = await sync_to_async(count_questions_in_file)(file_path)
         yield {'is_meta': True, 'type': 'total_count', 'count': total_questions}
 
         # PHASE 1: Resume ALL incomplete sessions first
-        print_debug(f"PHASE 1: {len(incomplete_sessions)} incomplete sessions to resume")
         for session in incomplete_sessions:
-            if not await sync_to_async(self.check_active, thread_sensitive=False)():
-                print_debug("PHASE 1: check_active returned False, breaking")
+            if not await sync_to_async(self.check_active)():
                 break
 
             # Add to completed set so we don't process again in phase 2
             completed_questions.add(session.question)
-            print_debug(f"PHASE 1: Processing session #{session.id}")
 
             async for event in self._process_single_session_async(
                 group,
@@ -1113,38 +909,30 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
                 yield event
 
         # PHASE 2: Process new questions from dataset
-        print_debug(f"PHASE 2: Starting, {len(completed_questions)} questions already completed")
         from .agent import question_file_iterator
         questions_iterator = question_file_iterator(file_path)
 
         while True:
-            if not await sync_to_async(self.check_active, thread_sensitive=False)():
-                print_debug("PHASE 2: check_active returned False, breaking")
+            if not await sync_to_async(self.check_active)():
                 break
             try:
-                data = await sync_to_async(next, thread_sensitive=False)(questions_iterator)
+                data = await sync_to_async(next)(questions_iterator)
             except StopIteration:
-                print_debug("PHASE 2: StopIteration - all questions processed")
                 break
 
             question_text = data['question']
 
             # Skip if already completed or processed in phase 1
             if question_text in completed_questions:
-                print_debug(f"PHASE 2: Skipping already completed question: {question_text[:50]}...")
                 continue
-
-            print_debug(f"PHASE 2: Processing new question: {question_text[:50]}...")
 
             ground_truths = data.get('ground_truths', [])
 
             async for event in self._process_single_session_async(group, question_text, ground_truths, existing_session=None):
                 yield event
 
-        print_debug("Pipeline run loop completed, cleaning up...")
         await self.cleanup()
-        await sync_to_async(self.stop_token, thread_sensitive=False)()
-        print_debug("Pipeline finished")
+        await sync_to_async(self.stop_token)()
 
     async def cleanup(self):
         """Optional hook for subclasses to release resources (e.g. MCP connections)."""
@@ -1183,15 +971,13 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
                     except: turn_start_index = 0
 
                 # Use shared retry prompt for all baselines
-                last_trial = await sync_to_async(lambda: session.trials.filter(status='completed').last(), thread_sensitive=False)()
+                last_trial = await sync_to_async(lambda: session.trials.filter(status='completed').last())()
                 feedback = last_trial.feedback if last_trial else "Incorrect"
                 retry_prompt = self._get_retry_prompt_key()
                 current_msg = Msg(name="User", role="user", content=PROMPTS[retry_prompt].format(question=session.question))
 
             if not hasattr(self, 'active_agent') or not self.active_agent:
-                print_debug(f"Trial {trial.trial_number}: Initializing agent...")
                 self.active_agent = await self._init_agent()
-                print_debug(f"Trial {trial.trial_number}: Agent initialized successfully")
 
             # The update hook allows real-time trace streaming to the frontend.
             # Use asyncio.create_task to properly schedule the async function
@@ -1208,23 +994,17 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
 
             try:
                 # 2. Execute Agent (delegated hook)
-                print_debug(f"Trial {trial.trial_number}: Executing agent...")
                 response_msg = await self._execute_agent(current_msg)
-                print_debug(f"Trial {trial.trial_number}: Agent returned response")
 
                 # 3. Process Response
                 trace_msgs = await self.active_agent.memory.get_memory()
-                print_debug(f"Trial {trial.trial_number}: Got {len(trace_msgs)} trace messages")
                 answer = self._parse_answer(response_msg)
-                print_debug(f"Trial {trial.trial_number}: Parsed answer from response: '{answer[:100] if answer else 'EMPTY'}...'")
 
                 # Slice to only save the 'delta' for the current trial
                 relevant_trace_msgs = trace_msgs[turn_start_index:] if len(trace_msgs) > turn_start_index else []
-                print_debug(f"Trial {trial.trial_number}: {len(relevant_trace_msgs)} relevant trace messages (from index {turn_start_index})")
 
                 # Parse trace for UI rendering and answer extraction
                 trace_data, real_answer_found = self._serialize_trace(relevant_trace_msgs)
-                print_debug(f"Trial {trial.trial_number}: Serialized {len(trace_data)} trace steps, real_answer_found: '{real_answer_found[:100] if real_answer_found else 'None'}...'")
                 if real_answer_found: answer = real_answer_found
 
                 # Ensure system prompt is at top of trace
@@ -1233,33 +1013,9 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
                     trace_data = [system_prompt_step] + trace_data
 
                 # 4. Save - pass raw messages and parsed trace
-                # MUST use asyncio.to_thread here because save_trial_result calls check_answer_llm
-                # which uses OpenAI SDK (httpx) that detects async context with sync_to_async
-                print_debug(f"Trial {trial.trial_number}: Saving trial result with answer: '{answer[:100] if answer else 'EMPTY'}...'")
-                answer, is_correct_llm = await asyncio.to_thread(
-                    self.save_trial_result, session, trial, answer, relevant_trace_msgs, trace_data
+                answer, is_correct_llm = await sync_to_async(self.save_trial_result)(
+                    session, trial, answer, relevant_trace_msgs, trace_data
                 )
-                print_debug(f"Trial {trial.trial_number}: Saved, is_correct_llm={is_correct_llm}")
-            except Exception as e:
-                # Save partial trace from agent memory before error propagates
-                # This ensures we have the trace even if Redis cache is empty/stale
-                try:
-                    if hasattr(self, 'active_agent') and self.active_agent and hasattr(self.active_agent, 'memory'):
-                        trace_msgs = await self.active_agent.memory.get_memory()
-                        relevant_msgs = trace_msgs[turn_start_index:] if len(trace_msgs) > turn_start_index else []
-                        if relevant_msgs:
-                            trace_data, _ = self._serialize_trace(relevant_msgs)
-                            # Add system prompt to trace
-                            if not trace_data or trace_data[0].get('role') != 'system':
-                                system_prompt_step = {"role": "system", "content": self._get_actual_system_prompt(), "step_type": "text"}
-                                trace_data = [system_prompt_step] + trace_data
-                            # Save trace to Redis so AsyncTrialGuard can pick it up
-                            key = RedisKeys.trial_trace(trial.id)
-                            await asyncio.to_thread(lambda: redis_client.set(key, json.dumps(trace_data), ex=RedisKeys.DEFAULT_TTL))
-                            print_debug(f"Saved {len(trace_data)} trace steps before error propagation")
-                except Exception as trace_err:
-                    print_debug(f"Failed to save partial trace on error: {trace_err}")
-                raise  # Re-raise the original exception
             finally:
                 # Avoid side-effects after trial finishes.
                 if hasattr(self, 'active_agent') and self.active_agent:
@@ -1347,38 +1103,52 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
             trace_data: Parsed trace for UI rendering
         Returns: (answer, is_correct_llm)
         """
-        # Evaluate using shared helper
-        is_correct_llm, is_correct_rule = self._evaluate_trial(session, answer)
+        # Uses judge client/model, not generation model
+        is_correct_llm = check_answer_llm(session.question, session.ground_truths, answer, client=self.judge_client, model=self.judge_model)
+        is_correct_rule = check_answer_rule(session.question, session.ground_truths, answer)
 
-        # Convert Msg objects to dict format
-        messages_list = [m.to_dict() if hasattr(m, 'to_dict') else m for m in messages]
+        trial.answer = answer
+        trial.is_correct_llm = is_correct_llm
+        trial.is_correct_rule = is_correct_rule
+        trial.feedback = "Correct" if is_correct_llm else "Incorrect"
 
-        # Build agent-specific extra log entries
-        extra_log = {}
+        # Store raw messages (authentic agent context)
+        trial.log = trial.log or {}
+        trial.log['messages'] = [m.to_dict() if hasattr(m, 'to_dict') else m for m in messages]
 
-        # Extract token usage from agent's model wrapper
+        # Store system prompt separately for database fallback when Redis expires
+        trial.log['system_prompt'] = self._get_actual_system_prompt()
+
+        # Store baseline-specific metadata (e.g., memory operations for agent baselines)
+        trial_meta = self._get_trial_meta(trial)
+        if trial_meta:
+            trial.log['meta'] = trial_meta
+
+        # Extract and store token usage from agent's model wrapper
         if hasattr(self, 'active_agent') and hasattr(self.active_agent, '_usage_tracker'):
             usage = self.active_agent._usage_tracker.get_usage()
             if usage and usage.get('call_count', 0) > 0:
-                extra_log['token_usage'] = usage
+                trial.log['token_usage'] = usage
             # Reset tracker for next trial
             self.active_agent._usage_tracker.reset_usage()
 
-        # Extract search queries from trace data
-        search_queries = self._extract_search_queries_from_trace(trace_data)
-        if search_queries:
-            extra_log['search_queries'] = search_queries
+        trial.status = 'completed'
+        trial.save()
 
-        # Finalize trial using shared helper
-        self._finalize_trial(
-            trial, answer, is_correct_llm, is_correct_rule,
-            messages=messages_list,
-            system_prompt=self._get_actual_system_prompt(),
-            token_usage=extra_log.get('token_usage'),
-            extra_log={'search_queries': extra_log.get('search_queries')} if extra_log.get('search_queries') else None
-        )
-
-        # Cache to Redis using shared helper
-        self._cache_trial_to_redis(trial, trace_data)
+        # Cache completion status in Redis (with trace for live UI)
+        try:
+            status_data = {
+                "id": trial.id,
+                "status": "completed",
+                "answer": trial.answer,
+                "feedback": trial.feedback,
+                "is_correct_llm": trial.is_correct_llm,
+                "is_correct_rule": trial.is_correct_rule,
+            }
+            redis_client.set(RedisKeys.trial_status(trial.id), json.dumps(status_data), ex=RedisKeys.DEFAULT_TTL)
+            # Cache trace separately for live UI rendering
+            redis_client.set(RedisKeys.trial_trace(trial.id), json.dumps(trace_data), ex=RedisKeys.DEFAULT_TTL)
+        except Exception as e:
+            print_debug(f"Failed to cache agent trial status: {e}")
 
         return answer, is_correct_llm

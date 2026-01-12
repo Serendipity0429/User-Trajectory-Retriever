@@ -1,7 +1,7 @@
 import inspect
 import json
 from asgiref.sync import sync_to_async
-from ..models import BenchmarkSettings, MultiTurnRun
+from ..models import BenchmarkSettings, MultiTurnRun, MultiTurnSession
 from ..utils import (
     print_debug,
     VanillaAgentFactory, BrowserAgentFactory
@@ -44,7 +44,7 @@ class VanillaAgentPipeline(BaseAgentPipeline):
     @classmethod
     async def create(cls, base_url, api_key, model, max_retries, pipeline_id=None, dataset_id=None, group_id=None):
         try:
-            instance = await sync_to_async(cls, thread_sensitive=False)(base_url, api_key, model, max_retries, pipeline_id, dataset_id, group_id)
+            instance = await sync_to_async(cls)(base_url, api_key, model, max_retries, pipeline_id, dataset_id, group_id)
             return instance
         except Exception as e:
             print_debug(f"VanillaAgentPipeline: Error in create: {e}")
@@ -53,21 +53,22 @@ class VanillaAgentPipeline(BaseAgentPipeline):
     def __str__(self):
         return "Vanilla Agent Pipeline"
 
-    def get_pipeline_type_name(self):
+    def _get_pipeline_type(self):
         return 'vanilla_agent'
 
-    def _requires_full_session_restart(self):
-        """
-        When resuming, restart the entire session from trial 1.
-        This ensures consistent agent state since we can't reconstruct
-        the conversation context from previous trials.
-        """
-        return True
+    def create_session(self, settings, question_text, ground_truths, group):
+        return MultiTurnSession.objects.create(
+            question=question_text,
+            ground_truths=ground_truths,
+            run=group,
+            run_tag=self.pipeline_id,
+            pipeline_type='vanilla_agent'
+        )
 
     # Hooks for BaseAgentPipeline template
     async def _init_agent(self):
         # Pass run_id for memory isolation (set by base pipeline before agent creation)
-        agent, long_term_memory = await sync_to_async(VanillaAgentFactory.create_agent, thread_sensitive=False)(
+        agent, long_term_memory = await sync_to_async(VanillaAgentFactory.create_agent)(
             self.agent_model,
             run_id=self._current_run_id
         )
@@ -134,7 +135,7 @@ class BrowserAgentPipeline(BaseAgentPipeline):
     async def create(cls, base_url, api_key, model, max_retries, pipeline_id=None, dataset_id=None, group_id=None):
         try:
             print_debug("BrowserAgentPipeline: Creating instance (lightweight)...")
-            instance = await sync_to_async(cls, thread_sensitive=False)(base_url, api_key, model, max_retries, pipeline_id, dataset_id, group_id)
+            instance = await sync_to_async(cls)(base_url, api_key, model, max_retries, pipeline_id, dataset_id, group_id)
             return instance
         except Exception as e:
             print_debug(f"BrowserAgentPipeline: Error in create: {e}")
@@ -143,15 +144,17 @@ class BrowserAgentPipeline(BaseAgentPipeline):
     def __str__(self):
         return "Browser Agent Pipeline"
 
-    def get_pipeline_type_name(self):
+    def _get_pipeline_type(self):
         return 'browser_agent'
 
-    def _requires_full_session_restart(self):
-        """
-        Browser agent maintains browser state across trials within a session.
-        When resuming, we must restart the entire session since browser state is lost.
-        """
-        return True
+    def create_session(self, settings, question_text, ground_truths, group):
+        return MultiTurnSession.objects.create(
+            question=question_text,
+            ground_truths=ground_truths,
+            run=group,
+            run_tag=self.pipeline_id,
+            pipeline_type='browser_agent'
+        )
 
     async def cleanup(self):
         """Final cleanup at end of pipeline run."""

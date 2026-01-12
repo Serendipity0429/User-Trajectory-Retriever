@@ -32,8 +32,8 @@ window.BenchmarkUtils.MultiTurnPage = (function() {
         ERROR_INTERVAL: 10000,  // On network error
 
         // Timeout settings
-        MAX_POLL_TIME: 3 * 60 * 1000,  // 3 minutes max polling time
-        STALL_THRESHOLD: 60 * 1000,      // Show warning after 1 min of no changes
+        MAX_POLL_TIME: 1 * 60 * 1000,  // 1 minutes max polling time
+        STALL_THRESHOLD: 30 * 1000,      // Show warning after 1 min of no changes
 
         // Backoff settings
         BACKOFF_MULTIPLIER: 1.5,  // Increase interval by 50% on no change
@@ -502,7 +502,12 @@ window.BenchmarkUtils.MultiTurnPage = (function() {
                 callbacks: {
                     onMeta: (data) => {
                         if (data.type === 'info') ui.statusDiv.textContent = data.message;
-                        if (data.type === 'session_created') {
+                        if (data.type === 'session_created' || data.type === 'session_resumed') {
+                            // For resumed sessions, clear any cached state first
+                            if (data.is_resumed) {
+                                // Force fresh load by clearing cache
+                                console.log(`Session ${data.session_id} resumed, clearing cached state`);
+                            }
                             BenchmarkSessionUI.addNewSessionToList('session-list', data.session_id, { question: data.question }, null, data.group_id, data.group_name, 'Processing...', pipelineType);
                             loadSession(data.session_id, null, pipelineType);
                             if (data.group_id) activeGroupId = data.group_id;

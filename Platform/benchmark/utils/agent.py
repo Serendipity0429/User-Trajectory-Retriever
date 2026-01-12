@@ -131,17 +131,18 @@ class UsageTrackingModelWrapper:
 
 @sync_to_async
 def get_search_engine_safe(fetch_full_content=None):
+    """Get search engine in a sync-safe wrapper for async context."""
     return get_search_engine(fetch_full_content=fetch_full_content)
 
 async def web_search_tool(query: str):
     """
-    Perform a web search to retrieve up-to-date information. 
+    Perform a web search to retrieve up-to-date information.
     The output will be a list of search results containing titles, links, and snippets.
     To see the full content of a result, use the `visit_page` tool with the link.
-    
+
     Args:
         query (str): The specific search query string. Be precise.
-        
+
     Returns:
         ToolResponse: The search results in JSON format.
     """
@@ -149,10 +150,10 @@ async def web_search_tool(query: str):
         # Force fetch_full_content=False to simulate human behavior (snippets only)
         engine = await get_search_engine_safe(fetch_full_content=False)
         results = await sync_to_async(engine.search)(query)
-        
+
         if not results:
              return ToolResponse(content="No results found. Please try again with a different or more specific query.")
-        
+
         # Check for error dict
         if isinstance(results, list) and len(results) > 0 and isinstance(results[0], dict) and results[0].get('error'):
             return ToolResponse(content=f"Search Error: {results[0].get('error')}")
@@ -165,7 +166,7 @@ async def visit_page(url: str):
     """
     Visit a web page to read its full content.
     Use this tool to get detailed information from a search result URL.
-    
+
     Args:
         url (str): The URL of the page to visit.
     """
@@ -173,10 +174,10 @@ async def visit_page(url: str):
         crawler = WebCrawler()
         # WebCrawler.extract is synchronous, run it in a thread
         content = await sync_to_async(crawler.extract)(url)
-        
+
         if not content:
             return ToolResponse(content="Could not extract content from the page. It might be empty or inaccessible.")
-            
+
         return ToolResponse(content=content)
     except Exception as e:
         return ToolResponse(content=f"Error visiting page: {str(e)}")
@@ -395,7 +396,7 @@ class BrowserAgentFactory:
             settings.memory_type,
             agent_name="BrowserAgent",
             user_id="browser_agent_user",
-            model=wrapped_model,  # Use wrapped model for memory operations too
+            model=wrapped_model,
             llm_settings=settings,
             run_id=run_id
         )

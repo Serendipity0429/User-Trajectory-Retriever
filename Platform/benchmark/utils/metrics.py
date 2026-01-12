@@ -793,12 +793,29 @@ def extract_session_metrics(session) -> Dict[str, Any]:
     first_trial = trials[0]
     last_trial = trials[-1]
 
+    # Detect error sessions: any trial has status='error' or last trial has no judgment
+    has_error_trial = any(get_attr(t, 'status') == 'error' for t in trials)
+    is_correct_llm = get_attr(last_trial, 'is_correct_llm')
+
+    # Get max_retries from session settings if available
+    max_retries = None
+    if hasattr(session, 'run') and session.run and hasattr(session.run, 'settings') and session.run.settings:
+        max_retries = getattr(session.run.settings, 'max_retries', None)
+
+    # For error sessions (has error trial OR no judgment AND trials < max_retries), use max_retries
+    actual_trials = len(trials)
+    effective_trials = actual_trials
+    if max_retries is not None:
+        is_error_session = has_error_trial or (is_correct_llm is None and actual_trials < max_retries)
+        if is_error_session:
+            effective_trials = max_retries
+
     result = {
         'session_id': get_attr(session, 'id'),
         'question': get_attr(session, 'question'),
         'ground_truths': get_attr(session, 'ground_truths'),
-        'trials': len(trials),
-        'is_correct_llm': get_attr(last_trial, 'is_correct_llm'),
+        'trials': effective_trials,
+        'is_correct_llm': is_correct_llm,
         'is_correct_rule': get_attr(last_trial, 'is_correct_rule'),
         'final_answer': get_attr(last_trial, 'answer'),
         'initial_correct': get_attr(first_trial, 'is_correct_llm'),

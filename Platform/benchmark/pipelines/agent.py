@@ -56,6 +56,14 @@ class VanillaAgentPipeline(BaseAgentPipeline):
     def get_pipeline_type_name(self):
         return 'vanilla_agent'
 
+    def _requires_full_session_restart(self):
+        """
+        When resuming, restart the entire session from trial 1.
+        This ensures consistent agent state since we can't reconstruct
+        the conversation context from previous trials.
+        """
+        return True
+
     # Hooks for BaseAgentPipeline template
     async def _init_agent(self):
         # Pass run_id for memory isolation (set by base pipeline before agent creation)

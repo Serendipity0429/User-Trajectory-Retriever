@@ -432,10 +432,13 @@ class BaseMultiTurnPipeline(BasePipeline):
                 # Success or exhausted retries - mark completed
                 session.is_completed = True
                 session.save()
-                # Refresh session to get updated trials for full metrics
-                session.refresh_from_db()
+
+                # Reload session with prefetched trials to ensure fresh data for metrics
+                # This is critical: session.refresh_from_db() does NOT refresh related objects
+                fresh_session = MultiTurnSession.objects.prefetch_related('trials').get(pk=session.id)
+
                 # Extract full session metrics for live dashboard display
-                enriched = extract_session_metrics(session)
+                enriched = extract_session_metrics(fresh_session)
                 enriched.update({
                     'max_retries': self.max_retries,
                     'group_name': group.name,
@@ -704,6 +707,56 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
     def _serialize_trace(self, trace_msgs):
         return TraceFormatter.serialize(trace_msgs)
 
+    def _extract_search_queries_from_trace(self, trace_data):
+        """
+        Extract search queries from agent trace data.
+
+        Looks for web_search_tool actions in the trace and extracts the query parameters.
+        Returns a list of search query strings.
+        """
+        queries = []
+        if not trace_data:
+            return queries
+
+        for step in trace_data:
+            # Look for action steps that contain web_search_tool calls
+            if step.get('step_type') == 'action':
+                content = step.get('content', '')
+                if isinstance(content, str) and 'web_search_tool' in content:
+                    try:
+                        # Try to parse as JSON to extract the query
+                        import json
+                        data = json.loads(content)
+                        # Handle both list format (tool_calls) and dict format (single tool)
+                        if isinstance(data, list):
+                            for item in data:
+                                if item.get('name') == 'web_search_tool':
+                                    query = self._extract_query_from_tool_call(item)
+                                    if query:
+                                        queries.append(query)
+                        elif isinstance(data, dict):
+                            if data.get('name') == 'web_search_tool':
+                                query = self._extract_query_from_tool_call(data)
+                                if query:
+                                    queries.append(query)
+                    except (json.JSONDecodeError, TypeError):
+                        pass
+        return queries
+
+    def _extract_query_from_tool_call(self, tool_call):
+        """Extract query string from a web_search_tool tool call dict."""
+        # Handle different input formats
+        input_data = tool_call.get('input') or tool_call.get('arguments') or tool_call.get('function', {}).get('arguments')
+        if isinstance(input_data, str):
+            try:
+                import json
+                input_data = json.loads(input_data)
+            except (json.JSONDecodeError, TypeError):
+                return input_data  # Might be the query string directly
+        if isinstance(input_data, dict):
+            return input_data.get('query')
+        return None
+
     async def _populate_agent_memory(self, session, agent):
         """
         Reconstructs the agent's internal state from database messages of previous trials.
@@ -827,10 +880,15 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
                     # Success or exhausted retries - mark completed
                     session.is_completed = True
                     await sync_to_async(session.save)()
-                    # Refresh session to get updated trials for full metrics
-                    await sync_to_async(session.refresh_from_db)()
+
+                    # Reload session with prefetched trials to ensure fresh data for metrics
+                    # This is critical: session.refresh_from_db() does NOT refresh related objects
+                    def reload_session_with_trials():
+                        return MultiTurnSession.objects.prefetch_related('trials').get(pk=session.id)
+                    fresh_session = await sync_to_async(reload_session_with_trials)()
+
                     # Extract full session metrics for live dashboard display
-                    enriched = await sync_to_async(extract_session_metrics)(session)
+                    enriched = await sync_to_async(extract_session_metrics)(fresh_session)
                     enriched.update({
                         'max_retries': self.max_retries,
                         'group_name': group.name,
@@ -1131,6 +1189,11 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
                 trial.log['token_usage'] = usage
             # Reset tracker for next trial
             self.active_agent._usage_tracker.reset_usage()
+
+        # Extract and store search queries from trace data (for agent pipelines)
+        search_queries = self._extract_search_queries_from_trace(trace_data)
+        if search_queries:
+            trial.log['search_queries'] = search_queries
 
         trial.status = 'completed'
         trial.save()

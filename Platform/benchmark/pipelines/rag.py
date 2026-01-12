@@ -77,7 +77,7 @@ class RagMultiTurnPipeline(BaseMultiTurnPipeline):
         with TrialGuard(trial):
             allow_reasoning = session.run.settings.allow_reasoning if session.run and session.run.settings else False
 
-            # Build base history from past trials (same pattern as vanilla_llm)
+            # Build base history from past trials 
             if completed_trials is None:
                 completed_trials = list(session.trials.filter(
                     trial_number__lt=trial.trial_number,
@@ -88,7 +88,7 @@ class RagMultiTurnPipeline(BaseMultiTurnPipeline):
             trial.log = trial.log or {}
             turn_messages = []  # Messages added during this turn
 
-            # Extract system prompt for trace (same pattern as vanilla_llm)
+            # Extract system prompt for trace
             system_prompt = history[0].get('content', '') if history and history[0].get('role') == 'system' else ''
 
             # Helper for trace updates - includes system prompt + current turn messages
@@ -99,7 +99,7 @@ class RagMultiTurnPipeline(BaseMultiTurnPipeline):
                 return trace_msgs
 
             def update_redis_trace(current_turn_messages):
-                # Include system prompt + current turn messages (matches vanilla_llm pattern)
+                # Include system prompt + current turn messages
                 trace_msgs = []
                 if system_prompt:
                     trace_msgs.append(SimpleMsg("system", system_prompt))
@@ -195,6 +195,9 @@ class RagMultiTurnPipeline(BaseMultiTurnPipeline):
                 trial_messages.append({"role": "system", "content": system_prompt})
             trial_messages.extend(turn_messages)
             trial.log["messages"] = trial_messages
+            # Store system prompt separately for consistency with other pipelines
+            if system_prompt:
+                trial.log["system_prompt"] = system_prompt
             trial.log["meta"] = self._get_trial_meta(trial)
             # Store token usage
             if trial_usage:

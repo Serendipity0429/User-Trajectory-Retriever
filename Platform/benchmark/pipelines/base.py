@@ -383,6 +383,7 @@ class BaseMultiTurnPipeline(BasePipeline):
                         'is_meta': True,
                         'type': 'trial_error',
                         'session_id': session.id,
+                        'trial_id': trial.id,
                         'trial_number': trial_number,
                         'error': str(e),
                         'group_id': group.id
@@ -842,7 +843,8 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
                         print_debug(f"Trial {trial_number} failed with error: {e}")
                         yield {
                             'is_meta': True, 'type': 'trial_error', 'session_id': session.id,
-                            'trial_number': trial_number, 'error': str(e), 'group_id': group.id
+                            'trial_id': trial.id, 'trial_number': trial_number,
+                            'error': str(e), 'group_id': group.id
                         }
                         # Mark that session had an error (don't mark as completed)
                         session_had_error = True
@@ -1074,6 +1076,26 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
                 answer, is_correct_llm = await sync_to_async(self.save_trial_result)(
                     session, trial, answer, relevant_trace_msgs, trace_data
                 )
+            except Exception as e:
+                # Save partial trace from agent memory before error propagates
+                # This ensures we have the trace even if Redis cache is empty/stale
+                try:
+                    if hasattr(self, 'active_agent') and self.active_agent and hasattr(self.active_agent, 'memory'):
+                        trace_msgs = await self.active_agent.memory.get_memory()
+                        relevant_msgs = trace_msgs[turn_start_index:] if len(trace_msgs) > turn_start_index else []
+                        if relevant_msgs:
+                            trace_data, _ = self._serialize_trace(relevant_msgs)
+                            # Add system prompt to trace
+                            if not trace_data or trace_data[0].get('role') != 'system':
+                                system_prompt_step = {"role": "system", "content": self._get_actual_system_prompt(), "step_type": "text"}
+                                trace_data = [system_prompt_step] + trace_data
+                            # Save trace to Redis so AsyncTrialGuard can pick it up
+                            key = RedisKeys.trial_trace(trial.id)
+                            await asyncio.to_thread(lambda: redis_client.set(key, json.dumps(trace_data), ex=RedisKeys.DEFAULT_TTL))
+                            print_debug(f"Saved {len(trace_data)} trace steps before error propagation")
+                except Exception as trace_err:
+                    print_debug(f"Failed to save partial trace on error: {trace_err}")
+                raise  # Re-raise the original exception
             finally:
                 # Avoid side-effects after trial finishes.
                 if hasattr(self, 'active_agent') and self.active_agent:

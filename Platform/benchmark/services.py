@@ -61,6 +61,10 @@ class TrialService:
                         "is_correct_rule": trial.is_correct_rule,
                         "full_response": trial.full_response if trial.status != 'processing' else None
                     }
+                    # Include error message if trial has error status
+                    if trial.status == 'error' and trial.log:
+                        trial_data["error"] = trial.log.get('error', 'Unknown error')
+                        trial_data["error_type"] = trial.log.get('error_type', 'Unknown')
                 except MultiTurnTrial.DoesNotExist:
                     trial_data = {"status": "error", "error": "Trial not found"}
 
@@ -96,13 +100,23 @@ class TrialService:
     def _reconstruct_trace_from_db(trial_id):
         """
         Reconstructs trace from database when Redis cache expires.
-        Uses trial.log['messages'] and trial.log['system_prompt'].
+
+        Priority order:
+        1. trial.log['trace'] - Pre-formatted trace saved during error recovery or completion
+        2. trial.log['messages'] + trial.log['system_prompt'] - Raw messages to reconstruct
         """
         try:
             trial = MultiTurnTrial.objects.get(pk=trial_id)
             if not trial.log:
                 return []
 
+            # PRIORITY 1: Check for pre-saved trace (saved during error recovery by AsyncTrialGuard)
+            saved_trace = trial.log.get('trace')
+            if saved_trace and isinstance(saved_trace, list) and len(saved_trace) > 0:
+                print_debug(f"Using pre-saved trace for trial {trial_id} ({len(saved_trace)} steps)")
+                return saved_trace
+
+            # PRIORITY 2: Reconstruct from raw messages
             messages = trial.log.get('messages', [])
             if not messages:
                 return []

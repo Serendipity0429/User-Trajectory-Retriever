@@ -22,6 +22,24 @@ window.BenchmarkUtils.MultiTurnPage = (function() {
     let sessionRetryTimeout = null;
     let loadSessionDebounceTimer = null;  // Debounce timer for loadSession
 
+    // === Polling Configuration ===
+    const POLL_CONFIG = {
+        // Interval bounds (ms)
+        MIN_INTERVAL: 250,      // Burst mode when active
+        BASE_INTERVAL: 500,     // Normal streaming
+        IDLE_INTERVAL: 2000,    // When waiting for next step
+        MAX_INTERVAL: 5000,     // Maximum backoff
+        ERROR_INTERVAL: 10000,  // On network error
+
+        // Timeout settings
+        MAX_POLL_TIME: 3 * 60 * 1000,  // 3 minutes max polling time
+        STALL_THRESHOLD: 60 * 1000,      // Show warning after 1 min of no changes
+
+        // Backoff settings
+        BACKOFF_MULTIPLIER: 1.5,  // Increase interval by 50% on no change
+        BURST_RESET_COUNT: 2      // Reset to burst mode after 2 consecutive changes
+    };
+
     // === Polling ===
     function stopPolling(trialId) {
         if (activePolls[trialId]) {
@@ -38,7 +56,22 @@ window.BenchmarkUtils.MultiTurnPage = (function() {
         }
         const config = BenchmarkPipelineConfig.get(pipelineType);
 
+        // Initialize polling state for this trial
+        trialState[trialId] = {
+            startTime: Date.now(),
+            lastChangeTime: Date.now(),
+            lastStepCount: 0,
+            lastContentHash: '',
+            consecutiveNoChange: 0,
+            consecutiveChanges: 0,
+            currentInterval: POLL_CONFIG.BASE_INTERVAL,
+            stallWarningShown: false
+        };
+
         const poll = () => {
+            const state = trialState[trialId];
+            if (!state) return;  // Polling was stopped
+
             const trialDiv = document.getElementById(`trial-${trialId}`);
             if (!trialDiv) {
                 stopPolling(trialId);
@@ -51,8 +84,25 @@ window.BenchmarkUtils.MultiTurnPage = (function() {
                 return;
             }
 
+            // Check for max polling time exceeded
+            const elapsedTime = Date.now() - state.startTime;
+            if (elapsedTime > POLL_CONFIG.MAX_POLL_TIME) {
+                stopPolling(trialId);
+                // Show timeout warning
+                if (!wrapper.querySelector('.trial-timeout-warning')) {
+                    const timeoutWarning = document.createElement('div');
+                    timeoutWarning.className = 'trial-timeout-warning alert alert-warning mt-3';
+                    timeoutWarning.innerHTML = `
+                        <strong>Polling Timeout</strong>
+                        <p class="mb-0 small">Stopped polling after ${Math.round(POLL_CONFIG.MAX_POLL_TIME / 60000)} minutes.
+                        The trial may still be processing. <a href="#" onclick="window.BenchmarkUtils.MultiTurnPage.startPolling(${trialId}, '${pipelineType}'); this.closest('.trial-timeout-warning').remove(); return false;">Resume polling</a></p>
+                    `;
+                    wrapper.appendChild(timeoutWarning);
+                }
+                return;
+            }
+
             // Always fetch full trace (cursor=0) and do a smart diff/replace
-            // This avoids sync issues between DOM state and cursor tracking
             BenchmarkAPI.get(`/benchmark/api/sessions/get_trial_trace/${trialId}/?cursor=0`)
                 .then(data => {
                     const allSteps = data.trace || [];
@@ -67,6 +117,63 @@ window.BenchmarkUtils.MultiTurnPage = (function() {
                     const existingCount = existingBubbles.length;
                     const verdictContainer = wrapper.querySelector('.trial-verdict-container');
                     const hasNewSteps = allSteps.length > existingCount;
+
+                    // Compute content hash for change detection (step count + last step content length)
+                    const contentHash = `${allSteps.length}:${lastStep ? (lastStep.content || '').length : 0}`;
+                    const hasContentChange = contentHash !== state.lastContentHash;
+                    state.lastContentHash = contentHash;
+
+                    // Update change tracking
+                    if (hasContentChange || hasNewSteps) {
+                        state.lastChangeTime = Date.now();
+                        state.consecutiveNoChange = 0;
+                        state.consecutiveChanges++;
+                        state.stallWarningShown = false;
+                        // Remove stall warning if it was shown
+                        wrapper.querySelector('.trial-stall-warning')?.remove();
+                    } else {
+                        state.consecutiveNoChange++;
+                        state.consecutiveChanges = 0;
+                    }
+
+                    // Calculate next polling interval dynamically
+                    let nextInterval;
+                    if (isStreaming && state.consecutiveChanges >= POLL_CONFIG.BURST_RESET_COUNT) {
+                        // Burst mode: rapid polling when actively streaming
+                        nextInterval = POLL_CONFIG.MIN_INTERVAL;
+                    } else if (isStreaming) {
+                        // Normal streaming
+                        nextInterval = POLL_CONFIG.BASE_INTERVAL;
+                    } else if (state.consecutiveNoChange > 0) {
+                        // Exponential backoff when no changes
+                        nextInterval = Math.min(
+                            state.currentInterval * POLL_CONFIG.BACKOFF_MULTIPLIER,
+                            POLL_CONFIG.MAX_INTERVAL
+                        );
+                    } else {
+                        // Idle, waiting for next step
+                        nextInterval = POLL_CONFIG.IDLE_INTERVAL;
+                    }
+                    state.currentInterval = nextInterval;
+
+                    // Check for stall condition
+                    const timeSinceChange = Date.now() - state.lastChangeTime;
+                    if (timeSinceChange > POLL_CONFIG.STALL_THRESHOLD && !state.stallWarningShown) {
+                        state.stallWarningShown = true;
+                        // Show stall warning (but keep polling)
+                        if (!wrapper.querySelector('.trial-stall-warning')) {
+                            const stallWarning = document.createElement('div');
+                            stallWarning.className = 'trial-stall-warning alert alert-info mt-2 py-2';
+                            stallWarning.innerHTML = `<small><i class="bi bi-hourglass-split me-1"></i>Waiting for response... (${Math.round(timeSinceChange / 1000)}s)</small>`;
+                            const indicator = wrapper.querySelector('.trial-processing-indicator')?.closest('.message-bubble');
+                            if (indicator) indicator.insertAdjacentElement('beforebegin', stallWarning);
+                            else wrapper.appendChild(stallWarning);
+                        }
+                    } else if (state.stallWarningShown && wrapper.querySelector('.trial-stall-warning')) {
+                        // Update stall warning time
+                        const stallEl = wrapper.querySelector('.trial-stall-warning small');
+                        if (stallEl) stallEl.innerHTML = `<i class="bi bi-hourglass-split me-1"></i>Waiting for response... (${Math.round(timeSinceChange / 1000)}s)`;
+                    }
 
                     // Only remove spinner when we have new steps to show (prevents flicker)
                     if (hasNewSteps) {
@@ -83,14 +190,11 @@ window.BenchmarkUtils.MultiTurnPage = (function() {
                     }
 
                     // Update last step if streaming (content may have changed)
-                    if (isStreaming && existingCount > 0 && allSteps.length === existingCount) {
+                    if (isStreaming && existingCount > 0 && allSteps.length === existingCount && hasContentChange) {
                         const lastBubble = existingBubbles[existingCount - 1];
                         const lastStepEl = BenchmarkUtils.BenchmarkRenderer.renderAgentStep(lastStep, existingCount - 1, trialId, trialInfo ? trialInfo.answer : null);
                         lastBubble.replaceWith(lastStepEl);
                     }
-
-                    // Set backoff based on streaming state
-                    const backoffDelay = isStreaming ? 500 : 2000;
 
                     // Add processing indicator if still processing and not already present
                     if (trialInfo && trialInfo.status === 'processing' && !wrapper.querySelector('.trial-processing-indicator')) {
@@ -107,10 +211,11 @@ window.BenchmarkUtils.MultiTurnPage = (function() {
                             trialTraceCache[trialId] = allSteps;
                         }
 
-                        // Final cleanup: remove all processing indicators
-                        wrapper.querySelectorAll('.trial-processing-indicator').forEach(indicator => {
-                            const parent = indicator.closest('.message-bubble');
+                        // Final cleanup: remove all indicators and warnings
+                        wrapper.querySelectorAll('.trial-processing-indicator, .trial-stall-warning').forEach(el => {
+                            const parent = el.closest('.message-bubble');
                             if (parent) parent.remove();
+                            else el.remove();
                         });
 
                         // Add verdict if completed and not already present
@@ -118,25 +223,39 @@ window.BenchmarkUtils.MultiTurnPage = (function() {
                             const verdictContainer = BenchmarkUtils.BenchmarkRenderer.renderTrialVerdict(trialInfo);
                             if (verdictContainer) wrapper.appendChild(verdictContainer);
                         }
+                        // Add error display if trial has error status
+                        if (trialInfo.status === 'error' && !wrapper.querySelector('.trial-error-container')) {
+                            const errorContainer = document.createElement('div');
+                            errorContainer.className = 'trial-error-container alert alert-danger mt-3';
+                            errorContainer.innerHTML = `
+                                <strong>Trial Error</strong>
+                                <p class="mb-0 small">${BenchmarkHelpers.escapeHtml(trialInfo.error || 'An error occurred during this trial.')}</p>
+                            `;
+                            wrapper.appendChild(errorContainer);
+                        }
                         return;
                     }
 
-                    // Schedule next poll
+                    // Schedule next poll with dynamic interval
                     if (activePolls[trialId]) {
-                        activePolls[trialId] = setTimeout(poll, backoffDelay);
+                        activePolls[trialId] = setTimeout(poll, nextInterval);
                     }
                 })
                 .catch(err => {
                     console.error("Polling error:", err);
-                    // Schedule retry with longer backoff
+                    // Exponential backoff on errors, but cap at ERROR_INTERVAL
+                    state.currentInterval = Math.min(
+                        state.currentInterval * 2,
+                        POLL_CONFIG.ERROR_INTERVAL
+                    );
                     if (activePolls[trialId]) {
-                        activePolls[trialId] = setTimeout(poll, 10000);
+                        activePolls[trialId] = setTimeout(poll, state.currentInterval);
                     }
                 });
         };
 
         // Mark as active and start first poll
-        activePolls[trialId] = setTimeout(poll, 500);
+        activePolls[trialId] = setTimeout(poll, POLL_CONFIG.MIN_INTERVAL);
     }
 
     // === Session Helpers ===
@@ -389,6 +508,18 @@ window.BenchmarkUtils.MultiTurnPage = (function() {
                             if (data.group_id) activeGroupId = data.group_id;
                         }
                         if (data.type === 'trial_started' || data.type === 'trial_completed') {
+                            if (activeSessionId && String(activeSessionId) === String(data.session_id)) {
+                                loadSession(data.session_id, null, pipelineType);
+                            }
+                        }
+                        // Handle trial errors - stop polling and update UI immediately
+                        if (data.type === 'trial_error') {
+                            ui.statusDiv.textContent = `Trial error: ${data.error}`;
+                            // Stop polling for this trial if we have the trial_id
+                            if (data.trial_id) {
+                                stopPolling(data.trial_id);
+                            }
+                            // Reload session to show error state
                             if (activeSessionId && String(activeSessionId) === String(data.session_id)) {
                                 loadSession(data.session_id, null, pipelineType);
                             }

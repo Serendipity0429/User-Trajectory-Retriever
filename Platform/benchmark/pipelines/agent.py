@@ -169,7 +169,7 @@ class BrowserAgentPipeline(BaseAgentPipeline):
 
         # Initialize fresh model and toolkit for this session
         self.agent_model, self.agent_toolkit = await sync_to_async(
-            BrowserAgentFactory.init_agentscope, thread_sensitive=False
+            BrowserAgentFactory.init_agentscope
         )(self.temp_settings)
 
         # Create fresh MCP manager and connect
@@ -209,7 +209,7 @@ class BrowserAgentPipeline(BaseAgentPipeline):
         if not self.agent_model or not self.agent_toolkit:
             print_debug("Warning: Model/toolkit not initialized, initializing now")
             self.agent_model, self.agent_toolkit = await sync_to_async(
-                BrowserAgentFactory.init_agentscope, thread_sensitive=False
+                BrowserAgentFactory.init_agentscope
             )(self.temp_settings)
             self.mcp_manager = ChromeDevToolsMCPManager()
             self.mcp_client = await self.mcp_manager.connect(self.agent_toolkit)

@@ -26,12 +26,50 @@ from core.utils import print_debug
 from asgiref.sync import sync_to_async
 
 
+# === Constants ===
+LLM_API_TIMEOUT = 120.0  # Timeout in seconds for LLM API calls (prevents hangs on context overflow)
+
+
+# === Shared Model Initialization ===
+
+def _init_agentscope_once():
+    """Initialize AgentScope environment (idempotent)."""
+    try:
+        agentscope.init(logging_level="INFO", use_monitor=False)
+    except TypeError:
+        agentscope.init(logging_level="INFO")
+
+
+def create_openai_model(llm_settings: 'BenchmarkSettings'):
+    """
+    Create an OpenAIChatModel with settings from BenchmarkSettings.
+
+    This is the single source of truth for model creation, used by all agent factories.
+    Includes timeout protection to prevent hangs on context overflow or network issues.
+    """
+    _init_agentscope_once()
+
+    model = OpenAIChatModel(
+        model_name=llm_settings.llm_model,
+        api_key=llm_settings.llm_api_key,
+        client_kwargs={
+            "base_url": llm_settings.llm_base_url,
+            "timeout": LLM_API_TIMEOUT,
+        },
+        stream=False
+    )
+    return model
+
+
 class UsageTrackingModelWrapper:
     """
     Wrapper around AgentScope model that tracks cumulative token usage.
 
     Intercepts all model calls and accumulates usage from ChatResponse.usage.
     Usage can be retrieved via get_usage() and reset via reset_usage().
+
+    Note: AgentScope models use async __call__, so we wrap the coroutine
+    to track usage after awaiting.
     """
 
     def __init__(self, model):
@@ -45,14 +83,21 @@ class UsageTrackingModelWrapper:
         }
 
     def __call__(self, *args, **kwargs):
-        """Synchronous call - intercepts and tracks usage."""
-        response = self._model(*args, **kwargs)
-        self._track_usage(response)
-        return response
+        """
+        Intercept model calls. AgentScope models return coroutines from __call__,
+        so we wrap the coroutine to track usage after it completes.
+        """
+        result = self._model(*args, **kwargs)
+        # If result is a coroutine, wrap it to track usage after awaiting
+        if asyncio.iscoroutine(result):
+            return self._wrap_coroutine(result)
+        # Synchronous result - track immediately
+        self._track_usage(result)
+        return result
 
-    async def __acall__(self, *args, **kwargs):
-        """Async call - intercepts and tracks usage."""
-        response = await self._model(*args, **kwargs)
+    async def _wrap_coroutine(self, coro):
+        """Wrap a coroutine to track usage after it completes."""
+        response = await coro
         self._track_usage(response)
         return response
 
@@ -331,25 +376,10 @@ class VanillaAgentFactory:
 
     @staticmethod
     def init_agentscope(llm_settings: BenchmarkSettings):
-        """
-        Initialize AgentScope with the project's LLM settings.
-        """
-        # Initialize basic agentscope environment (logging, etc.)
-        try:
-            agentscope.init(logging_level="INFO", use_monitor=False)
-        except TypeError:
-            agentscope.init(logging_level="INFO")
-        
-        # Create model instance directly
-        model = OpenAIChatModel(
-            model_name=llm_settings.llm_model,
-            api_key=llm_settings.llm_api_key,
-            client_kwargs={
-                "base_url": llm_settings.llm_base_url,
-            },
-            stream=False 
-        )
-        return model
+        """Initialize AgentScope and create model with settings."""
+        return create_openai_model(llm_settings)
+
+
 class BrowserAgentFactory:
     @staticmethod
     async def create_agent(model, toolkit: Toolkit, mcp_client: StdIOStatefulClient, verbose: bool = False, run_id=None):
@@ -422,23 +452,11 @@ class BrowserAgentFactory:
     @staticmethod
     def init_agentscope(llm_settings: BenchmarkSettings):
         """
-        Initialize AgentScope with the project's LLM settings.
-        Returns model and toolkit. MCP connection is handled externally.
+        Initialize AgentScope and create model with toolkit.
+        Returns (model, toolkit). MCP connection is handled externally.
         """
-        try:
-            agentscope.init(logging_level="INFO", use_monitor=False)
-        except TypeError:
-            agentscope.init(logging_level="INFO")
+        model = create_openai_model(llm_settings)
 
-        model = OpenAIChatModel(
-            model_name=llm_settings.llm_model,
-            api_key=llm_settings.llm_api_key,
-            client_kwargs={
-                "base_url": llm_settings.llm_base_url,
-            },
-            stream=False 
-        )
-        
         toolkit = Toolkit()
         toolkit.register_tool_function(think)
         toolkit.register_tool_function(answer_question)

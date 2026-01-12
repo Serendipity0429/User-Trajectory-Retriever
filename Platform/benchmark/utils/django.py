@@ -3,7 +3,6 @@ Django-specific utilities: decorators, context managers with ORM integration.
 """
 
 import json
-import asyncio
 from functools import wraps
 from django.http import JsonResponse
 from asgiref.sync import sync_to_async
@@ -108,9 +107,7 @@ class AsyncTrialGuard:
             partial_trace = []
             try:
                 from task_manager.utils import redis_client
-                trace_json = await asyncio.to_thread(
-                    redis_client.get, RedisKeys.trial_trace(self.trial.id)
-                )
+                trace_json = await sync_to_async(redis_client.get)(RedisKeys.trial_trace(self.trial.id))
                 if trace_json:
                     partial_trace = json.loads(trace_json)
             except Exception:
@@ -121,8 +118,7 @@ class AsyncTrialGuard:
 
             try:
                 from task_manager.utils import redis_client
-                await asyncio.to_thread(
-                    redis_client.set,
+                await sync_to_async(redis_client.set)(
                     RedisKeys.trial_status(self.trial.id),
                     status_payload,
                     RedisKeys.DEFAULT_TTL

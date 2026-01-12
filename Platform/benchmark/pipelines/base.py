@@ -1092,7 +1092,7 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
             if trace_data:
                 trace_data[-1]['is_streaming'] = True
             key = RedisKeys.trial_trace(trial.id)
-            await asyncio.to_thread(lambda: redis_client.set(key, json.dumps(trace_data), ex=RedisKeys.DEFAULT_TTL))
+            await sync_to_async(redis_client.set)(key, json.dumps(trace_data), ex=RedisKeys.DEFAULT_TTL)
         except Exception as e: print_debug(f"Trace update failed: {e}")
 
     def save_trial_result(self, session, trial, answer, messages, trace_data):

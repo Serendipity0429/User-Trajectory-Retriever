@@ -531,7 +531,7 @@ def get_navigation_stats():
     }
 
 
-def get_top_domains(limit=10):
+def get_top_domains(limit=15):
     """Get top visited domains."""
     if getattr(settings, 'DATABASE_TYPE', 'sqlite') == 'postgres':
         with connection.cursor() as cursor:

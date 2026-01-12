@@ -3,6 +3,11 @@ import os
 import openai
 import asyncio
 import time
+
+# Bypass Django's async safety check - sync_to_async has issues with Django 5.x/asgiref 3.9.x
+# where it still detects async context even inside thread pool threads
+os.environ.setdefault("DJANGO_ALLOW_ASYNC_UNSAFE", "true")
+
 from asgiref.sync import sync_to_async
 from datetime import datetime
 from task_manager.utils import redis_client, check_answer_rule, check_answer_llm
@@ -786,7 +791,8 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
                     except Exception as e:
                         # AsyncTrialGuard already marked the trial as 'error' and saved partial trace
                         # Yield error event and abandon session, move to next question
-                        print_debug(f"Trial {trial_number} failed with error: {e}")
+                        import traceback
+                        print_debug(f"Trial {trial_number} failed with error: {e}\n{traceback.format_exc()}")
                         yield {
                             'is_meta': True, 'type': 'trial_error', 'session_id': session.id,
                             'trial_number': trial_number, 'error': str(e), 'group_id': group.id
@@ -826,9 +832,9 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
                 else:
                     # Success or exhausted retries - mark completed
                     session.is_completed = True
-                    await sync_to_async(session.save)()
+                    await session.asave()  # Use Django's native async save
                     # Refresh session to get updated trials for full metrics
-                    await sync_to_async(session.refresh_from_db)()
+                    await session.arefresh_from_db()
                     # Extract full session metrics for live dashboard display
                     enriched = await sync_to_async(extract_session_metrics)(session)
                     enriched.update({
@@ -1013,7 +1019,7 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
                     trace_data = [system_prompt_step] + trace_data
 
                 # 4. Save - pass raw messages and parsed trace
-                answer, is_correct_llm = await sync_to_async(self.save_trial_result)(
+                answer, is_correct_llm = await self.save_trial_result_async(
                     session, trial, answer, relevant_trace_msgs, trace_data
                 )
             finally:
@@ -1095,16 +1101,19 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
             await sync_to_async(redis_client.set)(key, json.dumps(trace_data), ex=RedisKeys.DEFAULT_TTL)
         except Exception as e: print_debug(f"Trace update failed: {e}")
 
-    def save_trial_result(self, session, trial, answer, messages, trace_data):
+    async def save_trial_result_async(self, session, trial, answer, messages, trace_data):
         """
-        Saves the trial result to DB and caches status in Redis.
+        Saves the trial result to DB and caches status in Redis (async version).
         Args:
             messages: Raw Msg objects (list) - the authentic agent context
             trace_data: Parsed trace for UI rendering
         Returns: (answer, is_correct_llm)
         """
-        # Uses judge client/model, not generation model
-        is_correct_llm = check_answer_llm(session.question, session.ground_truths, answer, client=self.judge_client, model=self.judge_model)
+        # Uses judge client/model, not generation model (sync operation, wrap it)
+        is_correct_llm = await sync_to_async(check_answer_llm)(
+            session.question, session.ground_truths, answer,
+            client=self.judge_client, model=self.judge_model
+        )
         is_correct_rule = check_answer_rule(session.question, session.ground_truths, answer)
 
         trial.answer = answer
@@ -1133,7 +1142,7 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
             self.active_agent._usage_tracker.reset_usage()
 
         trial.status = 'completed'
-        trial.save()
+        await trial.asave()  # Use Django's native async save
 
         # Cache completion status in Redis (with trace for live UI)
         try:
@@ -1145,9 +1154,9 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
                 "is_correct_llm": trial.is_correct_llm,
                 "is_correct_rule": trial.is_correct_rule,
             }
-            redis_client.set(RedisKeys.trial_status(trial.id), json.dumps(status_data), ex=RedisKeys.DEFAULT_TTL)
+            await sync_to_async(redis_client.set)(RedisKeys.trial_status(trial.id), json.dumps(status_data), ex=RedisKeys.DEFAULT_TTL)
             # Cache trace separately for live UI rendering
-            redis_client.set(RedisKeys.trial_trace(trial.id), json.dumps(trace_data), ex=RedisKeys.DEFAULT_TTL)
+            await sync_to_async(redis_client.set)(RedisKeys.trial_trace(trial.id), json.dumps(trace_data), ex=RedisKeys.DEFAULT_TTL)
         except Exception as e:
             print_debug(f"Failed to cache agent trial status: {e}")
 

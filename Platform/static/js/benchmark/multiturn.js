@@ -32,8 +32,9 @@ window.BenchmarkUtils.MultiTurnPage = (function() {
         ERROR_INTERVAL: 10000,  // On network error
 
         // Timeout settings
-        MAX_POLL_TIME: 1 * 60 * 1000,  // 1 minutes max polling time
-        STALL_THRESHOLD: 30 * 1000,      // Show warning after 1 min of no changes
+        MAX_POLL_TIME: 10 * 60 * 1000,       // 10 minutes max polling time (for complex agents)
+        INACTIVITY_TIMEOUT: 3 * 60 * 1000,   // Stop after 3 minutes of NO changes
+        STALL_THRESHOLD: 30 * 1000,          // Show warning after 30s of no changes
 
         // Backoff settings
         BACKOFF_MULTIPLIER: 1.5,  // Increase interval by 50% on no change
@@ -84,17 +85,28 @@ window.BenchmarkUtils.MultiTurnPage = (function() {
                 return;
             }
 
-            // Check for max polling time exceeded
+            // Check for timeout conditions
             const elapsedTime = Date.now() - state.startTime;
-            if (elapsedTime > POLL_CONFIG.MAX_POLL_TIME) {
+            const timeSinceLastChange = Date.now() - state.lastChangeTime;
+
+            // Two timeout conditions:
+            // 1. Absolute max time exceeded (safety limit for very long runs)
+            // 2. No activity for INACTIVITY_TIMEOUT (smarter - stops only if truly stalled)
+            const absoluteTimeout = elapsedTime > POLL_CONFIG.MAX_POLL_TIME;
+            const inactivityTimeout = timeSinceLastChange > POLL_CONFIG.INACTIVITY_TIMEOUT;
+
+            if (absoluteTimeout || inactivityTimeout) {
                 stopPolling(trialId);
-                // Show timeout warning
+                // Show timeout warning with appropriate message
                 if (!wrapper.querySelector('.trial-timeout-warning')) {
                     const timeoutWarning = document.createElement('div');
                     timeoutWarning.className = 'trial-timeout-warning alert alert-warning mt-3';
+                    const timeoutReason = inactivityTimeout
+                        ? `No new data received for ${Math.round(POLL_CONFIG.INACTIVITY_TIMEOUT / 60000)} minutes`
+                        : `Maximum polling time (${Math.round(POLL_CONFIG.MAX_POLL_TIME / 60000)} minutes) exceeded`;
                     timeoutWarning.innerHTML = `
                         <strong>Polling Timeout</strong>
-                        <p class="mb-0 small">Stopped polling after ${Math.round(POLL_CONFIG.MAX_POLL_TIME / 60000)} minutes.
+                        <p class="mb-0 small">${timeoutReason}.
                         The trial may still be processing. <a href="#" onclick="window.BenchmarkUtils.MultiTurnPage.startPolling(${trialId}, '${pipelineType}'); this.closest('.trial-timeout-warning').remove(); return false;">Resume polling</a></p>
                     `;
                     wrapper.appendChild(timeoutWarning);

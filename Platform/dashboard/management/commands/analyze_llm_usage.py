@@ -112,7 +112,12 @@ class Command(BaseCommand):
         """Analyze Webpage URLs for LLM service visits."""
         results = defaultdict(list)
 
-        webpages = Webpage.objects.select_related("user", "belong_task").all()
+        # Optimize: only load required fields, exclude large JSON fields
+        webpages = Webpage.objects.select_related("user", "belong_task").only(
+            'id', 'url', 'title', 'dwell_time',
+            'user__id', 'user__username',
+            'belong_task__id'
+        ).iterator(chunk_size=500)
 
         for wp in webpages:
             url = wp.url or ""

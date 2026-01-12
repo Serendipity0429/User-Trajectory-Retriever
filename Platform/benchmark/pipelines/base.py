@@ -43,8 +43,8 @@ async def serialize_events_async(generator):
         yield json.dumps(event) + "\n"
 
 class BasePipeline:
-    # Timeout for LLM API calls (60 seconds)
-    LLM_TIMEOUT = 60.0
+    # Timeout for LLM API calls (30 seconds)
+    LLM_TIMEOUT = 30.0
 
     def __init__(self, base_url, api_key, model, pipeline_id=None, dataset_id=None):
         self.client = openai.OpenAI(base_url=base_url, api_key=api_key, timeout=self.LLM_TIMEOUT)
@@ -298,7 +298,21 @@ class BaseMultiTurnPipeline(BasePipeline):
         self.group_id = group_id
 
     def create_session(self, settings, question_text, ground_truths, group):
-        raise NotImplementedError("Subclasses must implement create_session")
+        """
+        Creates a session for the given question. Shared across all pipelines.
+        Pipeline type is determined by get_pipeline_type_name() hook.
+        """
+        return MultiTurnSession.objects.create(
+            question=question_text,
+            ground_truths=ground_truths,
+            run=group,
+            run_tag=self.pipeline_id,
+            pipeline_type=self.get_pipeline_type_name()
+        )
+
+    def get_pipeline_type_name(self):
+        """Returns the pipeline type identifier. Override in subclasses."""
+        raise NotImplementedError("Subclasses must implement get_pipeline_type_name()")
 
     def create_trial(self, session, trial_number):
         """
@@ -322,6 +336,82 @@ class BaseMultiTurnPipeline(BasePipeline):
         This data is stored in trial.log['meta'] separate from conversation messages.
         """
         return {}
+
+    # === Shared Trial Finalization Helpers ===
+
+    def _evaluate_trial(self, session, answer):
+        """
+        Evaluates answer correctness using both LLM judge and rule-based checking.
+        Returns: (is_correct_llm, is_correct_rule)
+        """
+        is_correct_llm = check_answer_llm(
+            session.question, session.ground_truths, answer,
+            client=self.judge_client, model=self.judge_model
+        )
+        is_correct_rule = check_answer_rule(session.question, session.ground_truths, answer)
+        return is_correct_llm, is_correct_rule
+
+    def _finalize_trial(self, trial, answer, is_correct_llm, is_correct_rule,
+                        messages=None, system_prompt=None, token_usage=None, extra_log=None):
+        """
+        Finalizes a trial by setting result fields and saving to DB.
+
+        Args:
+            trial: The trial object to finalize
+            answer: The extracted answer
+            is_correct_llm: LLM judge result
+            is_correct_rule: Rule-based result
+            messages: List of message dicts to store in trial.log['messages']
+            system_prompt: System prompt to store separately for DB fallback
+            token_usage: Token usage dict to store
+            extra_log: Additional log data to merge (e.g., search_query, search_results)
+        """
+        trial.answer = answer
+        trial.is_correct_llm = is_correct_llm
+        trial.is_correct_rule = is_correct_rule
+        trial.feedback = "Correct" if is_correct_llm else "Incorrect"
+        trial.status = 'completed'
+
+        trial.log = trial.log or {}
+        if messages:
+            trial.log['messages'] = messages
+        if system_prompt:
+            trial.log['system_prompt'] = system_prompt
+        if token_usage:
+            trial.log['token_usage'] = token_usage
+
+        # Add baseline-specific metadata
+        trial_meta = self._get_trial_meta(trial)
+        if trial_meta:
+            trial.log['meta'] = trial_meta
+
+        # Merge any extra log data (e.g., search queries, search results)
+        if extra_log:
+            trial.log.update(extra_log)
+
+        trial.save()
+
+    def _cache_trial_to_redis(self, trial, trace_data):
+        """
+        Caches trial status and trace to Redis for live UI polling.
+
+        Args:
+            trial: The completed trial object
+            trace_data: Formatted trace list for UI rendering
+        """
+        try:
+            status_data = {
+                "id": trial.id,
+                "status": "completed",
+                "answer": trial.answer,
+                "feedback": trial.feedback,
+                "is_correct_llm": trial.is_correct_llm,
+                "is_correct_rule": trial.is_correct_rule,
+            }
+            redis_client.set(RedisKeys.trial_status(trial.id), json.dumps(status_data), ex=RedisKeys.DEFAULT_TTL)
+            redis_client.set(RedisKeys.trial_trace(trial.id), json.dumps(trace_data), ex=RedisKeys.DEFAULT_TTL)
+        except Exception as e:
+            print_debug(f"Failed to cache trial to Redis: {e}")
 
     def _process_single_session(self, group, question_text, ground_truths, existing_session=None):
         """
@@ -592,61 +682,36 @@ class BaseMultiTurnPipeline(BasePipeline):
             else:
                 answer = full_response
 
-            # Logic for checking answer (uses judge client/model, not generation model)
-            is_correct_llm = check_answer_llm(session.question, session.ground_truths, answer, client=self.judge_client, model=self.judge_model)
-            is_correct_rule = check_answer_rule(session.question, session.ground_truths, answer)
+            # Evaluate using shared helper
+            is_correct_llm, is_correct_rule = self._evaluate_trial(session, answer)
 
-            # Store only this trial's messages (delta), not full conversation history
-            # This matches the trace structure: system prompt + current user input + response
+            # Build trial messages (delta only: system + user instruction + response)
             trial_messages = []
+            system_prompt = None
             if messages and messages[0].get('role') == 'system':
-                trial_messages.append({"role": "system", "content": messages[0].get("content", "")})
+                system_prompt = messages[0].get('content', '')
+                trial_messages.append({"role": "system", "content": system_prompt})
             trial_messages.append({"role": "user", "content": instruction})
             trial_messages.append({"role": "assistant", "content": full_response})
 
-            trial.answer = answer
-            trial.is_correct_llm = is_correct_llm
-            trial.is_correct_rule = is_correct_rule
-            trial.feedback = "Correct" if is_correct_llm else "Incorrect"
+            # Finalize trial using shared helper
+            self._finalize_trial(
+                trial, answer, is_correct_llm, is_correct_rule,
+                messages=trial_messages,
+                system_prompt=system_prompt,
+                token_usage=trial_usage
+            )
 
-            trial.log = trial.log or {}
-            trial.log['messages'] = trial_messages
-            # Store system prompt separately for database fallback when Redis expires
-            if messages and messages[0].get('role') == 'system':
-                trial.log['system_prompt'] = messages[0].get('content', '')
-            # Store token usage
-            if trial_usage:
-                trial.log['token_usage'] = trial_usage
-            trial.status = 'completed'
-            trial.save()
+            # Build trace for Redis caching
+            trace, _ = TraceFormatter.serialize([SimpleMsg(m["role"], m["content"]) for m in trial_messages])
+            # Ensure system prompt is at top of trace
+            if system_prompt and (not trace or trace[0].get('role') != 'system'):
+                system_prompt_step = {"role": "system", "content": system_prompt, "step_type": "text"}
+                trace = [system_prompt_step] + trace
 
-            # Cache completion status in Redis for efficient polling (parse trace for UI)
-            try:
-                trace, _ = TraceFormatter.serialize([SimpleMsg(m["role"], m["content"]) for m in trial_messages])
+            # Cache to Redis using shared helper
+            self._cache_trial_to_redis(trial, trace)
 
-                # Ensure system prompt is at top of trace
-                if not trace or trace[0].get('role') != 'system':
-                    # Get system prompt from messages or construct it
-                    system_prompt = None
-                    if messages and messages[0].get('role') == 'system':
-                        system_prompt = messages[0].get('content', '')
-                    if system_prompt:
-                        system_prompt_step = {"role": "system", "content": system_prompt, "step_type": "text"}
-                        trace = [system_prompt_step] + trace
-
-                status_data = {
-                    "id": trial.id,
-                    "status": "completed",
-                    "answer": trial.answer,
-                    "feedback": trial.feedback,
-                    "is_correct_llm": trial.is_correct_llm,
-                    "is_correct_rule": trial.is_correct_rule,
-                }
-                redis_client.set(RedisKeys.trial_status(trial.id), json.dumps(status_data), ex=RedisKeys.DEFAULT_TTL)
-                redis_client.set(RedisKeys.trial_trace(trial.id), json.dumps(trace), ex=RedisKeys.DEFAULT_TTL)
-            except Exception as e:
-                print_debug(f"Failed to cache trial status/trace: {e}")
-            
             return answer, is_correct_llm, []
 
 
@@ -680,7 +745,7 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
             }
         }
         # Add pipeline_type from subclass hook
-        pipeline_type = self._get_pipeline_type()
+        pipeline_type = self.get_pipeline_type_name()
         if pipeline_type:
             base_settings['pipeline_type'] = pipeline_type
         return base_settings
@@ -690,10 +755,6 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
         if hasattr(self, 'agent_model') and self.agent_model and hasattr(self.agent_model, 'model_name'):
             return self.agent_model.model_name
         return 'unknown'
-
-    def _get_pipeline_type(self):
-        """Hook for subclasses to provide their pipeline type string."""
-        return None
 
     def _get_memory_context(self):
         """Returns async context manager for long-term memory (ReMe needs it, others don't)."""
@@ -792,6 +853,17 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
         """Hook called when a session ends. Override in subclasses for cleanup."""
         pass
 
+    def _requires_full_session_restart(self):
+        """
+        Hook to indicate whether resuming a session requires restarting from trial 1.
+
+        Override to return True for pipelines with ephemeral state (e.g., browser agent)
+        where the state from previous trials cannot be reconstructed.
+
+        Default: False (continue from last completed trial)
+        """
+        return False
+
     async def _process_single_session_async(self, group, question_text, ground_truths, existing_session=None):
         """
         Orchestrates the lifecycle of a single question across multiple trials.
@@ -800,12 +872,20 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
         try:
             if existing_session:
                 session = existing_session
-                # Clean up stalled/incomplete trials
-                def cleanup():
-                    session.trials.exclude(status='completed').delete()
-                    return session.trials.filter(status='completed').count()
-                completed_count = await sync_to_async(cleanup)()
-                trial_number = completed_count + 1
+
+                if self._requires_full_session_restart():
+                    # Pipeline has ephemeral state - must restart entire session
+                    def full_cleanup():
+                        session.trials.all().delete()
+                    await sync_to_async(full_cleanup)()
+                    trial_number = 1
+                else:
+                    # Can continue from last completed trial
+                    def cleanup():
+                        session.trials.exclude(status='completed').delete()
+                        return session.trials.filter(status='completed').count()
+                    completed_count = await sync_to_async(cleanup)()
+                    trial_number = completed_count + 1
             else:
                 session = await sync_to_async(self.create_session)(self.llm_settings, question_text, ground_truths, group)
                 trial_number = 1
@@ -1183,57 +1263,38 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
             trace_data: Parsed trace for UI rendering
         Returns: (answer, is_correct_llm)
         """
-        # Uses judge client/model, not generation model
-        is_correct_llm = check_answer_llm(session.question, session.ground_truths, answer, client=self.judge_client, model=self.judge_model)
-        is_correct_rule = check_answer_rule(session.question, session.ground_truths, answer)
+        # Evaluate using shared helper
+        is_correct_llm, is_correct_rule = self._evaluate_trial(session, answer)
 
-        trial.answer = answer
-        trial.is_correct_llm = is_correct_llm
-        trial.is_correct_rule = is_correct_rule
-        trial.feedback = "Correct" if is_correct_llm else "Incorrect"
+        # Convert Msg objects to dict format
+        messages_list = [m.to_dict() if hasattr(m, 'to_dict') else m for m in messages]
 
-        # Store raw messages (authentic agent context)
-        trial.log = trial.log or {}
-        trial.log['messages'] = [m.to_dict() if hasattr(m, 'to_dict') else m for m in messages]
+        # Build agent-specific extra log entries
+        extra_log = {}
 
-        # Store system prompt separately for database fallback when Redis expires
-        trial.log['system_prompt'] = self._get_actual_system_prompt()
-
-        # Store baseline-specific metadata (e.g., memory operations for agent baselines)
-        trial_meta = self._get_trial_meta(trial)
-        if trial_meta:
-            trial.log['meta'] = trial_meta
-
-        # Extract and store token usage from agent's model wrapper
+        # Extract token usage from agent's model wrapper
         if hasattr(self, 'active_agent') and hasattr(self.active_agent, '_usage_tracker'):
             usage = self.active_agent._usage_tracker.get_usage()
             if usage and usage.get('call_count', 0) > 0:
-                trial.log['token_usage'] = usage
+                extra_log['token_usage'] = usage
             # Reset tracker for next trial
             self.active_agent._usage_tracker.reset_usage()
 
-        # Extract and store search queries from trace data (for agent pipelines)
+        # Extract search queries from trace data
         search_queries = self._extract_search_queries_from_trace(trace_data)
         if search_queries:
-            trial.log['search_queries'] = search_queries
+            extra_log['search_queries'] = search_queries
 
-        trial.status = 'completed'
-        trial.save()
+        # Finalize trial using shared helper
+        self._finalize_trial(
+            trial, answer, is_correct_llm, is_correct_rule,
+            messages=messages_list,
+            system_prompt=self._get_actual_system_prompt(),
+            token_usage=extra_log.get('token_usage'),
+            extra_log={'search_queries': extra_log.get('search_queries')} if extra_log.get('search_queries') else None
+        )
 
-        # Cache completion status in Redis (with trace for live UI)
-        try:
-            status_data = {
-                "id": trial.id,
-                "status": "completed",
-                "answer": trial.answer,
-                "feedback": trial.feedback,
-                "is_correct_llm": trial.is_correct_llm,
-                "is_correct_rule": trial.is_correct_rule,
-            }
-            redis_client.set(RedisKeys.trial_status(trial.id), json.dumps(status_data), ex=RedisKeys.DEFAULT_TTL)
-            # Cache trace separately for live UI rendering
-            redis_client.set(RedisKeys.trial_trace(trial.id), json.dumps(trace_data), ex=RedisKeys.DEFAULT_TTL)
-        except Exception as e:
-            print_debug(f"Failed to cache agent trial status: {e}")
+        # Cache to Redis using shared helper
+        self._cache_trial_to_redis(trial, trace_data)
 
         return answer, is_correct_llm

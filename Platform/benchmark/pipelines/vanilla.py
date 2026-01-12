@@ -1,11 +1,5 @@
-from datetime import datetime
-from task_manager.utils import check_answer_rule, check_answer_llm
 from ..utils import PROMPTS
-from ..models import MultiTurnSession
-from .base import (
-    BaseMultiTurnPipeline,
-    REDIS_PREFIX_VANILLA_MULTI_TURN
-)
+from .base import BaseMultiTurnPipeline, REDIS_PREFIX_VANILLA_MULTI_TURN
 
 class VanillaLLMMultiTurnPipeline(BaseMultiTurnPipeline):
     def __init__(self, base_url, api_key, model, max_retries, pipeline_id=None, dataset_id=None, group_id=None):
@@ -15,14 +9,8 @@ class VanillaLLMMultiTurnPipeline(BaseMultiTurnPipeline):
     def __str__(self):
         return "Vanilla LLM Multi-Turn Pipeline"
 
-    def create_session(self, settings, question_text, ground_truths, group):
-        return MultiTurnSession.objects.create(
-            question=question_text,
-            ground_truths=ground_truths,
-            run=group,
-            run_tag=self.pipeline_id,
-            pipeline_type='vanilla_llm'
-        )
+    def get_pipeline_type_name(self):
+        return 'vanilla_llm'
 
     def _construct_messages(self, session, trial, completed_trials):
         messages = []

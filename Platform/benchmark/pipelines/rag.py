@@ -1,12 +1,10 @@
 import json
-from task_manager.utils import check_answer_rule, check_answer_llm, redis_client
+from task_manager.utils import redis_client
 from ..utils import (
-    get_search_engine, print_debug, extract_final_answer, extract_query,
+    get_search_engine, extract_final_answer, extract_query,
     RedisKeys, PipelinePrefix, TraceFormatter, SimpleMsg, PROMPTS, TrialGuard
 )
-from ..models import (
-    BenchmarkSettings, MultiTurnSession
-)
+from ..models import BenchmarkSettings
 from .base import BaseMultiTurnPipeline
 
 
@@ -30,14 +28,8 @@ class RagMultiTurnPipeline(BaseMultiTurnPipeline):
             }
         }
 
-    def create_session(self, settings, question_text, ground_truths, group):
-        return MultiTurnSession.objects.create(
-            question=question_text,
-            ground_truths=ground_truths,
-            run=group,
-            run_tag=self.pipeline_id,
-            pipeline_type='rag'
-        )
+    def get_pipeline_type_name(self):
+        return 'rag'
 
     def _construct_messages(self, session, trial, completed_trials=None):
         """
@@ -179,45 +171,29 @@ class RagMultiTurnPipeline(BaseMultiTurnPipeline):
             else:
                 answer = full_response
 
-            # === Phase 3: Finalize (uses judge client/model, not generation model) ===
-            is_correct_llm = check_answer_llm(session.question, session.ground_truths, answer, client=self.judge_client, model=self.judge_model)
-            is_correct_rule = check_answer_rule(session.question, session.ground_truths, answer)
+            # === Phase 3: Finalize using shared helpers ===
+            is_correct_llm, is_correct_rule = self._evaluate_trial(session, answer)
 
-            trial.answer = answer
-            trial.is_correct_llm = is_correct_llm
-            trial.is_correct_rule = is_correct_rule
-            trial.feedback = "Correct" if is_correct_llm else "Incorrect"
-            trial.status = 'completed'
-
-            # Store system prompt + this turn's messages (matches vanilla_llm pattern for DB reconstruction)
+            # Build trial messages (system prompt + turn messages)
             trial_messages = []
             if system_prompt:
                 trial_messages.append({"role": "system", "content": system_prompt})
             trial_messages.extend(turn_messages)
-            trial.log["messages"] = trial_messages
-            # Store system prompt separately for consistency with other pipelines
-            if system_prompt:
-                trial.log["system_prompt"] = system_prompt
-            trial.log["meta"] = self._get_trial_meta(trial)
-            # Store token usage
-            if trial_usage:
-                trial.log["token_usage"] = trial_usage
-            trial.save()
 
-            # Cache status for UI (system prompt + current turn's messages)
-            try:
-                trace_msgs = []
-                if system_prompt:
-                    trace_msgs.append(SimpleMsg("system", system_prompt))
-                trace_msgs.extend(build_trace_msgs(turn_messages))
-                trace, _ = TraceFormatter.serialize(trace_msgs)
-                status_data = {
-                    "id": trial.id, "status": "completed", "answer": answer, "feedback": trial.feedback,
-                    "is_correct_llm": is_correct_llm, "is_correct_rule": is_correct_rule,
-                }
-                redis_client.set(RedisKeys.trial_status(trial.id), json.dumps(status_data), ex=RedisKeys.DEFAULT_TTL)
-                redis_client.set(RedisKeys.trial_trace(trial.id), json.dumps(trace), ex=RedisKeys.DEFAULT_TTL)
-            except Exception as e:
-                print_debug(f"Failed to cache RAG trace: {e}")
+            # Finalize trial (preserves existing search_query/search_results in trial.log)
+            self._finalize_trial(
+                trial, answer, is_correct_llm, is_correct_rule,
+                messages=trial_messages,
+                system_prompt=system_prompt,
+                token_usage=trial_usage
+            )
+
+            # Build trace and cache to Redis
+            trace_msgs = []
+            if system_prompt:
+                trace_msgs.append(SimpleMsg("system", system_prompt))
+            trace_msgs.extend(build_trace_msgs(turn_messages))
+            trace, _ = TraceFormatter.serialize(trace_msgs)
+            self._cache_trial_to_redis(trial, trace)
 
             return answer, is_correct_llm, search_results

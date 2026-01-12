@@ -27,7 +27,7 @@ from asgiref.sync import sync_to_async
 
 
 # === Constants ===
-LLM_API_TIMEOUT = 120.0  # Timeout in seconds for LLM API calls (prevents hangs on context overflow)
+LLM_API_TIMEOUT = 30.0  # Timeout in seconds for LLM API calls (30s limit before marking as error)
 
 
 # === Shared Model Initialization ===
@@ -67,6 +67,9 @@ class UsageTrackingModelWrapper:
 
     Intercepts all model calls and accumulates usage from ChatResponse.usage.
     Usage can be retrieved via get_usage() and reset via reset_usage().
+
+    Note: AgentScope's OpenAIChatModel.__call__ is async, so our __call__
+    must also be async to properly intercept and track usage.
     """
 
     def __init__(self, model):
@@ -79,14 +82,8 @@ class UsageTrackingModelWrapper:
             "calls": []
         }
 
-    def __call__(self, *args, **kwargs):
-        """Synchronous call - intercepts and tracks usage."""
-        response = self._model(*args, **kwargs)
-        self._track_usage(response)
-        return response
-
-    async def __acall__(self, *args, **kwargs):
-        """Async call - intercepts and tracks usage."""
+    async def __call__(self, *args, **kwargs):
+        """Async call - intercepts and tracks usage from the underlying model."""
         response = await self._model(*args, **kwargs)
         self._track_usage(response)
         return response

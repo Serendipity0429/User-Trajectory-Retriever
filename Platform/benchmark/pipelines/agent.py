@@ -1,7 +1,7 @@
 import inspect
 import json
 from asgiref.sync import sync_to_async
-from ..models import BenchmarkSettings, MultiTurnRun, MultiTurnSession
+from ..models import BenchmarkSettings, MultiTurnRun
 from ..utils import (
     print_debug,
     VanillaAgentFactory, BrowserAgentFactory
@@ -53,17 +53,8 @@ class VanillaAgentPipeline(BaseAgentPipeline):
     def __str__(self):
         return "Vanilla Agent Pipeline"
 
-    def _get_pipeline_type(self):
+    def get_pipeline_type_name(self):
         return 'vanilla_agent'
-
-    def create_session(self, settings, question_text, ground_truths, group):
-        return MultiTurnSession.objects.create(
-            question=question_text,
-            ground_truths=ground_truths,
-            run=group,
-            run_tag=self.pipeline_id,
-            pipeline_type='vanilla_agent'
-        )
 
     # Hooks for BaseAgentPipeline template
     async def _init_agent(self):
@@ -144,17 +135,15 @@ class BrowserAgentPipeline(BaseAgentPipeline):
     def __str__(self):
         return "Browser Agent Pipeline"
 
-    def _get_pipeline_type(self):
+    def get_pipeline_type_name(self):
         return 'browser_agent'
 
-    def create_session(self, settings, question_text, ground_truths, group):
-        return MultiTurnSession.objects.create(
-            question=question_text,
-            ground_truths=ground_truths,
-            run=group,
-            run_tag=self.pipeline_id,
-            pipeline_type='browser_agent'
-        )
+    def _requires_full_session_restart(self):
+        """
+        Browser agent maintains browser state across trials within a session.
+        When resuming, we must restart the entire session since browser state is lost.
+        """
+        return True
 
     async def cleanup(self):
         """Final cleanup at end of pipeline run."""

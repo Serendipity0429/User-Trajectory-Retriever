@@ -1,13 +1,15 @@
 # --- Shared Rule Component ---
-_RULES = """## Answer Format Rules
-1. Provide only the exact answer in plain text. No markdown or any other formatting.
-2. No punctuation, no extra words or sentences. Capitalization is ignored.
+_RULES = """## Final Answer Format Rules
+1. Your answer must be the EXACT MATCH to the expected answer. Please make the answer accurate and concise.
+2. Provide answer in plain text. No markdown or any other formatting.
+3. Don't include any punctuation, extra words or sentences.
+4. Capitalization is ignored.
 
 **Example:**
 - Question: What is the capital of France?
 - Correct: Paris
-- Incorrect: The capital of France is Paris (contains extra words)
-- Incorrect: Paris is the capital of France (contains extra words)
+- Incorrect: The capital of France is Paris (contains extra words, not exact match)
+- Incorrect: Paris is the capital of France (contains extra words, not exact match)
 - Incorrect: Paris. (contains punctuation)
 - Incorrect: **Paris** (contains markdown formatting)
 """
@@ -17,11 +19,12 @@ PROMPTS = {
     # 1. SHARED COMPONENTS (used across all baselines for fair comparison)
     # =========================================================================
 
-    "shared_reasoning_instruction_no_agent": """Please think step-by-step to arrive at the answer. Format your response as follows:
+    "shared_reasoning_instruction_no_agent": """
+Please think step-by-step to arrive at the answer. Make the reasoning as detailed as possible. Format your response as follows:
 <think>
 (step-by-step reasoning...)
 </think>
-Final Answer: <final answer only> """,
+Final Answer: (final answer only...) """,
 
     "shared_answer_request": "\nPlease provide the final answer.",
 
@@ -117,7 +120,7 @@ Your goal is to answer the user's question by interacting with the environment.
 
 ## Instructions
 1. You must use `answer_question` to finish.
-2. CRITICAL: You MUST use the `think` tool to explain your reasoning BEFORE using other tools.
+2. You MUST use the `think` tool to explain your reasoning BEFORE using other tools. Please think step-by-step. Make the reasoning as detailed as possible.
 3. The search tool only provides snippets. You usually need to `visit_page` to verify information or get details.
 4. Do not output text directly. Use the tools provided.
 """,
@@ -137,7 +140,7 @@ Your goal is to answer the user's question by browsing the web.
 
 ## Instructions
 1. You must use `answer_question` to finish.
-2. CRITICAL: You MUST use the `think` tool to explain your reasoning BEFORE using other tools.
+2. You MUST use the `think` tool to explain your reasoning BEFORE using other tools. Please think step-by-step. Make the reasoning as detailed as possible.
 3. Do not output text directly. Use the tools provided.
 """,
 

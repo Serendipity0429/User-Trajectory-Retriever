@@ -9,8 +9,8 @@ from .base import BaseMultiTurnPipeline
 
 
 class RagMultiTurnPipeline(BaseMultiTurnPipeline):
-    def __init__(self, base_url, api_key, model, max_retries, pipeline_id=None, dataset_id=None, group_id=None):
-        super().__init__(base_url, api_key, model, max_retries, pipeline_id, dataset_id, group_id)
+    def __init__(self, base_url, api_key, model, max_retries, pipeline_id=None, dataset_id=None, group_id=None, rerun_errors=True):
+        super().__init__(base_url, api_key, model, max_retries, pipeline_id, dataset_id, group_id, rerun_errors)
         self.search_engine = get_search_engine()
         self.redis_prefix = PipelinePrefix.RAG
 

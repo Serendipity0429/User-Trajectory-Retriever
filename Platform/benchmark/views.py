@@ -926,6 +926,7 @@ def _run_pipeline_generic(request, pipeline_class, redis_prefix_template, **kwar
     pipeline_id = request.POST.get("pipeline_id")
     dataset_id = request.POST.get("dataset_id")
     group_id = request.POST.get("group_id")
+    rerun_errors = request.POST.get("rerun_errors", "1") == "1"
 
     if not api_key:
         return JsonResponse({"error": "An API Key is required to run the benchmark."}, status=400)
@@ -941,6 +942,7 @@ def _run_pipeline_generic(request, pipeline_class, redis_prefix_template, **kwar
     constructor_args = {
         "base_url": base_url, "api_key": api_key, "model": model,
         "pipeline_id": pipeline_id, "dataset_id": dataset_id, "group_id": group_id,
+        "rerun_errors": rerun_errors,
     }
     # All pipelines inherit from BaseMultiTurnPipeline and accept max_retries
     if issubclass(pipeline_class, BaseMultiTurnPipeline):
@@ -1007,6 +1009,7 @@ def _run_pipeline_generic_async_wrapper(request, pipeline_class, redis_prefix_te
     pipeline_id = request.POST.get("pipeline_id")
     dataset_id = request.POST.get("dataset_id")
     group_id = request.POST.get("group_id")
+    rerun_errors = request.POST.get("rerun_errors", "1") == "1"
 
     if not api_key:
         return JsonResponse({"error": "An API Key is required to run the benchmark."}, status=400)
@@ -1017,7 +1020,8 @@ def _run_pipeline_generic_async_wrapper(request, pipeline_class, redis_prefix_te
         try:
             pipeline = await pipeline_class.create(
                 base_url=base_url, api_key=api_key, model=model, max_retries=max_retries,
-                pipeline_id=pipeline_id, dataset_id=dataset_id, group_id=group_id, **kwargs
+                pipeline_id=pipeline_id, dataset_id=dataset_id, group_id=group_id,
+                rerun_errors=rerun_errors, **kwargs
             )
             async for event in pipeline.run():
                 yield event

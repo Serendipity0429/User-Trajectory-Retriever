@@ -1,11 +1,43 @@
 import os
 import re
+import signal
+import subprocess
 from agentscope.mcp import StdIOStatefulClient
 from agentscope.tool import Toolkit
 from . import print_debug
 
-# Default profile directory for persistent browser sessions
 DEFAULT_CHROME_PROFILE_DIR = os.path.expanduser("~/.cache/chrome-devtools-mcp/agent-profile")
+
+
+def _kill_process_tree(pid, timeout=2):
+    """Kill a process and all its children using SIGTERM then SIGKILL."""
+    try:
+        import psutil
+        try:
+            proc = psutil.Process(pid)
+            children = proc.children(recursive=True)
+            for p in children + [proc]:
+                try:
+                    p.terminate()
+                except psutil.NoSuchProcess:
+                    pass
+            gone, alive = psutil.wait_procs(children + [proc], timeout=timeout)
+            for p in alive:
+                try:
+                    p.kill()
+                except psutil.NoSuchProcess:
+                    pass
+        except psutil.NoSuchProcess:
+            pass
+    except ImportError:
+        # Fallback without psutil - use process group kill
+        try:
+            os.killpg(os.getpgid(pid), signal.SIGTERM)
+        except (ProcessLookupError, PermissionError):
+            try:
+                os.kill(pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
 
 
 class ChromeDevToolsMCPManager:
@@ -28,6 +60,7 @@ class ChromeDevToolsMCPManager:
         self.use_isolated = use_isolated
         self.user_data_dir = user_data_dir or DEFAULT_CHROME_PROFILE_DIR
         self.proxy_server = proxy_server
+        self._node_pid = None  # Track the node process PID for cleanup
 
     async def connect(self, toolkit: Toolkit):
         """
@@ -75,9 +108,14 @@ class ChromeDevToolsMCPManager:
                 cwd=mcp_root
             )
             await self.client.connect()
+
+            # Try to capture the node process PID for cleanup
+            # The MCP library stores the process in client.client which is the stdio_client context
+            self._node_pid = self._extract_process_pid()
+
             await toolkit.register_mcp_client(self.client)
 
-            print_debug(f"Registered MCP tools from {self.client.name}")
+            print_debug(f"Registered MCP tools from {self.client.name} (node PID: {self._node_pid})")
 
             # Clean up pages from previous sessions (persistent profile may have old tabs)
             await self._cleanup_pages()
@@ -87,6 +125,47 @@ class ChromeDevToolsMCPManager:
         except Exception as e:
             print_debug(f"Failed to fetch/register MCP tools: {e}")
             return None
+
+    def _extract_process_pid(self):
+        """Try to extract node process PID from MCP client internals."""
+        if not self.client:
+            return None
+        try:
+            # Try various paths to find the process PID
+            if hasattr(self.client, 'client') and hasattr(self.client.client, '_process'):
+                proc = self.client.client._process
+                if hasattr(proc, 'pid'):
+                    return proc.pid
+            return None
+        except Exception:
+            return None
+
+    def _find_chrome_processes_by_profile(self):
+        """Find Chrome processes using our profile directory."""
+        try:
+            import psutil
+            pids = []
+            for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
+                try:
+                    if proc.info['name'] and 'chrom' in proc.info['name'].lower():
+                        cmdline_str = ' '.join(proc.info.get('cmdline') or [])
+                        if self.user_data_dir in cmdline_str:
+                            pids.append(proc.info['pid'])
+                except (psutil.NoSuchProcess, psutil.AccessDenied):
+                    pass
+            return pids
+        except ImportError:
+            # Fallback using pgrep
+            try:
+                result = subprocess.run(
+                    ['pgrep', '-f', self.user_data_dir],
+                    capture_output=True, text=True, timeout=5
+                )
+                if result.returncode == 0:
+                    return [int(p) for p in result.stdout.strip().split('\n') if p]
+            except Exception:
+                pass
+            return []
 
     async def _cleanup_pages(self):
         """
@@ -139,29 +218,44 @@ class ChromeDevToolsMCPManager:
 
     async def disconnect(self):
         """
-        Safely disconnects the MCP client and terminates the Chrome browser.
+        Disconnect MCP client. Handles cancel scope errors from async task mismatch
+        by falling back to forceful process termination.
         """
-        if self.client:
-            try:
-                # Always try to close - don't rely on is_connected attribute
-                # which may not be set correctly on StdIOStatefulClient
+        if not self.client:
+            return
+
+        node_pid = self._node_pid
+
+        # Try normal async close (may warn about cancel scope but won't raise)
+        try:
+            if self.client.is_connected:
                 await self.client.close()
-                print_debug("MCP client closed successfully")
-            except Exception as e:
-                print_debug(f"Error disconnecting MCP client: {e}")
-                # Try to forcefully terminate the subprocess if close() failed
-                try:
-                    if hasattr(self.client, '_process') and self.client._process:
-                        self.client._process.terminate()
-                        print_debug("Forcefully terminated MCP subprocess")
-                except Exception as e2:
-                    print_debug(f"Error terminating MCP process: {e2}")
-                # Also try closing the stack if it exists
-                try:
-                    if hasattr(self.client, 'stack') and self.client.stack:
-                        await self.client.stack.aclose()
-                        print_debug("Closed MCP stack")
-                except Exception as e3:
-                    print_debug(f"Error closing MCP stack: {e3}")
-            finally:
-                self.client = None
+                print_debug("MCP client closed")
+        except RuntimeError as e:
+            if "not connected" not in str(e).lower():
+                print_debug(f"MCP close error: {e}")
+        except Exception as e:
+            print_debug(f"MCP close error: {e}")
+
+        # Force cleanup - handles incomplete async cleanup due to cancel scope issues
+        await self._ensure_processes_terminated(node_pid)
+
+        self.client = None
+        self._node_pid = None
+
+    async def _ensure_processes_terminated(self, node_pid):
+        """Force terminate any remaining node/Chrome processes."""
+        # Kill node process if still running
+        if node_pid:
+            try:
+                os.kill(node_pid, 0)
+                print_debug(f"Forcing node process {node_pid} termination")
+                _kill_process_tree(node_pid)
+            except ProcessLookupError:
+                pass
+
+        # Kill orphan Chrome processes using our profile
+        chrome_pids = self._find_chrome_processes_by_profile()
+        for pid in chrome_pids:
+            print_debug(f"Killing orphan Chrome process {pid}")
+            _kill_process_tree(pid)

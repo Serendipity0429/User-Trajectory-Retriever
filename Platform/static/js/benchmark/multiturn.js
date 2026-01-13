@@ -441,7 +441,65 @@ window.BenchmarkUtils.MultiTurnPage = (function() {
     }
 
     // === Pipeline Helpers ===
-    function initiatePipelineRun(groupId, pipelineType) {
+
+    function showContinueDialog(groupId, pipelineType) {
+        // Create a modal dialog for continue options
+        const dialogHtml = `
+            <div class="modal fade" id="continueRunModal" tabindex="-1">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Resume Pipeline Run</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <p>How would you like to resume this pipeline run?</p>
+                            <div class="d-grid gap-2">
+                                <button type="button" class="btn btn-primary" id="continue-new-only-btn">
+                                    <i class="bi bi-plus-circle me-2"></i>Process New Questions Only
+                                    <small class="d-block text-light opacity-75">Skip sessions that previously failed or had errors</small>
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary" id="continue-with-errors-btn">
+                                    <i class="bi bi-arrow-repeat me-2"></i>Retry Failed Sessions
+                                    <small class="d-block">Also retry sessions that completed without success</small>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-link text-muted" data-bs-dismiss="modal">Cancel</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Remove existing modal if present
+        const existingModal = document.getElementById('continueRunModal');
+        if (existingModal) existingModal.remove();
+
+        // Add modal to DOM
+        document.body.insertAdjacentHTML('beforeend', dialogHtml);
+        const modalEl = document.getElementById('continueRunModal');
+        const modal = new bootstrap.Modal(modalEl);
+
+        // Handle button clicks
+        document.getElementById('continue-new-only-btn').addEventListener('click', () => {
+            modal.hide();
+            initiatePipelineRun(groupId, pipelineType, false);
+        });
+
+        document.getElementById('continue-with-errors-btn').addEventListener('click', () => {
+            modal.hide();
+            initiatePipelineRun(groupId, pipelineType, true);
+        });
+
+        // Clean up modal after hiding
+        modalEl.addEventListener('hidden.bs.modal', () => modalEl.remove());
+
+        modal.show();
+    }
+
+    function initiatePipelineRun(groupId, pipelineType, rerunErrors = true) {
         currentRunPipelineType = pipelineType;
         const currentPipelineId = BenchmarkHelpers.generateUUID();
         const ui = {
@@ -500,7 +558,10 @@ window.BenchmarkUtils.MultiTurnPage = (function() {
             formData.append('llm_api_key', currentLlmSettings.llm_api_key);
             formData.append('llm_model', currentLlmSettings.llm_model);
             if (currentLlmSettings.max_retries) formData.append('max_retries', currentLlmSettings.max_retries);
-            if (groupId && groupId !== 'null' && groupId !== 'undefined') formData.append('group_id', groupId);
+            if (groupId && groupId !== 'null' && groupId !== 'undefined') {
+                formData.append('group_id', groupId);
+                formData.append('rerun_errors', rerunErrors ? '1' : '0');
+            }
 
             // Allow page-specific form data additions
             if (window.buildPipelineFormData) window.buildPipelineFormData(formData);
@@ -695,9 +756,11 @@ window.BenchmarkUtils.MultiTurnPage = (function() {
             if (continueBtn) {
                 e.preventDefault();
                 e.stopPropagation();
-                if (confirm('Resume this pipeline run?')) {
-                    initiatePipelineRun(continueBtn.dataset.groupId, continueBtn.dataset.pipelineType || pipelineType);
-                }
+                const groupId = continueBtn.dataset.groupId;
+                const targetPipelineType = continueBtn.dataset.pipelineType || pipelineType;
+
+                // Show dialog asking about rerunning error sessions
+                showContinueDialog(groupId, targetPipelineType);
                 return;
             }
 

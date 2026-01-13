@@ -27,8 +27,8 @@ def question_file_iterator(file_path):
                 continue
 
 class VanillaAgentPipeline(BaseAgentPipeline):
-    def __init__(self, base_url, api_key, model, max_retries, pipeline_id=None, dataset_id=None, group_id=None):
-        super().__init__(base_url, api_key, model, max_retries, pipeline_id, dataset_id, group_id)
+    def __init__(self, base_url, api_key, model, max_retries, pipeline_id=None, dataset_id=None, group_id=None, rerun_errors=True):
+        super().__init__(base_url, api_key, model, max_retries, pipeline_id, dataset_id, group_id, rerun_errors)
         # Initialize AgentScope
         self.temp_settings = BenchmarkSettings(
             llm_base_url=base_url,
@@ -42,9 +42,9 @@ class VanillaAgentPipeline(BaseAgentPipeline):
         self._current_run_id = None  # Set when processing starts, used for memory isolation
 
     @classmethod
-    async def create(cls, base_url, api_key, model, max_retries, pipeline_id=None, dataset_id=None, group_id=None):
+    async def create(cls, base_url, api_key, model, max_retries, pipeline_id=None, dataset_id=None, group_id=None, rerun_errors=True):
         try:
-            instance = await sync_to_async(cls)(base_url, api_key, model, max_retries, pipeline_id, dataset_id, group_id)
+            instance = await sync_to_async(cls)(base_url, api_key, model, max_retries, pipeline_id, dataset_id, group_id, rerun_errors)
             return instance
         except Exception as e:
             print_debug(f"VanillaAgentPipeline: Error in create: {e}")
@@ -114,8 +114,8 @@ class VanillaAgentPipeline(BaseAgentPipeline):
 
 
 class BrowserAgentPipeline(BaseAgentPipeline):
-    def __init__(self, base_url, api_key, model, max_retries, pipeline_id=None, dataset_id=None, group_id=None):
-        super().__init__(base_url, api_key, model, max_retries, pipeline_id, dataset_id, group_id)
+    def __init__(self, base_url, api_key, model, max_retries, pipeline_id=None, dataset_id=None, group_id=None, rerun_errors=True):
+        super().__init__(base_url, api_key, model, max_retries, pipeline_id, dataset_id, group_id, rerun_errors)
         self.temp_settings = BenchmarkSettings(
             llm_base_url=base_url,
             llm_api_key=api_key,
@@ -132,10 +132,10 @@ class BrowserAgentPipeline(BaseAgentPipeline):
         self._current_run_id = None  # Set when processing starts, used for memory isolation
 
     @classmethod
-    async def create(cls, base_url, api_key, model, max_retries, pipeline_id=None, dataset_id=None, group_id=None):
+    async def create(cls, base_url, api_key, model, max_retries, pipeline_id=None, dataset_id=None, group_id=None, rerun_errors=True):
         try:
             print_debug("BrowserAgentPipeline: Creating instance (lightweight)...")
-            instance = await sync_to_async(cls)(base_url, api_key, model, max_retries, pipeline_id, dataset_id, group_id)
+            instance = await sync_to_async(cls)(base_url, api_key, model, max_retries, pipeline_id, dataset_id, group_id, rerun_errors)
             return instance
         except Exception as e:
             print_debug(f"BrowserAgentPipeline: Error in create: {e}")

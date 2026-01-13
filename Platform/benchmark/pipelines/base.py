@@ -296,11 +296,12 @@ class BasePipeline:
 
 
 class BaseMultiTurnPipeline(BasePipeline):
-    def __init__(self, base_url, api_key, model, max_retries, pipeline_id=None, dataset_id=None, group_id=None):
+    def __init__(self, base_url, api_key, model, max_retries, pipeline_id=None, dataset_id=None, group_id=None, rerun_errors=True):
         super().__init__(base_url, api_key, model, pipeline_id, dataset_id)
         self.max_retries = max_retries
         self.redis_prefix = REDIS_PREFIX_MULTI_TURN
         self.group_id = group_id
+        self.rerun_errors = rerun_errors
 
     def create_session(self, settings, question_text, ground_truths, group):
         raise NotImplementedError("Subclasses must implement create_session")
@@ -596,22 +597,31 @@ class BaseMultiTurnPipeline(BasePipeline):
             try:
                 group = MultiTurnRun.objects.get(pk=self.group_id)
 
-                # Collect incomplete sessions + fix any incorrectly completed ones
-                incomplete_sessions = list(group.sessions.filter(is_completed=False).prefetch_related('trials'))
+                if self.rerun_errors:
+                    # Collect incomplete sessions (crashed mid-execution, never completed)
+                    incomplete_sessions = list(group.sessions.filter(is_completed=False).prefetch_related('trials'))
 
-                for session in group.sessions.filter(is_completed=True).prefetch_related('trials'):
-                    completed_trials = list(session.trials.filter(status='completed'))
-                    has_success = any(t.is_correct_llm for t in completed_trials)
-                    if not has_success and len(completed_trials) < self.max_retries:
-                        session.is_completed = False
-                        session.save()
-                        incomplete_sessions.append(session)
-                        print_debug(f"Reset incorrectly completed session #{session.id} ({len(completed_trials)} trials, no success)")
+                    # Also reset sessions that completed without success
+                    for session in group.sessions.filter(is_completed=True).prefetch_related('trials'):
+                        completed_trials = list(session.trials.filter(status='completed'))
+                        has_success = any(t.is_correct_llm for t in completed_trials)
+                        if not has_success and len(completed_trials) < self.max_retries:
+                            session.is_completed = False
+                            session.save()
+                            incomplete_sessions.append(session)
+                            print_debug(f"Reset incorrectly completed session #{session.id} ({len(completed_trials)} trials, no success)")
 
-                # Identify truly completed questions (succeeded or exhausted retries)
-                completed_questions = set(
-                    s.question for s in group.sessions.filter(is_completed=True)
-                )
+                    # Identify truly completed questions (succeeded or exhausted retries)
+                    completed_questions = set(
+                        s.question for s in group.sessions.filter(is_completed=True)
+                    )
+                else:
+                    # Process new questions only - skip ALL existing sessions
+                    # Mark all questions that have any session as "completed" to skip them
+                    completed_questions = set(
+                        s.question for s in group.sessions.all()
+                    )
+                    incomplete_sessions = []  # Don't retry any existing sessions
 
             except MultiTurnRun.DoesNotExist:
                 yield {'error': f"Group with ID {self.group_id} not found."}
@@ -979,20 +989,26 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
                 group = await sync_to_async(MultiTurnRun.objects.get)(pk=self.group_id)
 
                 def collect_sessions_to_process():
-                    # Collect incomplete sessions + fix any incorrectly completed ones
-                    sessions_to_process = list(group.sessions.filter(is_completed=False).prefetch_related('trials'))
+                    if self.rerun_errors:
+                        # Collect incomplete sessions (crashed mid-execution, never completed)
+                        sessions_to_process = list(group.sessions.filter(is_completed=False).prefetch_related('trials'))
 
-                    for session in group.sessions.filter(is_completed=True).prefetch_related('trials'):
-                        completed_trials = list(session.trials.filter(status='completed'))
-                        has_success = any(t.is_correct_llm for t in completed_trials)
-                        if not has_success and len(completed_trials) < self.max_retries:
-                            session.is_completed = False
-                            session.save()
-                            sessions_to_process.append(session)
-                            print_debug(f"Reset incorrectly completed session #{session.id} ({len(completed_trials)} trials, no success)")
+                        # Also reset sessions that completed without success
+                        for session in group.sessions.filter(is_completed=True).prefetch_related('trials'):
+                            completed_trials = list(session.trials.filter(status='completed'))
+                            has_success = any(t.is_correct_llm for t in completed_trials)
+                            if not has_success and len(completed_trials) < self.max_retries:
+                                session.is_completed = False
+                                session.save()
+                                sessions_to_process.append(session)
+                                print_debug(f"Reset incorrectly completed session #{session.id} ({len(completed_trials)} trials, no success)")
 
-                    completed_qs = set(s.question for s in group.sessions.filter(is_completed=True))
-                    return sessions_to_process, completed_qs
+                        completed_qs = set(s.question for s in group.sessions.filter(is_completed=True))
+                        return sessions_to_process, completed_qs
+                    else:
+                        # Process new questions only - skip ALL existing sessions
+                        completed_qs = set(s.question for s in group.sessions.all())
+                        return [], completed_qs
 
                 incomplete_sessions, completed_questions = await sync_to_async(collect_sessions_to_process)()
             except MultiTurnRun.DoesNotExist:

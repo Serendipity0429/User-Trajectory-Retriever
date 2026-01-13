@@ -3,8 +3,8 @@ from ..models import MultiTurnSession
 from .base import BaseMultiTurnPipeline, REDIS_PREFIX_VANILLA_MULTI_TURN
 
 class VanillaLLMMultiTurnPipeline(BaseMultiTurnPipeline):
-    def __init__(self, base_url, api_key, model, max_retries, pipeline_id=None, dataset_id=None, group_id=None):
-        super().__init__(base_url, api_key, model, max_retries, pipeline_id, dataset_id, group_id)
+    def __init__(self, base_url, api_key, model, max_retries, pipeline_id=None, dataset_id=None, group_id=None, rerun_errors=True):
+        super().__init__(base_url, api_key, model, max_retries, pipeline_id, dataset_id, group_id, rerun_errors)
         self.redis_prefix = REDIS_PREFIX_VANILLA_MULTI_TURN
 
     def __str__(self):

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 from abc import ABC, abstractmethod
+from ..models import BenchmarkSettings
 import subprocess
 import json
 import os
@@ -10,6 +11,7 @@ import re
 import random
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from core.utils import print_debug
+import http.client
 
 def remove_null_bytes(data):
     """
@@ -825,9 +827,6 @@ class SerperSearch(WebSearch):
     def search(self, query: str) -> list:
         if not self.api_key:
             return [{"error": "Serper API key not configured."}]
-            
-        import http.client
-        import json
 
         all_results = []
         items_to_fetch = []
@@ -909,11 +908,11 @@ def get_search_engine(fetch_full_content=None) -> WebSearch:
     from ..models import BenchmarkSettings
     settings = BenchmarkSettings.load()
     limit = getattr(settings, 'search_limit', 5)
-    
+
     should_fetch = fetch_full_content if fetch_full_content is not None else settings.fetch_full_content
-    
+
     if settings.search_provider == 'serper':
-        api_key = os.getenv('SERPER_API_KEY') or settings.serper_api_key
+        api_key = settings.serper_api_key or os.getenv('SERPER_API_KEY')
         return SerperSearch(api_key=api_key, fetch_full_content=should_fetch, search_limit=limit)
     else:
         mcp = MCPSearch()

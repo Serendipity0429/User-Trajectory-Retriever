@@ -20,8 +20,27 @@ from extract_llm_queries import extract_query_from_url
 def extract_human_queries():
     """Extract queries from human trajectories, grouped by task > trajectory (user) > trial."""
 
-    # Get all valid tasks with their content
-    tasks = Task.valid_objects.select_related('content', 'user').prefetch_related('tasktrial_set').all()
+    # Filter for nq_hard_questions dataset only (exclude tutorial)
+    dataset_name = 'nq_hard_questions'
+
+    try:
+        from task_manager.models import TaskDataset
+        dataset = TaskDataset.objects.get(name=dataset_name)
+        print(f"Filtering for dataset: {dataset_name}")
+
+        # Get dataset entries (questions) for this dataset
+        dataset_entries = TaskDatasetEntry.objects.filter(belong_dataset=dataset)
+        print(f"Found {dataset_entries.count()} questions in {dataset_name}")
+
+        # Get all valid tasks with their content, filtered by dataset
+        tasks = Task.valid_objects.select_related('content', 'user').prefetch_related('tasktrial_set').filter(
+            content__in=dataset_entries
+        )
+        print(f"Found {tasks.count()} tasks for {dataset_name}\n")
+
+    except TaskDataset.DoesNotExist:
+        print(f"Warning: Dataset '{dataset_name}' not found. Using all tasks.")
+        tasks = Task.valid_objects.select_related('content', 'user').prefetch_related('tasktrial_set').all()
 
     results = {}
 

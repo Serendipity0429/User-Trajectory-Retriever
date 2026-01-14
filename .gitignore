@@ -24,3 +24,6 @@ gha-creds-*.json
 AGENTS.md
 CLAUDE.md
 calculate_wages.py
+outputs
+extracted_queries
+data/

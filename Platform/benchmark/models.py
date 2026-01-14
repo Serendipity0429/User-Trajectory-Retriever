@@ -189,13 +189,20 @@ class MultiTurnSession(models.Model):
         ('browser_agent', 'Browser Agent'),
     ]
 
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('completed', 'Completed'),
+        ('error', 'Error'),
+    ]
+
     run = models.ForeignKey(MultiTurnRun, related_name='sessions', on_delete=models.CASCADE)
     question = models.TextField()
     ground_truths = models.JSONField(default=list)
     created_at = models.DateTimeField(auto_now_add=True)
     is_completed = models.BooleanField(default=False)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending', db_index=True)
     run_tag = models.CharField(max_length=255, blank=True, null=True, db_index=True)
-    
+
     pipeline_type = models.CharField(max_length=50, choices=PIPELINE_TYPE_CHOICES, default='vanilla_llm')
 
     def __str__(self):

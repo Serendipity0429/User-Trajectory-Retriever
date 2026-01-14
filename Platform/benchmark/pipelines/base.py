@@ -52,7 +52,9 @@ class BasePipeline:
     LLM_TIMEOUT = 60.0
 
     def __init__(self, base_url, api_key, model, pipeline_id=None, dataset_id=None):
-        self.client = openai.OpenAI(base_url=base_url, api_key=api_key, timeout=self.LLM_TIMEOUT)
+        # max_retries=0 disables client retry logic - context_length_exceeded errors come as HTTP 500
+        # but retrying won't help. Our pipeline has trial-level retry for legitimate failures.
+        self.client = openai.OpenAI(base_url=base_url, api_key=api_key, timeout=self.LLM_TIMEOUT, max_retries=0)
         self.model = model
         self.pipeline_id = pipeline_id
         self.dataset_id = dataset_id
@@ -883,7 +885,14 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
                 trial_number = 1
 
             # Session lifecycle: setup resources (e.g., browser instance)
-            await self._on_session_start(session)
+            try:
+                await self._on_session_start(session)
+            except Exception as e:
+                print_debug(f"Error in session start (session {session.id}): {e}")
+                session.status = 'error'
+                await session.asave()
+                yield {'error': f"Session start failed: {e}", 'question': question_text, 'session_id': session.id, 'session_error': True}
+                return
 
             is_session_completed = False
             final_is_correct_llm = False
@@ -940,7 +949,9 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
                 total_trials = await sync_to_async(lambda: session.trials.filter(status='completed').count())()
 
                 if session_had_error:
-                    # Error during trial - don't mark completed, yield error summary
+                    # Error during trial - mark session as error status
+                    session.status = 'error'
+                    await session.asave()
                     yield {
                         'question': question_text, 'is_correct_llm': False, 'is_correct_rule': False,
                         'trials': total_trials, 'session_id': session.id, 'final_answer': None,
@@ -953,6 +964,7 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
                 else:
                     # Success or exhausted retries - mark completed
                     session.is_completed = True
+                    session.status = 'completed'
                     await session.asave()  # Use Django's native async save
                     # Refresh session to get updated trials for full metrics
                     await session.arefresh_from_db()
@@ -966,7 +978,11 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
                     yield enriched
             finally:
                 # Session lifecycle: cleanup resources (e.g., browser instance)
-                await self._on_session_end(session)
+                try:
+                    await self._on_session_end(session)
+                except Exception as e:
+                    # Log but don't propagate - cleanup errors shouldn't break the pipeline
+                    print_debug(f"Error in session cleanup (session {session.id}): {e}")
         except Exception as e:
             yield {'error': str(e), 'question': question_text}
 
@@ -990,20 +1006,29 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
 
                 def collect_sessions_to_process():
                     if self.rerun_errors:
-                        # Collect incomplete sessions (crashed mid-execution, never completed)
-                        sessions_to_process = list(group.sessions.filter(is_completed=False).prefetch_related('trials'))
+                        # Collect only pending sessions (crashed mid-execution, never completed)
+                        # Skip sessions with status='error' - they failed due to fundamental issues
+                        sessions_to_process = list(
+                            group.sessions.filter(is_completed=False, status='pending')
+                            .prefetch_related('trials')
+                        )
 
                         # Also reset sessions that completed without success
-                        for session in group.sessions.filter(is_completed=True).prefetch_related('trials'):
+                        for session in group.sessions.filter(is_completed=True, status='completed').prefetch_related('trials'):
                             completed_trials = list(session.trials.filter(status='completed'))
                             has_success = any(t.is_correct_llm for t in completed_trials)
                             if not has_success and len(completed_trials) < self.max_retries:
                                 session.is_completed = False
+                                session.status = 'pending'
                                 session.save()
                                 sessions_to_process.append(session)
                                 print_debug(f"Reset incorrectly completed session #{session.id} ({len(completed_trials)} trials, no success)")
 
-                        completed_qs = set(s.question for s in group.sessions.filter(is_completed=True))
+                        # Skip completed and errored sessions
+                        completed_qs = set(
+                            s.question for s in group.sessions.filter(is_completed=True) |
+                            group.sessions.filter(status='error')
+                        )
                         return sessions_to_process, completed_qs
                     else:
                         # Process new questions only - skip ALL existing sessions

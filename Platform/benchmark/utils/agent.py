@@ -46,6 +46,10 @@ def create_openai_model(llm_settings: 'BenchmarkSettings'):
 
     This is the single source of truth for model creation, used by all agent factories.
     Includes timeout protection to prevent hangs on context overflow or network issues.
+
+    Note: max_retries=0 disables OpenAI client's built-in retry logic. This is intentional
+    because context_length_exceeded errors return HTTP 500 but retrying won't help.
+    Our pipeline has its own retry logic at the trial level for legitimate failures.
     """
     _init_agentscope_once()
 
@@ -55,6 +59,7 @@ def create_openai_model(llm_settings: 'BenchmarkSettings'):
         client_kwargs={
             "base_url": llm_settings.llm_base_url,
             "timeout": LLM_API_TIMEOUT,
+            "max_retries": 0,  # Disable client retries - context_length errors come as 500
         },
         stream=False
     )

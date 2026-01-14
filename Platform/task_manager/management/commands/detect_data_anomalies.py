@@ -37,6 +37,7 @@ class Command(BaseCommand):
         parser.add_argument('--min-activity-ratio', type=float, default=0.4, help='Minimum ratio of dwell time to total duration for long tasks (default: 0.4)')
         parser.add_argument('--delete', action='store_true', help='Delete all tasks detected as anomalies.')
         parser.add_argument('--max-cancel-rate', type=float, default=0.1, help='Maximum allowed cancellation rate per user (default: 0.1)')
+        parser.add_argument('--detailed', action='store_true', help='Enable detailed interaction analysis (slower, detects idle pages and minimal interaction)')
 
     def handle(self, *args, **options):
         self.stdout.write(self.style.MIGRATE_HEADING("Starting Data Anomaly Detection (Efficient Single-Pass)..."))
@@ -250,130 +251,148 @@ class Command(BaseCommand):
         process_group(current_task_id, task_trials)
 
     def scan_interaction_efficiently(self, options, inc_tut):
-        # 1. Get relevant task IDs and metadata first (Efficient) 
-        tasks_meta = {} 
+        from django.db.models import Sum, Count, Q as DQ
+
+        # 1. Get relevant task IDs and metadata first
+        tasks_meta = {}
         t_meta_qs = Task.objects.filter(active=False)
-        if not inc_tut: t_meta_qs = t_meta_qs.exclude(content__belong_dataset__name="tutorial")
-        
+        if not inc_tut:
+            t_meta_qs = t_meta_qs.exclude(content__belong_dataset__name="tutorial")
+
         for t in t_meta_qs.values('id', 'user__username', 'start_timestamp', 'end_timestamp', 'content_id'):
             tasks_meta[t['id']] = t
-        
+
         relevant_task_ids = list(tasks_meta.keys())
         if not relevant_task_ids:
             self.stdout.write("No tasks found to scan.")
             return
 
-        # 2. Query Webpages using simple ID filter (MUCH faster)
-        # Avoid select_related here, use tasks_meta mapping instead
-        pages_qs = Webpage.objects.filter(belong_task_id__in=relevant_task_ids).only(
-            'id', 'dwell_time', 'mouse_moves', 'event_list', 'rrweb_record', 'is_redirected',
-            'belong_task_id'
-        ).order_by('belong_task_id')
+        # 2. Use aggregation to get per-task stats WITHOUT loading large JSON fields
+        task_page_stats = Webpage.objects.filter(
+            belong_task_id__in=relevant_task_ids
+        ).values('belong_task_id').annotate(
+            page_count=Count('id'),
+            total_dwell=Sum('dwell_time', filter=DQ(is_redirected=False))
+        )
 
-        total = pages_qs.count()
-        current_task_id = None
-        task_pages = []
-        recorded_task_ids = set()
+        page_stats_map = {
+            s['belong_task_id']: {
+                'page_count': s['page_count'],
+                'total_dwell': s['total_dwell'] or 0
+            }
+            for s in task_page_stats
+        }
 
-        def process_group(task_id, pages):
-            if not task_id: return
-            recorded_task_ids.add(task_id)
+        recorded_task_ids = set(page_stats_map.keys())
+
+        # 3. Identify tasks that need detailed analysis (duration anomaly candidates)
+        anomaly_candidates = set()
+
+        for task_id, stats in tqdm(page_stats_map.items(), desc="Pass 2a: Basic Stats", file=sys.stdout):
             meta = tasks_meta.get(task_id)
-            uname = meta['user__username'] if meta else "Unknown"
-            
-            # 11, 15 Pre-checks
+            if not meta:
+                continue
+            uname = meta['user__username']
+
             dur = 0
             is_duration_anomaly_candidate = False
-            duration_reason = ""
-            
-            if meta and meta['start_timestamp'] and meta['end_timestamp']:
+
+            if meta['start_timestamp'] and meta['end_timestamp']:
                 dur = (meta['end_timestamp'] - meta['start_timestamp']).total_seconds()
-                
-                # 11. Short Tasks (Remain separate)
+
+                # 11. Short Tasks
                 if dur < options['min_task_duration']:
                     msg = f"Task {task_id}: Completed very quickly ({dur:.1f}s)."
                     self.test_findings[11].append(f"User {uname}: {msg}")
                     self.user_issues[uname].append(msg)
-                
-                # Outlier check candidates
-                is_boxplot_outlier = False
+
+                # Check if boxplot outlier
                 cid = meta['content_id']
                 if cid in self.content_stats:
                     s = self.content_stats[cid]
                     if dur < s['low'] or dur > s['high']:
-                        is_boxplot_outlier = True
-                
-                if is_boxplot_outlier:
-                    is_duration_anomaly_candidate = True
-                    duration_reason = "Boxplot Outlier"
+                        is_duration_anomaly_candidate = True
 
             # 10. Excessive Navigation
-            if len(pages) > options['max_pages']:
-                msg = f"Task {task_id}: Excessive navigation ({len(pages)} pages)."
+            if stats['page_count'] > options['max_pages']:
+                msg = f"Task {task_id}: Excessive navigation ({stats['page_count']} pages)."
                 self.test_findings[10].append(f"User {uname}: {msg}")
                 self.user_issues[uname].append(msg)
                 self.task_issues[task_id].append(msg)
-            
-            # 16. Minimal Interaction & 9. Idle Pages & 20. Inactivity
-            total_m, total_e, has_idle = 0, 0, False
-            total_dwell_ms = 0
-            task_inactivity_gaps = []
-            
-            should_check_inactivity = is_duration_anomaly_candidate
 
-            for p in pages:
-                if p.is_redirected: continue
-                total_dwell_ms += (p.dwell_time or 0)
-                m = self._count_items(p.mouse_moves)
-                
-                e_rrweb = 0
-                if should_check_inactivity:
-                    events = self._get_rrweb_events(p.rrweb_record)
-                    e_rrweb = len(events)
-                    
-                    if events:
-                        page_gaps = []
-                        last_ts = events[0].get('timestamp')
-                        for ev in events:
-                            if self._is_interaction_event(ev):
-                                curr_ts = ev.get('timestamp')
-                                if last_ts and curr_ts:
-                                    gap = (curr_ts - last_ts) / 1000.0
-                                    if gap > options['max_inactivity']:
-                                        page_gaps.append(gap)
-                                last_ts = curr_ts
-                        
-                        if last_ts and events[-1].get('timestamp'):
-                            gap = (events[-1].get('timestamp') - last_ts) / 1000.0
-                            if gap > options['max_inactivity']:
-                                page_gaps.append(gap)
-                        
-                        if page_gaps:
-                            task_inactivity_gaps.extend(page_gaps)
-                else:
-                    e_rrweb = self._cheap_count_rrweb(p.rrweb_record)
-
-                e_list = self._count_items(p.event_list)
-                e = max(e_rrweb, e_list)
-
-                total_m += m
-                total_e += e
-                if p.dwell_time and p.dwell_time > options['min_dwell_time'] and m == 0 and e == 0:
-                    has_idle = True
-                    msg = f"Page {p.id} (Task {task_id}): Dwell {p.dwell_time}ms, no interaction."
-                    self.test_findings[9].append(f"User {uname}: {msg}")
-                    self.user_issues[uname].append(msg)
-                    self.task_issues[task_id].append(msg)
-
-            # 13. Consolidated Temporal-Activity Anomaly check
-            total_dwell_s = total_dwell_ms / 1000.0
-            if is_duration_anomaly_candidate:
-                # Flag as anomaly ONLY if it also fails the activity check
+            # 13. Temporal-Activity Anomaly (basic check with aggregated dwell)
+            if is_duration_anomaly_candidate and dur > 0:
+                total_dwell_s = stats['total_dwell'] / 1000.0
                 if total_dwell_s < (dur * options['min_activity_ratio']):
-                    msg = f"Task {task_id}: Temporal-Activity anomaly ({duration_reason}, Dur: {dur/60:.1f}m, Dwell: {total_dwell_s/60:.1f}m)."
+                    msg = f"Task {task_id}: Temporal-Activity anomaly (Boxplot Outlier, Dur: {dur/60:.1f}m, Dwell: {total_dwell_s/60:.1f}m)."
                     self.test_findings[13].append(f"User {uname}: {msg}")
                     self.user_issues[uname].append(msg)
                     self.task_issues[task_id].append(msg)
+                    # Mark for detailed inactivity analysis
+                    anomaly_candidates.add(task_id)
+
+        # 4. Detailed analysis ONLY for anomaly candidates (loads JSON fields)
+        if anomaly_candidates:
+            self._scan_detailed_interactions(options, tasks_meta, anomaly_candidates)
+
+        # 4b. Full detailed scan if --detailed flag (for tests 9 and 16)
+        if options.get('detailed'):
+            self._scan_full_interactions(options, tasks_meta, relevant_task_ids)
+
+        # 5. No webpages recorded
+        missing_pages = set(relevant_task_ids) - recorded_task_ids
+        for tid in missing_pages:
+            meta = tasks_meta[tid]
+            msg = f"Task {tid}: No webpages recorded."
+            self.test_findings[5].append(f"User {meta['user__username']}: {msg}")
+            self.user_issues[meta['user__username']].append(msg)
+
+    def _scan_detailed_interactions(self, options, tasks_meta, candidate_task_ids):
+        """Detailed scan for inactivity gaps - only for anomaly candidates."""
+        if not candidate_task_ids:
+            return
+
+        pages_qs = Webpage.objects.filter(
+            belong_task_id__in=list(candidate_task_ids),
+            is_redirected=False
+        ).only(
+            'id', 'belong_task_id', 'rrweb_record'
+        ).order_by('belong_task_id')
+
+        current_task_id = None
+        task_pages = []
+
+        def process_inactivity(task_id, pages):
+            if not task_id or not pages:
+                return
+            meta = tasks_meta.get(task_id)
+            if not meta:
+                return
+            uname = meta['user__username']
+
+            task_inactivity_gaps = []
+            for p in pages:
+                events = self._get_rrweb_events(p.rrweb_record)
+                if not events:
+                    continue
+
+                page_gaps = []
+                last_ts = events[0].get('timestamp')
+                for ev in events:
+                    if self._is_interaction_event(ev):
+                        curr_ts = ev.get('timestamp')
+                        if last_ts and curr_ts:
+                            gap = (curr_ts - last_ts) / 1000.0
+                            if gap > options['max_inactivity']:
+                                page_gaps.append(gap)
+                        last_ts = curr_ts
+
+                if last_ts and events[-1].get('timestamp'):
+                    gap = (events[-1].get('timestamp') - last_ts) / 1000.0
+                    if gap > options['max_inactivity']:
+                        page_gaps.append(gap)
+
+                task_inactivity_gaps.extend(page_gaps)
 
             if task_inactivity_gaps:
                 count = len(task_inactivity_gaps)
@@ -384,6 +403,58 @@ class Command(BaseCommand):
                 self.user_issues[uname].append(msg)
                 self.task_issues[task_id].append(msg)
 
+        for p in tqdm(pages_qs.iterator(chunk_size=100), desc="Pass 2b: Inactivity", file=sys.stdout):
+            if p.belong_task_id != current_task_id:
+                process_inactivity(current_task_id, task_pages)
+                current_task_id = p.belong_task_id
+                task_pages = []
+            task_pages.append(p)
+        process_inactivity(current_task_id, task_pages)
+
+    def _scan_full_interactions(self, options, tasks_meta, relevant_task_ids):
+        """Full interaction scan for tests 9 (Idle Pages) and 16 (Minimal Interaction).
+        Only runs with --detailed flag due to memory/time cost."""
+        pages_qs = Webpage.objects.filter(
+            belong_task_id__in=relevant_task_ids
+        ).only(
+            'id', 'dwell_time', 'mouse_moves', 'event_list', 'rrweb_record',
+            'is_redirected', 'belong_task_id'
+        ).order_by('belong_task_id')
+
+        current_task_id = None
+        task_pages = []
+        task_interaction_stats = {}  # task_id -> {total_m, total_e, has_idle}
+
+        def process_group(task_id, pages):
+            if not task_id:
+                return
+            meta = tasks_meta.get(task_id)
+            if not meta:
+                return
+            uname = meta['user__username']
+
+            total_m, total_e, has_idle = 0, 0, False
+
+            for p in pages:
+                if p.is_redirected:
+                    continue
+                m = self._count_items(p.mouse_moves)
+                e_rrweb = self._cheap_count_rrweb(p.rrweb_record)
+                e_list = self._count_items(p.event_list)
+                e = max(e_rrweb, e_list)
+
+                total_m += m
+                total_e += e
+
+                # 9. Idle Pages
+                if p.dwell_time and p.dwell_time > options['min_dwell_time'] and m == 0 and e == 0:
+                    has_idle = True
+                    msg = f"Page {p.id} (Task {task_id}): Dwell {p.dwell_time}ms, no interaction."
+                    self.test_findings[9].append(f"User {uname}: {msg}")
+                    self.user_issues[uname].append(msg)
+                    self.task_issues[task_id].append(msg)
+
+            # 16. Minimal Interaction
             if len(pages) > 0 and (total_m < 10 and total_e < 10):
                 msg = f"Task {task_id}: Minimal interaction (Moves: {total_m}, Events: {total_e})."
                 self.test_findings[16].append(f"User {uname}: {msg}")
@@ -395,21 +466,13 @@ class Command(BaseCommand):
                 self.user_issues[uname].append(msg)
                 self.task_issues[task_id].append(msg)
 
-        for p in tqdm(pages_qs.iterator(), total=total, desc="Pass 2: Interaction", file=sys.stdout):
+        for p in tqdm(pages_qs.iterator(chunk_size=500), desc="Pass 2c: Detailed Interaction", file=sys.stdout):
             if p.belong_task_id != current_task_id:
                 process_group(current_task_id, task_pages)
                 current_task_id = p.belong_task_id
                 task_pages = []
             task_pages.append(p)
         process_group(current_task_id, task_pages)
-        
-        # 5. No webpages recorded
-        missing_pages = set(relevant_task_ids) - recorded_task_ids
-        for tid in missing_pages:
-            meta = tasks_meta[tid]
-            msg = f"Task {tid}: No webpages recorded."
-            self.test_findings[5].append(f"User {meta['user__username']}: {msg}")
-            self.user_issues[meta['user__username']].append(msg)
 
     def scan_annotations_efficiently(self, min_anno, inc_tut):
         # 3. Missing Annotations & 7. Weak Queries & 17. Rushed

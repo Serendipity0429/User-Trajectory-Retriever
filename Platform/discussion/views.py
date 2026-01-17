@@ -616,3 +616,33 @@ def toggle_comment_hidden(request, pk):
         comment.is_hidden = not comment.is_hidden
         comment.save()
     return redirect("post_detail", pk=comment.post.pk)
+
+
+@staff_member_required
+def delete_attachment(request, pk):
+    attachment = get_object_or_404(Attachment, pk=pk)
+
+    # Determine redirect target
+    if attachment.bulletin:
+        redirect_url = redirect("bulletin_detail", pk=attachment.bulletin.pk)
+    elif attachment.post:
+        redirect_url = redirect("post_detail", pk=attachment.post.pk)
+    else:
+        redirect_url = redirect("discussion_home")
+
+    if request.method == "POST":
+        # Try to delete the actual file if it exists
+        try:
+            if attachment.file and os.path.exists(attachment.file.path):
+                os.remove(attachment.file.path)
+        except (ValueError, OSError):
+            pass  # File doesn't exist or can't be deleted, just remove DB record
+
+        attachment.delete()
+        send_system_message(
+            request.user,
+            "Attachment Deleted",
+            "The attachment record was removed successfully.",
+        )
+
+    return redirect_url

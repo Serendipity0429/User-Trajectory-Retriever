@@ -1,0 +1,127 @@
+/* ==========================================================================
+   CSS Variables - Centralized Color Palette and Design Tokens
+   ========================================================================== */
+
+:root {
+  /* Primary Colors */
+  --color-primary: #021e4d;
+  --color-primary-hover: #032b6b;
+  --color-primary-active: #01122e;
+  --color-primary-dark-hover: #011533;
+
+  /* Accent Colors (Dark Mode) */
+  --color-accent-light: #A0D1E2;
+  --color-accent-secondary: #7AB8D9;
+
+  /* Status Colors */
+  --color-success: #1c7430;
+  --color-success-light: #45c35e;
+  --color-success-bg: #e8f5e9;
+  --color-danger: #dc3545;
+  --color-danger-hover: #c82333;
+  --color-warning: #ffb700;
+  --color-warning-hover: #e0a800;
+  --color-info: #17a2b8;
+
+  /* Task Status */
+  --color-status-right: #4CAF50;
+  --color-status-wrong: #F44336;
+  --color-status-cancelled: #f0ad4e;
+
+  /* Text Colors */
+  --color-text-primary: #333;
+  --color-text-secondary: #555;
+  --color-text-muted: #6c757d;
+  --color-text-light: #adb5bd;
+  --color-text-white: #fff;
+
+  /* Background Colors */
+  --color-bg-light: #f8f9fa;
+  --color-bg-lighter: #edeff1;
+  --color-bg-dark: #343a40;
+  --color-bg-darker: #212529;
+
+  /* Border Colors */
+  --color-border-light: #dee2e6;
+  --color-border-default: #e9ecef;
+  --color-border-dashed: #ddd;
+
+  /* Discussion Badge Colors */
+  --color-badge-important: #A0001C;
+  --color-badge-update: #01579b;
+  --color-badge-general: #6c757d;
+  --color-badge-feedback: #37229e;
+  --color-badge-issues: #c5003e;
+
+  /* Category Colors */
+  --color-category-purple: #6f42c1;
+  --color-category-pink: #d63384;
+  --color-category-teal: #20c997;
+  --color-category-lime: #73b317;
+  --color-category-orange: #fd7e14;
+
+  /* Shadows */
+  --shadow-sm: 0 .125rem .25rem rgba(0, 0, 0, .075);
+  --shadow-md: 0 .5rem 1rem rgba(0, 0, 0, .15);
+  --shadow-lg: 0 1rem 3rem rgba(0, 0, 0, .175);
+
+  /* Transitions */
+  --transition-fast: 0.2s ease;
+  --transition-normal: 0.3s ease;
+}
+
+/* ==========================================================================
+   Dark Mode Variables
+   ========================================================================== */
+
+:root.dark-mode {
+  /* Override light mode colors for dark mode */
+  --color-primary: #82318E;
+  --color-primary-hover: #9C4DA8;
+  --color-primary-active: #6B2876;
+
+  /* Text Colors - Dark Mode */
+  --color-text-primary: #f6f6f6;
+  --color-text-secondary: #e0e0e0;
+  --color-text-muted: #adb5bd;
+  --color-text-white: #fff;
+
+  /* Background Colors - Dark Mode */
+  --color-bg-light: #303133;
+  --color-bg-lighter: #3a3a3c;
+  --color-bg-dark: #2a2a2a;
+  --color-bg-darker: #1e1e1e;
+
+  /* Border Colors - Dark Mode */
+  --color-border-light: #444;
+  --color-border-default: #555;
+  --color-border-dashed: #666;
+
+  /* Status Colors - Dark Mode (brighter for visibility) */
+  --color-success: #45c35e;
+  --color-success-light: #66d17a;
+  --color-success-bg: rgba(69, 195, 94, 0.2);
+  --color-danger: #ff6b6b;
+  --color-danger-hover: #ff8585;
+  --color-warning: #ffb74d;
+  --color-warning-hover: #ffc570;
+
+  /* Task Status - Dark Mode */
+  --color-status-right: #66d17a;
+  --color-status-wrong: #ff6b6b;
+  --color-status-cancelled: #ffb74d;
+
+  /* Discussion Badge Colors - Dark Mode */
+  --color-badge-important: #ff6b6b;
+  --color-badge-update: #4dd0e1;
+  --color-badge-general: #adb5bd;
+  --color-badge-feedback: #b39ddb;
+  --color-badge-issues: #ff8a80;
+
+  /* Category Colors - Dark Mode */
+  --color-category-purple: #b39ddb;
+  --color-category-pink: #f48fb1;
+  --color-category-teal: #4db6ac;
+  --color-category-lime: #aed581;
+  --color-category-orange: #ffb74d;
+}

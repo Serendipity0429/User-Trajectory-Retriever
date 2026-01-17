@@ -40,4 +40,9 @@ urlpatterns = [
     path("labels/autocomplete/", views.label_autocomplete, name="label_autocomplete"),
     path("upload_image/", views.upload_image, name="upload_image"),
     path("settings/", views.discussion_settings, name="discussion_settings"),
+    path(
+        "attachment/<int:pk>/delete/",
+        views.delete_attachment,
+        name="delete_attachment",
+    ),
 ]

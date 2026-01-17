@@ -822,6 +822,12 @@ document.addEventListener('DOMContentLoaded', function() {
             loaders.forEach(loader => loader.remove());
             contents.forEach(content => content.style.display = 'block');
             
+            // Dark mode detection for charts
+            const isDarkMode = document.documentElement.classList.contains('dark-mode');
+            const textColor = isDarkMode ? '#f6f6f6' : '#666';
+            const gridColor = isDarkMode ? '#444' : '#e0e0e0';
+            const mutedTextColor = isDarkMode ? '#adb5bd' : '#6c757d';
+
             const CHART_COLORS = {
                 red: 'rgb(255, 99, 132)',
                 orange: 'rgb(255, 159, 64)',
@@ -837,7 +843,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const noDataPlugin = {
                 id: 'noData',
                 afterDraw: (chart) => {
-                    const hasData = chart.data.datasets.some(dataset => 
+                    const hasData = chart.data.datasets.some(dataset =>
                         dataset.data && dataset.data.length > 0 && dataset.data.some(val => val !== 0 && val !== null && val !== undefined)
                     );
 
@@ -851,7 +857,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         ctx.textAlign = 'center';
                         ctx.textBaseline = 'middle';
                         ctx.font = '20px "Noto Sans", sans-serif';
-                        ctx.fillStyle = '#6c757d';
+                        ctx.fillStyle = mutedTextColor;
                         ctx.fillText('No Data Available', width / 2, height / 2);
                         ctx.restore();
                     }
@@ -892,17 +898,19 @@ document.addEventListener('DOMContentLoaded', function() {
                 responsive: true,
                 maintainAspectRatio: false,
                 plugins: {
-                    legend: { labels: { font: { size: 14 } } }
+                    legend: { labels: { font: { size: 14 }, color: textColor } }
                 },
                 scales: {
                     x: {
-                        beginAtZero: true, // Ensure value axis starts at zero
-                        ticks: { font: { size: 14 } },
-                        title: { display: true, font: { size: 16 } }
+                        beginAtZero: true,
+                        ticks: { font: { size: 14 }, color: textColor },
+                        title: { display: true, font: { size: 16 }, color: textColor },
+                        grid: { color: gridColor }
                     },
                     y: {
-                        ticks: { font: { size: 14 } },
-                        title: { display: true, font: { size: 16 } }
+                        ticks: { font: { size: 14 }, color: textColor },
+                        title: { display: true, font: { size: 16 }, color: textColor },
+                        grid: { color: gridColor }
                     }
                 }
             };
@@ -911,25 +919,26 @@ document.addEventListener('DOMContentLoaded', function() {
                 responsive: true,
                 maintainAspectRatio: false,
                 plugins: {
-                    legend: { position: 'top', labels: { font: { size: 14 } } }
+                    legend: { position: 'top', labels: { font: { size: 14 }, color: textColor } }
                 }
             };
-            
+
             const plotlyLayout = {
                 margin: { l: 80, r: 50, b: 80, t: 50 },
                 paper_bgcolor: 'rgba(0,0,0,0)',
                 plot_bgcolor: 'rgba(0,0,0,0)',
-                xaxis: { 
-                    gridcolor: '#e0e0e0',
-                    title: { font: { size: 18 } },
-                    tickfont: { size: 14 }
+                font: { color: textColor },
+                xaxis: {
+                    gridcolor: gridColor,
+                    title: { font: { size: 18, color: textColor } },
+                    tickfont: { size: 14, color: textColor }
                 },
-                yaxis: { 
-                    gridcolor: '#e0e0e0',
-                    title: { font: { size: 18 } },
-                    tickfont: { size: 14 }
+                yaxis: {
+                    gridcolor: gridColor,
+                    title: { font: { size: 18, color: textColor } },
+                    tickfont: { size: 14, color: textColor }
                 },
-                legend: { font: { size: 14 } }
+                legend: { font: { size: 14, color: textColor } }
             };
 
 
@@ -971,20 +980,23 @@ document.addEventListener('DOMContentLoaded', function() {
                         responsive: true,
                         maintainAspectRatio: false,
                         plugins: {
-                            legend: { labels: { font: { size: 14 } } }
+                            legend: { labels: { font: { size: 14 }, color: textColor } }
                         },
                         scales: {
                             x: {
                                 beginAtZero: true,
-                                ticks: { font: { size: 14 } },
-                                title: { display: true, font: { size: 16 } }
+                                ticks: { font: { size: 14 }, color: textColor },
+                                title: { display: true, font: { size: 16 }, color: textColor },
+                                grid: { color: gridColor }
                             },
                             y: {
-                                ticks: { 
+                                ticks: {
                                     font: { size: 14 },
-                                    autoSkip: false // Ensure all labels are shown
+                                    color: textColor,
+                                    autoSkip: false
                                 },
-                                title: { display: true, font: { size: 16 } }
+                                title: { display: true, font: { size: 16 }, color: textColor },
+                                grid: { color: gridColor }
                             }
                         }
                     } : chartJsDefaultOptions;

@@ -1,5 +1,6 @@
 :root {
-    --custom-dark-blue: #021e4d !important;
+    /* Legacy alias - prefer using --color-primary from _variables.css */
+    --custom-dark-blue: var(--color-primary, #021e4d);
 }
 
 /* --- Default CSS: Mobile styles (0px - 575px) --- */
@@ -7,15 +8,15 @@
 /* MAIN STYLE */
 body {
     font-family: 'Noto Sans SC', sans-serif;
-    background: #f8f9fa;
-    color: #333;
+    background: var(--color-bg-light, #f8f9fa);
+    color: var(--color-text-primary, #333);
     font-size: 16px; /* Adjusted for mobile */
 }
 
 p {
     font-size: inherit;
     line-height: 1.6em;
-    color: #555;
+    color: var(--color-text-secondary, #555);
 }
 
 a {
@@ -44,7 +45,7 @@ a, a:hover, a:focus {
 
 .navbar-btn {
     box-shadow: none;
-    outline: none !important;
+    outline: none;
     border: none;
 }
 
@@ -67,8 +68,8 @@ a, a:hover, a:focus {
     left: -200px;
     height: 100%;
     z-index: 1050;
-    background: #343a40;
-    color: #fff;
+    background: var(--color-bg-dark, #343a40);
+    color: var(--color-text-white, #fff);
     transition: all 0.3s;
     overflow-y: auto;
 }
@@ -79,7 +80,7 @@ a, a:hover, a:focus {
 
 #sidebar .sidebar-header {
     padding: 20px;
-    background: #212529;
+    background: var(--color-bg-darker, #212529);
 }
 
 #sidebar .sidebar-header h2 {
@@ -134,7 +135,7 @@ a, a:hover, a:focus {
 ul ul a {
     font-size: 0.9em !important;
     padding-left: 30px !important;
-    background: #212529;
+    background: var(--color-bg-darker, #212529);
 }
 
 /* CONTENT STYLE */
@@ -172,7 +173,7 @@ ul ul a {
     cursor: grab;
     display: flex;
     align-items: center;
-    border: 1px solid #dee2e6;
+    border: 1px solid var(--color-border-light, #dee2e6);
 }
 
 .drag-option:hover {
@@ -181,12 +182,12 @@ ul ul a {
 
 .sortable-placeholder {
     border: 2px dashed var(--custom-dark-blue);
-    background: #f8f9fa;
+    background: var(--color-bg-light, #f8f9fa);
 }
 
 .drag-handle {
     margin-right: 10px;
-    color: #adb5bd;
+    color: var(--color-text-light, #adb5bd);
 }
 
 .priority-number {
@@ -216,31 +217,31 @@ ul ul a {
 }
 
 .dropdown-menu[aria-labelledby="messageDropdown"] .dropdown-item:hover {
-    background-color: #f8f9fa;
+    background-color: var(--color-bg-light, #f8f9fa);
 }
 
 #sidebarCollapse {
     border: none;
     background: transparent;
-    color: #6c757d;
+    color: var(--color-text-muted, #6c757d);
 }
 
 #sidebarCollapse:hover {
-    color: #343a40;
+    color: var(--color-bg-dark, #343a40);
 }
 
 h2.text-success {
-    color: #1c7430 !important;
+    color: var(--color-success, #1c7430) !important;
 }
 
 .bg-success-light {
-    background-color: #1c7430 !important;
-    color: #fff !important;
+    background-color: var(--color-success, #1c7430) !important;
+    color: var(--color-text-white, #fff) !important;
 }
 
 .list-group-item-success {
-    background-color: #e8f5e9 !important;
-    color: #1c7430 !important;
+    background-color: var(--color-success-bg, #e8f5e9) !important;
+    color: var(--color-success, #1c7430) !important;
     border-color: #d4edda !important;
 }
 
@@ -299,7 +300,7 @@ h2.text-success {
 }
 
 .list-group.is-invalid {
-    border: 1px solid #dc3545;
+    border: 1px solid var(--color-danger, #dc3545);
     border-radius: 0.25rem;
 }
 
@@ -322,9 +323,9 @@ h2.text-success {
 }
 
 .btn-custom-dark-blue:hover {
-    background-color: #01122e;
-    border-color: #01122e;
-    color: #fff;
+    background-color: var(--color-primary-active, #01122e);
+    border-color: var(--color-primary-active, #01122e);
+    color: var(--color-text-white, #fff);
 }
 
 .btn-custom-dark-blue:disabled {
@@ -356,7 +357,7 @@ h2.text-success {
 }
 
 .reflection-text {
-    color: #6c757d;
+    color: var(--color-text-muted, #6c757d);
 }
 
 .custom-navbar .container-fluid:has(.question-in-header.visible) {
@@ -417,11 +418,10 @@ h2.text-success {
     border: none;
     padding: 0;
     font-size: inherit;
-    color: var(--bs-navbar-color);
     cursor: pointer;
     display: flex;
     align-items: center;
-    color: #6c757d;
+    color: var(--color-text-muted, #6c757d);
 }
 
 .page-settings-text-button:hover,
@@ -460,18 +460,18 @@ body.EasyMDE-fullscreen .card {
 }
 
 .user-info {
-    background: #edeff1;
+    background: var(--color-bg-lighter, #edeff1);
     border-radius: 4px;
     padding: 24px 23px 20px;
 }
 
 .list-header {
-    background: #edeff1;
-    border-bottom: 2px solid #343a40;
+    background: var(--color-bg-lighter, #edeff1);
+    border-bottom: 2px solid var(--color-bg-dark, #343a40);
 }
 
 .list-header b {
-    color: #021e4d;
+    color: var(--color-primary, #021e4d);
 }
 
 .list-row {
@@ -480,25 +480,25 @@ body.EasyMDE-fullscreen .card {
 }
 
 .row2 {
-    background: #edeff1;
+    background: var(--color-bg-lighter, #edeff1);
 }
 
 .control-panel {
-    background: #edeff1;
-    border-top: 2px solid #021e4d;
+    background: var(--color-bg-lighter, #edeff1);
+    border-top: 2px solid var(--color-primary, #021e4d);
     border-radius: 0 0 4px 4px;
     margin-bottom: 10px;
 }
 
 .btn-primary-custom {
-    background-color: #021e4d;
+    background-color: var(--color-primary, #021e4d);
     margin: 10px 0;
     font-size: large;
-    color: #fff;
+    color: var(--color-text-white, #fff);
 }
 
 .btn-primary-custom:hover {
-    background-color: #032b6b;
+    background-color: var(--color-primary-hover, #032b6b);
 }
 
 .btn-primary-custom:active,
@@ -522,7 +522,7 @@ div.question-wrapper {
 
 div.question-wrapper .question-text, .loaded-box .question-text {
     font-size: 1.2em;
-    color: #333;
+    color: var(--color-text-primary, #333);
     font-weight: bold;
 }
 
@@ -548,7 +548,7 @@ div.question-wrapper > :not(.question-text, input, textarea) {
     margin: 20px 0;
 }
 
-.task_wrapper {
+.task-wrapper {
     border-radius: 4px;
     padding: 10px 23px 20px;
     margin: 5px 0;
@@ -556,7 +556,7 @@ div.question-wrapper > :not(.question-text, input, textarea) {
     transition: all 0.2s ease-in-out;
 }
 
-.task_wrapper:hover {
+.task-wrapper:hover {
     transform: scale(1.01);
     transition: all 0.2s ease-in-out;
     box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
@@ -564,9 +564,9 @@ div.question-wrapper > :not(.question-text, input, textarea) {
 }
 
 .btn-cancel {
-    background-color: #6c757d;
-    border-color: #6c757d;
-    color: #fff;
+    background-color: var(--color-text-muted, #6c757d);
+    border-color: var(--color-text-muted, #6c757d);
+    color: var(--color-text-white, #fff);
 }
 
 .btn-cancel:hover {
@@ -617,7 +617,7 @@ label {
 }
 
 details:hover {
-    cursor: pointer !important;
+    cursor: pointer;
 }
 
 button.add-source {
@@ -657,9 +657,9 @@ button.remove-source:hover {
     font-weight: bold;
     cursor: pointer;
     padding: 5px 10px;
-    background: #edeff1;
-    border-bottom: 2px solid #021e4d;
-    color: #021e4d;
+    background: var(--color-bg-lighter, #edeff1);
+    border-bottom: 2px solid var(--color-primary, #021e4d);
+    color: var(--color-primary, #021e4d);
     list-style: none;
     display: block;
 }
@@ -669,7 +669,7 @@ button.remove-source:hover {
 }
 
 .summary, .task-process-container details[open] > summary {
-    border-bottom: 1px solid #ddd;
+    border-bottom: 1px solid var(--color-border-dashed, #ddd);
 }
 
 .annotation-body {
@@ -697,9 +697,9 @@ button.remove-source:hover {
     margin-bottom: 0;
 }
 
-.status-right { color: #4CAF50; }
-.status-wrong { color: #F44336; }
-.status-cancelled { color: #f0ad4e; }
+.status-right { color: var(--color-status-right, #4CAF50); }
+.status-wrong { color: var(--color-status-wrong, #F44336); }
+.status-cancelled { color: var(--color-status-cancelled, #f0ad4e); }
 
 .font-size-large #sidebarCollapse .sidebar-toggle-text,
 .font-size-large .page-settings-text-button .page-settings-text {
@@ -711,16 +711,11 @@ body.EasyMDE-fullscreen #content {
 }
 
 .dark-mode .dropdown-menu[aria-labelledby="messageDropdown"] .dropdown-item:hover {
-    background-color: #343a40;
+    background-color: var(--color-bg-dark, #343a40);
 }
 
 .form-label {
     margin-bottom: 0.75rem !important;
-}
-
-body.EasyMDE-fullscreen .card {
-    transition: none !important;
-    transform: none !important;
 }
 
 .navbar-center-content {
@@ -737,12 +732,12 @@ body.EasyMDE-fullscreen .card {
 }
 
 .task-filter-toggle {
-    background-color: #f8f9fa;
-    opacity: 1 !important;
+    background-color: var(--color-bg-light, #f8f9fa);
+    opacity: 1;
 }
 
 .task-filter-toggle[aria-expanded="true"] {
-    background-color: #e9ecef !important;
+    background-color: var(--color-border-default, #e9ecef) !important;
     color: #000 !important;
     border-color: #ced4da !important;
 }

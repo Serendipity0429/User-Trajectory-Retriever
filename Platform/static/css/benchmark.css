@@ -80,8 +80,8 @@
 
 /* Metric Cards Refined */
 .metric-card {
-    background-color: #fff;
-    border: 1px solid #e9ecef;
+    background-color: var(--color-text-white, #fff);
+    border: 1px solid var(--color-border-default, #e9ecef);
     border-radius: 0.5rem; /* rounded-lg */
     transition: transform 0.2s ease-in-out, box-shadow 0.2s ease;
     height: 100%;
@@ -91,7 +91,7 @@
 
 .metric-card:hover {
     transform: translateY(-3px);
-    box-shadow: 0 .5rem 1rem rgba(0,0,0,.08) !important;
+    box-shadow: 0 .5rem 1rem rgba(0,0,0,.08);
 }
 
 .metric-card .card-body {
@@ -149,7 +149,7 @@
     align-items: center;
     font-size: 1rem;
     font-weight: 700;
-    color: #343a40;
+    color: var(--color-bg-dark, #343a40);
     text-transform: uppercase;
     letter-spacing: 1px;
     margin-bottom: 1rem;
@@ -166,7 +166,7 @@
     align-items: center;
     font-size: 1rem;
     font-weight: 700;
-    color: #343a40;
+    color: var(--color-bg-dark, #343a40);
     text-transform: uppercase;
     letter-spacing: 1px;
     margin-bottom: 1rem;
@@ -188,11 +188,11 @@
     content: "";
     flex: 1;
     height: 1px;
-    background: #dee2e6;
+    background: var(--color-border-light, #dee2e6);
     margin-left: 1rem;
 }
 
-.text-purple { color: #6f42c1 !important; }
+.text-purple { color: var(--color-category-purple, #6f42c1) !important; }
 
 /* Refactored JS Styles */
 
@@ -286,6 +286,6 @@
 }
 
 .table-responsive thead th {
-    background-color: #f8f9fa;
+    background-color: var(--color-bg-light, #f8f9fa);
     box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.1);
 }

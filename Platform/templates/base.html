@@ -26,6 +26,10 @@
     <!-- Plotly.js -->
     <script src="{% static 'js/vendor/plotly.min.js' %}"></script>
 
+    <!-- CSS Variables and Utilities -->
+    <link href="{% static 'css/_variables.css' %}" rel="stylesheet">
+    <link href="{% static 'css/_utilities.css' %}" rel="stylesheet">
+
     <!-- Custom CSS -->
     <link href="{% static 'css/custom.css' %}" rel="stylesheet">
     <link href="{% static 'css/responsive.css' %}" rel="stylesheet">
@@ -72,20 +76,20 @@
         <nav id="sidebar" class="bg-dark">
             <div class="sidebar-header">
                 <h2>
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <img src="{% static 'img/IR4.png' %}" alt="Logo" style="width: 40px; height: 40px;">
-                        <span style="letter-spacing: 4px; font-weight: bold;">THUIR</span>
+                    <div class="flex-between">
+                        <img src="{% static 'img/IR4.png' %}" alt="Logo" class="icon-sq-40">
+                        <span class="header-text">THUIR</span>
                     </div>
-                    <div style="text-align: right; letter-spacing: 4px; font-weight: bold;">
+                    <div class="text-end header-text">
                         Annotation
                     </div>
-                    <div style="text-align: right; letter-spacing: 4px; font-weight: bold;">
+                    <div class="text-end header-text">
                         Platform
                     </div>
                 </h2>
             </div>
 
-            <hr style="border-color: #6c757d; width: 80%; margin: 5px auto;">
+            <hr class="sidebar-divider">
 
             <ul class="list-unstyled components">
                 <li class="active">
@@ -112,7 +116,7 @@
                 {% endif %}
                 {% if request.session.original_user_token %}
                 <li>
-                    <form id="return-to-admin-form" action="{% url 'dashboard:return_to_admin' %}" method="post" style="display: none;">
+                    <form id="return-to-admin-form" action="{% url 'dashboard:return_to_admin' %}" method="post" class="d-none">
                         {% csrf_token %}
                     </form>
                     <a href="#" onclick="event.preventDefault(); document.getElementById('return-to-admin-form').submit();">

@@ -1,0 +1,135 @@
+/* ==========================================================================
+   CSS Utilities - Reusable utility classes to replace inline styles
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   Typography
+   -------------------------------------------------------------------------- */
+.text-xs { font-size: 0.75rem; }
+.text-xxs { font-size: 0.7rem; }
+.text-micro { font-size: 0.65rem; }
+.text-strikethrough { text-decoration: line-through; }
+.ws-prewrap { white-space: pre-wrap; }
+.ws-nowrap { white-space: nowrap; }
+.word-break-all { word-break: break-all; }
+.word-break-word { word-break: break-word; }
+.header-text { letter-spacing: 4px; font-weight: bold; }
+.lh-sm { line-height: 1.4; }
+.lh-lg { line-height: 1.6; }
+.font-monospace { font-family: monospace; }
+
+/* --------------------------------------------------------------------------
+   Sizing
+   -------------------------------------------------------------------------- */
+.icon-sq-40 { width: 40px; height: 40px; }
+.icon-sq-36 { width: 36px; height: 36px; }
+.icon-sq-24 { width: 24px; height: 24px; }
+.icon-sq-20 { width: 20px; height: 20px; }
+.icon-sq-16 { width: 16px; height: 16px; }
+.max-w-90 { max-width: 90%; }
+.max-w-80 { max-width: 80%; }
+.min-w-0 { min-width: 0; }
+.w-fit { width: fit-content; }
+
+/* --------------------------------------------------------------------------
+   Interaction
+   -------------------------------------------------------------------------- */
+.cursor-pointer { cursor: pointer; }
+.cursor-default { cursor: default; }
+.pointer-events-none { pointer-events: none; }
+.user-select-none { user-select: none; }
+.transition-transform { transition: transform var(--transition-fast, 0.2s); }
+.transition-opacity { transition: opacity var(--transition-fast, 0.2s); }
+.transition-all { transition: all var(--transition-normal, 0.3s); }
+
+/* --------------------------------------------------------------------------
+   Scrolling
+   -------------------------------------------------------------------------- */
+.scrollable-120 { max-height: 120px; overflow-y: auto; }
+.scrollable-200 { max-height: 200px; overflow-y: auto; }
+.scrollable-300 { max-height: 300px; overflow-y: auto; }
+.scrollable-400 { max-height: 400px; overflow-y: auto; }
+.scrollable-500 { max-height: 500px; overflow-y: auto; }
+.scrollable-600 { max-height: 600px; overflow-y: auto; }
+.mh-50vh { max-height: 50vh; overflow-y: auto; }
+.mh-75vh { max-height: 75vh; overflow-y: auto; }
+.overflow-x-auto { overflow-x: auto; }
+.overflow-hidden { overflow: hidden; }
+
+/* --------------------------------------------------------------------------
+   Progress Bars
+   -------------------------------------------------------------------------- */
+.progress-lg { height: 25px; }
+.progress-md { height: 20px; }
+.progress-sm { height: 10px; }
+.progress-translucent { background-color: rgba(255,255,255,0.5); }
+
+/* --------------------------------------------------------------------------
+   Borders/Dividers
+   -------------------------------------------------------------------------- */
+.sidebar-divider {
+  border-color: var(--color-text-muted, #6c757d);
+  width: 80%;
+  margin: 5px auto;
+}
+.border-bottom-light { border-bottom: 1px solid var(--color-border-default, #e9ecef); }
+.border-top-light { border-top: 1px solid var(--color-border-default, #e9ecef); }
+.border-dashed { border-style: dashed; }
+
+/* --------------------------------------------------------------------------
+   Table Column Widths
+   -------------------------------------------------------------------------- */
+.col-rank { width: 60px; }
+.col-id { width: 5%; }
+.col-name { width: 25%; }
+.col-question { width: 35%; }
+.col-model { width: 15%; }
+.col-actions { width: 10%; }
+.col-answer { width: 30%; }
+.col-status { width: 20%; }
+
+/* --------------------------------------------------------------------------
+   Spacing Extensions
+   -------------------------------------------------------------------------- */
+.rrweb-player-mt { margin-top: 20px; }
+.gap-xs { gap: 0.25rem; }
+.gap-sm { gap: 0.5rem; }
+.gap-md { gap: 1rem; }
+
+/* --------------------------------------------------------------------------
+   Gradients
+   -------------------------------------------------------------------------- */
+.bg-gradient-blue { background: linear-gradient(135deg, #e8f4fd 0%, #f0f7ff 100%); }
+.bg-gradient-green { background: linear-gradient(135deg, #f0fdf4 0%, #f7fdf9 100%); }
+.bg-gradient-gray { background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); }
+
+/* --------------------------------------------------------------------------
+   Flexbox Utilities (extensions to Bootstrap)
+   -------------------------------------------------------------------------- */
+.flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.flex-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* --------------------------------------------------------------------------
+   Visibility Helpers
+   -------------------------------------------------------------------------- */
+.opacity-50 { opacity: 0.5; }
+.opacity-75 { opacity: 0.75; }
+.opacity-0 { opacity: 0; }
+
+/* --------------------------------------------------------------------------
+   Z-Index Scale
+   -------------------------------------------------------------------------- */
+.z-0 { z-index: 0; }
+.z-10 { z-index: 10; }
+.z-50 { z-index: 50; }
+.z-100 { z-index: 100; }
+.z-modal { z-index: 1050; }
+.z-tooltip { z-index: 1070; }

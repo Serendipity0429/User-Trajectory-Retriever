@@ -4,8 +4,8 @@
     --bs-body-bg-light: #303133;  /* Lighter background */
     --bs-body-color: #f6f6f6;
     --bs-border-color: #444;
-    --primary-accent-color: #A0D1E2; /* Lighter Sky Blue */
-    --secondary-accent-color: #7AB8D9; /* Soft Cyan Blue */
+    --primary-accent-color: #82318E; /* Tsinghua Purple */
+    --secondary-accent-color: #9C4DA8; /* Lighter Tsinghua Purple */
     --dark-color: #212529;
 }
 
@@ -42,7 +42,7 @@
 }
 
 /* .dark-mode a:not(.btn-view-task):hover {
-    color: #a0d1e2;
+    color: #9C4DA8;
 } */
 
 .dark-mode #sidebar a,
@@ -102,7 +102,7 @@
     background-color: #3a3a3c !important;
     color: var(--bs-body-color) !important;
     border-color: var(--primary-accent-color) !important;
-    box-shadow: 0 0 0 0.25rem rgba(138, 199, 219, 0.5) !important;
+    box-shadow: 0 0 0 0.25rem rgba(130, 49, 142, 0.5) !important;
 }
 
 .dark-mode .form-control.is-invalid {
@@ -118,13 +118,14 @@
 .dark-mode .btn-primary-custom:not(.btn-view-task) {
     background-color: var(--primary-accent-color) !important;
     border-color: var(--primary-accent-color) !important;
-    color: var(--bs-body-color) !important;
+    color: #fff !important; /* White text on dark purple */
 }
 
 
 .dark-mode .btn-primary-custom:not(.btn-view-task):hover {
-    background-color: #a0d1e2 !important;
-    border-color: #a0d1e2 !important;
+    background-color: #9C4DA8 !important;
+    border-color: #9C4DA8 !important;
+    color: #fff !important;
 }
 
 .dark-mode .btn-outline-primary {
@@ -360,8 +361,8 @@
 }
 
 .dark-mode .btn-custom-dark-blue:hover {
-    background-color: #a0d1e2;
-    border-color: #a0d1e2;
+    background-color: #9C4DA8;
+    border-color: #9C4DA8;
 }
 
 .dark-mode .btn-outline-custom-dark-blue {
@@ -370,9 +371,9 @@
 }
 
 .dark-mode .btn-check:not(:checked) + .btn-outline-custom-dark-blue:hover {
-    color: #a0d1e2;
-    background-color: rgba(138, 199, 219, 0.1); /* Subtle hover glow */
-    border-color: #a0d1e2;
+    color: #9C4DA8;
+    background-color: rgba(130, 49, 142, 0.1); /* Subtle hover glow */
+    border-color: #9C4DA8;
 }
 
 .dark-mode .btn-check:checked + .btn-outline-custom-dark-blue {
@@ -391,8 +392,8 @@
 
 .dark-mode .btn-check:checked + .btn-outline-custom-dark-blue:hover {
     color: var(--dark-color); /* Keep text dark */
-    background-color: #a0d1e2; /* Lighter accent color on hover */
-    border-color: #a0d1e2;
+    background-color: #9C4DA8; /* Lighter accent color on hover */
+    border-color: #9C4DA8;
 }
 
 .dark-mode .light-mode-elements {
@@ -448,12 +449,28 @@
 .dark-mode .btn-primary {
     background-color: var(--primary-accent-color) !important;
     border-color: var(--primary-accent-color) !important;
-    color: var(--bs-body-color) !important;
+    color: #fff !important; /* White text on dark purple */
 }
 
 .dark-mode .btn-primary:hover {
-    background-color: #a0d1e2 !important; /* Slightly lighter primary accent on hover */
-    border-color: #a0d1e2 !important;
+    background-color: #9C4DA8 !important; /* Slightly lighter purple on hover */
+    border-color: #9C4DA8 !important;
+    color: #fff !important;
+}
+
+/* View Task button */
+.dark-mode .btn-view-task,
+.dark-mode .btn-view-task.btn-primary {
+    background-color: var(--primary-accent-color) !important;
+    border-color: var(--primary-accent-color) !important;
+    color: #fff !important; /* White text on dark purple */
+}
+
+.dark-mode .btn-view-task:hover,
+.dark-mode .btn-view-task.btn-primary:hover {
+    background-color: #9C4DA8 !important;
+    border-color: #9C4DA8 !important;
+    color: #fff !important;
 }
 
 .dark-mode .btn-secondary:hover {
@@ -536,9 +553,697 @@
 .dark-mode .page-item.active .page-link {
     background-color: var(--primary-accent-color) !important;
     border-color: var(--primary-accent-color) !important;
-    color: var(--bs-body-color) !important;
+    color: #fff !important; /* White text on dark purple */
 }
 
 .dark-mode button.active .fa, .dark-mode button.active:hover .fa {
     color: var(--bs-body-bg) !important;
+}
+
+/* ==========================================================================
+   Discussion App Dark Mode
+   ========================================================================== */
+
+/* Discussion page headings */
+.dark-mode .discussion-page h1,
+.dark-mode .discussion-page h2,
+.dark-mode .discussion-page h3,
+.dark-mode .discussion-page h4,
+.dark-mode .discussion-page h5,
+.dark-mode .discussion-page h6,
+.dark-mode .discussion-page b {
+    color: var(--bs-body-color) !important;
+}
+
+/* Create post form */
+.dark-mode .create-post-form {
+    background: var(--bs-body-bg-light);
+    box-shadow: 0 2px 4px rgba(0,0,0,.3);
+}
+
+/* Discussion labels */
+.dark-mode .discussion-label {
+    background-color: var(--bs-body-bg);
+    color: var(--primary-accent-color);
+}
+
+/* Attachment items */
+.dark-mode .attachment-item {
+    background-color: var(--bs-body-bg);
+    border-color: var(--bs-border-color);
+}
+
+.dark-mode .attachment-item:hover {
+    background-color: var(--bs-body-bg-light);
+}
+
+.dark-mode .attachment-item i {
+    color: #adb5bd;
+}
+
+/* Discussion category badges - outline variants */
+.dark-mode .badge-outline-warning-custom {
+    color: #ffb700;
+    border-color: #ffb700;
+}
+
+.dark-mode .badge-outline-important-custom {
+    color: #ff6b6b;
+    border-color: #ff6b6b;
+}
+
+.dark-mode .badge-outline-update-custom {
+    color: var(--primary-accent-color);
+    border-color: var(--primary-accent-color);
+}
+
+.dark-mode .badge-outline-general-custom {
+    color: #adb5bd;
+    border-color: #adb5bd;
+}
+
+.dark-mode .badge-outline-feedback-custom {
+    color: #b39ddb;
+    border-color: #b39ddb;
+}
+
+.dark-mode .badge-outline-issues-custom {
+    color: #ff8a80;
+    border-color: #ff8a80;
+}
+
+/* Discussion category badges - modern style */
+.dark-mode .badge-discussion-purple {
+    color: #b39ddb;
+    background-color: rgba(179, 157, 219, 0.15);
+    border-color: rgba(179, 157, 219, 0.3);
+}
+
+.dark-mode .badge-discussion-pink {
+    color: #f48fb1;
+    background-color: rgba(244, 143, 177, 0.15);
+    border-color: rgba(244, 143, 177, 0.3);
+}
+
+.dark-mode .badge-discussion-teal {
+    color: #4db6ac;
+    background-color: rgba(77, 182, 172, 0.15);
+    border-color: rgba(77, 182, 172, 0.3);
+}
+
+.dark-mode .badge-discussion-lime {
+    color: #aed581;
+    background-color: rgba(174, 213, 129, 0.15);
+    border-color: rgba(174, 213, 129, 0.3);
+}
+
+.dark-mode .badge-discussion-orange {
+    color: #ffb74d;
+    background-color: rgba(255, 183, 77, 0.15);
+    border-color: rgba(255, 183, 77, 0.3);
+}
+
+/* Discussion button outline variants */
+.dark-mode .btn-outline-discussion-purple {
+    color: #b39ddb;
+    border-color: #b39ddb;
+}
+
+.dark-mode .btn-outline-discussion-purple:hover {
+    background-color: #b39ddb;
+    color: var(--dark-color);
+}
+
+.dark-mode .btn-outline-discussion-pink {
+    color: #f48fb1;
+    border-color: #f48fb1;
+}
+
+.dark-mode .btn-outline-discussion-pink:hover {
+    background-color: #f48fb1;
+    color: var(--dark-color);
+}
+
+.dark-mode .btn-outline-discussion-teal {
+    color: #4db6ac;
+    border-color: #4db6ac;
+}
+
+.dark-mode .btn-outline-discussion-teal:hover {
+    background-color: #4db6ac;
+    color: var(--dark-color);
+}
+
+.dark-mode .btn-outline-discussion-lime {
+    color: #aed581;
+    border-color: #aed581;
+}
+
+.dark-mode .btn-outline-discussion-lime:hover {
+    background-color: #aed581;
+    color: var(--dark-color);
+}
+
+.dark-mode .btn-outline-discussion-orange {
+    color: #ffb74d;
+    border-color: #ffb74d;
+}
+
+.dark-mode .btn-outline-discussion-orange:hover {
+    background-color: #ffb74d;
+    color: var(--dark-color);
+}
+
+/* ==========================================================================
+   Benchmark App Dark Mode
+   ========================================================================== */
+
+/* Metric cards */
+.dark-mode .metric-card {
+    background-color: var(--bs-body-bg-light) !important;
+    border-color: var(--bs-border-color) !important;
+}
+
+.dark-mode .metric-card:hover {
+    box-shadow: 0 .5rem 1rem rgba(0,0,0,.3) !important;
+}
+
+.dark-mode .metric-card .card-body {
+    background-color: var(--bs-body-bg-light) !important;
+}
+
+.dark-mode .metric-value {
+    color: var(--bs-body-color) !important;
+}
+
+.dark-mode .metric-label {
+    color: #adb5bd !important;
+}
+
+/* Section headers */
+.dark-mode .section-header {
+    color: var(--bs-body-color);
+}
+
+.dark-mode .metrics-group-details summary {
+    color: var(--bs-body-color);
+}
+
+.dark-mode .metrics-group-details summary::after {
+    background: var(--bs-border-color);
+}
+
+/* Table styles for benchmark */
+.dark-mode .table-success-light {
+    --bs-table-bg: rgba(40, 167, 69, 0.2);
+    --bs-table-color: var(--bs-body-color);
+}
+
+.dark-mode .table-danger-light {
+    --bs-table-bg: rgba(220, 53, 69, 0.2);
+    --bs-table-color: var(--bs-body-color);
+}
+
+.dark-mode .text-success-dark {
+    color: #45c35e;
+}
+
+.dark-mode .text-danger-dark {
+    color: #ff6b6b;
+}
+
+/* Text emphasis colors for dark mode */
+.dark-mode .text-primary-emphasis {
+    color: var(--primary-accent-color);
+}
+
+.dark-mode .text-success-emphasis {
+    color: #45c35e;
+}
+
+.dark-mode .text-danger-emphasis {
+    color: #ff6b6b;
+}
+
+.dark-mode .text-info-emphasis {
+    color: #4dd0e1;
+}
+
+.dark-mode .text-warning-emphasis {
+    color: #ffb74d;
+}
+
+.dark-mode .text-secondary-emphasis {
+    color: #adb5bd;
+}
+
+.dark-mode .text-purple-emphasis {
+    color: #b39ddb;
+}
+
+/* Table header sticky */
+.dark-mode .table-responsive thead th {
+    background-color: var(--bs-body-bg-light);
+}
+
+/* Chat bubbles */
+.dark-mode .message-bubble {
+    background-color: var(--bs-body-bg-light);
+}
+
+.dark-mode .message-bubble pre,
+.dark-mode .message-bubble code {
+    background-color: var(--bs-body-bg);
+    color: var(--bs-body-color);
+}
+
+/* Agent step components */
+.dark-mode .tool-content {
+    background-color: var(--bs-body-bg) !important;
+    color: var(--bs-body-color) !important;
+    border-color: var(--bs-border-color) !important;
+}
+
+.dark-mode .obs-content {
+    background-color: var(--bs-body-bg-light) !important;
+    color: #adb5bd !important;
+    border-color: var(--bs-border-color) !important;
+}
+
+/* Gradient backgrounds for dark mode */
+.dark-mode .bg-gradient-blue {
+    background: linear-gradient(135deg, rgba(77, 208, 225, 0.1) 0%, rgba(77, 208, 225, 0.05) 100%);
+}
+
+.dark-mode .bg-gradient-green {
+    background: linear-gradient(135deg, rgba(69, 195, 94, 0.1) 0%, rgba(69, 195, 94, 0.05) 100%);
+}
+
+/* Session items */
+.dark-mode .session-item {
+    border-color: var(--bs-border-color) !important;
+}
+
+.dark-mode .session-item:hover {
+    background-color: var(--bs-body-bg-light);
+}
+
+/* Compact cell */
+.dark-mode .compact-cell {
+    background-color: var(--bs-body-bg);
+}
+
+/* ==========================================================================
+   Dashboard App Dark Mode
+   ========================================================================== */
+
+/* Dashboard statistics cards */
+.dark-mode .dashboard .card-header {
+    background-color: var(--bs-body-bg) !important;
+}
+
+/* Chart backgrounds - make transparent for dark mode */
+.dark-mode canvas {
+    filter: none;
+}
+
+/* Card body with bg-light */
+.dark-mode .card-body .bg-light {
+    background-color: var(--bs-body-bg) !important;
+}
+
+/* Border accents for dark mode */
+.dark-mode .border-start {
+    border-color: inherit !important;
+}
+
+/* KPI cards in dashboard */
+.dark-mode .card.border-start.border-4 {
+    background-color: var(--bs-body-bg-light);
+}
+
+/* Text colors in dashboard cards */
+.dark-mode .text-primary {
+    color: var(--primary-accent-color) !important;
+}
+
+.dark-mode .text-dark {
+    color: var(--bs-body-color) !important;
+}
+
+/* Metric definitions card */
+.dark-mode .card.bg-light.border-0 {
+    background-color: var(--bs-body-bg) !important;
+}
+
+.dark-mode .card.bg-light.border-0 .text-dark {
+    color: var(--bs-body-color) !important;
+}
+
+/* Modal body bg-light */
+.dark-mode .modal-body.bg-light {
+    background-color: var(--bs-body-bg) !important;
+}
+
+/* Consent content preview */
+.dark-mode #consent-content {
+    background-color: var(--bs-body-bg-light);
+}
+
+/* Task filter toggle */
+.dark-mode .task-filter-toggle {
+    background-color: var(--bs-body-bg-light);
+    color: var(--bs-body-color);
+}
+
+/* ==========================================================================
+   Message System Dark Mode
+   ========================================================================== */
+
+.dark-mode .message-item {
+    background-color: var(--bs-body-bg-light);
+    border-color: var(--bs-border-color);
+}
+
+.dark-mode .message-item:hover {
+    background-color: var(--bs-body-bg);
+}
+
+.dark-mode .message-unread {
+    border-left-color: var(--primary-accent-color);
+}
+
+/* ==========================================================================
+   Bootstrap Table Dark Mode Enhancements
+   ========================================================================== */
+
+.dark-mode .table {
+    --bs-table-bg: transparent;
+    --bs-table-color: var(--bs-body-color);
+    --bs-table-border-color: var(--bs-border-color);
+}
+
+.dark-mode .table > thead {
+    background-color: var(--bs-body-bg-light);
+}
+
+.dark-mode .table-striped > tbody > tr:nth-of-type(odd) > * {
+    --bs-table-accent-bg: rgba(255, 255, 255, 0.02);
+}
+
+.dark-mode .table-hover > tbody > tr:hover > * {
+    --bs-table-accent-bg: rgba(255, 255, 255, 0.05);
+}
+
+/* ==========================================================================
+   Benchmark App - History Card & Sidebar Dark Mode Fixes
+   ========================================================================== */
+
+/* Leaderboard */
+.dark-mode #leaderboard-container {
+    background-color: var(--bs-body-bg-light) !important;
+}
+
+.dark-mode .leaderboard-controls {
+    background-color: var(--bs-body-bg) !important;
+    border-color: var(--bs-border-color) !important;
+}
+
+.dark-mode .leaderboard-entry {
+    border-color: var(--bs-border-color) !important;
+}
+
+.dark-mode .leaderboard-entry:hover {
+    background-color: var(--bs-body-bg) !important;
+}
+
+.dark-mode .leaderboard-entry.active {
+    background-color: rgba(130, 49, 142, 0.2) !important;
+    border-left-color: var(--primary-accent-color) !important;
+}
+
+.dark-mode .leaderboard-rank.default {
+    background-color: var(--bs-body-bg) !important;
+    color: var(--bs-body-color) !important;
+    border-color: var(--bs-border-color) !important;
+}
+
+/* History Section Headers */
+.dark-mode .history-section .section-header {
+    background: var(--bs-body-bg) !important;
+    border-color: var(--bs-border-color) !important;
+}
+
+.dark-mode .pipeline-runs-section .section-header {
+    background: linear-gradient(135deg, rgba(130, 49, 142, 0.15) 0%, rgba(130, 49, 142, 0.08) 100%) !important;
+}
+
+.dark-mode .single-sessions-section .section-header {
+    background: linear-gradient(135deg, rgba(40, 167, 69, 0.15) 0%, rgba(40, 167, 69, 0.08) 100%) !important;
+}
+
+/* Select all rows */
+.dark-mode .select-all-row {
+    background-color: var(--bs-body-bg) !important;
+    border-color: var(--bs-border-color) !important;
+}
+
+/* Session list inner */
+.dark-mode .session-list-inner {
+    background-color: var(--bs-body-bg-light) !important;
+}
+
+/* Session items */
+.dark-mode .session-item {
+    border-color: var(--bs-border-color) !important;
+}
+
+.dark-mode .session-item:hover {
+    background-color: var(--bs-body-bg) !important;
+}
+
+/* Group items */
+.dark-mode .group-item {
+    border-color: var(--bs-border-color) !important;
+}
+
+.dark-mode .group-header:hover {
+    background-color: var(--bs-body-bg) !important;
+}
+
+/* ==========================================================================
+   Benchmark App - Metric Cards & Results Dark Mode Fixes
+   ========================================================================== */
+
+/* Processing row */
+.dark-mode .processing-row,
+.dark-mode .table-light {
+    background-color: var(--bs-body-bg-light) !important;
+    --bs-table-bg: var(--bs-body-bg-light) !important;
+}
+
+/* Modal search result items */
+.dark-mode .list-group-item.bg-white,
+.dark-mode #tpl-modal-search-result-item .bg-white {
+    background-color: var(--bs-body-bg-light) !important;
+}
+
+/* Agent action tool content */
+.dark-mode .tool-content.bg-white {
+    background-color: var(--bs-body-bg-light) !important;
+}
+
+/* Thinking process */
+.dark-mode .thinking-content {
+    background-color: var(--bs-body-bg) !important;
+    border-color: #ffc107 !important;
+}
+
+/* Full content body in modals */
+.dark-mode .full-content-body {
+    background-color: var(--bs-body-bg) !important;
+}
+
+/* Result link badges */
+.dark-mode .badge.bg-light {
+    background-color: var(--bs-body-bg) !important;
+    color: var(--bs-body-color) !important;
+}
+
+/* Search observation cards */
+.dark-mode .obs-content .bg-white {
+    background-color: var(--bs-body-bg-light) !important;
+}
+
+/* Final answer card */
+.dark-mode .final-answer-card {
+    border-color: var(--primary-accent-color) !important;
+}
+
+.dark-mode .final-answer-card .text-primary {
+    color: var(--primary-accent-color) !important;
+}
+
+.dark-mode .response-text.text-dark {
+    color: var(--bs-body-color) !important;
+}
+
+/* Input group text */
+.dark-mode .input-group-text {
+    background-color: var(--bs-body-bg-light) !important;
+    border-color: var(--bs-border-color) !important;
+    color: var(--bs-body-color) !important;
+}
+
+/* Card headers in benchmark */
+.dark-mode .card-header {
+    background-color: var(--bs-body-bg) !important;
+    border-color: var(--bs-border-color) !important;
+}
+
+/* Pipeline badges with primary color */
+.dark-mode .badge.bg-primary {
+    background-color: var(--primary-accent-color) !important;
+    color: #fff !important;
+}
+
+/* Trial verdict cards */
+.dark-mode .trial-verdict-container .card {
+    background-color: var(--bs-body-bg-light) !important;
+}
+
+/* Run config items */
+.dark-mode .config-col .bg-white {
+    background-color: var(--bs-body-bg-light) !important;
+}
+
+.dark-mode .config-col .border {
+    border-color: var(--bs-border-color) !important;
+}
+
+/* Run config card */
+.dark-mode #run-config-card {
+    background-color: var(--bs-body-bg) !important;
+}
+
+/* Turn labels */
+.dark-mode .turn-label {
+    background-color: rgba(130, 49, 142, 0.15) !important;
+    color: var(--primary-accent-color) !important;
+    border-color: rgba(130, 49, 142, 0.3) !important;
+}
+
+/* Turn dividers */
+.dark-mode .turn-divider-line {
+    border-color: var(--bs-border-color) !important;
+}
+
+/* Table light header */
+.dark-mode .table-light,
+.dark-mode thead.table-light {
+    background-color: var(--bs-body-bg-light) !important;
+    --bs-table-bg: var(--bs-body-bg-light) !important;
+    color: var(--bs-body-color) !important;
+}
+
+.dark-mode thead.table-light th {
+    background-color: var(--bs-body-bg-light) !important;
+    color: #adb5bd !important;
+}
+
+/* Border opacity utilities */
+.dark-mode .border-primary {
+    border-color: var(--primary-accent-color) !important;
+}
+
+/* Alert and info icons */
+.dark-mode .bi {
+    color: inherit;
+}
+
+/* No session selected placeholder */
+.dark-mode #no-session-selected .bi {
+    color: #555 !important;
+}
+
+/* Empty state */
+.dark-mode .empty-state .bi {
+    color: #555 !important;
+}
+
+/* Message bubble backgrounds */
+.dark-mode .message-bubble-content {
+    background-color: var(--bs-body-bg-light) !important;
+    border-color: var(--bs-border-color) !important;
+}
+
+/* Avatar circles */
+.dark-mode .avatar-circle {
+    background-color: var(--bs-body-bg-light) !important;
+}
+
+/* btn-outline variants for dark mode */
+.dark-mode .btn-outline-info {
+    color: #4dd0e1 !important;
+    border-color: #4dd0e1 !important;
+}
+
+.dark-mode .btn-outline-info:hover {
+    background-color: #4dd0e1 !important;
+    color: #212529 !important;
+}
+
+.dark-mode .btn-outline-primary {
+    color: var(--primary-accent-color) !important;
+    border-color: var(--primary-accent-color) !important;
+}
+
+.dark-mode .btn-outline-primary:hover {
+    background-color: var(--primary-accent-color) !important;
+    color: #fff !important;
+}
+
+/* Override inline styles for history sections */
+.dark-mode [style*="background-color: #f8fbff"],
+.dark-mode [style*="background-color: #f8fdf9"],
+.dark-mode [style*="background-color: #fafbfc"],
+.dark-mode [style*="background-color: #f8f9fa"] {
+    background-color: var(--bs-body-bg) !important;
+}
+
+.dark-mode [style*="border-bottom: 1px solid #f0f0f0"],
+.dark-mode [style*="border-bottom: 1px solid #e9ecef"] {
+    border-color: var(--bs-border-color) !important;
+}
+
+/* Override inline gradient backgrounds */
+.dark-mode [style*="linear-gradient(135deg, #e8f4fd"],
+.dark-mode [style*="linear-gradient(135deg, #f0fdf4"] {
+    background: var(--bs-body-bg) !important;
+}
+
+/* ==========================================================================
+   Leaderboard Table Dark Mode
+   ========================================================================== */
+
+/* Leaderboard table hover in dark mode */
+.dark-mode #leaderboard-table tbody tr:hover {
+    background-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+.dark-mode #leaderboard-table tbody tr.active {
+    background-color: rgba(130, 49, 142, 0.25) !important;
+}
+
+.dark-mode .human-baseline-row {
+    background-color: var(--bs-body-bg) !important;
+}
+
+.dark-mode .human-baseline-row:hover {
+    background-color: var(--bs-body-bg-light) !important;
+}
+
+.dark-mode .leaderboard-rank-badge.default {
+    background-color: var(--bs-body-bg-light) !important;
+    color: var(--bs-body-color) !important;
 }

@@ -6,6 +6,17 @@ register = template.Library()
 
 
 @register.filter
+def file_exists(file_field):
+    """Check if a file field's file actually exists on disk."""
+    if not file_field:
+        return False
+    try:
+        return os.path.exists(file_field.path)
+    except (ValueError, AttributeError):
+        return False
+
+
+@register.filter
 def filename(value):
     return os.path.basename(value.name)
 

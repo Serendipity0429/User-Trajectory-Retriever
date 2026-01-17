@@ -36,7 +36,6 @@
     <link href="{% static 'css/vendor/bootstrap-icons.css' %}" rel="stylesheet">
     <link href="{% static 'css/rrweb-player.css' %}" rel="stylesheet"/>
     <link id="dark-mode-stylesheet" href="{% static 'css/dark.css' %}" rel="stylesheet" disabled>
-    <link id="compact-mode-stylesheet" href="{% static 'css/compact.css' %}" rel="stylesheet" disabled>
 
     <!-- Bootstrap 5 JS -->
     <script src="{% static 'js/vendor/bootstrap.bundle.min.js' %}"></script>
@@ -51,10 +50,6 @@
             if (localStorage.getItem('darkMode') === 'enabled') {
                 document.documentElement.classList.add('dark-mode');
                 document.getElementById('dark-mode-stylesheet').disabled = false;
-            }
-            if (localStorage.getItem('compactMode') === 'enabled') {
-                document.documentElement.classList.add('compact-mode');
-                document.getElementById('compact-mode-stylesheet').disabled = false;
             }
             const savedFontSize = localStorage.getItem('fontSize');
             if (savedFontSize) {
@@ -181,14 +176,6 @@
                                         </div>
                                         <div class="dropdown-divider"></div>
                                         <div class="px-3 py-1">
-                                            <label class="form-label d-flex align-items-center"><i class="bi bi-distribute-vertical me-2 pb-1"></i>Layout</label>
-                                            <div class="form-check form-switch">
-                                                <input class="form-check-input" type="checkbox" id="compactModeSwitch">
-                                                <label class="form-check-label px-2" for="compactModeSwitch">Compact Mode</label>
-                                            </div>
-                                        </div>
-                                        <div class="dropdown-divider"></div>
-                                        <div class="px-3 py-1">
                                             <label class="form-label d-flex align-items-center"><i class="bi bi-palette-fill me-2 pb-1"></i>Theme</label>
                                             <div class="form-check form-switch">
                                                 <input class="form-check-input" type="checkbox" id="darkModeSwitch">
@@ -292,106 +279,6 @@
                 }
             }
 
-            // Compact Mode Switch
-            const compactModeSwitch = document.getElementById('compactModeSwitch');
-
-            function applyCompactLayout(isCompact) {
-                const content = document.getElementById('content');
-                if (!content) return;
-
-                const elements = content.querySelectorAll('[class*="p-"], [class*="m-"], p, label.btn');
-                const spacingPattern = /^(p|m)(t|b|s|e|x|y)?-(\d)$/;
-                const classMap = { '5': '3', '4': '2', '3': '1', '2': '1', '1': '0' };
-
-                elements.forEach(el => {
-                    // Handle spacing utility classes
-                    if (isCompact) {
-                        if (el.hasAttribute('data-original-classes')) return;
-
-                        const originalClassesToStore = [];
-                        const classesToProcess = [...el.classList];
-
-                        classesToProcess.forEach(cls => {
-                            const match = cls.match(spacingPattern);
-                            if (match) {
-                                const originalSize = match[3];
-                                const newSize = classMap[originalSize];
-                                if (newSize !== undefined && newSize !== originalSize) {
-                                    originalClassesToStore.push(cls);
-                                    el.classList.remove(cls);
-                                    el.classList.add(cls.replace(originalSize, newSize));
-                                }
-                            }
-                        });
-
-                        if (originalClassesToStore.length > 0) {
-                            el.setAttribute('data-original-classes', originalClassesToStore.join(' '));
-                        }
-                    } else {
-                        if (el.hasAttribute('data-original-classes')) {
-                            const originalClasses = el.getAttribute('data-original-classes').split(' ');
-                            
-                            originalClasses.forEach(originalCls => {
-                                const match = originalCls.match(spacingPattern);
-                                if (match) {
-                                    const originalSize = match[3];
-                                    const newSize = classMap[originalSize];
-                                    if (newSize !== undefined) {
-                                        const compactedCls = originalCls.replace(originalSize, newSize);
-                                        el.classList.remove(compactedCls);
-                                    }
-                                }
-                            });
-
-                            originalClasses.forEach(cls => {
-                                el.classList.add(cls);
-                            });
-
-                            el.removeAttribute('data-original-classes');
-                        }
-                    }
-
-                    // Specifically handle <p> tag default margins
-                    if (el.tagName === 'P') {
-                        if (isCompact) {
-                            const hasMarginBottom = [...el.classList].some(cls => cls.startsWith('mb-'));
-                            if (!hasMarginBottom) {
-                                el.classList.add('mb-0');
-                                el.setAttribute('data-compact-p', 'true'); // Mark it
-                            }
-                        } else {
-                            if (el.hasAttribute('data-compact-p')) {
-                                el.classList.remove('mb-0');
-                                el.removeAttribute('data-compact-p');
-                            }
-                        }
-                    }
-
-                    // Specifically handle choice buttons
-                    if (el.tagName === 'LABEL' && el.classList.contains('btn')) {
-                        if (isCompact) {
-                            el.style.paddingTop = '0.25rem';
-                            el.style.paddingBottom = '0.25rem';
-                            el.style.fontSize = '0.9rem';
-                            el.setAttribute('data-compact-choice-btn', 'true');
-                        } else {
-                            if (el.hasAttribute('data-compact-choice-btn')) {
-                                el.style.paddingTop = '';
-                                el.style.paddingBottom = '';
-                                el.style.fontSize = '';
-                                el.removeAttribute('data-compact-choice-btn');
-                            }
-                        }
-                    }
-                });
-            }
-
-            compactModeSwitch.addEventListener('change', () => {
-                const isCompact = compactModeSwitch.checked;
-                applyCompactLayout(isCompact);
-                localStorage.setItem('compactMode', isCompact ? 'enabled' : 'disabled');
-            });
-
             // Clear Settings Button
             const clearSettingsButton = document.getElementById('clear-settings');
 
@@ -417,12 +304,6 @@
                     darkModeSwitch.checked = true;
                     rootElement.classList.add('dark-mode');
                     document.getElementById('dark-mode-stylesheet').disabled = false;
-                }
-
-                // Compact Mode
-                if (localStorage.getItem('compactMode') === 'enabled') {
-                    compactModeSwitch.checked = true;
-                    applyCompactLayout(true);
                 }
             }
 

@@ -822,11 +822,19 @@ document.addEventListener('DOMContentLoaded', function() {
             loaders.forEach(loader => loader.remove());
             contents.forEach(content => content.style.display = 'block');
             
-            // Dark mode detection for charts
-            const isDarkMode = document.documentElement.classList.contains('dark-mode');
-            const textColor = isDarkMode ? '#f6f6f6' : '#666';
-            const gridColor = isDarkMode ? '#444' : '#e0e0e0';
-            const mutedTextColor = isDarkMode ? '#adb5bd' : '#6c757d';
+            // Dark mode detection for charts - use functions to get current state
+            const getIsDarkMode = () => document.documentElement.classList.contains('dark-mode');
+            const getTextColor = () => getIsDarkMode() ? '#f6f6f6' : '#666';
+            const getGridColor = () => getIsDarkMode() ? '#444' : '#e0e0e0';
+            const getMutedTextColor = () => getIsDarkMode() ? '#adb5bd' : '#6c757d';
+
+            // Initial values
+            let textColor = getTextColor();
+            let gridColor = getGridColor();
+            let mutedTextColor = getMutedTextColor();
+
+            // Store chart instances for updating on dark mode toggle
+            const chartInstances = [];
 
             const CHART_COLORS = {
                 red: 'rgb(255, 99, 132)',
@@ -873,6 +881,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const renderPlotlyChart = (elementId, data, layout) => {
                 if (data && data.length > 0) {
                     Plotly.newPlot(elementId, data, layout);
+                    plotlyChartIds.push(elementId);
                 } else {
                      const noDataLayout = {
                         xaxis: { showgrid: false, zeroline: false, showticklabels: false },
@@ -882,7 +891,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             xref: "paper",
                             yref: "paper",
                             showarrow: false,
-                            font: { size: 20, color: '#6c757d' }
+                            font: { size: 20, color: mutedTextColor }
                         }],
                         paper_bgcolor: 'rgba(0,0,0,0)',
                         plot_bgcolor: 'rgba(0,0,0,0)',
@@ -945,7 +954,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // --- Chart Factories ---
             const ChartFactory = {
                 createLine: (id, labels, data, label, color) => {
-                    new Chart(document.getElementById(id), {
+                    const chart = new Chart(document.getElementById(id), {
                         type: 'line',
                         data: {
                             labels: labels,
@@ -953,9 +962,10 @@ document.addEventListener('DOMContentLoaded', function() {
                         },
                         options: chartJsDefaultOptions
                     });
+                    chartInstances.push({ chart, type: 'line' });
                 },
                 createDoughnut: (id, labels, data, colors = chartColorsArray) => {
-                    new Chart(document.getElementById(id), {
+                    const chart = new Chart(document.getElementById(id), {
                         type: 'doughnut',
                         data: {
                             labels: labels,
@@ -963,9 +973,10 @@ document.addEventListener('DOMContentLoaded', function() {
                         },
                         options: doughnutPieOptions
                     });
+                    chartInstances.push({ chart, type: 'doughnut' });
                 },
                 createPie: (id, labels, data, colors = chartColorsArray) => {
-                    new Chart(document.getElementById(id), {
+                    const chart = new Chart(document.getElementById(id), {
                         type: 'pie',
                         data: {
                             labels: labels,
@@ -973,6 +984,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         },
                         options: doughnutPieOptions
                     });
+                    chartInstances.push({ chart, type: 'pie' });
                 },
                 createBar: (id, labels, data, label, color, isHorizontal = false) => {
                     const options = isHorizontal ? {
@@ -1001,7 +1013,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         }
                     } : chartJsDefaultOptions;
 
-                    new Chart(document.getElementById(id), {
+                    const chart = new Chart(document.getElementById(id), {
                         type: 'bar',
                         data: {
                             labels: labels,
@@ -1009,8 +1021,72 @@ document.addEventListener('DOMContentLoaded', function() {
                         },
                         options: options
                     });
+                    chartInstances.push({ chart, type: 'bar', isHorizontal });
                 }
             };
+
+            // Store Plotly chart IDs for updating on dark mode toggle
+            const plotlyChartIds = [];
+
+            // Function to update all charts when dark mode changes
+            const updateChartsForDarkMode = () => {
+                textColor = getTextColor();
+                gridColor = getGridColor();
+                mutedTextColor = getMutedTextColor();
+
+                // Update Chart.js instances
+                chartInstances.forEach(({ chart, type, isHorizontal }) => {
+                    // Update legend color
+                    if (chart.options.plugins && chart.options.plugins.legend && chart.options.plugins.legend.labels) {
+                        chart.options.plugins.legend.labels.color = textColor;
+                    }
+
+                    // Update scales for non-pie/doughnut charts
+                    if (type !== 'doughnut' && type !== 'pie') {
+                        if (chart.options.scales) {
+                            if (chart.options.scales.x) {
+                                if (chart.options.scales.x.ticks) chart.options.scales.x.ticks.color = textColor;
+                                if (chart.options.scales.x.title) chart.options.scales.x.title.color = textColor;
+                                if (chart.options.scales.x.grid) chart.options.scales.x.grid.color = gridColor;
+                            }
+                            if (chart.options.scales.y) {
+                                if (chart.options.scales.y.ticks) chart.options.scales.y.ticks.color = textColor;
+                                if (chart.options.scales.y.title) chart.options.scales.y.title.color = textColor;
+                                if (chart.options.scales.y.grid) chart.options.scales.y.grid.color = gridColor;
+                            }
+                        }
+                    }
+
+                    chart.update();
+                });
+
+                // Update Plotly charts
+                const plotlyUpdate = {
+                    'font.color': textColor,
+                    'xaxis.gridcolor': gridColor,
+                    'yaxis.gridcolor': gridColor,
+                    'xaxis.tickfont.color': textColor,
+                    'yaxis.tickfont.color': textColor,
+                    'xaxis.title.font.color': textColor,
+                    'yaxis.title.font.color': textColor,
+                    'legend.font.color': textColor
+                };
+                plotlyChartIds.forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el && el.data) {
+                        Plotly.relayout(id, plotlyUpdate);
+                    }
+                });
+            };
+
+            // Listen for dark mode toggle
+            const darkModeSwitch = document.getElementById('darkModeSwitch');
+            if (darkModeSwitch) {
+                darkModeSwitch.addEventListener('change', () => {
+                    // Small delay to ensure dark mode class is applied
+                    setTimeout(updateChartsForDarkMode, 50);
+                });
+            }
 
             const PlotlyFactory = {
                 createHistogram: (id, data, xLabel, yLabel, color, options = {}) => {

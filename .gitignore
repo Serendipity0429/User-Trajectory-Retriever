@@ -27,3 +27,6 @@ calculate_wages.py
 outputs
 extracted_queries
 analysis/
+Platform/logs/
+*.log
+log

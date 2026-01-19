@@ -4,7 +4,8 @@ import agentscope
 from decouple import config
 from .search import get_search_engine, WebCrawler
 from ..models import BenchmarkSettings
-from .prompts import PROMPTS
+from .prompts import PROMPTS, get_agent_prompt
+from .model_config import has_builtin_thinking
 from agentscope.agent import ReActAgent
 from agentscope.tool import Toolkit, ToolResponse
 from agentscope.memory import InMemoryMemory
@@ -18,7 +19,11 @@ try:
 except ImportError:
     ReMePersonalLongTermMemory = None
 
-from agentscope.formatter import OpenAIChatFormatter
+from agentscope.formatter import (
+    OpenAIChatFormatter,
+    AnthropicChatFormatter,
+    GeminiChatFormatter,
+)
 from agentscope.model import OpenAIChatModel
 from agentscope.embedding import OpenAITextEmbedding
 from agentscope.mcp import StdIOStatefulClient
@@ -28,6 +33,134 @@ from asgiref.sync import sync_to_async
 
 # === Constants ===
 LLM_API_TIMEOUT = 120.0  # Timeout in seconds for LLM API calls (prevents hangs on context overflow)
+
+
+class ThinkingAwareOpenAIFormatter(OpenAIChatFormatter):
+    """
+    OpenAI formatter that converts thinking blocks to text blocks.
+
+    Some models (like Qwen) output thinking blocks, but the OpenAI API doesn't
+    support them. This formatter converts thinking blocks to text so the model
+    can still see its previous thoughts in the conversation history.
+    """
+
+    async def _format(self, msgs):
+        """Override _format to handle thinking blocks."""
+        import json as _json
+        from agentscope.formatter._openai_formatter import (
+            _format_openai_image_block,
+            _to_openai_audio_data,
+        )
+
+        self.assert_list_of_msgs(msgs)
+
+        messages = []
+        i = 0
+        while i < len(msgs):
+            msg = msgs[i]
+            content_blocks = []
+            tool_calls = []
+
+            for block in msg.get_content_blocks():
+                typ = block.get("type")
+                if typ == "text":
+                    content_blocks.append({**block})
+
+                elif typ == "thinking":
+                    # Convert thinking block to text block
+                    thinking_content = block.get("thinking", "").strip()
+                    if thinking_content:
+                        content_blocks.append({
+                            "type": "text",
+                            "text": f"[Thinking] {thinking_content}"
+                        })
+                    # Skip empty thinking blocks
+
+                elif typ == "tool_use":
+                    tool_calls.append({
+                        "id": block.get("id"),
+                        "type": "function",
+                        "function": {
+                            "name": block.get("name"),
+                            "arguments": _json.dumps(
+                                block.get("input", {}),
+                                ensure_ascii=False,
+                            ),
+                        },
+                    })
+
+                elif typ == "tool_result":
+                    (
+                        textual_output,
+                        multimodal_data,
+                    ) = self.convert_tool_result_to_string(block["output"])
+
+                    messages.append({
+                        "role": "tool",
+                        "tool_call_id": block.get("id"),
+                        "content": textual_output,
+                        "name": block.get("name"),
+                    })
+
+                elif typ == "image":
+                    content_blocks.append(
+                        _format_openai_image_block(block)
+                    )
+
+                elif typ == "audio":
+                    input_audio = _to_openai_audio_data(block["source"])
+                    content_blocks.append({
+                        "type": "input_audio",
+                        "input_audio": input_audio,
+                    })
+
+                # Skip other unsupported types silently
+
+            msg_openai = {
+                "role": msg.role,
+                "name": msg.name,
+                "content": content_blocks or None,
+            }
+
+            if tool_calls:
+                msg_openai["tool_calls"] = tool_calls
+
+            if msg_openai["content"] or msg_openai.get("tool_calls"):
+                messages.append(msg_openai)
+
+            i += 1
+
+        return messages
+
+
+def get_formatter(model_name: str):
+    """
+    Select the appropriate AgentScope formatter based on model name.
+
+    Note: Most models (including Qwen, DeepSeek, Llama) are typically served through
+    OpenAI-compatible APIs (vLLM, Ollama, etc.), so they use OpenAIChatFormatter.
+    Only Claude and Gemini require their specific formatters as they're only
+    available through their native APIs.
+
+    Args:
+        model_name: The model identifier
+
+    Returns:
+        The appropriate formatter instance.
+    """
+    model_lower = (model_name or '').lower()
+
+    # Claude models - only available through Anthropic API
+    if 'claude' in model_lower:
+        return AnthropicChatFormatter()
+
+    # Gemini models - only available through Google API
+    if 'gemini' in model_lower:
+        return GeminiChatFormatter()
+
+    # Default: OpenAI-compatible formatter with thinking block support
+    # Works for: GPT, Qwen, DeepSeek, Llama, Mistral, and most models
+    return ThinkingAwareOpenAIFormatter()
 
 
 # === Shared Model Initialization ===
@@ -53,16 +186,18 @@ def create_openai_model(llm_settings: 'BenchmarkSettings'):
     """
     _init_agentscope_once()
 
-    model = OpenAIChatModel(
-        model_name=llm_settings.llm_model,
-        api_key=llm_settings.llm_api_key,
-        client_kwargs={
+    model_kwargs = {
+        "model_name": llm_settings.llm_model,
+        "api_key": llm_settings.llm_api_key,
+        "client_kwargs": {
             "base_url": llm_settings.llm_base_url,
             "timeout": LLM_API_TIMEOUT,
             "max_retries": 0,  # Disable client retries - context_length errors come as 500
         },
-        stream=False
-    )
+        "stream": False
+    }
+
+    model = OpenAIChatModel(**model_kwargs)
     return model
 
 
@@ -329,27 +464,34 @@ class VanillaAgentFactory:
         # Wrap model for token usage tracking
         wrapped_model = UsageTrackingModelWrapper(model)
 
-        # Create Toolkit and register tool
+        settings = BenchmarkSettings.get_effective_settings()
+        model_has_thinking = has_builtin_thinking(settings.llm_model)
+
+        # Create Toolkit - skip think tool for thinking models
         toolkit = Toolkit()
-        toolkit.register_tool_function(think)
+        if not model_has_thinking:
+            toolkit.register_tool_function(think)
         toolkit.register_tool_function(web_search_tool)
         toolkit.register_tool_function(visit_page)
         toolkit.register_tool_function(answer_question)
 
-        settings = BenchmarkSettings.get_effective_settings()
         print_debug(f"VanillaAgent: Creating agent with memory_type={settings.memory_type}")
         short_term_memory, long_term_memory = create_memory(
             settings.memory_type,
             agent_name="VanillaAgent",
             user_id="vanilla_agent_user",
-            model=wrapped_model,  # Use wrapped model for memory operations too
+            model=wrapped_model,
             llm_settings=settings,
             run_id=run_id
         )
         print_debug(f"VanillaAgent: long_term_memory is {'set' if long_term_memory else 'None'}")
 
-        # Build system prompt (static_control mode auto-handles memory, no need for prompt section)
-        sys_prompt = PROMPTS["vanilla_agent_system_prompt"]
+        # Build prompt dynamically based on model capability
+        sys_prompt = get_agent_prompt("vanilla_agent_system_prompt", settings.llm_model)
+
+        # Select formatter based on model name
+        formatter = get_formatter(settings.llm_model)
+        print_debug(f"VanillaAgent: Using {type(formatter).__name__}")
 
         # Build ReActAgent with proper memory parameters per AgentScope docs
         agent_kwargs = {
@@ -358,7 +500,7 @@ class VanillaAgentFactory:
             "model": wrapped_model,  # Use wrapped model
             "toolkit": toolkit,
             "memory": short_term_memory,
-            "formatter": OpenAIChatFormatter(),
+            "formatter": formatter,
             "max_iters": settings.agent_max_iters,
         }
 
@@ -404,23 +546,25 @@ class BrowserAgentFactory:
         # Wrap model for token usage tracking
         wrapped_model = UsageTrackingModelWrapper(model)
 
-        # DEBUG: Print all registered tools
-        print_debug(f"BrowserAgent Toolkit Tools: {list(toolkit.tools.keys())}")
-
         settings = await sync_to_async(BenchmarkSettings.get_effective_settings)()
+
         print_debug(f"BrowserAgent: Creating agent with memory_type={settings.memory_type}")
         short_term_memory, long_term_memory = create_memory(
             settings.memory_type,
             agent_name="BrowserAgent",
             user_id="browser_agent_user",
-            model=wrapped_model,  # Use wrapped model for memory operations too
+            model=wrapped_model,
             llm_settings=settings,
             run_id=run_id
         )
         print_debug(f"BrowserAgent: long_term_memory is {'set' if long_term_memory else 'None'}")
 
-        # Build system prompt (static_control mode auto-handles memory, no need for prompt section)
-        sys_prompt = PROMPTS["browser_agent_system_prompt"]
+        # Build prompt dynamically based on model capability
+        sys_prompt = get_agent_prompt("browser_agent_system_prompt", settings.llm_model)
+
+        # Select formatter based on model name
+        formatter = get_formatter(settings.llm_model)
+        print_debug(f"BrowserAgent: Using {type(formatter).__name__}")
 
         # Build ReActAgent with proper memory parameters per AgentScope docs
         agent_kwargs = {
@@ -429,7 +573,7 @@ class BrowserAgentFactory:
             "model": wrapped_model,  # Use wrapped model
             "toolkit": toolkit,
             "memory": short_term_memory,
-            "formatter": OpenAIChatFormatter(),
+            "formatter": formatter,
             "max_iters": settings.agent_max_iters,
         }
 
@@ -462,8 +606,12 @@ class BrowserAgentFactory:
         """
         model = create_openai_model(llm_settings)
 
+        # For models with built-in thinking, skip the `think` tool
+        model_has_thinking = has_builtin_thinking(llm_settings.llm_model)
+
         toolkit = Toolkit()
-        toolkit.register_tool_function(think)
+        if not model_has_thinking:
+            toolkit.register_tool_function(think)
         toolkit.register_tool_function(answer_question)
 
         return model, toolkit

@@ -149,8 +149,8 @@ window.BenchmarkUtils.BenchmarkRenderer = {
             }
         }
 
-        // For completed trials, use cached trace if available, otherwise fetch
-        if (trial.status === 'completed') {
+        // For completed or error trials, use cached trace if available, otherwise fetch
+        if (trial.status === 'completed' || trial.status === 'error') {
             // Check cache first
             const cachedTrace = window.BenchmarkUtils?.MultiTurnPage?.getCachedTrace?.(trial.id);
 
@@ -201,9 +201,20 @@ window.BenchmarkUtils.BenchmarkRenderer = {
             }
 
             // Add verdict after setting up the trace (it will be inserted before verdict by the render callback)
-            if (trial.feedback || trial.is_correct_rule !== undefined) {
+            if (trial.status === 'completed' && (trial.feedback || trial.is_correct_rule !== undefined)) {
                 const verdictHtml = this.renderTrialVerdict(trial);
                 if (verdictHtml) wrapper.appendChild(verdictHtml);
+            }
+
+            // Add subtle error indicator for error trials
+            if (trial.status === 'error') {
+                const errorMsg = trial.error || 'Trial stopped or encountered an error';
+                const errorBubble = this.createMessageBubble(
+                    'system',
+                    `<span class="text-danger"><i class="bi bi-exclamation-circle me-1"></i>${BenchmarkHelpers.escapeHtml(errorMsg)}</span>`,
+                    'bg-danger bg-opacity-10 border-danger border-opacity-25'
+                );
+                wrapper.appendChild(errorBubble);
             }
         }
 

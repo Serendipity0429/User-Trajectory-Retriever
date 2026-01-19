@@ -1,4 +1,4 @@
-from ..utils import PROMPTS
+from ..utils import PROMPTS, has_builtin_thinking
 from ..models import MultiTurnSession
 from .base import BaseMultiTurnPipeline, REDIS_PREFIX_VANILLA_MULTI_TURN
 
@@ -24,44 +24,37 @@ class VanillaLLMMultiTurnPipeline(BaseMultiTurnPipeline):
 
     def _construct_messages(self, session, trial, completed_trials):
         messages = []
-        
-        # session.run is the MultiTurnRun object
-        allow_reasoning = session.run.settings.allow_reasoning if session.run and session.run.settings else False
 
-        # 1. System and Initial Prompt
+        # Get settings
+        settings = session.run.settings if session.run else None
+        allow_reasoning = settings.allow_reasoning if settings else False
+
+        # 1. System prompt - add CoT instructions only for non-thinking models
         sys_prompt = PROMPTS["vanilla_system_prompt"]
-        if allow_reasoning:
-            sys_prompt += PROMPTS["shared_reasoning_instruction_no_agent"]
+        model_name = settings.llm_model if settings else ""
+        if allow_reasoning and not has_builtin_thinking(model_name):
+            sys_prompt += PROMPTS["shared_reasoning_instruction"]
 
-        initial_user_prompt = PROMPTS["shared_user_question"].format(question=session.question)
-        
         messages.append({"role": "system", "content": sys_prompt})
-        messages.append({"role": "user", "content": initial_user_prompt})
+        messages.append({"role": "user", "content": PROMPTS["shared_user_question"].format(question=session.question)})
 
-        # 2. History - get assistant response from stored messages
+        # 2. History
         for i, past_trial in enumerate(completed_trials):
             past_log = past_trial.log or {}
             past_messages = past_log.get('messages', [])
-            # Find the assistant's response from stored messages
-            assistant_response = None
-            for m in reversed(past_messages):
-                if m.get('role') == 'assistant':
-                    assistant_response = m.get('content')
-                    break
+            assistant_response = next((m.get('content') for m in reversed(past_messages) if m.get('role') == 'assistant'), None)
             if assistant_response:
                 messages.append({"role": "assistant", "content": assistant_response})
             elif past_trial.answer:
                 messages.append({"role": "assistant", "content": past_trial.answer})
-            # Only add the generic feedback if this is NOT the last completed trial.
-            # The last trial's feedback is handled by the follow-up prompt.
             if i < len(completed_trials) - 1:
                 messages.append({"role": "user", "content": PROMPTS["shared_retry_request"].format(question=session.question)})
 
-        # 3. Follow-up instructions (only if we have history)
+        # 3. Retry prompt if we have history
         if completed_trials:
             if allow_reasoning:
                 messages.append({"role": "user", "content": PROMPTS["shared_retry_reasoning_prompt"].format(question=session.question)})
             else:
                 messages.append({"role": "user", "content": PROMPTS["shared_retry_request"].format(question=session.question)})
-            
+
         return messages

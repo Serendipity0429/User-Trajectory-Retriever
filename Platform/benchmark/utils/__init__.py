@@ -6,7 +6,8 @@ Consolidates all utility functions and classes for the benchmark app.
 # Re-export from submodules for convenient imports
 from .redis import RedisKeys, PipelinePrefix, clear_trial_cache
 from .trace_formatter import TraceFormatter, SimpleMsg
-from .prompts import PROMPTS
+from .prompts import PROMPTS, get_agent_prompt
+from .model_config import has_builtin_thinking
 from .text import count_questions_in_file, extract_final_answer, extract_query, ensure_system_prompt
 from .django import (
     handle_api_error,
@@ -59,6 +60,8 @@ __all__ = [
     'SimpleMsg',
     # Prompts
     'PROMPTS',
+    'has_builtin_thinking',
+    'get_agent_prompt',
     # Text processing
     'count_questions_in_file',
     'extract_final_answer',

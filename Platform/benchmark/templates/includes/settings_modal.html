@@ -120,10 +120,16 @@
                                     <div class="col-md-6">
                                         <label for="top_p" class="form-label small text-muted fw-bold d-flex justify-content-between mb-1">
                                             <span>Top P (Nucleus)</span>
-                                            <span id="top_p_val" class="badge bg-white text-primary border">{{ llm_settings.top_p|default:1.0 }}</span>
+                                            <span id="top_p_val" class="badge bg-white text-primary border">{{ llm_settings.top_p|default:0.95 }}</span>
                                         </label>
-                                        <input type="range" class="form-range mb-1" id="top_p" min="0" max="1" step="0.05" value="{{ llm_settings.top_p|default:1.0 }}" oninput="document.getElementById('top_p_val').textContent = this.value">
+                                        <input type="range" class="form-range mb-1" id="top_p" min="0" max="1" step="0.05" value="{{ llm_settings.top_p|default:0.95 }}" oninput="document.getElementById('top_p_val').textContent = this.value">
                                         <div class="text-muted" style="font-size: 0.9rem;">Limits token choices to top probability mass (1.0 = all).</div>
+                                    </div>
+
+                                    <div class="col-md-6">
+                                        <label for="top_k" class="form-label small text-muted fw-bold mb-1">Top K</label>
+                                        <input type="number" class="form-control form-control-sm" id="top_k" min="1" placeholder="Provider default (20 for Qwen3)" value="{{ llm_settings.top_k|default_if_none:'' }}">
+                                        <div class="text-muted mt-1" style="font-size: 0.9rem;">Limits token choices to top K candidates. Leave empty for provider default.</div>
                                     </div>
 
                                     <div class="col-md-6">

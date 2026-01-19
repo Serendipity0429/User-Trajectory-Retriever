@@ -15,6 +15,7 @@ window.BenchmarkSettingsConfig = {
                 { key: 'max_retries', label: 'Max Retries', icon: 'bi-arrow-repeat' },
                 { key: 'temperature', label: 'Temperature', icon: 'bi-thermometer-half' },
                 { key: 'top_p', label: 'Top P', icon: 'bi-percent' },
+                { key: 'top_k', label: 'Top K', icon: 'bi-sort-numeric-down' },
                 { key: 'max_tokens', label: 'Max Tokens', icon: 'bi-text-paragraph' },
                 { key: 'allow_reasoning', label: 'Reasoning', icon: 'bi-lightbulb', type: 'boolean' },
                 { key: 'llm_base_url', label: 'Base URL', icon: 'bi-link-45deg' }

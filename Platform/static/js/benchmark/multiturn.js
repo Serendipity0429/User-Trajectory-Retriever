@@ -235,15 +235,15 @@ window.BenchmarkUtils.MultiTurnPage = (function() {
                             const verdictContainer = BenchmarkUtils.BenchmarkRenderer.renderTrialVerdict(trialInfo);
                             if (verdictContainer) wrapper.appendChild(verdictContainer);
                         }
-                        // Add error display if trial has error status
-                        if (trialInfo.status === 'error' && !wrapper.querySelector('.trial-error-container')) {
-                            const errorContainer = document.createElement('div');
-                            errorContainer.className = 'trial-error-container alert alert-danger mt-3';
-                            errorContainer.innerHTML = `
-                                <strong>Trial Error</strong>
-                                <p class="mb-0 small">${BenchmarkHelpers.escapeHtml(trialInfo.error || 'An error occurred during this trial.')}</p>
-                            `;
-                            wrapper.appendChild(errorContainer);
+                        // Add subtle error indicator if trial has error status
+                        if (trialInfo.status === 'error' && !wrapper.querySelector('.trial-error-bubble')) {
+                            const errorMsg = trialInfo.error || 'Trial stopped or encountered an error';
+                            const errorBubble = BenchmarkUtils.BenchmarkRenderer.createMessageBubble(
+                                'system',
+                                `<span class="text-danger"><i class="bi bi-exclamation-circle me-1"></i>${BenchmarkHelpers.escapeHtml(errorMsg)}</span>`,
+                                'bg-danger bg-opacity-10 border-danger border-opacity-25 trial-error-bubble'
+                            );
+                            wrapper.appendChild(errorBubble);
                         }
                         return;
                     }
@@ -628,9 +628,19 @@ window.BenchmarkUtils.MultiTurnPage = (function() {
     }
 
     function stopPipeline() {
+        const currentSessionId = activeSessionId;
+        const pipelineType = currentRunPipelineType;
+
         if (pipelineController) pipelineController.abort();
         if (pipelineController?.pipelineId) {
-            BenchmarkAPI.post(BenchmarkUrls.pipeline.stop(currentRunPipelineType), { pipeline_id: pipelineController.pipelineId }, { keepalive: true }).catch(console.error);
+            BenchmarkAPI.post(BenchmarkUrls.pipeline.stop(pipelineType), { pipeline_id: pipelineController.pipelineId }, { keepalive: true })
+                .then(() => {
+                    // Reload current session to show saved traces
+                    if (currentSessionId) {
+                        setTimeout(() => loadSession(currentSessionId, null, pipelineType), 100);
+                    }
+                })
+                .catch(console.error);
         }
     }
 

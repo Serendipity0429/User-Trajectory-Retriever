@@ -81,7 +81,7 @@ window.BenchmarkSettings.testConnection = function(url, data, resultDivId, btnId
  */
 window.BenchmarkSettings.SETTINGS_FIELDS = [
     'llm_base_url', 'llm_api_key', 'llm_model', 'llm_judge_model', 'max_retries', 'allow_reasoning',
-    'temperature', 'top_p', 'max_tokens',
+    'temperature', 'top_p', 'top_k', 'max_tokens',
     'search_provider', 'search_limit', 'serper_api_key', 'serper_fetch_full_content',
     'agent_memory_type', 'embedding_model', 'agent_max_iters'
 ];
@@ -157,6 +157,7 @@ window.BenchmarkSettings.restoreDefaults = function() {
                 'allow_reasoning': 'allow_reasoning',
                 'temperature': 'temperature',
                 'top_p': 'top_p',
+                'top_k': 'top_k',
                 'max_tokens': 'max_tokens',
                 'search_provider': 'search_provider',
                 'search_limit': 'search_limit',
@@ -344,8 +345,9 @@ window.BenchmarkSettings.setupConfigurationActionHandlers = function() {
                 llm_judge_model: document.getElementById('llm_judge_model') ? document.getElementById('llm_judge_model').value : '',
                 max_retries: document.getElementById('max_retries') ? document.getElementById('max_retries').value : 3,
                 allow_reasoning: document.getElementById('allow_reasoning') ? document.getElementById('allow_reasoning').checked : false,
-                temperature: document.getElementById('temperature') ? document.getElementById('temperature').value : 0.0,
-                top_p: document.getElementById('top_p') ? document.getElementById('top_p').value : 1.0,
+                temperature: document.getElementById('temperature') ? document.getElementById('temperature').value : 0.3,
+                top_p: document.getElementById('top_p') ? document.getElementById('top_p').value : 0.95,
+                top_k: document.getElementById('top_k') ? document.getElementById('top_k').value : null,
                 max_tokens: document.getElementById('max_tokens') ? document.getElementById('max_tokens').value : null,
                 search_provider: document.getElementById('search_provider') ? document.getElementById('search_provider').value : 'serper',
                 search_limit: document.getElementById('search_limit') ? document.getElementById('search_limit').value : 5,

@@ -52,8 +52,9 @@ class BenchmarkSettings(models.Model):
     embedding_model = models.CharField(max_length=100, blank=True, help_text="Embedding model for long-term memory. If empty, uses EMBEDDING_MODEL env or defaults to text-embedding-3-small.")
     
     # LLM Advanced Parameters
-    temperature = models.FloatField(default=0.0, help_text="Sampling temperature (0.0 to 2.0).")
-    top_p = models.FloatField(default=1.0, help_text="Nucleus sampling probability (0.0 to 1.0).")
+    temperature = models.FloatField(default=0.3, help_text="Sampling temperature (0.0 to 2.0).")
+    top_p = models.FloatField(default=0.95, help_text="Nucleus sampling probability (0.0 to 1.0).")
+    top_k = models.PositiveIntegerField(null=True, blank=True, help_text="Top-K sampling. Leave empty for provider default (20 recommended for Qwen3).")
     max_tokens = models.PositiveIntegerField(null=True, blank=True, help_text="Maximum number of tokens to generate.")
 
     # Search Settings
@@ -117,6 +118,7 @@ class BenchmarkSettings(models.Model):
             allow_reasoning=self.allow_reasoning,
             temperature=self.temperature,
             top_p=self.top_p,
+            top_k=self.top_k,
             max_tokens=self.max_tokens,
             search_provider=self.search_provider,
             serper_api_key=self.serper_api_key,
@@ -138,6 +140,7 @@ class BenchmarkSettings(models.Model):
                 "allow_reasoning": self.allow_reasoning,
                 "temperature": self.temperature,
                 "top_p": self.top_p,
+                "top_k": self.top_k,
                 "max_tokens": self.max_tokens,
                 "llm_api_key": self.llm_api_key,
             },

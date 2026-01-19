@@ -22,6 +22,26 @@ class SimpleMsg:
         return {"role": self.role, "content": self.content}
 
 
+def strip_qwen_thinking_blocks(content):
+    """
+    Remove Qwen-style JSON thinking blocks from content.
+
+    Qwen models output blocks like: {"type": "thinking", "thinking": ""}
+    These should be stripped as they're just markers, not actual content.
+    """
+    if not isinstance(content, str):
+        return content
+
+    # Pattern to match {"type": "thinking", "thinking": "..."} blocks
+    # Handles both empty and non-empty thinking content
+    pattern = r'\{\s*"type"\s*:\s*"thinking"\s*,\s*"thinking"\s*:\s*"[^"]*"\s*\}'
+    cleaned = re.sub(pattern, '', content)
+
+    # Clean up extra whitespace/newlines left behind
+    cleaned = re.sub(r'\n\s*\n', '\n', cleaned)
+    return cleaned.strip()
+
+
 def parse_think_tags(content):
     """
     Splits content into blocks of Thought and Text based on <think> tags.
@@ -29,6 +49,9 @@ def parse_think_tags(content):
     """
     if not isinstance(content, str):
         return [{"type": "text", "content": content}]
+
+    # First strip Qwen-style JSON thinking blocks
+    content = strip_qwen_thinking_blocks(content)
 
     blocks = []
 
@@ -69,10 +92,13 @@ def parse_think_tags(content):
 def parse_react_content(content):
     """
     Parses a ReAct-style text content into blocks of Thought, Action, Observation.
-    Also handles <think> tags.
+    Also handles <think> tags and Qwen-style JSON thinking blocks.
     """
     if not isinstance(content, str):
         return [{"type": "text", "content": content}]
+
+    # First strip Qwen-style JSON thinking blocks
+    content = strip_qwen_thinking_blocks(content)
 
     # 1. First, split by <think> tags if they exist
     lower_content = content.lower()
@@ -158,7 +184,8 @@ class TraceFormatter:
 
             # Helper to extract text from content list/dict
             def extract_text(c):
-                if isinstance(c, str): return c
+                if isinstance(c, str):
+                    return strip_qwen_thinking_blocks(c)
                 if isinstance(c, list):
                     try:
                         texts = []
@@ -167,10 +194,12 @@ class TraceFormatter:
                                 texts.append(item.get('text', ''))
                             elif isinstance(item, str):
                                 texts.append(item)
-                        return "".join(texts)
+                        result = "".join(texts)
+                        return strip_qwen_thinking_blocks(result)
                     except Exception: return json.dumps(c, indent=2)
                 if isinstance(c, dict):
-                    if c.get('type') == 'text': return c.get('text', '')
+                    if c.get('type') == 'text':
+                        return strip_qwen_thinking_blocks(c.get('text', ''))
                     return json.dumps(c, indent=2)
                 return str(c)
 
@@ -251,6 +280,14 @@ class TraceFormatter:
                     for item in cleaned_content:
                         if isinstance(item, dict) and item.get('type') == 'text':
                             current_texts.append(item.get('text', ''))
+
+                        # Handle Qwen-style thinking blocks
+                        elif isinstance(item, dict) and item.get('type') == 'thinking':
+                            # Extract thinking content if present, otherwise skip
+                            thinking_content = item.get('thinking', '').strip()
+                            if thinking_content:
+                                current_texts.append(thinking_content)
+                            continue
 
                         elif isinstance(item, dict) and item.get('type') == 'tool_use':
                             # Flush texts as thought

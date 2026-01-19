@@ -15,7 +15,7 @@ from ..utils import (
     print_debug, extract_final_answer, count_questions_in_file,
     TrialGuard, RedisKeys, PipelinePrefix,
     TraceFormatter, SimpleMsg, PROMPTS, clear_trial_cache,
-    extract_session_metrics
+    extract_session_metrics, has_builtin_thinking
 )
 from ..models import (
     BenchmarkSettings, BenchmarkDataset,
@@ -128,9 +128,10 @@ class BasePipeline:
         Usage dict contains: input_tokens, output_tokens, total_tokens (or None if unavailable)
         """
         if temperature is None:
-            temperature = getattr(self.llm_settings, 'temperature', 0.0)
+            temperature = getattr(self.llm_settings, 'temperature', 0.3)
 
-        top_p = getattr(self.llm_settings, 'top_p', 1.0)
+        top_p = getattr(self.llm_settings, 'top_p', 0.95)
+        top_k = getattr(self.llm_settings, 'top_k', None)
         max_tokens = getattr(self.llm_settings, 'max_tokens', None)
 
         # Determine whether to extract final answer
@@ -140,8 +141,11 @@ class BasePipeline:
             "model": self.model,
             "messages": messages,
             "temperature": temperature,
-            "top_p": top_p
+            "top_p": top_p,
         }
+        # top_k via extra_body (OpenAI-compatible APIs)
+        if top_k:
+            kwargs['extra_body'] = {"top_k": top_k}
         if max_tokens:
             kwargs['max_tokens'] = max_tokens
 
@@ -151,7 +155,13 @@ class BasePipeline:
         for attempt in range(max_api_retries):
             try:
                 response = self.client.chat.completions.create(**kwargs)
-                full_response = response.choices[0].message.content
+                message = response.choices[0].message
+                full_response = message.content or ""
+
+                # Handle reasoning in separate field (some providers like OpenAI o1)
+                reasoning = getattr(message, 'reasoning', None) or getattr(message, 'reasoning_content', None)
+                if reasoning and reasoning.strip():
+                    full_response = f"<think>\n{reasoning.strip()}\n</think>\n{full_response}"
 
                 # Extract token usage from response
                 usage = None
@@ -186,9 +196,10 @@ class BasePipeline:
         Callers should handle: for response, usage in self.get_llm_response_stream(...)
         """
         if temperature is None:
-            temperature = getattr(self.llm_settings, 'temperature', 0.0)
+            temperature = getattr(self.llm_settings, 'temperature', 0.3)
 
-        top_p = getattr(self.llm_settings, 'top_p', 1.0)
+        top_p = getattr(self.llm_settings, 'top_p', 0.95)
+        top_k = getattr(self.llm_settings, 'top_k', None)
         max_tokens = getattr(self.llm_settings, 'max_tokens', None)
 
         kwargs = {
@@ -197,17 +208,20 @@ class BasePipeline:
             "temperature": temperature,
             "top_p": top_p,
             "stream": True,
-            "stream_options": {"include_usage": True}  # Request usage in stream
+            "stream_options": {"include_usage": True}
         }
+        # top_k via extra_body (OpenAI-compatible APIs)
+        if top_k:
+            kwargs['extra_body'] = {"top_k": top_k}
         if max_tokens:
             kwargs['max_tokens'] = max_tokens
 
         full_response = ""
+        reasoning_response = ""
         usage = None
         try:
             response = self.client.chat.completions.create(**kwargs)
             for chunk in response:
-                # Check for usage in chunk (typically in final chunk with stream_options)
                 if hasattr(chunk, 'usage') and chunk.usage:
                     usage = {
                         "input_tokens": getattr(chunk.usage, 'prompt_tokens', 0),
@@ -216,13 +230,24 @@ class BasePipeline:
                     }
                 if not chunk.choices:
                     continue
-                content = chunk.choices[0].delta.content
+                delta = chunk.choices[0].delta
+                content = delta.content if hasattr(delta, 'content') else None
+                # Handle reasoning in separate field (some providers)
+                reasoning = getattr(delta, 'reasoning', None) or getattr(delta, 'reasoning_content', None)
+                if reasoning:
+                    reasoning_response += reasoning
                 if content:
                     full_response += content
-                    yield full_response, None  # Yield tuple during streaming
-            # Final yield with usage (if we have content)
-            if full_response:
-                yield full_response, usage
+                    if reasoning_response:
+                        yield f"<think>\n{reasoning_response}\n</think>\n{full_response}", None
+                    else:
+                        yield full_response, None
+            # Final yield
+            final_response = full_response
+            if reasoning_response:
+                final_response = f"<think>\n{reasoning_response}\n</think>\n{full_response}"
+            if final_response:
+                yield final_response, usage
         except Exception as e:
             print_debug(f"LLM API stream failed: {e}")
             raise e
@@ -629,7 +654,7 @@ class BaseMultiTurnPipeline(BasePipeline):
                 yield {'error': f"Group with ID {self.group_id} not found."}
                 return
         else:
-            group_name = f"{str(self)}- {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+            group_name = f"{str(self)} - {self.llm_settings.llm_model} - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
             # Create a new settings instance for this run
             new_settings = self.llm_settings.clone()
             new_settings.save()

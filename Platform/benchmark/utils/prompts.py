@@ -1,3 +1,35 @@
+# Import from dedicated config file
+from .model_config import has_builtin_thinking
+
+
+def get_agent_prompt(prompt_key: str, model_name: str) -> str:
+    """
+    Build agent system prompt based on model capability.
+
+    For thinking models: no think tool, no CoT instructions
+    For other models: include think tool and CoT instructions
+    """
+    base_key = f"{prompt_key}_base"
+    if base_key not in PROMPTS:
+        # Fallback to direct key if no base version
+        return PROMPTS.get(prompt_key, "")
+
+    base_prompt = PROMPTS[base_key]
+
+    if has_builtin_thinking(model_name):
+        # Thinking models: no think tool, no explicit CoT
+        return base_prompt.format(
+            tools_section="",
+            think_instruction=""
+        )
+    else:
+        # Other models: include think tool and CoT instructions
+        return base_prompt.format(
+            tools_section="- `think(thought: str)`: Record your step-by-step reasoning.\n",
+            think_instruction="2. You MUST use the `think` tool to explain your reasoning BEFORE using other tools. Please think step-by-step.\n"
+        )
+
+
 # --- Shared Rule Component ---
 _RULES = """## Final Answer Format Rules
 1. Your answer must be the EXACT MATCH to the expected answer. Please make the answer accurate and concise.
@@ -19,14 +51,16 @@ PROMPTS = {
     # 1. SHARED COMPONENTS (used across all baselines for fair comparison)
     # =========================================================================
 
-    "shared_reasoning_instruction_no_agent": """
+    # CoT prompting for models without built-in thinking
+    # For thinking models, this is skipped entirely (they think natively)
+    "shared_reasoning_instruction": """
 Please think step-by-step to arrive at the answer. Make the reasoning as detailed as possible. Format your response as follows:
 <think>
 (step-by-step reasoning...)
 </think>
 Final Answer: (final answer only...) """,
 
-    "shared_answer_request": "\nPlease provide the final answer.",
+    "shared_answer_request": "\nPlease provide the final answer.\nFinal Answer:",
 
     "shared_user_question": "Please answer the question: {question}",
 
@@ -64,6 +98,7 @@ Output ONLY the query.
 Question: {question}
 Search Query:""",
 
+    # CoT version for non-thinking models
     "rag_query_gen_cot_prompt": """Generate a search query to answer the following question.
 Format your response as follows:
 <think>
@@ -79,6 +114,7 @@ Based on the conversation history, formulate a better search query.
 Output ONLY the new query string.
 """,
 
+    # CoT version for non-thinking models
     "rag_query_reform_cot_prompt": """You are a search query optimizer.
 The previous search did not have yielded the correct answer.
 Based on the conversation history, formulate a better search query.
@@ -105,7 +141,8 @@ Question: {question}
     # =========================================================================
 
     # --- Vanilla Agent (ReAct) ---
-    "vanilla_agent_system_prompt": f"""# ReAct Agent
+    # Base prompt - think tool added dynamically based on model capability
+    "vanilla_agent_system_prompt_base": f"""# ReAct Agent
 
 You are a ReAct (Reasoning and Acting) Agent expert in open-domain QA.
 Your goal is to answer the user's question by interacting with the environment.
@@ -113,20 +150,21 @@ Your goal is to answer the user's question by interacting with the environment.
 {_RULES}
 
 ## Tools Available
-- `think(thought: str)`: Record your step-by-step reasoning.
+{{tools_section}}
 - `web_search_tool(query: str)`: Search the web. Returns snippets only.
 - `visit_page(url: str)`: Visit a web page to read its full content.
 - `answer_question(answer: str)`: Submit the final answer.
 
 ## Instructions
 1. You must use `answer_question` to finish.
-2. You MUST use the `think` tool to explain your reasoning BEFORE using other tools. Please think step-by-step. Make the reasoning as detailed as possible.
-3. The search tool only provides snippets. You usually need to `visit_page` to verify information or get details.
-4. Do not output text directly. Use the tools provided.
+{{think_instruction}}
+2. The search tool only provides snippets. You usually need to `visit_page` to verify information or get details.
+3. Do not output text directly. Use the tools provided.
 """,
 
     # --- Browser Agent (Autonomous) ---
-    "browser_agent_system_prompt": f"""# Browser Agent
+    # Base prompt - think tool added dynamically based on model capability
+    "browser_agent_system_prompt_base": f"""# Browser Agent
 
 You are an autonomous Browser Agent expert in open-domain QA.
 Your goal is to answer the user's question by browsing the web.
@@ -134,14 +172,14 @@ Your goal is to answer the user's question by browsing the web.
 {_RULES}
 
 ## Tools Available
-- `think(thought: str)`: Record your step-by-step reasoning.
+{{tools_section}}
 - Browser tools provided by Chrome-Devtools-MCP.
 - `answer_question(answer: str)`: Submit the final answer.
 
 ## Instructions
 1. You must use `answer_question` to finish.
-2. You MUST use the `think` tool to explain your reasoning BEFORE using other tools. Please think step-by-step. Make the reasoning as detailed as possible.
-3. Do not output text directly. Use the tools provided.
+{{think_instruction}}
+2. Do not output text directly. Use the tools provided.
 """,
 
 }

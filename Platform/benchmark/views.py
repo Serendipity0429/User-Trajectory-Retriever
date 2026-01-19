@@ -447,6 +447,7 @@ def get_default_settings(request):
             "allow_reasoning": settings.allow_reasoning,
             "temperature": settings.temperature,
             "top_p": settings.top_p,
+            "top_k": settings.top_k,
             "max_tokens": settings.max_tokens,
 
             # Search
@@ -457,6 +458,7 @@ def get_default_settings(request):
 
             # Agent
             "agent_memory_type": settings.memory_type,
+            "agent_max_iters": settings.agent_max_iters,
         }
         return JsonResponse(config_data)
     except OperationalError:
@@ -482,7 +484,7 @@ def save_settings(request):
             'llm_base_url': (str, ''), 'llm_model': (str, ''), 'llm_api_key': (str, ''),
             'llm_judge_model': (str, ''), 'embedding_model': (str, ''),
             'max_retries': (int, 3), 'allow_reasoning': (bool, True),
-            'temperature': (float, 0.0), 'top_p': (float, 1.0),
+            'temperature': (float, 0.3), 'top_p': (float, 0.95),
             'search_provider': (str, None), 'serper_api_key': (str, None),
             'search_limit': (int, None), 'memory_type': (str, None),
             'agent_max_iters': (int, 30),
@@ -500,6 +502,9 @@ def save_settings(request):
         if 'max_tokens' in data:
             val = data['max_tokens']
             settings.max_tokens = int(val) if val not in (None, '') else None
+        if 'top_k' in data:
+            val = data['top_k']
+            settings.top_k = int(val) if val not in (None, '') else None
 
         settings.save()
         return JsonResponse({"status": "ok"})
@@ -835,17 +840,31 @@ def stop_session(request):
         session_id = data.get("session_id")
         if not session_id:
              return JsonResponse({"status": "error", "message": "Session ID required"}, status=400)
-             
+
         session = get_object_or_404(MultiTurnSession, pk=session_id)
-        processing_trials = session.trials.filter(status='processing')
-        
+        processing_trials = list(session.trials.filter(status='processing'))
+
+        # Save partial traces before clearing Redis
         for trial in processing_trials:
+            trace_json = redis_client.get(RedisKeys.trial_trace(trial.id))
+            if trace_json:
+                try:
+                    partial_trace = json.loads(trace_json)
+                    trial.log = trial.log or {}
+                    trial.log["trace"] = partial_trace
+                    trial.log["error"] = "Session stopped by user"
+                    trial.log["error_type"] = "UserStopped"
+                except json.JSONDecodeError:
+                    pass
+            trial.status = 'error'
+            trial.feedback = 'Session stopped by user.'
+            trial.save()
+            # Clear Redis after saving
             redis_client.delete(RedisKeys.trial_status(trial.id))
             redis_client.delete(RedisKeys.trial_trace(trial.id))
-        
-        processing_trials.update(status='error', feedback='Session stopped by user.')
+
         PipelineManager.get_instance().close_session(session_id)
-        
+
         return JsonResponse({"status": "ok"})
     except Exception as e:
         return JsonResponse({"status": "error", "message": str(e)}, status=500)
@@ -970,7 +989,32 @@ def _stop_pipeline_generic(request, redis_prefix_template):
     data = json.loads(request.body)
     pipeline_id = data.get("pipeline_id")
     if pipeline_id:
+        # First, delete the active flag to signal pipeline to stop
         redis_client.delete(RedisKeys.pipeline_active(redis_prefix_template, pipeline_id))
+
+        # Find and save traces for any processing trials in this pipeline run
+        sessions = MultiTurnSession.objects.filter(run_tag=pipeline_id)
+        for session in sessions:
+            processing_trials = list(session.trials.filter(status='processing'))
+            for trial in processing_trials:
+                # Save partial trace before clearing Redis
+                trace_json = redis_client.get(RedisKeys.trial_trace(trial.id))
+                if trace_json:
+                    try:
+                        partial_trace = json.loads(trace_json)
+                        trial.log = trial.log or {}
+                        trial.log["trace"] = partial_trace
+                        trial.log["error"] = "Pipeline stopped by user"
+                        trial.log["error_type"] = "UserStopped"
+                    except json.JSONDecodeError:
+                        pass
+                trial.status = 'error'
+                trial.feedback = 'Pipeline stopped by user.'
+                trial.save()
+                # Clear Redis after saving
+                redis_client.delete(RedisKeys.trial_status(trial.id))
+                redis_client.delete(RedisKeys.trial_trace(trial.id))
+
     return JsonResponse({"status": "ok"})
 
 @admin_required
@@ -1072,22 +1116,33 @@ def get_session(request, session_id):
 
     for t in trials:
         log = t.pop("log", {}) or {}
-        messages = log.get("messages", [])
 
         # Parse trace on-demand for UI rendering
-        if messages:
-            # Handle both simple dicts and complex agent Msg dicts
-            trace_msgs = []
-            for m in messages:
-                role = m.get("role", "assistant")
-                content = m.get("content", "")
-                trace_msgs.append(SimpleMsg(role, content))
-            t["trace"], _ = TraceFormatter.serialize(trace_msgs)
+        # Priority 1: Use pre-saved trace (captured at error time by TrialGuard)
+        saved_trace = log.get("trace")
+        if saved_trace and isinstance(saved_trace, list) and len(saved_trace) > 0:
+            t["trace"] = saved_trace
         else:
-            t["trace"] = []
+            # Priority 2: Reconstruct from messages
+            messages = log.get("messages", [])
+            if messages:
+                # Handle both simple dicts and complex agent Msg dicts
+                trace_msgs = []
+                for m in messages:
+                    role = m.get("role", "assistant")
+                    content = m.get("content", "")
+                    trace_msgs.append(SimpleMsg(role, content))
+                t["trace"], _ = TraceFormatter.serialize(trace_msgs)
+            else:
+                t["trace"] = []
 
         # Apply pipeline-specific metadata (search data for RAG, memory data for agents)
         apply_trial_metadata(t, log, pipeline_type)
+
+        # Include error info for error trials
+        if t.get("status") == "error":
+            t["error"] = log.get("error", "An error occurred during this trial.")
+            t["error_type"] = log.get("error_type")
 
     return JsonResponse({
         "session": {

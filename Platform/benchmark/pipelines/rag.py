@@ -2,7 +2,8 @@ import json
 from task_manager.utils import redis_client
 from ..utils import (
     get_search_engine, extract_final_answer, extract_query,
-    RedisKeys, PipelinePrefix, TraceFormatter, SimpleMsg, PROMPTS, TrialGuard
+    RedisKeys, PipelinePrefix, TraceFormatter, SimpleMsg, PROMPTS, TrialGuard,
+    has_builtin_thinking
 )
 from ..models import BenchmarkSettings, MultiTurnSession
 from .base import BaseMultiTurnPipeline
@@ -41,26 +42,24 @@ class RagMultiTurnPipeline(BaseMultiTurnPipeline):
         return 'rag'
 
     def _construct_messages(self, session, trial, completed_trials=None):
-        """
-        Builds the conversation history from past trials.
-        Unified pattern: system prompt + past trials' full conversations.
-        """
+        """Builds conversation history from past trials."""
         if completed_trials is None:
             completed_trials = list(session.trials.filter(status='completed').order_by('trial_number'))
 
-        allow_reasoning = session.run.settings.allow_reasoning if session.run and session.run.settings else False
+        settings = session.run.settings if session.run else None
+        allow_reasoning = settings.allow_reasoning if settings else False
 
-        # System prompt
+        # System prompt - add CoT instructions only for non-thinking models
         system_prompt = PROMPTS["rag_system_prompt"]
-        if allow_reasoning:
-            system_prompt += PROMPTS["shared_reasoning_instruction_no_agent"]
+        model_name = settings.llm_model if settings else ""
+        if allow_reasoning and not has_builtin_thinking(model_name):
+            system_prompt += PROMPTS["shared_reasoning_instruction"]
 
         messages = [{"role": "system", "content": system_prompt}]
 
-        # Append past trials' messages (excluding system prompts)
+        # Append past trials' messages
         for past_trial in completed_trials:
-            past_msgs = past_trial.log.get('messages', [])
-            for m in past_msgs:
+            for m in past_trial.log.get('messages', []):
                 if m.get('role') != 'system':
                     messages.append(m)
 
@@ -76,9 +75,12 @@ class RagMultiTurnPipeline(BaseMultiTurnPipeline):
 
     def run_single_turn(self, session, trial, completed_trials=None):
         with TrialGuard(trial):
-            allow_reasoning = session.run.settings.allow_reasoning if session.run and session.run.settings else False
+            settings = session.run.settings if session.run else None
+            allow_reasoning = settings.allow_reasoning if settings else False
+            # For thinking models, skip explicit CoT - they think natively
+            use_cot = allow_reasoning and not has_builtin_thinking(settings.llm_model if settings else "")
 
-            # Build base history from past trials 
+            # Build base history
             if completed_trials is None:
                 completed_trials = list(session.trials.filter(
                     trial_number__lt=trial.trial_number,
@@ -87,35 +89,26 @@ class RagMultiTurnPipeline(BaseMultiTurnPipeline):
             history = self._construct_messages(session, trial, completed_trials)
 
             trial.log = trial.log or {}
-            turn_messages = []  # Messages added during this turn
+            turn_messages = []
 
-            # Extract system prompt for trace
             system_prompt = history[0].get('content', '') if history and history[0].get('role') == 'system' else ''
 
-            # Helper for trace updates - includes system prompt + current turn messages
             def build_trace_msgs(messages):
-                trace_msgs = []
-                for m in messages:
-                    trace_msgs.append(SimpleMsg(m["role"], m["content"]))
-                return trace_msgs
+                return [SimpleMsg(m["role"], m["content"]) for m in messages]
 
             def update_redis_trace(current_turn_messages):
-                # Include system prompt + current turn messages
-                trace_msgs = []
-                if system_prompt:
-                    trace_msgs.append(SimpleMsg("system", system_prompt))
+                trace_msgs = [SimpleMsg("system", system_prompt)] if system_prompt else []
                 trace_msgs.extend(build_trace_msgs(current_turn_messages))
                 trace_data, _ = TraceFormatter.serialize(trace_msgs)
                 redis_client.set(RedisKeys.trial_trace(trial.id), json.dumps(trace_data), ex=RedisKeys.DEFAULT_TTL)
 
             # === Phase 1: Query Generation ===
             if trial.trial_number == 1:
-                query_instruction = PROMPTS["rag_query_gen_cot_prompt" if allow_reasoning else "rag_query_gen_prompt"].format(question=session.question)
+                prompt_key = "rag_query_gen_cot_prompt" if use_cot else "rag_query_gen_prompt"
+                query_instruction = PROMPTS[prompt_key].format(question=session.question)
             else:
-                # Add retry message to turn_messages only (not history, to avoid duplication in final_messages)
-                retry_msg = {"role": "user", "content": PROMPTS["shared_retry_request"].format(question=session.question)}
-                turn_messages.append(retry_msg)
-                query_instruction = PROMPTS["rag_query_reform_cot_prompt" if allow_reasoning else "rag_query_reform_prompt"]
+                turn_messages.append({"role": "user", "content": PROMPTS["shared_retry_request"].format(question=session.question)})
+                query_instruction = PROMPTS["rag_query_reform_cot_prompt" if use_cot else "rag_query_reform_prompt"]
 
             # Add query instruction
             query_instruction_msg = {"role": "user", "content": query_instruction}
@@ -146,7 +139,7 @@ class RagMultiTurnPipeline(BaseMultiTurnPipeline):
             # === Phase 2: Answer Synthesis ===
             formatted_results = self.search_engine.format_results(search_results)
             results_instruction = "Search Results:\n" + PROMPTS["rag_context_wrapper"].format(formatted_results=formatted_results)
-            results_instruction += PROMPTS["shared_reasoning_instruction_no_agent" if allow_reasoning else "shared_answer_request"]
+            results_instruction += PROMPTS["shared_reasoning_instruction"] if use_cot else PROMPTS["shared_answer_request"]
 
             results_msg = {"role": "user", "content": results_instruction}
             turn_messages.append(results_msg)

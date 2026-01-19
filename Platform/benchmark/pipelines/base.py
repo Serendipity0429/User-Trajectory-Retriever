@@ -143,9 +143,17 @@ class BasePipeline:
             "temperature": temperature,
             "top_p": top_p,
         }
-        # top_k via extra_body (OpenAI-compatible APIs)
+        # extra_body for provider-specific parameters
+        extra_body = {}
         if top_k:
-            kwargs['extra_body'] = {"top_k": top_k}
+            extra_body["top_k"] = top_k
+        # Enable thinking mode for models with built-in thinking (Qwen3, etc.)
+        if has_builtin_thinking(self.model):
+            extra_body["enable_thinking"] = True
+            # Some providers use chat_template_kwargs instead
+            extra_body["chat_template_kwargs"] = {"enable_thinking": True}
+        if extra_body:
+            kwargs['extra_body'] = extra_body
         if max_tokens:
             kwargs['max_tokens'] = max_tokens
 
@@ -210,9 +218,17 @@ class BasePipeline:
             "stream": True,
             "stream_options": {"include_usage": True}
         }
-        # top_k via extra_body (OpenAI-compatible APIs)
+        # extra_body for provider-specific parameters
+        extra_body = {}
         if top_k:
-            kwargs['extra_body'] = {"top_k": top_k}
+            extra_body["top_k"] = top_k
+        # Enable thinking mode for models with built-in thinking (Qwen3, etc.)
+        if has_builtin_thinking(self.model):
+            extra_body["enable_thinking"] = True
+            # Some providers use chat_template_kwargs instead
+            extra_body["chat_template_kwargs"] = {"enable_thinking": True}
+        if extra_body:
+            kwargs['extra_body'] = extra_body
         if max_tokens:
             kwargs['max_tokens'] = max_tokens
 
@@ -501,8 +517,10 @@ class BaseMultiTurnPipeline(BasePipeline):
         try:
             if existing_session:
                 session = existing_session
-                # Clean up stalled/incomplete trials
+                # Clean up stalled/incomplete trials (error, processing, pending)
                 session.trials.exclude(status='completed').delete()
+                # Refresh to get accurate count after deletion
+                session.refresh_from_db()
                 # Continue from next trial after completed ones
                 completed_count = session.trials.filter(status='completed').count()
                 trial_number = completed_count + 1
@@ -899,9 +917,10 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
         try:
             if existing_session:
                 session = existing_session
-                # Clean up stalled/incomplete trials
+                # Clean up stalled/incomplete trials (error, processing, pending)
                 def cleanup():
                     session.trials.exclude(status='completed').delete()
+                    session.refresh_from_db()
                     return session.trials.filter(status='completed').count()
                 completed_count = await sync_to_async(cleanup)()
                 trial_number = completed_count + 1

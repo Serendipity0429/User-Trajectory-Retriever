@@ -128,7 +128,7 @@
 
                                     <div class="col-md-6">
                                         <label for="top_k" class="form-label small text-muted fw-bold mb-1">Top K</label>
-                                        <input type="number" class="form-control form-control-sm" id="top_k" min="1" placeholder="Provider default (20 for Qwen3)" value="{{ llm_settings.top_k|default_if_none:'' }}">
+                                        <input type="number" class="form-control form-control-sm" id="top_k" min="1" placeholder="Provider default" value="{{ llm_settings.top_k|default_if_none:'' }}">
                                         <div class="text-muted mt-1" style="font-size: 0.9rem;">Limits token choices to top K candidates. Leave empty for provider default.</div>
                                     </div>
 

@@ -821,6 +821,9 @@ def retry_session(request, trial_id):
             session.save()
             return JsonResponse({"status": "max_retries_reached", "session_id": session.id})
 
+        # Clear stale non-completed trials to avoid unique constraint conflicts.
+        session.trials.exclude(status='completed').exclude(pk=original_trial.pk).delete()
+
         new_trial = MultiTurnTrial.objects.create(
             session=session,
             trial_number=original_trial.trial_number + 1,

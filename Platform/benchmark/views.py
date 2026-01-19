@@ -748,16 +748,14 @@ def run_trial(request, trial_id):
     settings = get_session_settings(session)
     base_url = settings.llm_base_url
     model = settings.llm_model
-    api_key = config("LLM_API_KEY", default=None)
+    api_key = settings.llm_api_key
 
-    if not api_key or not model:
-        db_settings = BenchmarkSettings.get_effective_settings()
-        if not api_key:
-            api_key = config("LLM_API_KEY", default=db_settings.llm_api_key)
-        if not base_url:
-            base_url = config("LLM_BASE_URL", default=db_settings.llm_base_url)
-        if not model:
-            model = db_settings.llm_model or config("LLM_MODEL", default="gpt-4o")
+    if not api_key:
+        api_key = config("LLM_API_KEY", default=None)
+    if not base_url:
+        base_url = config("LLM_BASE_URL", default=None)
+    if not model:
+        model = config("LLM_MODEL", default="gpt-4o")
 
     common_kwargs = {"base_url": base_url, "api_key": api_key, "model": model, "max_retries": 1}
     pipeline_type = session.pipeline_type
@@ -774,6 +772,8 @@ def run_trial(request, trial_id):
     else:
         PipelineClass = PipelineRegistry.get_pipeline_class(pipeline_type)
         pipeline = PipelineClass(**common_kwargs)
+        pipeline.llm_settings = settings
+        pipeline.judge_model = settings.llm_judge_model or model
         answer, is_correct_llm, search_results = pipeline.run_single_turn(session, trial)
 
     if is_correct_llm:

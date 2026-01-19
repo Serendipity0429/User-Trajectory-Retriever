@@ -118,10 +118,17 @@ class PipelineManager:
         
         # 2. Fetch DB Objects safely
         try:
-            session = await sync_to_async(MultiTurnSession.objects.get)(pk=session_id)
+            session = await sync_to_async(
+                MultiTurnSession.objects.select_related("run", "run__settings").get
+            )(pk=session_id)
             trial = await sync_to_async(MultiTurnTrial.objects.get)(pk=trial_id)
         except Exception as e:
             return None, False, [], f"DB Error: {str(e)}"
+
+        # Align pipeline settings with the stored run settings for this session.
+        if session.run and session.run.settings:
+            pipeline.llm_settings = session.run.settings
+            pipeline.judge_model = session.run.settings.llm_judge_model or pipeline.model
 
         # 3. Run Turn
         # run_single_turn_async(session, trial, auto_cleanup=False) 

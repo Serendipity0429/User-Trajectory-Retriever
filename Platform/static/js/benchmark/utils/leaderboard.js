@@ -14,13 +14,13 @@ window.BenchmarkLeaderboard = (function() {
     let leaderboardData = [];
     let activeRunId = null;
 
-    // Pipeline badge configuration
+    // Pipeline badge configuration with icons
     const PIPELINE_BADGES = {
-        'vanilla_llm': { text: 'LLM', class: 'bg-primary' },
-        'rag': { text: 'RAG', class: 'bg-success' },
-        'vanilla_agent': { text: 'Agent', class: 'bg-info' },
-        'browser_agent': { text: 'Browser', class: 'bg-warning text-dark' },
-        'human': { text: 'Human', class: 'bg-dark' }
+        'vanilla_llm': { text: 'LLM', class: 'pipeline-llm', icon: 'bi-chat-square-text' },
+        'rag': { text: 'RAG', class: 'pipeline-rag', icon: 'bi-search' },
+        'vanilla_agent': { text: 'Agent', class: 'pipeline-agent', icon: 'bi-robot' },
+        'browser_agent': { text: 'Browser', class: 'pipeline-browser', icon: 'bi-globe' },
+        'human': { text: 'Human', class: 'pipeline-human', icon: 'bi-person-fill' }
     };
 
     /**
@@ -172,7 +172,7 @@ window.BenchmarkLeaderboard = (function() {
         if (run.accuracy >= 70) accuracyClass = 'accuracy-high';
         else if (run.accuracy >= 40) accuracyClass = 'accuracy-medium';
 
-        const badge = PIPELINE_BADGES[run.pipeline_type] || { text: run.pipeline_type, class: 'bg-secondary' };
+        const badge = PIPELINE_BADGES[run.pipeline_type] || { text: run.pipeline_type, class: 'bg-secondary', icon: 'bi-question-circle' };
         const modelName = run.model || 'Unknown';
         const date = run.created_at ? new Date(run.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '-';
         const isActive = activeRunId === run.run_id;
@@ -198,7 +198,7 @@ window.BenchmarkLeaderboard = (function() {
                 attrs: { title: run.name }
             },
             '.pipeline-badge': {
-                text: badge.text,
+                html: (badge.icon ? `<i class="bi ${badge.icon}"></i>` : '') + badge.text,
                 addClass: badge.class
             },
             '.model-text': {

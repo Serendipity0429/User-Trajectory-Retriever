@@ -71,25 +71,4 @@ window.BenchmarkUrls = {
         }
     },
 
-    // Compatibility (Mapping to unified)
-    vanillaLlmMultiTurn: {
-        loadRun: (id) => `${API_PREFIX}/sessions/load_vanilla_run/${id}/`,
-        runPipeline: `${API_PREFIX}/pipeline/start/vanilla_llm/`,
-        stopPipeline: `${API_PREFIX}/pipeline/stop/vanilla_llm/`
-    },
-    ragMultiTurn: {
-        loadRun: (id) => `${API_PREFIX}/sessions/load_rag_run/${id}/`,
-        runPipeline: `${API_PREFIX}/pipeline/start/rag/`,
-        stopPipeline: `${API_PREFIX}/pipeline/stop/rag/`
-    },
-    vanillaAgent: {
-        loadRun: (id) => `${API_PREFIX}/sessions/load_agent_run/${id}/`,
-        runPipeline: `${API_PREFIX}/pipeline/start/vanilla_agent/`,
-        stopPipeline: `${API_PREFIX}/pipeline/stop/vanilla_agent/`
-    },
-    browserAgent: {
-        loadRun: (id) => `${API_PREFIX}/sessions/load_agent_run/${id}/`,
-        runPipeline: `${API_PREFIX}/pipeline/start/browser_agent/`,
-        stopPipeline: `${API_PREFIX}/pipeline/stop/browser_agent/`
-    }
 };

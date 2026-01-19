@@ -765,20 +765,29 @@ def _session_extract_dynamics_metrics(result: Dict, trials: list, ground_truths:
         result['recovery_effective'] = recovery_effective
 
 
-def extract_session_metrics(session) -> Dict[str, Any]:
+def extract_session_metrics(session, skip_expensive: bool = False) -> Dict[str, Any]:
     """
     Extract all metrics for a single session from its trials.
 
     This is the main entry point for per-session metric extraction.
     Returns a dict with all session-level metrics ready for aggregation.
+
+    Args:
+        session: Session ORM object or dict
+        skip_expensive: If True, skip expensive string similarity calculations
+                       (dynamics metrics). Use for leaderboard where only
+                       basic metrics are needed.
     """
     # Helper to get attributes from ORM objects or dicts
     def get_attr(obj, attr):
         return getattr(obj, attr, None) if hasattr(obj, attr) else obj.get(attr) if isinstance(obj, dict) else None
 
     # Get trials (handle both ORM objects and dicts)
+    # Note: When using prefetch_related with Prefetch(..., queryset=...order_by()),
+    # avoid calling .order_by() again as it bypasses the prefetch cache and hits the DB.
     if hasattr(session, 'trials'):
-        trials = list(session.trials.all().order_by('trial_number'))
+        # Use list() to materialize prefetched queryset; sort in Python to avoid DB hit
+        trials = sorted(session.trials.all(), key=lambda t: t.trial_number)
     else:
         trials = session.get('trials', [])
 
@@ -840,13 +849,14 @@ def extract_session_metrics(session) -> Dict[str, Any]:
     if token_usage.get('total_tokens', 0) > 0:
         result['token_usage'] = token_usage
 
-    # Search/query metrics
-    question = get_attr(session, 'question')
-    _session_extract_search_metrics(result, trials, original_question=question)
+    # Search/query metrics (skip if expensive mode - not needed for leaderboard)
+    if not skip_expensive:
+        question = get_attr(session, 'question')
+        _session_extract_search_metrics(result, trials, original_question=question)
 
-    # Dynamics metrics
-    ground_truths = get_attr(session, 'ground_truths')
-    _session_extract_dynamics_metrics(result, trials, ground_truths=ground_truths)
+        # Dynamics metrics (expensive string similarity calculations)
+        ground_truths = get_attr(session, 'ground_truths')
+        _session_extract_dynamics_metrics(result, trials, ground_truths=ground_truths)
 
     return result
 

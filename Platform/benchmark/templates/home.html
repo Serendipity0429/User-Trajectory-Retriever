@@ -157,9 +157,40 @@
     .accuracy-high { color: #198754; font-weight: 600; }
     .accuracy-medium { color: #fd7e14; font-weight: 600; }
     .accuracy-low { color: #dc3545; font-weight: 600; }
+    /* Pipeline badges - modern pill style with icons */
     .pipeline-badge {
         font-size: 0.7rem;
-        padding: 0.25rem 0.5rem;
+        padding: 0.3rem 0.6rem;
+        font-weight: 500;
+        letter-spacing: 0.02em;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        border: none !important;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+    }
+    .pipeline-badge i {
+        font-size: 0.65rem;
+    }
+    .pipeline-badge.pipeline-llm {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: #fff;
+    }
+    .pipeline-badge.pipeline-rag {
+        background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+        color: #fff;
+    }
+    .pipeline-badge.pipeline-agent {
+        background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        color: #fff;
+    }
+    .pipeline-badge.pipeline-browser {
+        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        color: #fff;
+    }
+    .pipeline-badge.pipeline-human {
+        background: linear-gradient(135deg, #f7971e 0%, #ffd200 100%);
+        color: #7c5a00;
     }
     .model-text {
         font-size: 0.85rem;

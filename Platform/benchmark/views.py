@@ -1,4 +1,5 @@
 from django.db import models
+from django.db.models import Prefetch
 from django.views.decorators.http import require_POST, require_http_methods
 from asgiref.sync import sync_to_async
 import csv
@@ -210,8 +211,15 @@ def get_leaderboard(request):
             if active_dataset:
                 target_question_count = active_dataset.question_count
 
-        # Build base query for runs
-        runs_query = MultiTurnRun.objects.filter(is_ad_hoc=False).prefetch_related('sessions__trials')
+        # Build base query for runs with optimized prefetch
+        # Use Prefetch to pre-sort trials, avoiding N+1 queries in extract_session_metrics
+        trials_prefetch = Prefetch(
+            'sessions__trials',
+            queryset=MultiTurnTrial.objects.order_by('trial_number')
+        )
+        runs_query = MultiTurnRun.objects.filter(is_ad_hoc=False).prefetch_related(
+            'sessions', trials_prefetch, 'settings'
+        )
 
         # Filter by pipeline type if specified
         if pipeline_type:
@@ -226,19 +234,25 @@ def get_leaderboard(request):
         leaderboard_entries = []
 
         for run in runs_query:
-            # Get pipeline type from first session
-            first_session = run.sessions.first()
-            run_pipeline_type = first_session.pipeline_type if first_session else 'unknown'
+            # Get all prefetched sessions
+            all_sessions = list(run.sessions.all())
+            if not all_sessions:
+                continue
 
-            # Get sessions for this run
-            sessions = run.sessions.all()
+            # Get pipeline type from first session
+            run_pipeline_type = all_sessions[0].pipeline_type if all_sessions else 'unknown'
+
+            # Filter sessions in Python if pipeline_type specified (to use prefetch cache)
             if pipeline_type:
-                sessions = sessions.filter(pipeline_type=pipeline_type)
+                sessions = [s for s in all_sessions if s.pipeline_type == pipeline_type]
+            else:
+                sessions = all_sessions
 
             # Build results list for metric calculation
+            # Use skip_expensive=True for leaderboard (skip dynamics/search metrics)
             results = []
             for session in sessions:
-                enriched = extract_session_metrics(session)
+                enriched = extract_session_metrics(session, skip_expensive=True)
                 if enriched.get('trials', 0) > 0:
                     enriched['pipeline_type'] = session.pipeline_type
                     results.append(enriched)

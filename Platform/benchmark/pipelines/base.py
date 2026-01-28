@@ -15,7 +15,7 @@ from ..utils import (
     print_debug, extract_final_answer, count_questions_in_file,
     TrialGuard, RedisKeys, PipelinePrefix,
     TraceFormatter, SimpleMsg, PROMPTS, clear_trial_cache,
-    extract_session_metrics, has_builtin_thinking
+    extract_session_metrics, has_builtin_thinking, is_openai_reasoning_model
 )
 from ..models import (
     BenchmarkSettings, BenchmarkDataset,
@@ -120,6 +120,74 @@ class BasePipeline:
         except Exception:
             return 0
 
+    def _get_openai_responses_api(self, messages, max_tokens=None):
+        """
+        Call OpenAI Responses API for reasoning models (o1, o3, o4, gpt-5.x).
+        Returns: (full_response, usage) where full_response includes <think> tags with summary.
+        """
+        # Convert messages to input format for Responses API
+        input_messages = []
+        for msg in messages:
+            role = msg.get('role', 'user')
+            content = msg.get('content', '')
+            # Responses API uses 'developer' instead of 'system'
+            if role == 'system':
+                role = 'developer'
+            input_messages.append({"role": role, "content": content})
+
+        kwargs = {
+            "model": self.model,
+            "input": input_messages,
+            "reasoning": {
+                "effort": "medium",
+                "summary": "auto"  # Get reasoning summary
+            }
+        }
+        if max_tokens:
+            kwargs['max_output_tokens'] = max_tokens
+
+        response = self.client.responses.create(**kwargs)
+
+        # Parse output array - contains reasoning and message items
+        reasoning_summary = ""
+        output_text = ""
+
+        for item in response.output:
+            if item.type == "reasoning":
+                # Extract summary text from reasoning item
+                if hasattr(item, 'summary') and item.summary:
+                    for summary_item in item.summary:
+                        if hasattr(summary_item, 'text'):
+                            reasoning_summary += summary_item.text + "\n"
+            elif item.type == "message":
+                # Extract output text from message item
+                if hasattr(item, 'content') and item.content:
+                    for content_item in item.content:
+                        if hasattr(content_item, 'text'):
+                            output_text += content_item.text
+
+        # Format with <think> tags for unified handling
+        if reasoning_summary.strip():
+            full_response = f"<think>\n{reasoning_summary.strip()}\n</think>\n{output_text}"
+        else:
+            full_response = output_text
+
+        # Extract usage
+        usage = None
+        if hasattr(response, 'usage') and response.usage:
+            usage = {
+                "input_tokens": getattr(response.usage, 'input_tokens', 0),
+                "output_tokens": getattr(response.usage, 'output_tokens', 0),
+                "total_tokens": getattr(response.usage, 'total_tokens', 0),
+            }
+            # Include reasoning tokens detail if available
+            if hasattr(response.usage, 'output_tokens_details'):
+                details = response.usage.output_tokens_details
+                if hasattr(details, 'reasoning_tokens'):
+                    usage["reasoning_tokens"] = details.reasoning_tokens
+
+        return full_response, usage
+
     def get_llm_response(self, messages, temperature=None, allow_reasoning=None):
         """
         Sends messages to LLM and parses the response based on current settings.
@@ -137,48 +205,53 @@ class BasePipeline:
         # Determine whether to extract final answer
         should_extract = allow_reasoning if allow_reasoning is not None else getattr(self.llm_settings, 'allow_reasoning', False)
 
-        kwargs = {
-            "model": self.model,
-            "messages": messages,
-            "temperature": temperature,
-            "top_p": top_p,
-        }
-        # extra_body for provider-specific parameters
-        extra_body = {}
-        if top_k:
-            extra_body["top_k"] = top_k
-        # Enable thinking mode for models with built-in thinking (Qwen3, etc.)
-        if has_builtin_thinking(self.model):
-            extra_body["enable_thinking"] = True
-            # Some providers use chat_template_kwargs instead
-            extra_body["chat_template_kwargs"] = {"enable_thinking": True}
-        if extra_body:
-            kwargs['extra_body'] = extra_body
-        if max_tokens:
-            kwargs['max_tokens'] = max_tokens
-
         max_api_retries = 3
         last_exception = None
 
         for attempt in range(max_api_retries):
             try:
-                response = self.client.chat.completions.create(**kwargs)
-                message = response.choices[0].message
-                full_response = message.content or ""
-
-                # Handle reasoning in separate field (some providers like OpenAI o1)
-                reasoning = getattr(message, 'reasoning', None) or getattr(message, 'reasoning_content', None)
-                if reasoning and reasoning.strip():
-                    full_response = f"<think>\n{reasoning.strip()}\n</think>\n{full_response}"
-
-                # Extract token usage from response
-                usage = None
-                if hasattr(response, 'usage') and response.usage:
-                    usage = {
-                        "input_tokens": getattr(response.usage, 'prompt_tokens', 0),
-                        "output_tokens": getattr(response.usage, 'completion_tokens', 0),
-                        "total_tokens": getattr(response.usage, 'total_tokens', 0),
+                # Use Responses API for OpenAI reasoning models
+                if is_openai_reasoning_model(self.model):
+                    full_response, usage = self._get_openai_responses_api(messages, max_tokens)
+                else:
+                    # Standard Chat Completions API
+                    kwargs = {
+                        "model": self.model,
+                        "messages": messages,
+                        "temperature": temperature,
+                        "top_p": top_p,
                     }
+                    # extra_body for provider-specific parameters
+                    extra_body = {}
+                    if top_k:
+                        extra_body["top_k"] = top_k
+                    # Enable thinking mode for models with built-in thinking (Qwen3, etc.)
+                    if has_builtin_thinking(self.model):
+                        extra_body["enable_thinking"] = True
+                        # Some providers use chat_template_kwargs instead
+                        extra_body["chat_template_kwargs"] = {"enable_thinking": True}
+                    if extra_body:
+                        kwargs['extra_body'] = extra_body
+                    if max_tokens:
+                        kwargs['max_tokens'] = max_tokens
+
+                    response = self.client.chat.completions.create(**kwargs)
+                    message = response.choices[0].message
+                    full_response = message.content or ""
+
+                    # Handle reasoning in separate field (some providers)
+                    reasoning = getattr(message, 'reasoning', None) or getattr(message, 'reasoning_content', None)
+                    if reasoning and reasoning.strip():
+                        full_response = f"<think>\n{reasoning.strip()}\n</think>\n{full_response}"
+
+                    # Extract token usage from response
+                    usage = None
+                    if hasattr(response, 'usage') and response.usage:
+                        usage = {
+                            "input_tokens": getattr(response.usage, 'prompt_tokens', 0),
+                            "output_tokens": getattr(response.usage, 'completion_tokens', 0),
+                            "total_tokens": getattr(response.usage, 'total_tokens', 0),
+                        }
 
                 if should_extract:
                     answer = extract_final_answer(full_response)
@@ -202,13 +275,29 @@ class BasePipeline:
 
         Usage is None during streaming and populated in the final yield when available.
         Callers should handle: for response, usage in self.get_llm_response_stream(...)
+
+        Note: OpenAI reasoning models (o1, o3, gpt-5.x) use Responses API which doesn't
+        support true streaming of reasoning summaries. For these models, we yield the
+        complete response at the end.
         """
         if temperature is None:
             temperature = getattr(self.llm_settings, 'temperature', 0.3)
 
+        max_tokens = getattr(self.llm_settings, 'max_tokens', None)
+
+        # OpenAI reasoning models: use Responses API (no true streaming for summaries)
+        if is_openai_reasoning_model(self.model):
+            try:
+                full_response, usage = self._get_openai_responses_api(messages, max_tokens)
+                yield full_response, usage
+            except Exception as e:
+                print_debug(f"OpenAI Responses API failed: {e}")
+                raise e
+            return
+
+        # Standard Chat Completions API with streaming
         top_p = getattr(self.llm_settings, 'top_p', 0.95)
         top_k = getattr(self.llm_settings, 'top_k', None)
-        max_tokens = getattr(self.llm_settings, 'max_tokens', None)
 
         kwargs = {
             "model": self.model,

@@ -728,6 +728,198 @@
             </div>
         </div>
     </div>
+
+    <!-- Data Export/Import Section -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-header" data-bs-toggle="collapse" href="#dataExportImportCollapse" role="button" aria-expanded="true" aria-controls="dataExportImportCollapse">
+            <i class="bi bi-database me-2"></i>
+            Data Export / Import
+        </div>
+        <div class="collapse show" id="dataExportImportCollapse">
+            <div class="card-body">
+                <ul class="nav nav-tabs mb-3" id="exportImportTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="export-tab" data-bs-toggle="tab" data-bs-target="#export-panel" type="button" role="tab" aria-controls="export-panel" aria-selected="true">
+                            <i class="bi bi-cloud-download me-1"></i> Export
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="import-tab" data-bs-toggle="tab" data-bs-target="#import-panel" type="button" role="tab" aria-controls="import-panel" aria-selected="false">
+                            <i class="bi bi-cloud-upload me-1"></i> Import
+                        </button>
+                    </li>
+                </ul>
+
+                <div class="tab-content" id="exportImportTabContent">
+                    <!-- Export Panel -->
+                    <div class="tab-pane fade show active" id="export-panel" role="tabpanel" aria-labelledby="export-tab">
+                        <div class="row">
+                            <div class="col-lg-8">
+                                <!-- User Selection -->
+                                <h6 class="fw-bold mb-3"><i class="bi bi-people me-2"></i>Select Users to Export</h6>
+                                <div class="mb-3">
+                                    <div class="btn-group btn-group-sm" role="group">
+                                        <button type="button" class="btn btn-outline-primary" id="export-select-all">Select All</button>
+                                        <button type="button" class="btn btn-outline-secondary" id="export-deselect-all">Deselect All</button>
+                                    </div>
+                                    <span class="ms-3 text-muted" id="export-selected-count">0 users selected</span>
+                                </div>
+                                <div id="export-user-list-wrapper" class="position-relative">
+                                    <div id="export-user-list-overlay" class="position-absolute top-0 start-0 w-100 h-100 bg-white bg-opacity-75 d-flex align-items-center justify-content-center" style="display: none !important; z-index: 10;">
+                                        <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+                                        <span class="ms-2">Updating...</span>
+                                    </div>
+                                    <div id="export-user-list" class="border rounded p-2" style="max-height: 300px; overflow-y: auto;">
+                                        <div class="text-center py-3">
+                                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
+                                            <span class="ms-2">Loading users...</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-lg-4">
+                                <!-- Dataset Selection -->
+                                <h6 class="fw-bold mb-3"><i class="bi bi-folder me-2"></i>Datasets</h6>
+                                <div id="export-dataset-list" class="border rounded p-2 mb-3" style="max-height: 120px; overflow-y: auto;">
+                                    <div class="text-center py-2">
+                                        <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
+                                        <span class="ms-2">Loading...</span>
+                                    </div>
+                                </div>
+
+                                <!-- Export Options -->
+                                <h6 class="fw-bold mb-3"><i class="bi bi-gear me-2"></i>Options</h6>
+                                <div class="card bg-light border-0">
+                                    <div class="card-body">
+                                        <div class="form-check form-switch mb-3">
+                                            <input class="form-check-input" type="checkbox" id="export-anonymize" checked>
+                                            <label class="form-check-label" for="export-anonymize">
+                                                <strong>Anonymize Data</strong>
+                                                <br><small class="text-muted">Replace PII with placeholders</small>
+                                            </label>
+                                        </div>
+                                        <hr>
+                                        <div id="export-preview" class="mb-3" style="display: none;">
+                                            <h6 class="fw-bold text-muted small">Export Preview</h6>
+                                            <ul class="list-unstyled small mb-0">
+                                                <li><i class="bi bi-person me-1"></i> <span id="preview-participants">-</span> participants</li>
+                                                <li><i class="bi bi-card-checklist me-1"></i> <span id="preview-tasks">-</span> tasks</li>
+                                                <li><i class="bi bi-arrow-repeat me-1"></i> <span id="preview-trials">-</span> trials</li>
+                                                <li><i class="bi bi-globe me-1"></i> <span id="preview-webpages">-</span> webpages</li>
+                                            </ul>
+                                        </div>
+                                        <button type="button" class="btn btn-outline-secondary w-100 mb-2" id="export-preview-btn">
+                                            <i class="bi bi-eye me-1"></i> Preview
+                                        </button>
+                                        <button type="button" class="btn btn-primary w-100" id="export-download-btn" disabled>
+                                            <i class="bi bi-download me-1"></i> Download Export
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Import Panel -->
+                    <div class="tab-pane fade" id="import-panel" role="tabpanel" aria-labelledby="import-tab">
+                        <div class="row">
+                            <div class="col-lg-6">
+                                <h6 class="fw-bold mb-3"><i class="bi bi-file-earmark-arrow-up me-2"></i>Upload Data File</h6>
+                                <div class="card bg-light border-0 mb-3">
+                                    <div class="card-body">
+                                        <div class="mb-3">
+                                            <label for="import-file" class="form-label">Select JSONL file</label>
+                                            <input class="form-control" type="file" id="import-file" accept=".jsonl,.json">
+                                        </div>
+                                        <button type="button" class="btn btn-outline-secondary w-100" id="import-validate-btn" disabled>
+                                            <i class="bi bi-check-circle me-1"></i> Validate & Preview
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div id="import-preview" style="display: none;">
+                                    <div class="alert alert-warning">
+                                        <i class="bi bi-exclamation-triangle me-2"></i>
+                                        <strong>Warning:</strong> Import will <strong>DELETE</strong> all existing data (except admin accounts) and replace with imported data.
+                                    </div>
+
+                                    <div class="row g-2 mb-3">
+                                        <div class="col-6">
+                                            <div class="card border-danger">
+                                                <div class="card-header bg-danger text-white py-1">
+                                                    <small class="fw-bold">Will Delete</small>
+                                                </div>
+                                                <div class="card-body py-2">
+                                                    <ul class="list-unstyled small mb-0">
+                                                        <li><span id="delete-users">-</span> users</li>
+                                                        <li><span id="delete-tasks">-</span> tasks</li>
+                                                        <li><span id="delete-webpages">-</span> webpages</li>
+                                                    </ul>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-6">
+                                            <div class="card border-success">
+                                                <div class="card-header bg-success text-white py-1">
+                                                    <small class="fw-bold">Will Import</small>
+                                                </div>
+                                                <div class="card-body py-2">
+                                                    <ul class="list-unstyled small mb-0">
+                                                        <li><span id="import-participants">-</span> participants</li>
+                                                        <li><span id="import-tasks">-</span> tasks</li>
+                                                        <li><span id="import-webpages">-</span> webpages</li>
+                                                    </ul>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-lg-6">
+                                <div id="import-auth" style="display: none;">
+                                    <h6 class="fw-bold mb-3"><i class="bi bi-shield-lock me-2"></i>Confirm Import</h6>
+                                    <div class="card bg-light border-0">
+                                        <div class="card-body">
+                                            <p class="text-muted small">Enter your admin password to confirm the import operation.</p>
+                                            <div class="mb-3">
+                                                <label for="import-password" class="form-label">Admin Password</label>
+                                                <input type="password" class="form-control" id="import-password" placeholder="Enter password">
+                                            </div>
+                                            <button type="button" class="btn btn-danger w-100" id="import-execute-btn">
+                                                <i class="bi bi-database-fill-up me-1"></i> Execute Import
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div id="import-result" style="display: none;">
+                                    <div class="alert alert-success">
+                                        <h6 class="fw-bold"><i class="bi bi-check-circle me-2"></i>Import Completed</h6>
+                                        <ul class="mb-0 small">
+                                            <li><span id="result-participants">-</span> participants imported</li>
+                                            <li><span id="result-tasks">-</span> tasks imported</li>
+                                            <li><span id="result-trials">-</span> trials imported</li>
+                                            <li><span id="result-webpages">-</span> webpages imported</li>
+                                        </ul>
+                                    </div>
+                                </div>
+
+                                <div id="import-error" class="alert alert-danger" style="display: none;">
+                                    <i class="bi bi-exclamation-octagon me-2"></i>
+                                    <span id="import-error-message"></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="card shadow-sm mb-4">
         <div class="card-header" data-bs-toggle="collapse" href="#userManagementCollapse" role="button" aria-expanded="true" aria-controls="userManagementCollapse">
             <i class="bi bi-people-fill me-2"></i>

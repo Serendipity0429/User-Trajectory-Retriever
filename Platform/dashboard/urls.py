@@ -18,4 +18,11 @@ urlpatterns = [
     path("extension_versions/", views.manage_extension_versions, name="manage_extension_versions"),
     path("extension_versions/revert/", views.revert_latest_extension_version, name="revert_latest_extension_version"),
     path("view_user_info/<int:user_id>/", views.view_user_info, name="view_user_info"),
+    # Data Export/Import
+    path("export/users/", views.export_users_list, name="export_users_list"),
+    path("export/datasets/", views.export_datasets_list, name="export_datasets_list"),
+    path("export/preview/", views.export_preview, name="export_preview"),
+    path("export/download/", views.export_data, name="export_data"),
+    path("import/preview/", views.import_preview, name="import_preview"),
+    path("import/execute/", views.import_data, name="import_data"),
 ]

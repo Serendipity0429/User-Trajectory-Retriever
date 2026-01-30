@@ -17,7 +17,10 @@ import numpy as np
 from task_manager.models import Task, TaskTrial, PreTaskAnnotation, PostTaskAnnotation, Justification, Webpage
 from task_manager.mappings import ANSWER_FORMULATION_MAP, FAMILIARITY_MAP, DIFFICULTY_MAP, EFFORT_MAP, CONFIDENCE_MAP
 from user_system.models import User, Profile
-from core.filters import Q_VALID_USER_REL, Q_VALID_TASK_USER, Q_VALID_TRIAL_USER
+from core.filters import (
+    Q_VALID_USER_REL, Q_VALID_TASK_USER, Q_VALID_TRIAL_USER,
+    Q_TUTORIAL_TASK, Q_TUTORIAL_TASK_REL, Q_TUTORIAL_TRIAL_REL, Q_TUTORIAL_WEBPAGE
+)
 
 
 # =============================================================================
@@ -30,7 +33,8 @@ def calculate_task_success_metrics(task_queryset=None):
 
     Args:
         task_queryset: Optional queryset of tasks to analyze.
-                       If None, uses all valid finished tasks (both completed and cancelled).
+                       If None, uses all valid finished tasks (both completed and cancelled),
+                       excluding tutorial datasets.
 
     Returns:
         dict with success rates, counts, and timing metrics.
@@ -38,7 +42,8 @@ def calculate_task_success_metrics(task_queryset=None):
     """
     if task_queryset is None:
         # Include ALL finished tasks - cancelled ones count as failures
-        task_queryset = Task.valid_objects.filter(active=False)
+        # Exclude tutorial datasets
+        task_queryset = Task.valid_objects.filter(active=False).exclude(Q_TUTORIAL_TASK)
 
     tasks = task_queryset.prefetch_related('tasktrial_set')
 
@@ -113,11 +118,12 @@ def calculate_task_success_metrics(task_queryset=None):
 def _get_per_user_task_stats(num_questions, min_completion_ratio=0.9):
     """
     Calculate per-user task statistics for users who completed >= min_completion_ratio of tasks.
+    Excludes tutorial datasets.
 
     Returns:
         List of dicts with accuracy, avg_trials, successful, finished for each qualifying user.
     """
-    all_tasks = Task.valid_objects.filter(active=False).prefetch_related('tasktrial_set')
+    all_tasks = Task.valid_objects.filter(active=False).exclude(Q_TUTORIAL_TASK).prefetch_related('tasktrial_set')
     user_stats = defaultdict(lambda: {'finished': 0, 'successful': 0, 'total_trials': 0})
 
     for task in all_tasks:
@@ -148,8 +154,8 @@ def _get_per_user_task_stats(num_questions, min_completion_ratio=0.9):
 
 
 def _get_task_based_stats():
-    """Calculate task-based statistics across ALL finished tasks."""
-    all_tasks = Task.valid_objects.filter(active=False).prefetch_related('tasktrial_set')
+    """Calculate task-based statistics across ALL finished tasks, excluding tutorials."""
+    all_tasks = Task.valid_objects.filter(active=False).exclude(Q_TUTORIAL_TASK).prefetch_related('tasktrial_set')
 
     total_finished = 0
     total_successful = 0
@@ -298,10 +304,11 @@ def get_all_profile_distributions():
 # =============================================================================
 
 def get_task_creation_stats(days=30):
-    """Get task creation counts by date for the last N days."""
+    """Get task creation counts by date for the last N days, excluding tutorials."""
     cutoff = timezone.now() - timedelta(days=days)
     creations = (
         Task.valid_objects.filter(start_timestamp__gte=cutoff)
+        .exclude(Q_TUTORIAL_TASK)
         .annotate(date=TruncDate("start_timestamp"))
         .values("date")
         .annotate(count=Count("id"))
@@ -314,17 +321,17 @@ def get_task_creation_stats(days=30):
 
 
 def get_time_distributions():
-    """Get task and trial time distributions."""
+    """Get task and trial time distributions, excluding tutorials."""
     completed_tasks = Task.valid_objects.filter(
         active=False, end_timestamp__isnull=False
-    ).prefetch_related('tasktrial_set')
+    ).exclude(Q_TUTORIAL_TASK).prefetch_related('tasktrial_set')
 
     task_times = [
         (task.end_timestamp - task.start_timestamp).total_seconds()
         for task in completed_tasks
     ]
 
-    all_trials = TaskTrial.objects.filter(Q_VALID_TASK_USER, end_timestamp__isnull=False)
+    all_trials = TaskTrial.objects.filter(Q_VALID_TASK_USER, end_timestamp__isnull=False).exclude(Q_TUTORIAL_TASK_REL)
     trial_times = [
         (trial.end_timestamp - trial.start_timestamp).total_seconds()
         for trial in all_trials
@@ -378,9 +385,12 @@ def get_time_distributions():
 # Annotation Statistics
 # =============================================================================
 
-def get_annotation_distribution(model, field, mapping, q_obj):
-    """Get distribution of an annotation field with label mapping."""
-    counts = model.objects.filter(q_obj).values(field).annotate(count=Count(field))
+def get_annotation_distribution(model, field, mapping, q_obj, exclude_q=None):
+    """Get distribution of an annotation field with label mapping, excluding tutorials."""
+    qs = model.objects.filter(q_obj)
+    if exclude_q is not None:
+        qs = qs.exclude(exclude_q)
+    counts = qs.values(field).annotate(count=Count(field))
     return {
         "labels": [mapping.get(str(c[field]), str(c[field])) for c in counts if c[field] is not None],
         "data": [c["count"] for c in counts if c[field] is not None],
@@ -388,7 +398,7 @@ def get_annotation_distribution(model, field, mapping, q_obj):
 
 
 def get_all_annotation_distributions():
-    """Get all annotation field distributions."""
+    """Get all annotation field distributions, excluding tutorials."""
     familiarity_map = {str(k): v for k, v in FAMILIARITY_MAP["mapping"].items()}
     difficulty_map = {str(k): v for k, v in DIFFICULTY_MAP["mapping"].items()}
     effort_map = {str(k): v for k, v in EFFORT_MAP["mapping"].items()}
@@ -396,28 +406,29 @@ def get_all_annotation_distributions():
 
     return {
         "familiarity_distribution": get_annotation_distribution(
-            PreTaskAnnotation, "familiarity", familiarity_map, Q_VALID_TASK_USER
+            PreTaskAnnotation, "familiarity", familiarity_map, Q_VALID_TASK_USER, Q_TUTORIAL_TASK_REL
         ),
         "pre_task_difficulty_distribution": get_annotation_distribution(
-            PreTaskAnnotation, "difficulty", difficulty_map, Q_VALID_TASK_USER
+            PreTaskAnnotation, "difficulty", difficulty_map, Q_VALID_TASK_USER, Q_TUTORIAL_TASK_REL
         ),
         "post_task_difficulty_distribution": get_annotation_distribution(
-            PostTaskAnnotation, "difficulty_actual", difficulty_map, Q_VALID_TASK_USER
+            PostTaskAnnotation, "difficulty_actual", difficulty_map, Q_VALID_TASK_USER, Q_TUTORIAL_TASK_REL
         ),
         "effort_distribution": get_annotation_distribution(
-            PreTaskAnnotation, "effort", effort_map, Q_VALID_TASK_USER
+            PreTaskAnnotation, "effort", effort_map, Q_VALID_TASK_USER, Q_TUTORIAL_TASK_REL
         ),
         "confidence_distribution": get_annotation_distribution(
-            TaskTrial, "confidence", confidence_map, Q_VALID_TASK_USER
+            TaskTrial, "confidence", confidence_map, Q_VALID_TASK_USER, Q_TUTORIAL_TASK_REL
         ),
     }
 
 
 def get_trial_statistics():
-    """Get trial-related statistics (correctness, aha moments, answer methods)."""
+    """Get trial-related statistics (correctness, aha moments, answer methods), excluding tutorials."""
     # Aha Moment
     aha_counts = (
         PostTaskAnnotation.objects.filter(Q_VALID_TASK_USER)
+        .exclude(Q_TUTORIAL_TASK_REL)
         .values('aha_moment_type')
         .annotate(count=Count('aha_moment_type'))
         .exclude(aha_moment_type__isnull=True)
@@ -428,7 +439,7 @@ def get_trial_statistics():
     }
 
     # Trial Correctness
-    correctness_counts = TaskTrial.objects.filter(Q_VALID_TASK_USER).values('is_correct').annotate(count=Count('is_correct'))
+    correctness_counts = TaskTrial.objects.filter(Q_VALID_TASK_USER).exclude(Q_TUTORIAL_TASK_REL).values('is_correct').annotate(count=Count('is_correct'))
     def correctness_label(val):
         if val is True: return "Correct"
         if val is False: return "Incorrect"
@@ -440,7 +451,7 @@ def get_trial_statistics():
 
     # Answer Formulation Method
     afm_mapping = ANSWER_FORMULATION_MAP["mapping"]
-    afm_data = TaskTrial.objects.filter(Q_VALID_TASK_USER).values_list('answer_formulation_method', flat=True)
+    afm_data = TaskTrial.objects.filter(Q_VALID_TASK_USER).exclude(Q_TUTORIAL_TASK_REL).values_list('answer_formulation_method', flat=True)
     afm_flat = []
     for item in afm_data:
         if isinstance(item, list):
@@ -460,7 +471,7 @@ def get_trial_statistics():
     }
 
     # Evidence Type
-    evidence_counts = Justification.objects.filter(Q_VALID_TRIAL_USER).values('evidence_type').annotate(count=Count('evidence_type'))
+    evidence_counts = Justification.objects.filter(Q_VALID_TRIAL_USER).exclude(Q_TUTORIAL_TRIAL_REL).values('evidence_type').annotate(count=Count('evidence_type'))
     evidence_dist = {
         "labels": [item['evidence_type'] for item in evidence_counts],
         "data": [item['count'] for item in evidence_counts]
@@ -498,10 +509,11 @@ def get_json_field_distribution(model, field, q_obj):
 # =============================================================================
 
 def get_navigation_stats():
-    """Get navigation and behavior statistics."""
+    """Get navigation and behavior statistics, excluding tutorials."""
     # Average Trajectory Length
     trajectory_stats = (
         Webpage.objects.filter(Q_VALID_USER_REL)
+        .exclude(Q_TUTORIAL_WEBPAGE)
         .values('belong_task')
         .annotate(page_count=Count('id'))
         .aggregate(avg_length=Avg('page_count'))
@@ -509,11 +521,11 @@ def get_navigation_stats():
     avg_trajectory = round(trajectory_stats['avg_length'] or 0, 1)
 
     # Annotation Burden
-    avg_pre = PreTaskAnnotation.objects.filter(Q_VALID_TASK_USER).aggregate(avg=Avg('duration'))
-    avg_post = PostTaskAnnotation.objects.filter(Q_VALID_TASK_USER).aggregate(avg=Avg('duration'))
+    avg_pre = PreTaskAnnotation.objects.filter(Q_VALID_TASK_USER).exclude(Q_TUTORIAL_TASK_REL).aggregate(avg=Avg('duration'))
+    avg_post = PostTaskAnnotation.objects.filter(Q_VALID_TASK_USER).exclude(Q_TUTORIAL_TASK_REL).aggregate(avg=Avg('duration'))
 
     # Dwell Time
-    dwell_times = Webpage.objects.filter(Q_VALID_USER_REL).exclude(dwell_time__isnull=True).values_list('dwell_time', flat=True)
+    dwell_times = Webpage.objects.filter(Q_VALID_USER_REL).exclude(Q_TUTORIAL_WEBPAGE).exclude(dwell_time__isnull=True).values_list('dwell_time', flat=True)
     cleaned_dwell = []
     for dt in dwell_times:
         try:
@@ -532,16 +544,21 @@ def get_navigation_stats():
 
 
 def get_top_domains(limit=15):
-    """Get top visited domains."""
+    """Get top visited domains, excluding tutorials."""
     if getattr(settings, 'DATABASE_TYPE', 'sqlite') == 'postgres':
         with connection.cursor() as cursor:
             cursor.execute("""
                 SELECT
-                    substring(url from '.*://([^/]*)') as domain,
+                    substring(w.url from '.*://([^/]*)') as domain,
                     COUNT(*) as count
-                FROM task_manager_webpage
-                INNER JOIN user_system_user ON task_manager_webpage.user_id = user_system_user.id
-                WHERE (user_system_user.is_superuser = false AND user_system_user.is_staff = false)
+                FROM task_manager_webpage w
+                INNER JOIN user_system_user u ON w.user_id = u.id
+                INNER JOIN task_manager_task t ON w.belong_task_id = t.id
+                INNER JOIN task_manager_taskdatasetentry e ON t.content_id = e.id
+                INNER JOIN task_manager_taskdataset d ON e.belong_dataset_id = d.id
+                WHERE u.is_superuser = false
+                  AND u.is_staff = false
+                  AND LOWER(d.name) != 'tutorial'
                 GROUP BY domain
                 ORDER BY count DESC
                 LIMIT %s;
@@ -558,7 +575,7 @@ def get_top_domains(limit=15):
         top = final_counts.most_common(limit)
     else:
         # SQLite fallback
-        urls = Webpage.objects.filter(Q_VALID_USER_REL).values_list('url', flat=True).iterator()
+        urls = Webpage.objects.filter(Q_VALID_USER_REL).exclude(Q_TUTORIAL_WEBPAGE).values_list('url', flat=True).iterator()
         domains = []
         for url in urls:
             try:

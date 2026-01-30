@@ -1,12 +1,17 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+import json
+import os
+import tempfile
+
 from django.shortcuts import render, get_object_or_404
-from django.http import HttpResponseRedirect, JsonResponse
+from django.http import HttpResponseRedirect, JsonResponse, StreamingHttpResponse
 from django.contrib.auth.decorators import login_required, user_passes_test
+from django.contrib.auth import authenticate
 from django.urls import reverse
 from django.contrib import messages
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_POST, require_GET
 from django.core.signing import Signer, BadSignature
 from django.contrib.auth import login as auth_login
 from django.db.models import Q
@@ -21,7 +26,7 @@ from discussion.models import Bulletin, Post, Comment
 
 from user_system.forms import InformedConsentForm
 from task_manager.forms import ExtensionVersionForm
-from core.filters import Q_VALID_TASK_USER, Q_VALID_TRIAL_USER
+from core.filters import Q_VALID_TASK_USER, Q_VALID_TRIAL_USER, Q_VALID_USER
 from .utils import (
     calculate_task_success_metrics,
     get_user_signup_stats,
@@ -404,3 +409,258 @@ def revert_latest_extension_version(request):
     else:
         messages.warning(request, "No extension versions to revert.")
     return HttpResponseRedirect(reverse("dashboard:manage_extension_versions"))
+
+
+# ============================================
+# Data Export/Import Views
+# ============================================
+
+@login_required
+@user_passes_test(is_superuser)
+def export_users_list(request):
+    """Get list of valid users with finished tasks for export selection."""
+    from django.db.models import Count, Q as DQ
+
+    # Get dataset filter from request
+    exclude_datasets_str = request.GET.get('exclude_datasets', '')
+    exclude_dataset_ids = []
+    if exclude_datasets_str:
+        try:
+            exclude_dataset_ids = [int(d.strip()) for d in exclude_datasets_str.split(',') if d.strip()]
+        except ValueError:
+            pass
+
+    # Build task filter - fields are relative to the 'task' relationship
+    task_filter = DQ(task__active=False)  # Only finished tasks
+    if exclude_dataset_ids:
+        task_filter &= ~DQ(task__content__belong_dataset_id__in=exclude_dataset_ids)
+
+    # Get users with finished task counts (excluding specified datasets)
+    users = User.objects.filter(Q_VALID_USER).select_related('profile').annotate(
+        finished_task_count=Count('task', filter=task_filter)
+    ).filter(finished_task_count__gt=0).order_by('id')
+
+    user_list = []
+    for user in users:
+        user_list.append({
+            'id': user.id,
+            'username': user.username,
+            'email': user.email,
+            'name': user.profile.name if hasattr(user, 'profile') else '',
+            'task_count': user.finished_task_count,
+            'date_joined': user.date_joined.isoformat() if user.date_joined else None,
+        })
+    return JsonResponse({'users': user_list})
+
+
+@login_required
+@user_passes_test(is_superuser)
+def export_datasets_list(request):
+    """Get list of datasets for export selection."""
+    from task_manager.models import TaskDataset
+    from django.db.models import Count
+
+    datasets = TaskDataset.objects.annotate(
+        task_count=Count('taskdatasetentry__task', filter=Q(
+            taskdatasetentry__task__user__is_superuser=False,
+            taskdatasetentry__task__user__is_test_account=False,
+            taskdatasetentry__task__active=False
+        ))
+    ).filter(task_count__gt=0).order_by('name')
+
+    dataset_list = []
+    for ds in datasets:
+        # Check if it's a tutorial dataset (by name)
+        is_tutorial = 'tutorial' in ds.name.lower()
+        dataset_list.append({
+            'id': ds.id,
+            'name': ds.name,
+            'task_count': ds.task_count,
+            'is_tutorial': is_tutorial,
+        })
+    return JsonResponse({'datasets': dataset_list})
+
+
+@login_required
+@user_passes_test(is_superuser)
+@require_POST
+def export_preview(request):
+    """Get preview of what would be exported."""
+    from .utils.export import TaskManagerExporter
+
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+
+    user_ids = data.get('user_ids', [])
+    anonymize = data.get('anonymize', True)
+    exclude_dataset_ids = data.get('exclude_datasets', [])
+
+    # Validate types
+    if not isinstance(user_ids, list):
+        return JsonResponse({'error': 'user_ids must be a list'}, status=400)
+    if not isinstance(exclude_dataset_ids, list):
+        return JsonResponse({'error': 'exclude_datasets must be a list'}, status=400)
+
+    exporter = TaskManagerExporter(anonymize=anonymize)
+    preview = exporter.get_export_preview(
+        user_ids=user_ids if user_ids else None,
+        exclude_dataset_ids=exclude_dataset_ids if exclude_dataset_ids else None
+    )
+
+    return JsonResponse({
+        'preview': preview,
+    })
+
+
+@login_required
+@user_passes_test(is_superuser)
+@require_POST
+def export_data(request):
+    """Export data to JSONL file with streaming response."""
+    from .utils.export import TaskManagerExporter
+    from .utils.huggingface import save_huggingface_files
+    import zipfile
+    import shutil
+
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+
+    user_ids = data.get('user_ids', [])
+    anonymize = data.get('anonymize', True)
+    exclude_dataset_ids = data.get('exclude_datasets', [])
+
+    # Create temp directory (not using context manager so we can stream)
+    temp_dir = tempfile.mkdtemp()
+
+    try:
+        exporter = TaskManagerExporter(anonymize=anonymize)
+        stats = exporter.export_to_file(
+            temp_dir,
+            user_ids=user_ids if user_ids else None,
+            exclude_dataset_ids=exclude_dataset_ids if exclude_dataset_ids else None
+        )
+        save_huggingface_files(temp_dir, stats, anonymized=anonymize)
+
+        # Create zip file
+        zip_path = os.path.join(temp_dir, 'export.zip')
+        with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zf:
+            for filename in ['data.jsonl', 'dataset_info.json', 'README.md']:
+                filepath = os.path.join(temp_dir, filename)
+                if os.path.exists(filepath):
+                    zf.write(filepath, filename)
+
+        # Get file size for Content-Length header
+        file_size = os.path.getsize(zip_path)
+
+        # Stream the zip file in chunks
+        def file_iterator(file_path, chunk_size=8192):
+            try:
+                with open(file_path, 'rb') as f:
+                    while True:
+                        chunk = f.read(chunk_size)
+                        if not chunk:
+                            break
+                        yield chunk
+            finally:
+                # Clean up temp directory after streaming completes
+                try:
+                    shutil.rmtree(temp_dir)
+                except Exception:
+                    pass
+
+        mode_suffix = 'anonymized' if anonymize else 'full'
+        filename = f'task_data_export_{mode_suffix}.zip'
+
+        response = StreamingHttpResponse(
+            file_iterator(zip_path),
+            content_type='application/zip'
+        )
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        response['Content-Length'] = file_size
+        return response
+
+    except Exception as e:
+        # Clean up on error
+        try:
+            shutil.rmtree(temp_dir)
+        except Exception:
+            pass
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required
+@user_passes_test(is_superuser)
+@require_POST
+def import_preview(request):
+    """Validate and preview import from uploaded file."""
+    from .utils.importer import TaskManagerImporter
+
+    if 'file' not in request.FILES:
+        return JsonResponse({'error': 'No file uploaded'}, status=400)
+
+    uploaded_file = request.FILES['file']
+
+    # Save to temp file
+    with tempfile.NamedTemporaryFile(mode='wb', suffix='.jsonl', delete=False) as temp_file:
+        for chunk in uploaded_file.chunks():
+            temp_file.write(chunk)
+        temp_path = temp_file.name
+
+    try:
+        importer = TaskManagerImporter()
+        preview = importer.validate_and_preview(temp_path)
+        # Store temp path in session for actual import
+        request.session['import_temp_path'] = temp_path
+        return JsonResponse(preview)
+    except Exception as e:
+        os.unlink(temp_path)
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required
+@user_passes_test(is_superuser)
+@require_POST
+def import_data(request):
+    """Import data from previously uploaded file."""
+    from .utils.importer import TaskManagerImporter, ImportValidationError
+
+    # Get temp path from session
+    temp_path = request.session.get('import_temp_path')
+    if not temp_path or not os.path.exists(temp_path):
+        return JsonResponse({'error': 'No file to import. Please upload again.'}, status=400)
+
+    # Verify admin password
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid request'}, status=400)
+
+    password = data.get('password')
+    if not password:
+        return JsonResponse({'error': 'Password required'}, status=400)
+
+    # Authenticate
+    user = authenticate(username=request.user.username, password=password)
+    if not user or not user.is_superuser:
+        return JsonResponse({'error': 'Invalid password'}, status=401)
+
+    try:
+        importer = TaskManagerImporter()
+        stats = importer.import_from_file(temp_path)
+
+        # Clean up
+        os.unlink(temp_path)
+        del request.session['import_temp_path']
+
+        return JsonResponse({
+            'success': True,
+            'stats': stats,
+        })
+    except ImportValidationError as e:
+        return JsonResponse({'error': str(e)}, status=400)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)

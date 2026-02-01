@@ -958,11 +958,29 @@ def _get_llm_settings_from_request(request, data_source=None):
 
 @handle_api_error
 def _run_pipeline_generic(request, pipeline_class, redis_prefix_template, **kwargs):
-    base_url, api_key, model, max_retries = _get_llm_settings_from_request(request)
     pipeline_id = request.POST.get("pipeline_id")
     dataset_id = request.POST.get("dataset_id")
     group_id = request.POST.get("group_id")
     rerun_errors = request.POST.get("rerun_errors", "1") == "1"
+
+    # When resuming an existing run (group_id provided), use the run's saved settings
+    if group_id:
+        try:
+            existing_run = MultiTurnRun.objects.select_related("settings").get(pk=group_id)
+            if existing_run.settings:
+                saved = existing_run.settings
+                base_url = saved.llm_base_url
+                api_key = saved.llm_api_key
+                model = saved.llm_model
+                max_retries = saved.max_retries
+            else:
+                # Fallback to request settings if run has no saved settings
+                base_url, api_key, model, max_retries = _get_llm_settings_from_request(request)
+        except MultiTurnRun.DoesNotExist:
+            return JsonResponse({"error": f"Run with ID {group_id} not found."}, status=404)
+    else:
+        # New run - use settings from request
+        base_url, api_key, model, max_retries = _get_llm_settings_from_request(request)
 
     if not api_key:
         return JsonResponse({"error": "An API Key is required to run the benchmark."}, status=400)
@@ -1066,11 +1084,29 @@ def sync_iterator_from_async(async_gen):
 
 @handle_api_error
 def _run_pipeline_generic_async_wrapper(request, pipeline_class, redis_prefix_template, **kwargs):
-    base_url, api_key, model, max_retries = _get_llm_settings_from_request(request)
     pipeline_id = request.POST.get("pipeline_id")
     dataset_id = request.POST.get("dataset_id")
     group_id = request.POST.get("group_id")
     rerun_errors = request.POST.get("rerun_errors", "1") == "1"
+
+    # When resuming an existing run (group_id provided), use the run's saved settings
+    if group_id:
+        try:
+            existing_run = MultiTurnRun.objects.select_related("settings").get(pk=group_id)
+            if existing_run.settings:
+                saved = existing_run.settings
+                base_url = saved.llm_base_url
+                api_key = saved.llm_api_key
+                model = saved.llm_model
+                max_retries = saved.max_retries
+            else:
+                # Fallback to request settings if run has no saved settings
+                base_url, api_key, model, max_retries = _get_llm_settings_from_request(request)
+        except MultiTurnRun.DoesNotExist:
+            return JsonResponse({"error": f"Run with ID {group_id} not found."}, status=404)
+    else:
+        # New run - use settings from request
+        base_url, api_key, model, max_retries = _get_llm_settings_from_request(request)
 
     if not api_key:
         return JsonResponse({"error": "An API Key is required to run the benchmark."}, status=400)

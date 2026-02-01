@@ -1168,7 +1168,7 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
         in a dataset, supporting run resumption and stop signals.
         """
         def create_run_obj():
-            name = f"{str(self)}- {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+            name = f"{str(self)} - {self.llm_settings.llm_model} - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
             new_settings = self.llm_settings.clone()
             new_settings.save()
             return MultiTurnRun.objects.create(name=name, settings=new_settings)

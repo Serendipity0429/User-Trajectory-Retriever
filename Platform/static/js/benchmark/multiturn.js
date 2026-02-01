@@ -33,8 +33,8 @@ window.BenchmarkUtils.MultiTurnPage = (function() {
 
         // Timeout settings
         MAX_POLL_TIME: 10 * 60 * 1000,       // 10 minutes max polling time (for complex agents)
-        INACTIVITY_TIMEOUT: 3 * 60 * 1000,   // Stop after 3 minutes of NO changes
-        STALL_THRESHOLD: 30 * 1000,          // Show warning after 30s of no changes
+        INACTIVITY_TIMEOUT: 60 * 1000,       // Stop after 1 minute of NO changes
+        STALL_THRESHOLD: 15 * 1000,          // Show warning after 15s of no changes
 
         // Backoff settings
         BACKOFF_MULTIPLIER: 1.5,  // Increase interval by 50% on no change

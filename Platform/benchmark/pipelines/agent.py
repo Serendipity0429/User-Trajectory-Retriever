@@ -147,6 +147,10 @@ class BrowserAgentPipeline(BaseAgentPipeline):
     def _get_pipeline_type(self):
         return 'browser_agent'
 
+    def _should_start_fresh_on_resume(self):
+        """Browser agent should start fresh - context accumulates from web browsing."""
+        return True
+
     def create_session(self, settings, question_text, ground_truths, group):
         return MultiTurnSession.objects.create(
             question=question_text,

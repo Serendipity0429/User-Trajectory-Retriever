@@ -61,6 +61,12 @@ class BasePipeline:
         self.redis_prefix = REDIS_PREFIX_ACTIVE
         self.llm_settings = BenchmarkSettings.get_effective_settings()
 
+        # Override llm_settings with actual runtime values from constructor
+        # This ensures the cloned settings saved with the run reflect actual values used
+        self.llm_settings.llm_base_url = base_url
+        self.llm_settings.llm_model = model
+        self.llm_settings.llm_api_key = api_key
+
         # Initialize judge client (uses same base_url/api_key but potentially different model)
         self.judge_client = self.client  # Same client, different model
         self.judge_model = self.llm_settings.llm_judge_model or model  # Fallback to generation model
@@ -434,6 +440,8 @@ class BaseMultiTurnPipeline(BasePipeline):
         self.redis_prefix = REDIS_PREFIX_MULTI_TURN
         self.group_id = group_id
         self.rerun_errors = rerun_errors
+        # Sync max_retries to llm_settings so cloned settings have correct value
+        self.llm_settings.max_retries = max_retries
 
     def create_session(self, settings, question_text, ground_truths, group):
         raise NotImplementedError("Subclasses must implement create_session")
@@ -695,7 +703,9 @@ class BaseMultiTurnPipeline(BasePipeline):
             total_trials = session.trials.filter(status='completed').count()
 
             if session_had_error:
-                # Error during trial - don't mark completed, yield error summary
+                # Error during trial - mark status as error, yield error summary
+                session.status = 'error'
+                session.save()
                 yield {
                     'question': question_text, 'is_correct_llm': False, 'is_correct_rule': False,
                     'trials': total_trials, 'session_id': session.id, 'final_answer': None,
@@ -733,7 +743,32 @@ class BaseMultiTurnPipeline(BasePipeline):
 
                 if self.rerun_errors:
                     # Collect incomplete sessions (crashed mid-execution, never completed)
-                    incomplete_sessions = list(group.sessions.filter(is_completed=False).prefetch_related('trials'))
+                    # but skip sessions that failed due to context length exceeded (unrecoverable)
+                    all_incomplete = group.sessions.filter(is_completed=False).prefetch_related('trials')
+                    incomplete_sessions = []
+                    context_exceeded_count = 0
+
+                    for session in all_incomplete:
+                        # Check if any error trial has context length exceeded
+                        has_context_error = False
+                        for trial in session.trials.filter(status='error'):
+                            error_msg = str(trial.log.get('error', '')) if trial.log else ''
+                            if 'context length' in error_msg.lower() or 'maximum context' in error_msg.lower():
+                                has_context_error = True
+                                break
+
+                        if has_context_error:
+                            # Mark as completed so it's skipped permanently
+                            session.is_completed = True
+                            session.status = 'error'
+                            session.save()
+                            context_exceeded_count += 1
+                            print_debug(f"Skipping session #{session.id} - context length exceeded (unrecoverable)")
+                        else:
+                            incomplete_sessions.append(session)
+
+                    if context_exceeded_count > 0:
+                        print_debug(f"Skipped {context_exceeded_count} sessions with context length errors")
 
                     # Also reset sessions that completed without success
                     for session in group.sessions.filter(is_completed=True).prefetch_related('trials'):
@@ -1006,11 +1041,19 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
         try:
             if existing_session:
                 session = existing_session
-                # Clean up stalled/incomplete trials (error, processing, pending)
+                # Clean up trials based on pipeline type
+                start_fresh = self._should_start_fresh_on_resume()
                 def cleanup():
-                    session.trials.exclude(status='completed').delete()
-                    session.refresh_from_db()
-                    return session.trials.filter(status='completed').count()
+                    if start_fresh:
+                        # Clear all trials and start from trial 1 (e.g., browser_agent)
+                        session.trials.all().delete()
+                        session.refresh_from_db()
+                        return 0
+                    else:
+                        # Keep completed trials, continue from where it left off
+                        session.trials.exclude(status='completed').delete()
+                        session.refresh_from_db()
+                        return session.trials.filter(status='completed').count()
                 completed_count = await sync_to_async(cleanup)()
                 trial_number = completed_count + 1
             else:
@@ -1139,12 +1182,32 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
 
                 def collect_sessions_to_process():
                     if self.rerun_errors:
-                        # Collect only pending sessions (crashed mid-execution, never completed)
-                        # Skip sessions with status='error' - they failed due to fundamental issues
-                        sessions_to_process = list(
-                            group.sessions.filter(is_completed=False, status='pending')
-                            .prefetch_related('trials')
-                        )
+                        # Collect incomplete sessions, but skip those with context length errors (unrecoverable)
+                        all_incomplete = group.sessions.filter(is_completed=False).prefetch_related('trials')
+                        sessions_to_process = []
+                        context_exceeded_count = 0
+
+                        for session in all_incomplete:
+                            # Check if any error trial has context length exceeded
+                            has_context_error = False
+                            for trial in session.trials.filter(status='error'):
+                                error_msg = str(trial.log.get('error', '')) if trial.log else ''
+                                if 'context length' in error_msg.lower() or 'maximum context' in error_msg.lower():
+                                    has_context_error = True
+                                    break
+
+                            if has_context_error:
+                                # Mark as completed so it's skipped permanently
+                                session.is_completed = True
+                                session.status = 'error'
+                                session.save()
+                                context_exceeded_count += 1
+                                print_debug(f"Skipping session #{session.id} - context length exceeded (unrecoverable)")
+                            else:
+                                sessions_to_process.append(session)
+
+                        if context_exceeded_count > 0:
+                            print_debug(f"Skipped {context_exceeded_count} sessions with context length errors")
 
                         # Also reset sessions that completed without success
                         for session in group.sessions.filter(is_completed=True, status='completed').prefetch_related('trials'):
@@ -1157,10 +1220,9 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
                                 sessions_to_process.append(session)
                                 print_debug(f"Reset incorrectly completed session #{session.id} ({len(completed_trials)} trials, no success)")
 
-                        # Skip completed and errored sessions
+                        # Skip only truly completed sessions
                         completed_qs = set(
-                            s.question for s in group.sessions.filter(is_completed=True) |
-                            group.sessions.filter(status='error')
+                            s.question for s in group.sessions.filter(is_completed=True)
                         )
                         return sessions_to_process, completed_qs
                     else:
@@ -1341,6 +1403,15 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
         When True, short-term memory is cleared and agent must use long-term memory.
         Default is False (naive behavior - inherit full context).
         Subclasses with long-term memory should override to return True.
+        """
+        return False
+
+    def _should_start_fresh_on_resume(self):
+        """Whether to clear all trials and start from trial 1 when resuming a session.
+
+        When True, all trials are deleted and session starts fresh (for pipelines where
+        context accumulates in ways that can't be recovered, like browser_agent).
+        Default is False (keep completed trials, continue from where it left off).
         """
         return False
 

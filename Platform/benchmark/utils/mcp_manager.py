@@ -70,7 +70,8 @@ class ChromeDevToolsMCPManager:
             current_dir = os.path.dirname(os.path.abspath(__file__))
             # Go up one level from 'utils' to 'benchmark', then into 'mcp'
             mcp_root = os.path.join(current_dir, '..', 'mcp', 'chrome-devtools-mcp')
-            mcp_script = os.path.join(mcp_root, 'build', 'src', 'index.js')
+            # Use installed npm package
+            mcp_script = os.path.join(mcp_root, 'node_modules', 'chrome-devtools-mcp', 'build', 'src', 'index.js')
 
             # Build MCP args with anti-bot detection measures
             # See: https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/430

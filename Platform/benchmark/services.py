@@ -14,6 +14,7 @@ class TrialService:
         """
         trace_key = RedisKeys.trial_trace(trial_id)
         status_key = RedisKeys.trial_status(trial_id)
+        db_trial = None  # Track the DB trial for search_results extraction
 
         try:
             # 1. Try Fetching Cached Status from Redis (Fastest)
@@ -51,20 +52,20 @@ class TrialService:
             else:
                 # 2. Fallback: Fetch Status/Results from DB (Slower, but necessary if not in Redis)
                 try:
-                    trial = MultiTurnTrial.objects.get(pk=trial_id)
+                    db_trial = MultiTurnTrial.objects.get(pk=trial_id)
                     trial_data = {
-                        "id": trial.id,
-                        "status": trial.status,
-                        "answer": trial.answer,
-                        "feedback": trial.feedback,
-                        "is_correct_llm": trial.is_correct_llm,
-                        "is_correct_rule": trial.is_correct_rule,
-                        "full_response": trial.full_response if trial.status != 'processing' else None
+                        "id": db_trial.id,
+                        "status": db_trial.status,
+                        "answer": db_trial.answer,
+                        "feedback": db_trial.feedback,
+                        "is_correct_llm": db_trial.is_correct_llm,
+                        "is_correct_rule": db_trial.is_correct_rule,
+                        "full_response": db_trial.full_response if db_trial.status != 'processing' else None
                     }
                     # Include error message if trial has error status
-                    if trial.status == 'error' and trial.log:
-                        trial_data["error"] = trial.log.get('error', 'Unknown error')
-                        trial_data["error_type"] = trial.log.get('error_type', 'Unknown')
+                    if db_trial.status == 'error' and db_trial.log:
+                        trial_data["error"] = db_trial.log.get('error', 'Unknown error')
+                        trial_data["error_type"] = db_trial.log.get('error_type', 'Unknown')
                 except MultiTurnTrial.DoesNotExist:
                     trial_data = {"status": "error", "error": "Trial not found"}
 
@@ -89,6 +90,13 @@ class TrialService:
                     response_data["trace"] = full_trace[cursor:]
                 else:
                     response_data["trace"] = full_trace
+
+            # 4. Include search_results from trial log for RAG pipelines
+            # This provides the full content data that's more reliable than parsing from source tags
+            if db_trial and db_trial.log:
+                search_results = db_trial.log.get('search_results')
+                if search_results:
+                    response_data["search_results"] = search_results
 
             return response_data
 

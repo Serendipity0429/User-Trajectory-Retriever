@@ -94,7 +94,8 @@ window.BenchmarkUI.SearchResults = {
                     const btnText = itemElement.querySelector('.btn-text');
                     const icon = itemElement.querySelector('.icon-chevron');
 
-                    if (contentContainer) contentContainer.style.display = 'block';
+                    // Remove d-none class (Bootstrap's !important overrides inline styles)
+                    if (contentContainer) contentContainer.classList.remove('d-none');
                     if (toggleBtn) toggleBtn.setAttribute('data-bs-target', `#${collapseId}`);
                     if (collapseDiv) collapseDiv.id = collapseId;
                     if (contentBody) contentBody.textContent = fullContent;

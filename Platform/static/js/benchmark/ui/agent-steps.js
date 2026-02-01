@@ -44,7 +44,7 @@ window.BenchmarkUI.AgentSteps = {
         if (type === 'final_answer') return this._renderFinalAnswer(content);
         if (type === 'observation') return this._renderObservation(content, name, finalAnswerText);
         if (role === 'system') return this._renderSystemPrompt(content);
-        if (role === 'user') return this._renderUserInput(content);
+        if (role === 'user') return this._renderUserInput(content, trialId);
 
         if (typeof content === 'string') {
             content = BenchmarkHelpers.escapeAndFormatContent(content);
@@ -198,15 +198,23 @@ window.BenchmarkUI.AgentSteps = {
         return BenchmarkUI.MessageBubble.create('system', fallbackHtml, 'bg-light border-secondary border-opacity-10 shadow-none');
     },
 
-    _renderUserInput: function(content) {
+    _renderUserInput: function(content, trialId) {
         if (typeof content === 'string' && content.includes('<source')) {
-            const extractedResults = this._parseSourceTagsFromContent(content);
+            // Prefer stored search_results (has full content) over parsing from source tags
+            let searchResults = null;
+            if (trialId && window._benchmarkTrialSearchResults && window._benchmarkTrialSearchResults[trialId]) {
+                searchResults = window._benchmarkTrialSearchResults[trialId];
+            }
+            // Fallback to parsing from source tags if no stored results
+            if (!searchResults) {
+                searchResults = this._parseSourceTagsFromContent(content);
+            }
 
-            if (extractedResults) {
+            if (searchResults) {
                 const injection = BenchmarkUtils.renderTemplate('tpl-user-search-injection', {
-                    '.docs-count-text': { text: `${extractedResults.length} search results` },
+                    '.docs-count-text': { text: `${searchResults.length} search results` },
                     '.view-search-results-btn': {
-                        attrs: { onclick: BenchmarkHelpers.storeSearchData(extractedResults) }
+                        attrs: { onclick: BenchmarkHelpers.storeSearchData(searchResults) }
                     }
                 });
 

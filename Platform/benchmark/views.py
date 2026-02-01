@@ -1102,10 +1102,10 @@ def _run_pipeline_generic_async_wrapper(request, pipeline_class, redis_prefix_te
 @admin_required
 def get_session(request, session_id):
     try:
-        session = MultiTurnSession.objects.select_related("run").get(pk=session_id)
+        session = MultiTurnSession.objects.select_related("run", "run__settings").get(pk=session_id)
     except MultiTurnSession.DoesNotExist:
         return JsonResponse({"error": "Session not found"}, status=404)
-    
+
     pipeline_type = session.pipeline_type
     settings = get_session_settings(session)
     snapshot = settings.to_snapshot_dict()
@@ -1152,7 +1152,7 @@ def get_session(request, session_id):
             "id": session.id, "question": session.question, "ground_truths": session.ground_truths,
             "is_completed": session.is_completed, "created_at": session.created_at,
             "max_retries": max_retries, "group_id": session.run_id,
-            "pipeline_type": pipeline_type, "settings": snapshot,
+            "pipeline_type": pipeline_type, "settings_snapshot": snapshot,
         },
         "trials": trials,
     })

@@ -151,6 +151,13 @@ window.BenchmarkUtils.BenchmarkRenderer = {
 
         // For completed or error trials, use cached trace if available, otherwise fetch
         if (trial.status === 'completed' || trial.status === 'error') {
+            // Store search_results from trial data (available from get_session for RAG pipelines)
+            // This ensures popup has full content regardless of trace caching
+            if (trial.search_results) {
+                window._benchmarkTrialSearchResults = window._benchmarkTrialSearchResults || {};
+                window._benchmarkTrialSearchResults[trial.id] = trial.search_results;
+            }
+
             // Check cache first
             const cachedTrace = window.BenchmarkUtils?.MultiTurnPage?.getCachedTrace?.(trial.id);
 
@@ -187,6 +194,11 @@ window.BenchmarkUtils.BenchmarkRenderer = {
                         // Cache the fetched trace for future use
                         if (fetchedTrace.length > 0 && window.BenchmarkUtils?.MultiTurnPage?.setCachedTrace) {
                             window.BenchmarkUtils.MultiTurnPage.setCachedTrace(trial.id, fetchedTrace);
+                        }
+                        // Store search_results for use in popup (RAG pipelines)
+                        if (data.search_results) {
+                            window._benchmarkTrialSearchResults = window._benchmarkTrialSearchResults || {};
+                            window._benchmarkTrialSearchResults[trial.id] = data.search_results;
                         }
                         renderTraceSteps(fetchedTrace);
                     })

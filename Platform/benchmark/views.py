@@ -250,12 +250,12 @@ def get_leaderboard(request):
 
             # Build results list for metric calculation
             # Use skip_expensive=True for leaderboard (skip dynamics/search metrics)
+            # Include 0-trial (pending) sessions so they count as errors
             results = []
             for session in sessions:
                 enriched = extract_session_metrics(session, skip_expensive=True)
-                if enriched.get('trials', 0) > 0:
-                    enriched['pipeline_type'] = session.pipeline_type
-                    results.append(enriched)
+                enriched['pipeline_type'] = session.pipeline_type
+                results.append(enriched)
 
             if not results:
                 continue
@@ -1208,10 +1208,6 @@ def _get_run_results(group_id, pipeline_types):
     for session in sessions:
         # Use centralized metric extraction from metrics.py
         enriched = extract_session_metrics(session)
-
-        # Skip sessions with no trials
-        if enriched.get('trials', 0) == 0:
-            continue
 
         # Add fields not in enriched dict (settings-level, not session-level)
         enriched['max_retries'] = max_retries

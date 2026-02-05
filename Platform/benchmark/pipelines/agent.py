@@ -68,9 +68,11 @@ class VanillaAgentPipeline(BaseAgentPipeline):
     # Hooks for BaseAgentPipeline template
     async def _init_agent(self):
         # Pass run_id for memory isolation (set by base pipeline before agent creation)
+        # Pass llm_settings to ensure prompt uses same model name as toolkit (for think tool consistency)
         agent, long_term_memory = await sync_to_async(VanillaAgentFactory.create_agent)(
             self.agent_model,
-            run_id=self._current_run_id
+            run_id=self._current_run_id,
+            llm_settings=self.temp_settings
         )
         self.long_term_memory = long_term_memory
         return agent
@@ -219,11 +221,13 @@ class BrowserAgentPipeline(BaseAgentPipeline):
             self.mcp_client = await self.mcp_manager.connect(self.agent_toolkit)
 
         # Pass run_id for memory isolation (set by base pipeline before agent creation)
+        # Pass llm_settings to ensure prompt uses same model name as toolkit (for think tool consistency)
         agent, long_term_memory = await BrowserAgentFactory.create_agent(
             self.agent_model,
             self.agent_toolkit,
             self.mcp_client,
-            run_id=self._current_run_id
+            run_id=self._current_run_id,
+            llm_settings=self.temp_settings
         )
         self.long_term_memory = long_term_memory
         return agent

@@ -114,7 +114,8 @@ class AsyncTrialGuard:
                 pass
 
             status_payload = _update_trial_on_error(self.trial, exc_type, exc_val, partial_trace)
-            await self.trial.asave()  # Use Django's native async save
+            # Use sync save wrapped in sync_to_async for reliability with SQLite
+            await sync_to_async(self.trial.save)()
 
             try:
                 from task_manager.utils import redis_client

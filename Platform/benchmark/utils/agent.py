@@ -449,7 +449,7 @@ def think(thought: str):
 
 class VanillaAgentFactory:
     @staticmethod
-    def create_agent(model, verbose: bool = False, run_id=None):
+    def create_agent(model, verbose: bool = False, run_id=None, llm_settings: BenchmarkSettings = None):
         """
         Create a VanillaAgent with optional long-term memory.
 
@@ -457,6 +457,7 @@ class VanillaAgentFactory:
             model: The LLM model to use
             verbose: Enable verbose logging
             run_id: Optional run ID for memory isolation
+            llm_settings: Settings used to create the model (for consistent prompt/toolkit generation)
 
         Returns:
             tuple: (agent, long_term_memory) where long_term_memory may be None
@@ -464,8 +465,10 @@ class VanillaAgentFactory:
         # Wrap model for token usage tracking
         wrapped_model = UsageTrackingModelWrapper(model)
 
-        settings = BenchmarkSettings.get_effective_settings()
-        model_has_thinking = has_builtin_thinking(settings.llm_model)
+        # Use provided settings for model name, fallback to effective settings for other values
+        effective_settings = BenchmarkSettings.get_effective_settings()
+        model_name = llm_settings.llm_model if llm_settings else effective_settings.llm_model
+        model_has_thinking = has_builtin_thinking(model_name)
 
         # Create Toolkit - skip think tool for thinking models
         toolkit = Toolkit()
@@ -475,22 +478,22 @@ class VanillaAgentFactory:
         toolkit.register_tool_function(visit_page)
         toolkit.register_tool_function(answer_question)
 
-        print_debug(f"VanillaAgent: Creating agent with memory_type={settings.memory_type}")
+        print_debug(f"VanillaAgent: Creating agent with memory_type={effective_settings.memory_type}, model={model_name}")
         short_term_memory, long_term_memory = create_memory(
-            settings.memory_type,
+            effective_settings.memory_type,
             agent_name="VanillaAgent",
             user_id="vanilla_agent_user",
             model=wrapped_model,
-            llm_settings=settings,
+            llm_settings=effective_settings,
             run_id=run_id
         )
         print_debug(f"VanillaAgent: long_term_memory is {'set' if long_term_memory else 'None'}")
 
-        # Build prompt dynamically based on model capability
-        sys_prompt = get_agent_prompt("vanilla_agent_system_prompt", settings.llm_model)
+        # Build prompt dynamically based on model capability - use same model name as toolkit
+        sys_prompt = get_agent_prompt("vanilla_agent_system_prompt", model_name)
 
-        # Select formatter based on model name
-        formatter = get_formatter(settings.llm_model)
+        # Select formatter based on model name - use same model name as toolkit
+        formatter = get_formatter(model_name)
         print_debug(f"VanillaAgent: Using {type(formatter).__name__}")
 
         # Build ReActAgent with proper memory parameters per AgentScope docs
@@ -501,7 +504,7 @@ class VanillaAgentFactory:
             "toolkit": toolkit,
             "memory": short_term_memory,
             "formatter": formatter,
-            "max_iters": settings.agent_max_iters,
+            "max_iters": effective_settings.agent_max_iters,
         }
 
         # Only add long-term memory if it was successfully created
@@ -529,7 +532,7 @@ class VanillaAgentFactory:
 
 class BrowserAgentFactory:
     @staticmethod
-    async def create_agent(model, toolkit: Toolkit, mcp_client: StdIOStatefulClient, verbose: bool = False, run_id=None):
+    async def create_agent(model, toolkit: Toolkit, mcp_client: StdIOStatefulClient, verbose: bool = False, run_id=None, llm_settings: BenchmarkSettings = None):
         """
         Create a BrowserAgent with optional long-term memory.
 
@@ -539,6 +542,7 @@ class BrowserAgentFactory:
             mcp_client: MCP client for browser automation
             verbose: Enable verbose logging
             run_id: Optional run ID for memory isolation
+            llm_settings: Settings used to create the model (for consistent prompt generation)
 
         Returns:
             tuple: (agent, long_term_memory) where long_term_memory may be None
@@ -546,24 +550,27 @@ class BrowserAgentFactory:
         # Wrap model for token usage tracking
         wrapped_model = UsageTrackingModelWrapper(model)
 
-        settings = await sync_to_async(BenchmarkSettings.get_effective_settings)()
+        # Use provided settings for model name consistency, fallback to effective settings for other values
+        effective_settings = await sync_to_async(BenchmarkSettings.get_effective_settings)()
+        # Use the model name from llm_settings (same source as toolkit creation) for prompt generation
+        model_name = llm_settings.llm_model if llm_settings else effective_settings.llm_model
 
-        print_debug(f"BrowserAgent: Creating agent with memory_type={settings.memory_type}")
+        print_debug(f"BrowserAgent: Creating agent with memory_type={effective_settings.memory_type}, model={model_name}")
         short_term_memory, long_term_memory = create_memory(
-            settings.memory_type,
+            effective_settings.memory_type,
             agent_name="BrowserAgent",
             user_id="browser_agent_user",
             model=wrapped_model,
-            llm_settings=settings,
+            llm_settings=effective_settings,
             run_id=run_id
         )
         print_debug(f"BrowserAgent: long_term_memory is {'set' if long_term_memory else 'None'}")
 
-        # Build prompt dynamically based on model capability
-        sys_prompt = get_agent_prompt("browser_agent_system_prompt", settings.llm_model)
+        # Build prompt dynamically based on model capability - use same model name as toolkit
+        sys_prompt = get_agent_prompt("browser_agent_system_prompt", model_name)
 
-        # Select formatter based on model name
-        formatter = get_formatter(settings.llm_model)
+        # Select formatter based on model name - use same model name as toolkit
+        formatter = get_formatter(model_name)
         print_debug(f"BrowserAgent: Using {type(formatter).__name__}")
 
         # Build ReActAgent with proper memory parameters per AgentScope docs
@@ -574,7 +581,7 @@ class BrowserAgentFactory:
             "toolkit": toolkit,
             "memory": short_term_memory,
             "formatter": formatter,
-            "max_iters": settings.agent_max_iters,
+            "max_iters": effective_settings.agent_max_iters,
         }
 
         # Only add long-term memory if it was successfully created

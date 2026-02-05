@@ -585,7 +585,9 @@ class BaseMultiTurnPipeline(BasePipeline):
         if extra_log:
             trial.log.update(extra_log)
 
-        await trial.asave()
+        # Use sync save wrapped in sync_to_async for reliability
+        # Django's native asave() can have issues with SQLite
+        await sync_to_async(trial.save)()
 
     async def _cache_trial_to_redis_async(self, trial, trace_data):
         """
@@ -1066,7 +1068,7 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
             except Exception as e:
                 print_debug(f"Error in session start (session {session.id}): {e}")
                 session.status = 'error'
-                await session.asave()
+                await sync_to_async(session.save)()
                 yield {'error': f"Session start failed: {e}", 'question': question_text, 'session_id': session.id, 'session_error': True}
                 return
 
@@ -1127,7 +1129,7 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
                 if session_had_error:
                     # Error during trial - mark session as error status
                     session.status = 'error'
-                    await session.asave()
+                    await sync_to_async(session.save)()
                     yield {
                         'question': question_text, 'is_correct_llm': False, 'is_correct_rule': False,
                         'trials': total_trials, 'session_id': session.id, 'final_answer': None,
@@ -1135,15 +1137,33 @@ class BaseAgentPipeline(BaseMultiTurnPipeline):
                         'group_name': group.name, 'group_id': group.id, 'session_error': True
                     }
                 elif pipeline_stopped:
-                    # Pipeline stopped mid-session - don't mark completed, will be resumed later
-                    pass
+                    # Pipeline stopped mid-session
+                    # Check if we have any completed trials - if so, mark session state appropriately
+                    # This ensures partial progress is preserved even when pipeline is stopped
+                    def check_and_save_partial_progress():
+                        completed_trials = list(session.trials.filter(status='completed').order_by('-trial_number'))
+                        if completed_trials:
+                            last_completed = completed_trials[0]
+                            # If the last completed trial got correct, mark session as completed
+                            if last_completed.is_correct_llm:
+                                session.is_completed = True
+                                session.status = 'completed'
+                            # Otherwise mark as pending (can be resumed) with the trial count
+                            else:
+                                session.status = 'pending'
+                            session.save()
+                        # If no completed trials but trials were deleted, mark as pending for retry
+                        elif not session.trials.exists():
+                            session.status = 'pending'
+                            session.save()
+                    await sync_to_async(check_and_save_partial_progress)()
                 else:
                     # Success or exhausted retries - mark completed
                     session.is_completed = True
                     session.status = 'completed'
-                    await session.asave()  # Use Django's native async save
+                    await sync_to_async(session.save)()
                     # Refresh session to get updated trials for full metrics
-                    await session.arefresh_from_db()
+                    await sync_to_async(session.refresh_from_db)()
                     # Extract full session metrics for live dashboard display
                     enriched = await sync_to_async(extract_session_metrics)(session)
                     enriched.update({

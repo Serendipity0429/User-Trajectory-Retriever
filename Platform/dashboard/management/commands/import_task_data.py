@@ -29,23 +29,31 @@ class Command(BaseCommand):
             action='store_true',
             help='Test mode: validate and preview without making changes (dry run)'
         )
+        parser.add_argument(
+            '--mode',
+            type=str,
+            choices=['full', 'incremental'],
+            default='full',
+            help='Import mode: "full" deletes existing data first (default), "incremental" adds alongside existing data'
+        )
 
     def handle(self, *args, **options):
         input_file = options['input']
         test_mode = options['test']
+        mode = options['mode']
 
         importer = TaskManagerImporter()
 
         if test_mode:
-            self._handle_test_mode(importer, input_file)
+            self._handle_test_mode(importer, input_file, mode)
         else:
-            self._handle_import(importer, input_file)
+            self._handle_import(importer, input_file, mode)
 
-    def _handle_test_mode(self, importer, input_file):
+    def _handle_test_mode(self, importer, input_file, mode='full'):
         """Handle dry-run/test mode."""
-        self.stdout.write(self.style.WARNING('[DRY RUN] Validating import...'))
+        self.stdout.write(self.style.WARNING(f'[DRY RUN] Validating import (mode: {mode})...'))
 
-        preview = importer.validate_and_preview(input_file)
+        preview = importer.validate_and_preview(input_file, mode=mode)
 
         if preview['is_valid']:
             self.stdout.write(self.style.SUCCESS('Valid JSONL format'))
@@ -57,12 +65,17 @@ class Command(BaseCommand):
                 self.stdout.write(f"  ... and {len(preview['errors']) - 10} more errors")
             return
 
-        self.stdout.write('')
-        self.stdout.write('Would delete:')
-        self.stdout.write(f"  - {preview['would_delete']['users']} existing users (excluding admins)")
-        self.stdout.write(f"  - {preview['would_delete']['tasks']} existing tasks")
-        self.stdout.write(f"  - {preview['would_delete']['trials']} existing trials")
-        self.stdout.write(f"  - {preview['would_delete']['webpages']} existing webpages")
+        if preview['would_delete']:
+            self.stdout.write('')
+            self.stdout.write('Would delete:')
+            self.stdout.write(f"  - {preview['would_delete']['users']} existing users (excluding admins)")
+            self.stdout.write(f"  - {preview['would_delete']['tasks']} existing tasks")
+            self.stdout.write(f"  - {preview['would_delete']['trials']} existing trials")
+            self.stdout.write(f"  - {preview['would_delete']['webpages']} existing webpages")
+        else:
+            self.stdout.write('')
+            self.stdout.write(self.style.SUCCESS('Incremental mode: no data will be deleted.'))
+            self.stdout.write('Duplicate tasks (same user + question) will be skipped.')
 
         self.stdout.write('')
         self.stdout.write('Would import:')
@@ -74,10 +87,10 @@ class Command(BaseCommand):
         self.stdout.write('')
         self.stdout.write(self.style.SUCCESS('No changes made to database.'))
 
-    def _handle_import(self, importer, input_file):
+    def _handle_import(self, importer, input_file, mode='full'):
         """Handle real import with admin verification."""
         # First validate
-        preview = importer.validate_and_preview(input_file)
+        preview = importer.validate_and_preview(input_file, mode=mode)
 
         if not preview['is_valid']:
             self.stdout.write(self.style.ERROR('Validation failed:'))
@@ -85,8 +98,8 @@ class Command(BaseCommand):
                 self.stdout.write(f"  - {error}")
             raise CommandError('Cannot import: validation errors found')
 
-        # Check if there's existing data
-        if preview['existing_stats']['has_data']:
+        # Check if there's existing data - only require auth for full mode
+        if mode == 'full' and preview['existing_stats']['has_data']:
             self.stdout.write('')
             self.stdout.write(self.style.WARNING('Existing data detected:'))
             self.stdout.write(f"  - {preview['existing_stats']['task_count']} tasks")
@@ -108,10 +121,13 @@ class Command(BaseCommand):
                 raise CommandError('Authentication failed or user is not an admin.')
 
             self.stdout.write(self.style.SUCCESS(f'Authenticated as {username}'))
+        elif mode == 'incremental':
+            self.stdout.write(self.style.SUCCESS('Incremental mode: no data will be deleted.'))
+            self.stdout.write('Duplicate tasks (same user + question) will be skipped.')
 
         # Confirm
         self.stdout.write('')
-        self.stdout.write('About to import:')
+        self.stdout.write(f'About to import (mode: {mode}):')
         self.stdout.write(f"  - {preview['would_import']['participants']} participants")
         self.stdout.write(f"  - {preview['would_import']['tasks']} tasks")
         self.stdout.write(f"  - {preview['would_import']['trials']} trials")
@@ -126,7 +142,7 @@ class Command(BaseCommand):
         # Perform import
         self.stdout.write('Importing...')
         try:
-            stats = importer.import_from_file(input_file)
+            stats = importer.import_from_file(input_file, mode=mode)
         except ImportValidationError as e:
             raise CommandError(f'Import failed: {e}')
 
@@ -135,3 +151,5 @@ class Command(BaseCommand):
         self.stdout.write(f"  - Tasks imported: {stats['tasks_imported']}")
         self.stdout.write(f"  - Trials imported: {stats['trials_imported']}")
         self.stdout.write(f"  - Webpages imported: {stats['webpages_imported']}")
+        if stats.get('tasks_skipped', 0) > 0:
+            self.stdout.write(f"  - Duplicate tasks skipped: {stats['tasks_skipped']}")

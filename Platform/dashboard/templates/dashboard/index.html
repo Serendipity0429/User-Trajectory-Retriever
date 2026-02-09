@@ -833,6 +833,22 @@
                                 <div class="card bg-light border-0 mb-3">
                                     <div class="card-body">
                                         <div class="mb-3">
+                                            <label class="form-label fw-bold">Import Mode</label>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="radio" name="import-mode" id="import-mode-full" value="full" checked>
+                                                <label class="form-check-label" for="import-mode-full">
+                                                    <strong>Full Import</strong> &mdash; Deletes all existing data and replaces with imported data
+                                                </label>
+                                            </div>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="radio" name="import-mode" id="import-mode-incremental" value="incremental">
+                                                <label class="form-check-label" for="import-mode-incremental">
+                                                    <strong>Incremental Import</strong> &mdash; Adds imported data alongside existing data (duplicates are skipped)
+                                                </label>
+                                            </div>
+                                        </div>
+                                        <hr>
+                                        <div class="mb-3">
                                             <label for="import-file" class="form-label">Select JSONL file</label>
                                             <input class="form-control" type="file" id="import-file" accept=".jsonl,.json">
                                         </div>
@@ -843,13 +859,17 @@
                                 </div>
 
                                 <div id="import-preview" style="display: none;">
-                                    <div class="alert alert-warning">
+                                    <div id="import-warning-full" class="alert alert-warning">
                                         <i class="bi bi-exclamation-triangle me-2"></i>
                                         <strong>Warning:</strong> Import will <strong>DELETE</strong> all existing data (except admin accounts) and replace with imported data.
                                     </div>
+                                    <div id="import-info-incremental" class="alert alert-info" style="display: none;">
+                                        <i class="bi bi-info-circle me-2"></i>
+                                        Imported data will be added alongside existing data. Duplicate tasks (same user + question) will be skipped.
+                                    </div>
 
                                     <div class="row g-2 mb-3">
-                                        <div class="col-6">
+                                        <div class="col-6" id="delete-card-col">
                                             <div class="card border-danger">
                                                 <div class="card-header bg-danger text-white py-1">
                                                     <small class="fw-bold">Will Delete</small>
@@ -863,7 +883,7 @@
                                                 </div>
                                             </div>
                                         </div>
-                                        <div class="col-6">
+                                        <div class="col-6" id="import-card-col">
                                             <div class="card border-success">
                                                 <div class="card-header bg-success text-white py-1">
                                                     <small class="fw-bold">Will Import</small>
@@ -885,10 +905,15 @@
                                     <h6 class="fw-bold mb-3"><i class="bi bi-shield-lock me-2"></i>Confirm Import</h6>
                                     <div class="card bg-light border-0">
                                         <div class="card-body">
-                                            <p class="text-muted small">Enter your admin password to confirm the import operation.</p>
-                                            <div class="mb-3">
-                                                <label for="import-password" class="form-label">Admin Password</label>
-                                                <input type="password" class="form-control" id="import-password" placeholder="Enter password">
+                                            <div id="import-password-section">
+                                                <p class="text-muted small">Enter your admin password to confirm the destructive import operation.</p>
+                                                <div class="mb-3">
+                                                    <label for="import-password" class="form-label">Admin Password</label>
+                                                    <input type="password" class="form-control" id="import-password" placeholder="Enter password">
+                                                </div>
+                                            </div>
+                                            <div id="import-incremental-confirm" style="display: none;">
+                                                <p class="text-muted small">Data will be added alongside existing records. No data will be deleted.</p>
                                             </div>
                                             <button type="button" class="btn btn-danger w-100" id="import-execute-btn">
                                                 <i class="bi bi-database-fill-up me-1"></i> Execute Import
@@ -905,6 +930,7 @@
                                             <li><span id="result-tasks">-</span> tasks imported</li>
                                             <li><span id="result-trials">-</span> trials imported</li>
                                             <li><span id="result-webpages">-</span> webpages imported</li>
+                                            <li id="result-skipped-row" style="display: none;"><span id="result-skipped">0</span> duplicate tasks skipped</li>
                                         </ul>
                                     </div>
                                 </div>

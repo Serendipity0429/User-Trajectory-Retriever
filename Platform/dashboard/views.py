@@ -707,10 +707,15 @@ def import_preview(request):
         temp_path = temp_file.name
 
     try:
+        mode = request.POST.get('mode', 'full')
+        if mode not in ('full', 'incremental'):
+            mode = 'full'
+
         importer = TaskManagerImporter()
-        preview = importer.validate_and_preview(temp_path)
-        # Store temp path in session for actual import
+        preview = importer.validate_and_preview(temp_path, mode=mode)
+        # Store temp path and mode in session for actual import
         request.session['import_temp_path'] = temp_path
+        request.session['import_mode'] = mode
         return JsonResponse(preview)
     except Exception as e:
         os.unlink(temp_path)
@@ -724,33 +729,37 @@ def import_data(request):
     """Import data from previously uploaded file."""
     from .utils.importer import TaskManagerImporter, ImportValidationError
 
-    # Get temp path from session
+    # Get temp path and mode from session
     temp_path = request.session.get('import_temp_path')
     if not temp_path or not os.path.exists(temp_path):
         return JsonResponse({'error': 'No file to import. Please upload again.'}, status=400)
 
-    # Verify admin password
+    mode = request.session.get('import_mode', 'full')
+
     try:
         data = json.loads(request.body)
     except json.JSONDecodeError:
         return JsonResponse({'error': 'Invalid request'}, status=400)
 
-    password = data.get('password')
-    if not password:
-        return JsonResponse({'error': 'Password required'}, status=400)
+    # Verify admin password only for full mode (destructive)
+    if mode == 'full':
+        password = data.get('password')
+        if not password:
+            return JsonResponse({'error': 'Password required'}, status=400)
 
-    # Authenticate
-    user = authenticate(username=request.user.username, password=password)
-    if not user or not user.is_superuser:
-        return JsonResponse({'error': 'Invalid password'}, status=401)
+        user = authenticate(username=request.user.username, password=password)
+        if not user or not user.is_superuser:
+            return JsonResponse({'error': 'Invalid password'}, status=401)
 
     try:
         importer = TaskManagerImporter()
-        stats = importer.import_from_file(temp_path)
+        stats = importer.import_from_file(temp_path, mode=mode)
 
         # Clean up
         os.unlink(temp_path)
         del request.session['import_temp_path']
+        if 'import_mode' in request.session:
+            del request.session['import_mode']
 
         return JsonResponse({
             'success': True,

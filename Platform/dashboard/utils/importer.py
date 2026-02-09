@@ -33,10 +33,14 @@ class TaskManagerImporter:
         stats = importer.import_from_file(input_file)
     """
 
+    MODE_FULL = "full"
+    MODE_INCREMENTAL = "incremental"
+
     def __init__(self):
         self._user_map: Dict[str, Any] = {}  # participant_id -> User instance
         self._dataset_map: Dict[str, Any] = {}  # dataset_name -> TaskDataset instance
         self._entry_map: Dict[int, Any] = {}  # old_entry_id -> TaskDatasetEntry instance
+        self._mode: str = self.MODE_FULL
 
     def _parse_datetime(self, value: Optional[str]) -> Optional[datetime]:
         """Parse ISO datetime string."""
@@ -45,7 +49,11 @@ class TaskManagerImporter:
         return parse_datetime(value)
 
     def _get_or_create_user(self, participant_data: Dict[str, Any], participant_id: str):
-        """Get or create a user from participant data."""
+        """Get or create a user from participant data.
+
+        In full mode: reuses existing users by username match.
+        In incremental mode: reuses existing users by username match (idempotent).
+        """
         from user_system.models import User, Profile
 
         if participant_id in self._user_map:
@@ -75,26 +83,25 @@ class TaskManagerImporter:
             user.consent_agreed = participant_data.get("consent_agreed", False)
             user.save()
 
-            # Create profile
+            # Update profile (already created by post_save signal)
             profile_data = participant_data.get("profile", {})
-            profile = Profile.objects.create(
-                user=user,
-                name=profile_data.get("name", ANONYMIZED_PLACEHOLDER),
-                phone=profile_data.get("phone", ANONYMIZED_PLACEHOLDER),
-                age=0 if profile_data.get("age") in [ANONYMIZED_PLACEHOLDER, None] else (
-                    profile_data.get("age") if isinstance(profile_data.get("age"), int) else 0
-                ),
-                gender=profile_data.get("gender", ""),
-                occupation=profile_data.get("occupation", ""),
-                education=profile_data.get("education", ""),
-                field_of_expertise=profile_data.get("field_of_expertise", ANONYMIZED_PLACEHOLDER),
-                llm_frequency=profile_data.get("llm_frequency", ""),
-                llm_history=profile_data.get("llm_history", ""),
-                english_proficiency=profile_data.get("english_proficiency", ""),
-                web_search_proficiency=profile_data.get("web_search_proficiency", ""),
-                web_agent_familiarity=profile_data.get("web_agent_familiarity", ""),
-                web_agent_frequency=profile_data.get("web_agent_frequency", ""),
+            profile = Profile.objects.get(user=user)
+            profile.name = profile_data.get("name", ANONYMIZED_PLACEHOLDER)
+            profile.phone = profile_data.get("phone", ANONYMIZED_PLACEHOLDER)
+            profile.age = 0 if profile_data.get("age") in [ANONYMIZED_PLACEHOLDER, None] else (
+                profile_data.get("age") if isinstance(profile_data.get("age"), int) else 0
             )
+            profile.gender = profile_data.get("gender", "")
+            profile.occupation = profile_data.get("occupation", "")
+            profile.education = profile_data.get("education", "")
+            profile.field_of_expertise = profile_data.get("field_of_expertise", ANONYMIZED_PLACEHOLDER)
+            profile.llm_frequency = profile_data.get("llm_frequency", "")
+            profile.llm_history = profile_data.get("llm_history", "")
+            profile.english_proficiency = profile_data.get("english_proficiency", "")
+            profile.web_search_proficiency = profile_data.get("web_search_proficiency", "")
+            profile.web_agent_familiarity = profile_data.get("web_agent_familiarity", "")
+            profile.web_agent_frequency = profile_data.get("web_agent_frequency", "")
+            profile.save()
 
         self._user_map[participant_id] = user
         return user
@@ -175,7 +182,7 @@ class TaskManagerImporter:
         # Create annotations
         pre_task = task_data.get("pre_task_annotation")
         if pre_task:
-            PreTaskAnnotation.objects.create(
+            obj = PreTaskAnnotation.objects.create(
                 belong_task=task,
                 familiarity=pre_task.get("familiarity"),
                 difficulty=pre_task.get("difficulty"),
@@ -188,10 +195,14 @@ class TaskManagerImporter:
                 expected_source_other=pre_task.get("expected_source_other"),
                 duration=pre_task.get("duration"),
             )
+            if pre_task.get("submission_timestamp"):
+                PreTaskAnnotation.objects.filter(pk=obj.pk).update(
+                    submission_timestamp=self._parse_datetime(pre_task["submission_timestamp"])
+                )
 
         post_task = task_data.get("post_task_annotation")
         if post_task:
-            PostTaskAnnotation.objects.create(
+            obj = PostTaskAnnotation.objects.create(
                 belong_task=task,
                 difficulty_actual=post_task.get("difficulty_actual"),
                 aha_moment_type=post_task.get("aha_moment_type"),
@@ -202,10 +213,14 @@ class TaskManagerImporter:
                 strategy_shift_other=post_task.get("strategy_shift_other"),
                 duration=post_task.get("duration"),
             )
+            if post_task.get("submission_timestamp"):
+                PostTaskAnnotation.objects.filter(pk=obj.pk).update(
+                    submission_timestamp=self._parse_datetime(post_task["submission_timestamp"])
+                )
 
         cancel = task_data.get("cancel_annotation")
         if cancel:
-            CancelAnnotation.objects.create(
+            obj = CancelAnnotation.objects.create(
                 belong_task=task,
                 category=cancel.get("category"),
                 reason=cancel.get("reason"),
@@ -213,6 +228,10 @@ class TaskManagerImporter:
                 missing_resources_other=cancel.get("missing_resources_other"),
                 duration=cancel.get("duration"),
             )
+            if cancel.get("submission_timestamp"):
+                CancelAnnotation.objects.filter(pk=obj.pk).update(
+                    submission_timestamp=self._parse_datetime(cancel["submission_timestamp"])
+                )
 
         # Create trials
         for trial_data in task_data.get("trials", []):
@@ -226,15 +245,19 @@ class TaskManagerImporter:
                 answer_formulation_method_other=trial_data.get("answer_formulation_method_other"),
             )
 
-            # Update timestamps
+            # Update timestamps (use .filter().update() to bypass auto_now_add)
+            ts_updates = {}
+            if trial_data.get("start_timestamp"):
+                ts_updates["start_timestamp"] = self._parse_datetime(trial_data["start_timestamp"])
             if trial_data.get("end_timestamp"):
-                trial.end_timestamp = self._parse_datetime(trial_data["end_timestamp"])
-                trial.save(update_fields=["end_timestamp"])
+                ts_updates["end_timestamp"] = self._parse_datetime(trial_data["end_timestamp"])
+            if ts_updates:
+                TaskTrial.objects.filter(pk=trial.pk).update(**ts_updates)
 
             # Create reflection annotation
             reflection = trial_data.get("reflection_annotation")
             if reflection:
-                ReflectionAnnotation.objects.create(
+                obj = ReflectionAnnotation.objects.create(
                     belong_task_trial=trial,
                     failure_category=reflection.get("failure_category"),
                     failure_category_other=reflection.get("failure_category_other", ""),
@@ -245,10 +268,14 @@ class TaskManagerImporter:
                     additional_reflection=reflection.get("additional_reflection"),
                     duration=reflection.get("duration"),
                 )
+                if reflection.get("submission_timestamp"):
+                    ReflectionAnnotation.objects.filter(pk=obj.pk).update(
+                        submission_timestamp=self._parse_datetime(reflection["submission_timestamp"])
+                    )
 
             # Create justifications
             for just_data in trial_data.get("justifications", []):
-                Justification.objects.create(
+                obj = Justification.objects.create(
                     belong_task_trial=trial,
                     url=just_data.get("url", ""),
                     page_title=just_data.get("page_title"),
@@ -260,6 +287,10 @@ class TaskManagerImporter:
                     relevance=just_data.get("relevance", 0),
                     credibility=just_data.get("credibility", 0),
                 )
+                if just_data.get("timestamp"):
+                    Justification.objects.filter(pk=obj.pk).update(
+                        timestamp=self._parse_datetime(just_data["timestamp"])
+                    )
 
             # Create webpages
             for wp_data in trial_data.get("webpages", []):
@@ -270,6 +301,8 @@ class TaskManagerImporter:
                     title=wp_data.get("title"),
                     url=wp_data.get("url", ""),
                     referrer=wp_data.get("referrer"),
+                    start_timestamp=self._parse_datetime(wp_data.get("start_timestamp")),
+                    end_timestamp=self._parse_datetime(wp_data.get("end_timestamp")),
                     dwell_time=wp_data.get("dwell_time"),
                     width=wp_data.get("width"),
                     height=wp_data.get("height"),
@@ -367,12 +400,13 @@ class TaskManagerImporter:
             "has_data": task_count > 0,
         }
 
-    def validate_and_preview(self, file_path: str) -> Dict[str, Any]:
+    def validate_and_preview(self, file_path: str, mode: str = "full") -> Dict[str, Any]:
         """
         Validate file and preview import (dry run).
 
         Args:
             file_path: Path to JSONL file
+            mode: "full" (delete + replace) or "incremental" (add alongside)
 
         Returns:
             Preview information including validation results
@@ -380,17 +414,12 @@ class TaskManagerImporter:
         is_valid, errors, import_stats = self.validate_jsonl(file_path)
         existing_stats = self.get_existing_data_stats()
 
-        return {
+        result = {
             "is_valid": is_valid,
             "errors": errors,
+            "mode": mode,
             "import_stats": import_stats,
             "existing_stats": existing_stats,
-            "would_delete": {
-                "users": existing_stats["user_count"],
-                "tasks": existing_stats["task_count"],
-                "trials": existing_stats["trial_count"],
-                "webpages": existing_stats["webpage_count"],
-            },
             "would_import": {
                 "participants": import_stats.get("participant_count", 0),
                 "tasks": import_stats.get("task_count", 0),
@@ -398,6 +427,18 @@ class TaskManagerImporter:
                 "webpages": import_stats.get("webpage_count", 0),
             },
         }
+
+        if mode == self.MODE_FULL:
+            result["would_delete"] = {
+                "users": existing_stats["user_count"],
+                "tasks": existing_stats["task_count"],
+                "trials": existing_stats["trial_count"],
+                "webpages": existing_stats["webpage_count"],
+            }
+        else:
+            result["would_delete"] = None
+
+        return result
 
     def _clear_existing_data(self):
         """Clear all existing non-admin user data."""
@@ -430,26 +471,41 @@ class TaskManagerImporter:
         Profile.objects.filter(user_id__in=user_ids).delete()
         users_to_delete.delete()
 
+    def _is_duplicate_task(self, user, task_data: Dict[str, Any]) -> bool:
+        """Check if a task already exists for this user with the same question."""
+        from task_manager.models import Task
+
+        question = task_data.get("question", "")
+        if not question:
+            return False
+
+        return Task.objects.filter(
+            user=user,
+            content__question=question,
+        ).exists()
+
     @transaction.atomic
-    def import_from_file(self, file_path: str) -> Dict[str, Any]:
+    def import_from_file(self, file_path: str, mode: str = "full") -> Dict[str, Any]:
         """
         Import data from JSONL file.
 
-        This will DELETE all existing non-admin user data and replace with imported data.
-
         Args:
             file_path: Path to JSONL file
+            mode: "full" (delete + replace) or "incremental" (add alongside existing)
 
         Returns:
             Import statistics
         """
+        self._mode = mode
+
         # Validate first
         is_valid, errors, _ = self.validate_jsonl(file_path)
         if not is_valid:
             raise ImportValidationError(f"Validation failed: {'; '.join(errors)}")
 
-        # Clear existing data
-        self._clear_existing_data()
+        # Only clear data in full mode
+        if mode == self.MODE_FULL:
+            self._clear_existing_data()
 
         # Reset maps
         self._user_map = {}
@@ -461,6 +517,7 @@ class TaskManagerImporter:
             "participants_imported": 0,
             "trials_imported": 0,
             "webpages_imported": 0,
+            "tasks_skipped": 0,
         }
 
         seen_participants = set()
@@ -481,6 +538,11 @@ class TaskManagerImporter:
                 if participant_id not in seen_participants:
                     seen_participants.add(participant_id)
                     stats["participants_imported"] += 1
+
+                # In incremental mode, skip duplicate tasks
+                if mode == self.MODE_INCREMENTAL and self._is_duplicate_task(user, task_data):
+                    stats["tasks_skipped"] += 1
+                    continue
 
                 # Create task
                 task = self._create_task(task_data, user)

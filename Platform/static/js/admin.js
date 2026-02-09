@@ -483,6 +483,35 @@ document.addEventListener('DOMContentLoaded', function() {
             const importResult = document.getElementById('import-result');
             const importError = document.getElementById('import-error');
 
+            const getImportMode = () => {
+                const checked = document.querySelector('input[name="import-mode"]:checked');
+                return checked ? checked.value : 'full';
+            };
+
+            const updateUIForMode = (mode) => {
+                const isIncremental = mode === 'incremental';
+                // Toggle delete card and warnings
+                document.getElementById('delete-card-col').style.display = isIncremental ? 'none' : '';
+                document.getElementById('import-card-col').className = isIncremental ? 'col-12' : 'col-6';
+                document.getElementById('import-warning-full').style.display = isIncremental ? 'none' : '';
+                document.getElementById('import-info-incremental').style.display = isIncremental ? '' : 'none';
+                // Toggle password vs simple confirm
+                document.getElementById('import-password-section').style.display = isIncremental ? 'none' : '';
+                document.getElementById('import-incremental-confirm').style.display = isIncremental ? '' : 'none';
+                // Button style
+                executeBtn.className = isIncremental ? 'btn btn-success w-100' : 'btn btn-danger w-100';
+            };
+
+            // Reset preview when mode changes
+            document.querySelectorAll('input[name="import-mode"]').forEach(radio => {
+                radio.addEventListener('change', () => {
+                    importPreview.style.display = 'none';
+                    importAuth.style.display = 'none';
+                    importResult.style.display = 'none';
+                    importError.style.display = 'none';
+                });
+            });
+
             fileInput.addEventListener('change', () => {
                 validateBtn.disabled = !fileInput.files.length;
                 importPreview.style.display = 'none';
@@ -494,8 +523,10 @@ document.addEventListener('DOMContentLoaded', function() {
             validateBtn.addEventListener('click', () => {
                 if (!fileInput.files.length) return;
 
+                const mode = getImportMode();
                 const formData = new FormData();
                 formData.append('file', fileInput.files[0]);
+                formData.append('mode', mode);
 
                 validateBtn.disabled = true;
                 validateBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Validating...';
@@ -522,10 +553,14 @@ document.addEventListener('DOMContentLoaded', function() {
                         return;
                     }
 
-                    // Show preview
-                    document.getElementById('delete-users').textContent = data.would_delete.users;
-                    document.getElementById('delete-tasks').textContent = data.would_delete.tasks;
-                    document.getElementById('delete-webpages').textContent = data.would_delete.webpages;
+                    // Show preview based on mode
+                    updateUIForMode(mode);
+
+                    if (data.would_delete) {
+                        document.getElementById('delete-users').textContent = data.would_delete.users;
+                        document.getElementById('delete-tasks').textContent = data.would_delete.tasks;
+                        document.getElementById('delete-webpages').textContent = data.would_delete.webpages;
+                    }
                     document.getElementById('import-participants').textContent = data.would_import.participants;
                     document.getElementById('import-tasks').textContent = data.would_import.tasks;
                     document.getElementById('import-webpages').textContent = data.would_import.webpages;
@@ -545,18 +580,26 @@ document.addEventListener('DOMContentLoaded', function() {
             });
 
             executeBtn.addEventListener('click', () => {
+                const mode = getImportMode();
+                const isIncremental = mode === 'incremental';
                 const password = importPassword.value;
-                if (!password) {
+
+                if (!isIncremental && !password) {
                     alert('Please enter your password.');
                     return;
                 }
 
-                if (!confirm('Are you sure you want to proceed? This will DELETE all existing data.')) {
+                const confirmMsg = isIncremental
+                    ? 'Are you sure you want to add this data? Duplicate tasks will be skipped.'
+                    : 'Are you sure you want to proceed? This will DELETE all existing data.';
+                if (!confirm(confirmMsg)) {
                     return;
                 }
 
                 executeBtn.disabled = true;
                 executeBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Importing...';
+
+                const body = isIncremental ? { mode } : { password, mode };
 
                 fetch('/dashboard/import/execute/', {
                     method: 'POST',
@@ -564,7 +607,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         'X-CSRFToken': getCsrfToken(),
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({ password }),
+                    body: JSON.stringify(body),
                 })
                 .then(res => res.json())
                 .then(data => {
@@ -581,6 +624,15 @@ document.addEventListener('DOMContentLoaded', function() {
                         document.getElementById('result-tasks').textContent = data.stats.tasks_imported;
                         document.getElementById('result-trials').textContent = data.stats.trials_imported;
                         document.getElementById('result-webpages').textContent = data.stats.webpages_imported;
+
+                        // Show skipped count for incremental mode
+                        const skippedRow = document.getElementById('result-skipped-row');
+                        if (data.stats.tasks_skipped > 0) {
+                            skippedRow.style.display = '';
+                            document.getElementById('result-skipped').textContent = data.stats.tasks_skipped;
+                        } else {
+                            skippedRow.style.display = 'none';
+                        }
                     }
                 })
                 .catch(err => {

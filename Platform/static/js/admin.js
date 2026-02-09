@@ -580,6 +580,10 @@ document.addEventListener('DOMContentLoaded', function() {
             });
 
             executeBtn.addEventListener('click', () => {
+                // Clear previous errors/results
+                importError.style.display = 'none';
+                importResult.style.display = 'none';
+
                 const mode = getImportMode();
                 const isIncremental = mode === 'incremental';
                 const password = importPassword.value;
@@ -597,9 +601,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
 
                 executeBtn.disabled = true;
-                executeBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Importing...';
+                executeBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Starting...';
 
                 const body = isIncremental ? { mode } : { password, mode };
+                const importProgressDiv = document.getElementById('import-progress');
 
                 fetch('/dashboard/import/execute/', {
                     method: 'POST',
@@ -614,33 +619,102 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (data.error) {
                         importError.style.display = 'block';
                         document.getElementById('import-error-message').textContent = data.error;
+                        executeBtn.disabled = false;
+                        executeBtn.innerHTML = '<i class="bi bi-database-fill-up me-1"></i> Execute Import';
                         return;
                     }
 
-                    if (data.success) {
-                        importAuth.style.display = 'none';
-                        importResult.style.display = 'block';
-                        document.getElementById('result-participants').textContent = data.stats.participants_imported;
-                        document.getElementById('result-tasks').textContent = data.stats.tasks_imported;
-                        document.getElementById('result-trials').textContent = data.stats.trials_imported;
-                        document.getElementById('result-webpages').textContent = data.stats.webpages_imported;
+                    const import_id = data.import_id;
 
-                        // Show skipped count for incremental mode
-                        const skippedRow = document.getElementById('result-skipped-row');
-                        if (data.stats.tasks_skipped > 0) {
-                            skippedRow.style.display = '';
-                            document.getElementById('result-skipped').textContent = data.stats.tasks_skipped;
-                        } else {
-                            skippedRow.style.display = 'none';
-                        }
-                    }
+                    // Show progress bar
+                    importAuth.style.display = 'none';
+                    importProgressDiv.style.display = 'block';
+                    importProgressDiv.innerHTML = `
+                        <div class="progress" style="height: 22px;">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated"
+                                 role="progressbar" style="width: 5%" id="import-progress-bar">
+                                Starting...
+                            </div>
+                        </div>
+                        <small class="text-muted mt-1 d-block" id="import-progress-detail"></small>
+                    `;
+
+                    const bar = document.getElementById('import-progress-bar');
+                    const detail = document.getElementById('import-progress-detail');
+
+                    const pollInterval = setInterval(() => {
+                        fetch(`/dashboard/import/progress/${import_id}/`)
+                            .then(r => r.json())
+                            .then(prog => {
+                                if (prog.status === 'running') {
+                                    const total = prog.total_tasks || 1;
+                                    const current = prog.current_task || 0;
+                                    const pct = Math.round((current / total) * 100);
+                                    bar.style.width = Math.max(pct, 5) + '%';
+
+                                    if (prog.phase === 'deleting') {
+                                        bar.textContent = 'Deleting existing data...';
+                                        detail.textContent = '';
+                                    } else {
+                                        bar.textContent = `Task ${current} of ${total} (${pct}%)`;
+                                        const parts = [];
+                                        if (prog.tasks_imported) parts.push(`${prog.tasks_imported} tasks`);
+                                        if (prog.participants_imported) parts.push(`${prog.participants_imported} participants`);
+                                        if (prog.tasks_skipped) parts.push(`${prog.tasks_skipped} skipped`);
+                                        detail.textContent = parts.length ? `Imported: ${parts.join(', ')}` : '';
+                                    }
+                                } else if (prog.status === 'complete') {
+                                    clearInterval(pollInterval);
+                                    bar.style.width = '100%';
+                                    bar.classList.remove('progress-bar-animated');
+                                    bar.classList.add('bg-success');
+                                    bar.textContent = 'Complete!';
+                                    detail.textContent = '';
+
+                                    setTimeout(() => {
+                                        importProgressDiv.style.display = 'none';
+                                        importResult.style.display = 'block';
+                                        document.getElementById('result-participants').textContent = prog.participants_imported || 0;
+                                        document.getElementById('result-tasks').textContent = prog.tasks_imported || 0;
+                                        document.getElementById('result-trials').textContent = prog.trials_imported || 0;
+                                        document.getElementById('result-webpages').textContent = prog.webpages_imported || 0;
+
+                                        const skippedRow = document.getElementById('result-skipped-row');
+                                        if (prog.tasks_skipped > 0) {
+                                            skippedRow.style.display = '';
+                                            document.getElementById('result-skipped').textContent = prog.tasks_skipped;
+                                        } else {
+                                            skippedRow.style.display = 'none';
+                                        }
+                                    }, 1000);
+
+                                    executeBtn.disabled = false;
+                                    executeBtn.innerHTML = '<i class="bi bi-database-fill-up me-1"></i> Execute Import';
+                                } else if (prog.status === 'error') {
+                                    clearInterval(pollInterval);
+                                    bar.classList.remove('progress-bar-animated', 'progress-bar-striped');
+                                    bar.classList.add('bg-danger');
+                                    bar.style.width = '100%';
+                                    bar.textContent = 'Import failed';
+                                    detail.textContent = prog.error || 'Unknown error';
+                                    executeBtn.disabled = false;
+                                    executeBtn.innerHTML = '<i class="bi bi-database-fill-up me-1"></i> Execute Import';
+                                }
+                            })
+                            .catch(() => {
+                                clearInterval(pollInterval);
+                                importProgressDiv.style.display = 'none';
+                                importError.style.display = 'block';
+                                document.getElementById('import-error-message').textContent = 'Lost connection while checking import progress.';
+                                executeBtn.disabled = false;
+                                executeBtn.innerHTML = '<i class="bi bi-database-fill-up me-1"></i> Execute Import';
+                            });
+                    }, 1000);
                 })
                 .catch(err => {
                     importError.style.display = 'block';
-                    document.getElementById('import-error-message').textContent = 'Error during import.';
+                    document.getElementById('import-error-message').textContent = 'Error starting import.';
                     console.error(err);
-                })
-                .finally(() => {
                     executeBtn.disabled = false;
                     executeBtn.innerHTML = '<i class="bi bi-database-fill-up me-1"></i> Execute Import';
                 });

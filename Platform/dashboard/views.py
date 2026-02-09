@@ -698,6 +698,14 @@ def import_preview(request):
     if 'file' not in request.FILES:
         return JsonResponse({'error': 'No file uploaded'}, status=400)
 
+    # Clean up any previous temp file from this session
+    old_temp = request.session.get('import_temp_path')
+    if old_temp and os.path.exists(old_temp):
+        try:
+            os.unlink(old_temp)
+        except OSError:
+            pass
+
     uploaded_file = request.FILES['file']
 
     # Save to temp file
@@ -713,22 +721,69 @@ def import_preview(request):
 
         importer = TaskManagerImporter()
         preview = importer.validate_and_preview(temp_path, mode=mode)
-        # Store temp path and mode in session for actual import
+        # Store temp path, mode, and task count in session for actual import
         request.session['import_temp_path'] = temp_path
         request.session['import_mode'] = mode
+        request.session['import_total_tasks'] = preview.get('import_stats', {}).get('task_count', 0)
         return JsonResponse(preview)
     except Exception as e:
         os.unlink(temp_path)
+        request.session.pop('import_temp_path', None)
+        request.session.pop('import_mode', None)
         return JsonResponse({'error': str(e)}, status=500)
+
+
+def _run_import(import_id, temp_path, mode, total_tasks=0):
+    """Background thread function that runs the import and updates Redis progress."""
+    import django.db
+    import redis as redis_lib
+
+    from .utils.importer import TaskManagerImporter, ImportValidationError, ImportRedisKeys
+
+    r = redis_lib.Redis()
+    progress_key = ImportRedisKeys.progress(import_id)
+
+    def _update_progress(**fields):
+        r.hset(progress_key, mapping={k: json.dumps(v) for k, v in fields.items()})
+        r.expire(progress_key, ImportRedisKeys.TTL)
+
+    try:
+        _update_progress(status="running", current_task=0, total_tasks=total_tasks, tasks_imported=0)
+
+        def on_progress(current_task, total_tasks, stats):
+            _update_progress(
+                status="running",
+                current_task=current_task,
+                total_tasks=total_tasks,
+                **stats,
+            )
+
+        importer = TaskManagerImporter()
+        stats = importer.import_from_file(
+            temp_path, mode=mode, on_progress=on_progress,
+            total_tasks=total_tasks, skip_validation=True,
+        )
+
+        _update_progress(status="complete", **stats)
+
+    except (ImportValidationError, Exception) as e:
+        logger.exception("Import %s failed", import_id)
+        _update_progress(status="error", error=str(e))
+    finally:
+        # Always clean up temp file
+        if os.path.exists(temp_path):
+            try:
+                os.unlink(temp_path)
+            except OSError:
+                pass
+        django.db.connections.close_all()
 
 
 @login_required
 @user_passes_test(is_superuser)
 @require_POST
 def import_data(request):
-    """Import data from previously uploaded file."""
-    from .utils.importer import TaskManagerImporter, ImportValidationError
-
+    """Start a background import and return the import ID immediately."""
     # Get temp path and mode from session
     temp_path = request.session.get('import_temp_path')
     if not temp_path or not os.path.exists(temp_path):
@@ -751,21 +806,38 @@ def import_data(request):
         if not user or not user.is_superuser:
             return JsonResponse({'error': 'Invalid password'}, status=401)
 
-    try:
-        importer = TaskManagerImporter()
-        stats = importer.import_from_file(temp_path, mode=mode)
+    import_id = str(uuid.uuid4())
+    total_tasks = request.session.get('import_total_tasks', 0)
 
-        # Clean up
-        os.unlink(temp_path)
-        del request.session['import_temp_path']
-        if 'import_mode' in request.session:
-            del request.session['import_mode']
+    # Clear session references (background thread owns the temp file now)
+    request.session.pop('import_temp_path', None)
+    request.session.pop('import_mode', None)
+    request.session.pop('import_total_tasks', None)
 
-        return JsonResponse({
-            'success': True,
-            'stats': stats,
-        })
-    except ImportValidationError as e:
-        return JsonResponse({'error': str(e)}, status=400)
-    except Exception as e:
-        return JsonResponse({'error': str(e)}, status=500)
+    t = threading.Thread(
+        target=_run_import,
+        args=(import_id, temp_path, mode, total_tasks),
+        daemon=True,
+    )
+    t.start()
+
+    return JsonResponse({'import_id': import_id})
+
+
+@login_required
+@user_passes_test(is_superuser)
+@require_GET
+def import_progress(request, import_id):
+    """Poll the progress of a running import."""
+    import redis as redis_lib
+    from .utils.importer import ImportRedisKeys
+
+    r = redis_lib.Redis()
+    progress_key = ImportRedisKeys.progress(import_id)
+    raw = r.hgetall(progress_key)
+
+    if not raw:
+        return JsonResponse({'error': 'Import not found or expired'}, status=404)
+
+    data = {k.decode(): json.loads(v.decode()) for k, v in raw.items()}
+    return JsonResponse(data)

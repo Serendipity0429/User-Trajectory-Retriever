@@ -141,8 +141,30 @@ class Command(BaseCommand):
 
         # Perform import
         self.stdout.write('Importing...')
+        last_pct = -1
+
+        def on_progress(current_task, total_tasks, stats):
+            nonlocal last_pct
+            if total_tasks == 0:
+                return
+            pct = int(current_task / total_tasks * 100)
+            if pct != last_pct:
+                last_pct = pct
+                self.stdout.write(
+                    f"\r  Progress: {current_task}/{total_tasks} tasks ({pct}%) "
+                    f"- {stats.get('tasks_imported', 0)} imported, "
+                    f"{stats.get('tasks_skipped', 0)} skipped",
+                    ending=''
+                )
+                self.stdout.flush()
+
+        total_tasks = preview['would_import']['tasks']
         try:
-            stats = importer.import_from_file(input_file, mode=mode)
+            stats = importer.import_from_file(
+                input_file, mode=mode, on_progress=on_progress,
+                total_tasks=total_tasks, skip_validation=True,
+            )
+            self.stdout.write('')  # newline after progress
         except ImportValidationError as e:
             raise CommandError(f'Import failed: {e}')
 

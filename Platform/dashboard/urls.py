@@ -27,4 +27,5 @@ urlpatterns = [
     path("export/download/<str:export_id>/", views.download_export, name="download_export"),
     path("import/preview/", views.import_preview, name="import_preview"),
     path("import/execute/", views.import_data, name="import_data"),
+    path("import/progress/<str:import_id>/", views.import_progress, name="import_progress"),
 ]

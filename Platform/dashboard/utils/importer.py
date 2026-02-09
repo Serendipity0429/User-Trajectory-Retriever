@@ -19,6 +19,14 @@ class ImportValidationError(Exception):
     pass
 
 
+class ImportRedisKeys:
+    TTL = 3600  # 1 hour auto-expire
+
+    @staticmethod
+    def progress(import_id: str) -> str:
+        return f"import:progress:{import_id}"
+
+
 class TaskManagerImporter:
     """
     Imports task_manager data from HuggingFace-compatible JSONL format.
@@ -485,26 +493,39 @@ class TaskManagerImporter:
         ).exists()
 
     @transaction.atomic
-    def import_from_file(self, file_path: str, mode: str = "full") -> Dict[str, Any]:
+    def import_from_file(self, file_path: str, mode: str = "full",
+                         on_progress: Optional[callable] = None,
+                         total_tasks: Optional[int] = None,
+                         skip_validation: bool = False) -> Dict[str, Any]:
         """
         Import data from JSONL file.
 
         Args:
             file_path: Path to JSONL file
             mode: "full" (delete + replace) or "incremental" (add alongside existing)
+            on_progress: Optional callback(current_task, total_tasks, stats) for progress updates
+            total_tasks: Pre-computed task count (from preview) to avoid re-reading the file
+            skip_validation: Skip validation if already done in preview step
 
         Returns:
             Import statistics
         """
         self._mode = mode
 
-        # Validate first
-        is_valid, errors, _ = self.validate_jsonl(file_path)
-        if not is_valid:
-            raise ImportValidationError(f"Validation failed: {'; '.join(errors)}")
+        if not skip_validation:
+            is_valid, errors, preview_stats = self.validate_jsonl(file_path)
+            if not is_valid:
+                raise ImportValidationError(f"Validation failed: {'; '.join(errors)}")
+            if total_tasks is None:
+                total_tasks = preview_stats.get("task_count", 0)
+
+        if total_tasks is None:
+            total_tasks = 0
 
         # Only clear data in full mode
         if mode == self.MODE_FULL:
+            if on_progress:
+                on_progress(0, total_tasks, {"phase": "deleting"})
             self._clear_existing_data()
 
         # Reset maps
@@ -521,6 +542,10 @@ class TaskManagerImporter:
         }
 
         seen_participants = set()
+        current_task = 0
+        # Throttle progress updates to avoid excessive Redis writes
+        last_progress_task = 0
+        progress_interval = max(1, total_tasks // 200) if total_tasks else 10
 
         with open(file_path, 'r', encoding='utf-8') as f:
             for line in f:
@@ -528,6 +553,7 @@ class TaskManagerImporter:
                 if not line:
                     continue
 
+                current_task += 1
                 task_data = json.loads(line)
 
                 # Get or create user
@@ -542,14 +568,21 @@ class TaskManagerImporter:
                 # In incremental mode, skip duplicate tasks
                 if mode == self.MODE_INCREMENTAL and self._is_duplicate_task(user, task_data):
                     stats["tasks_skipped"] += 1
-                    continue
+                else:
+                    # Create task
+                    self._create_task(task_data, user)
+                    stats["tasks_imported"] += 1
 
-                # Create task
-                task = self._create_task(task_data, user)
-                stats["tasks_imported"] += 1
+                    for trial in task_data.get("trials", []):
+                        stats["trials_imported"] += 1
+                        stats["webpages_imported"] += len(trial.get("webpages", []))
 
-                for trial in task_data.get("trials", []):
-                    stats["trials_imported"] += 1
-                    stats["webpages_imported"] += len(trial.get("webpages", []))
+                if on_progress and (current_task - last_progress_task) >= progress_interval:
+                    last_progress_task = current_task
+                    on_progress(current_task, total_tasks, stats)
+
+        # Final progress update
+        if on_progress:
+            on_progress(current_task, total_tasks, stats)
 
         return stats

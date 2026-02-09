@@ -4,12 +4,20 @@ Task manager data export utilities.
 
 import json
 from datetime import datetime, timezone as dt_timezone
-from typing import Dict, Any, List, Optional, Iterator
+from typing import Dict, Any, List, Optional, Iterator, Callable
 from pathlib import Path
 
 from django.db.models import Prefetch
 
 from .anonymizer import UserAnonymizer, ANONYMIZED_PLACEHOLDER
+
+
+class ExportRedisKeys:
+    TTL = 3600  # 1 hour auto-expire
+
+    @staticmethod
+    def progress(export_id: str) -> str:
+        return f"export:progress:{export_id}"
 
 
 class TaskManagerExporter:
@@ -301,7 +309,8 @@ class TaskManagerExporter:
         self,
         user_ids: Optional[List[int]] = None,
         limit: Optional[int] = None,
-        exclude_dataset_ids: Optional[List[int]] = None
+        exclude_dataset_ids: Optional[List[int]] = None,
+        on_user_start: Optional[Callable[[int, int], None]] = None,
     ) -> Iterator[Dict[str, Any]]:
         """
         Export all task data.
@@ -310,13 +319,17 @@ class TaskManagerExporter:
             user_ids: Optional list of user IDs to export
             limit: Optional limit on number of users (for test mode)
             exclude_dataset_ids: Optional list of dataset IDs to exclude
+            on_user_start: Optional callback(current_index, total_users) called before each user
 
         Yields:
             Task dictionaries
         """
-        users = self._get_users_queryset(user_ids, limit)
+        users = list(self._get_users_queryset(user_ids, limit))
+        total_users = len(users)
 
-        for user in users:
+        for idx, user in enumerate(users):
+            if on_user_start:
+                on_user_start(idx, total_users)
             yield from self.export_user_tasks(user, exclude_dataset_ids)
 
     def export_to_file(
@@ -324,7 +337,8 @@ class TaskManagerExporter:
         output_dir: str,
         user_ids: Optional[List[int]] = None,
         limit: Optional[int] = None,
-        exclude_dataset_ids: Optional[List[int]] = None
+        exclude_dataset_ids: Optional[List[int]] = None,
+        on_progress: Optional[Callable[[int, int, int], None]] = None,
     ) -> Dict[str, Any]:
         """
         Export data to JSONL file.
@@ -334,6 +348,7 @@ class TaskManagerExporter:
             user_ids: Optional list of user IDs to export
             limit: Optional limit on number of users (for test mode)
             exclude_dataset_ids: Optional list of dataset IDs to exclude
+            on_progress: Optional callback(current_user, total_users, tasks_exported)
 
         Returns:
             Export statistics
@@ -354,8 +369,20 @@ class TaskManagerExporter:
 
         seen_participants = set()
 
+        # Progress tracking state shared with on_user_start closure
+        progress_state = {"current_user": 0, "total_users": 0}
+
+        def _on_user_start(idx, total):
+            progress_state["current_user"] = idx
+            progress_state["total_users"] = total
+            if on_progress:
+                on_progress(idx, total, stats["task_count"])
+
         with open(data_file, 'w', encoding='utf-8') as f:
-            for task_data in self.export_all(user_ids, limit, exclude_dataset_ids):
+            for task_data in self.export_all(
+                user_ids, limit, exclude_dataset_ids,
+                on_user_start=_on_user_start,
+            ):
                 # Write JSONL
                 f.write(json.dumps(task_data, ensure_ascii=False, default=str) + '\n')
 

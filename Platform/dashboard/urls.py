@@ -22,7 +22,9 @@ urlpatterns = [
     path("export/users/", views.export_users_list, name="export_users_list"),
     path("export/datasets/", views.export_datasets_list, name="export_datasets_list"),
     path("export/preview/", views.export_preview, name="export_preview"),
-    path("export/download/", views.export_data, name="export_data"),
+    path("export/start/", views.start_export, name="start_export"),
+    path("export/progress/<str:export_id>/", views.export_progress, name="export_progress"),
+    path("export/download/<str:export_id>/", views.download_export, name="download_export"),
     path("import/preview/", views.import_preview, name="import_preview"),
     path("import/execute/", views.import_data, name="import_data"),
 ]

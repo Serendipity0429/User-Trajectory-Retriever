@@ -4,6 +4,9 @@
 import json
 import os
 import tempfile
+import threading
+import uuid
+import logging
 
 from django.shortcuts import render, get_object_or_404
 from django.http import HttpResponseRedirect, JsonResponse, StreamingHttpResponse
@@ -19,6 +22,8 @@ from django.core.paginator import Paginator
 from django.utils import timezone
 from datetime import timedelta
 import markdown
+
+logger = logging.getLogger(__name__)
 
 from user_system.models import User, InformedConsent
 from task_manager.models import Task, ExtensionVersion, CancelAnnotation, ReflectionAnnotation
@@ -514,36 +519,46 @@ def export_preview(request):
     })
 
 
-@login_required
-@user_passes_test(is_superuser)
-@require_POST
-def export_data(request):
-    """Export data to JSONL file with streaming response."""
-    from .utils.export import TaskManagerExporter
-    from .utils.huggingface import save_huggingface_files
+def _run_export(export_id, temp_dir, user_ids, anonymize, exclude_dataset_ids):
+    """Background thread function that runs the export and updates Redis progress."""
+    import django.db
+    import redis as redis_lib
     import zipfile
     import shutil
 
-    try:
-        data = json.loads(request.body)
-    except json.JSONDecodeError:
-        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+    from .utils.export import TaskManagerExporter, ExportRedisKeys
+    from .utils.huggingface import save_huggingface_files
 
-    user_ids = data.get('user_ids', [])
-    anonymize = data.get('anonymize', True)
-    exclude_dataset_ids = data.get('exclude_datasets', [])
+    r = redis_lib.Redis()
+    progress_key = ExportRedisKeys.progress(export_id)
 
-    # Create temp directory (not using context manager so we can stream)
-    temp_dir = tempfile.mkdtemp()
+    def _update_progress(**fields):
+        r.hset(progress_key, mapping={k: json.dumps(v) for k, v in fields.items()})
+        r.expire(progress_key, ExportRedisKeys.TTL)
 
     try:
+        _update_progress(status="running", current_user=0, total_users=0, tasks_exported=0)
+
+        def on_progress(current_user, total_users, tasks_exported):
+            _update_progress(
+                status="running",
+                current_user=current_user,
+                total_users=total_users,
+                tasks_exported=tasks_exported,
+            )
+
         exporter = TaskManagerExporter(anonymize=anonymize)
         stats = exporter.export_to_file(
             temp_dir,
             user_ids=user_ids if user_ids else None,
-            exclude_dataset_ids=exclude_dataset_ids if exclude_dataset_ids else None
+            exclude_dataset_ids=exclude_dataset_ids if exclude_dataset_ids else None,
+            on_progress=on_progress,
         )
         save_huggingface_files(temp_dir, stats, anonymized=anonymize)
+
+        _update_progress(status="zipping", tasks_exported=stats["task_count"],
+                         current_user=stats["participant_count"],
+                         total_users=stats["participant_count"])
 
         # Create zip file
         zip_path = os.path.join(temp_dir, 'export.zip')
@@ -553,43 +568,124 @@ def export_data(request):
                 if os.path.exists(filepath):
                     zf.write(filepath, filename)
 
-        # Get file size for Content-Length header
-        file_size = os.path.getsize(zip_path)
-
-        # Stream the zip file in chunks
-        def file_iterator(file_path, chunk_size=8192):
-            try:
-                with open(file_path, 'rb') as f:
-                    while True:
-                        chunk = f.read(chunk_size)
-                        if not chunk:
-                            break
-                        yield chunk
-            finally:
-                # Clean up temp directory after streaming completes
-                try:
-                    shutil.rmtree(temp_dir)
-                except Exception:
-                    pass
-
         mode_suffix = 'anonymized' if anonymize else 'full'
-        filename = f'task_data_export_{mode_suffix}.zip'
-
-        response = StreamingHttpResponse(
-            file_iterator(zip_path),
-            content_type='application/zip'
+        _update_progress(
+            status="complete",
+            zip_path=zip_path,
+            filename=f'task_data_export_{mode_suffix}.zip',
+            tasks_exported=stats["task_count"],
+            current_user=stats["participant_count"],
+            total_users=stats["participant_count"],
         )
-        response['Content-Disposition'] = f'attachment; filename="{filename}"'
-        response['Content-Length'] = file_size
-        return response
 
     except Exception as e:
-        # Clean up on error
+        logger.exception("Export %s failed", export_id)
+        _update_progress(status="error", error=str(e))
         try:
             shutil.rmtree(temp_dir)
         except Exception:
             pass
-        return JsonResponse({'error': str(e)}, status=500)
+    finally:
+        django.db.connections.close_all()
+
+
+@login_required
+@user_passes_test(is_superuser)
+@require_POST
+def start_export(request):
+    """Start a background export and return the export ID immediately."""
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+
+    user_ids = data.get('user_ids', [])
+    anonymize = data.get('anonymize', True)
+    exclude_dataset_ids = data.get('exclude_datasets', [])
+
+    export_id = str(uuid.uuid4())
+    temp_dir = tempfile.mkdtemp()
+
+    t = threading.Thread(
+        target=_run_export,
+        args=(export_id, temp_dir, user_ids, anonymize, exclude_dataset_ids),
+        daemon=True,
+    )
+    t.start()
+
+    return JsonResponse({'export_id': export_id})
+
+
+@login_required
+@user_passes_test(is_superuser)
+@require_GET
+def export_progress(request, export_id):
+    """Poll the progress of a running export."""
+    import redis as redis_lib
+    from .utils.export import ExportRedisKeys
+
+    r = redis_lib.Redis()
+    progress_key = ExportRedisKeys.progress(export_id)
+    raw = r.hgetall(progress_key)
+
+    if not raw:
+        return JsonResponse({'error': 'Export not found or expired'}, status=404)
+
+    data = {k.decode(): json.loads(v.decode()) for k, v in raw.items()}
+    return JsonResponse(data)
+
+
+@login_required
+@user_passes_test(is_superuser)
+@require_GET
+def download_export(request, export_id):
+    """Download the completed export zip file."""
+    import redis as redis_lib
+    import shutil
+    from .utils.export import ExportRedisKeys
+
+    r = redis_lib.Redis()
+    progress_key = ExportRedisKeys.progress(export_id)
+    raw = r.hgetall(progress_key)
+
+    if not raw:
+        return JsonResponse({'error': 'Export not found or expired'}, status=404)
+
+    data = {k.decode(): json.loads(v.decode()) for k, v in raw.items()}
+
+    if data.get('status') != 'complete':
+        return JsonResponse({'error': 'Export not ready'}, status=400)
+
+    zip_path = data.get('zip_path', '')
+    if not zip_path or not os.path.exists(zip_path):
+        return JsonResponse({'error': 'Export file not found'}, status=404)
+
+    file_size = os.path.getsize(zip_path)
+    temp_dir = os.path.dirname(zip_path)
+    filename = data.get('filename', 'task_data_export.zip')
+
+    def file_iterator(file_path, chunk_size=8192):
+        try:
+            with open(file_path, 'rb') as f:
+                while True:
+                    chunk = f.read(chunk_size)
+                    if not chunk:
+                        break
+                    yield chunk
+        finally:
+            r.delete(progress_key)
+            try:
+                shutil.rmtree(temp_dir)
+            except Exception:
+                pass
+
+    response = StreamingHttpResponse(
+        file_iterator(zip_path),
+        content_type='application/zip'
+    )
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    response['Content-Length'] = file_size
+    return response
 
 
 @login_required

@@ -374,10 +374,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 };
 
                 downloadBtn.disabled = true;
-                downloadBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Preparing...';
+                downloadBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Starting...';
 
-                // Use POST with JSON body to avoid URL length limits
-                fetch('/dashboard/export/download/', {
+                const progressDiv = document.getElementById('export-progress');
+
+                fetch('/dashboard/export/start/', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -386,34 +387,85 @@ document.addEventListener('DOMContentLoaded', function() {
                     body: JSON.stringify(requestBody),
                 })
                     .then(response => {
-                        if (!response.ok) {
-                            throw new Error('Export failed');
-                        }
-                        // Get filename from Content-Disposition header or use default
-                        const disposition = response.headers.get('Content-Disposition');
-                        let filename = 'task_data_export.zip';
-                        if (disposition && disposition.includes('filename=')) {
-                            const match = disposition.match(/filename="?([^";\n]+)"?/);
-                            if (match) filename = match[1];
-                        }
-                        return response.blob().then(blob => ({ blob, filename }));
+                        if (!response.ok) throw new Error('Failed to start export');
+                        return response.json();
                     })
-                    .then(({ blob, filename }) => {
-                        // Create blob URL and trigger download
-                        const url = window.URL.createObjectURL(blob);
-                        const link = document.createElement('a');
-                        link.href = url;
-                        link.download = filename;
-                        document.body.appendChild(link);
-                        link.click();
-                        document.body.removeChild(link);
-                        window.URL.revokeObjectURL(url);
+                    .then(({ export_id }) => {
+                        // Show progress bar
+                        progressDiv.style.display = 'block';
+                        progressDiv.innerHTML = `
+                            <div class="progress" style="height: 22px;">
+                                <div class="progress-bar progress-bar-striped progress-bar-animated"
+                                     role="progressbar" style="width: 0%" id="export-progress-bar">
+                                    Starting...
+                                </div>
+                            </div>
+                            <small class="text-muted mt-1 d-block" id="export-progress-detail"></small>
+                        `;
+
+                        const bar = document.getElementById('export-progress-bar');
+                        const detail = document.getElementById('export-progress-detail');
+
+                        const pollInterval = setInterval(() => {
+                            fetch(`/dashboard/export/progress/${export_id}/`)
+                                .then(r => r.json())
+                                .then(data => {
+                                    if (data.status === 'running') {
+                                        const total = data.total_users || 1;
+                                        const current = data.current_user || 0;
+                                        const pct = Math.round((current / total) * 100);
+                                        bar.style.width = Math.max(pct, 5) + '%';
+                                        bar.textContent = `Exporting user ${current + 1} of ${total}`;
+                                        detail.textContent = `${data.tasks_exported || 0} tasks exported so far`;
+                                    } else if (data.status === 'zipping') {
+                                        bar.style.width = '95%';
+                                        bar.textContent = 'Creating zip file...';
+                                        detail.textContent = `${data.tasks_exported || 0} tasks exported`;
+                                    } else if (data.status === 'complete') {
+                                        clearInterval(pollInterval);
+                                        bar.style.width = '100%';
+                                        bar.classList.remove('progress-bar-animated');
+                                        bar.classList.add('bg-success');
+                                        bar.textContent = 'Complete! Downloading...';
+                                        detail.textContent = '';
+
+                                        // Trigger browser download via hidden link
+                                        const link = document.createElement('a');
+                                        link.href = `/dashboard/export/download/${export_id}/`;
+                                        link.style.display = 'none';
+                                        document.body.appendChild(link);
+                                        link.click();
+                                        document.body.removeChild(link);
+
+                                        setTimeout(() => {
+                                            progressDiv.style.display = 'none';
+                                            downloadBtn.disabled = false;
+                                            downloadBtn.innerHTML = '<i class="bi bi-download me-1"></i> Download Export';
+                                        }, 2000);
+                                    } else if (data.status === 'error') {
+                                        clearInterval(pollInterval);
+                                        bar.classList.remove('progress-bar-animated', 'progress-bar-striped');
+                                        bar.classList.add('bg-danger');
+                                        bar.style.width = '100%';
+                                        bar.textContent = 'Export failed';
+                                        detail.textContent = data.error || 'Unknown error';
+                                        downloadBtn.disabled = false;
+                                        downloadBtn.innerHTML = '<i class="bi bi-download me-1"></i> Download Export';
+                                    }
+                                })
+                                .catch(() => {
+                                    clearInterval(pollInterval);
+                                    progressDiv.style.display = 'none';
+                                    alert('Lost connection while checking export progress.');
+                                    downloadBtn.disabled = false;
+                                    downloadBtn.innerHTML = '<i class="bi bi-download me-1"></i> Download Export';
+                                });
+                        }, 1000);
                     })
                     .catch(err => {
-                        alert('Error downloading export: ' + err.message);
-                        console.error('Download error:', err);
-                    })
-                    .finally(() => {
+                        alert('Error starting export: ' + err.message);
+                        console.error('Export error:', err);
+                        progressDiv.style.display = 'none';
                         downloadBtn.disabled = false;
                         downloadBtn.innerHTML = '<i class="bi bi-download me-1"></i> Download Export';
                     });

@@ -1,69 +1,44 @@
 # TEC: A Collection of Human Trial-and-error Trajectories for Problem Solving
 
-This is the open-source platform and dataset for the paper:
-
 > **TEC: A Collection of Human Trial-and-error Trajectories for Problem Solving**
 > Xinkai Zhang, Jingtao Zhan, Yiqun Liu, and Qingyao Ai.
 
+Dataset: [Hugging Face](https://huggingface.co/datasets/Serendipity2004/TEC)
+
 ## Overview
 
-Solving problems through trial-and-error is a fundamental skill of human intelligence, yet no existing resource captures this multi-trial process with both behavioral traces and structured diagnostic reflections. TEC fills this gap with:
+TEC is an open-source platform for recording, replaying, and annotating user web trajectories. It pairs a Chrome extension with a Django backend to support multi-trial web interaction studies.
 
-1. **An open-source recording platform** — a Chrome extension paired with a Django backend for cross-domain rrweb DOM recording, interaction capture, and DOM-based replay
-2. **A replay-based annotation methodology** — a five-stage workflow that captures pre-task assessments, evidence marking, answer submission, failure reflections with prioritized diagnoses and corrective plans, and post-task evaluations
-3. **The TEC dataset** — 5,370 trials across 58 open-domain questions covering 41,229 webpages, with per-trial labels, structured failure reflections, evidence markers, and full replayable behavioral traces
+- **Chrome Extension** (`ManifestV3/`): Built on Manifest V3, records three synchronized streams per page — rrweb DOM snapshots, interaction events (clicks, hovers, keypresses), and continuous mouse/scroll positions. Works on any website without per-site configuration.
+- **Django Backend** (`Platform/`): Manages the full study lifecycle — task assignment, data ingestion, answer evaluation, replay-based annotation, user authentication, informed consent, admin analytics, and data export/import. Studies are organized hierarchically: dataset → question → per-user task → trials.
 
-## System Architecture
+## Features
 
-The platform pairs a **Chrome Extension** that non-intrusively captures DOM snapshots, interaction events, and mouse trajectories from any webpage via [rrweb](https://github.com/rrweb-io/rrweb), with a **Django Backend** that manages the full study lifecycle including task assignment, data ingestion, annotation, and evaluation.
-
-- **Chrome Extension** (`ManifestV3/`): Built on Manifest V3, captures three synchronized streams per page — (1) rrweb DOM recording, (2) interaction events (clicks, hovers, keypresses) with timestamps, and (3) continuous mouse position and scroll offset. Works on any website without per-site configuration.
-- **Django Backend** (`Platform/`): Organizes studies hierarchically (dataset → question → per-user task → trials) and handles task assignment, data ingestion, answer evaluation, user authentication, informed consent, admin analytics, and data export/import.
+### Trajectory Recording & Replay
+- Cross-domain rrweb DOM recording from any webpage
+- High-fidelity DOM-based replay with timeline controls
+- Mouse trail visualization during replay
+- Evidence marking via right-click context menu
 
 ### Multi-Stage Annotation Workflow
-
-Participants review a DOM-based replay of their browsing session before annotating. The workflow proceeds through five stages:
-
 1. **Pre-task assessment** — familiarity, difficulty, and initial strategy
-2. **Browse and collect evidence** — extension records trajectories; evidence marked via right-click context menu
-3. **Answer submission** — submit answer with confidence rating and evidence assessments
-4. **Correctness evaluation** — automatic evaluation against ground truth, routing to post-task assessment on success or reflection on failure
-5. **Reflection on failure** — prioritized failure diagnosis and corrective plan, then retry from stage 2
+2. **Browse and collect evidence** — extension records trajectories
+3. **Answer submission** — answer with confidence rating and evidence assessments
+4. **Correctness evaluation** — automatic evaluation against ground truth
+5. **Reflection on failure** — failure diagnosis and corrective plan, then retry
 
-### LLM Benchmarking
-
-The platform includes built-in pipelines for comparing LLM trial-and-error strategies against human behavior:
-
-- **Vanilla LLM**: Direct prompting without search
-- **RAG**: Query generation, web search, and answer synthesis
-- **Vanilla Agent**: ReAct-style agent with search and page-visit tools
-- **Browser Agent**: ReAct-style agent with Chrome DevTools MCP for browser automation
-
-All methods run with explicit reflection prompts between trials to match the human protocol.
-
-## TEC Dataset
-
-The dataset is publicly available on [Hugging Face](https://huggingface.co/datasets/Serendipity2004/TEC).
-
-| Metric | Value |
-|---|---|
-| Questions | 58 |
-| Task trajectories | 2,424 |
-| Total trials | 5,370 |
-| Avg trials per task | 2.2 |
-| Webpages visited (with recording) | 41,229 |
-| Unique domains visited | 1,053 |
-| Interaction events | 1,516,981 |
-| Search queries | 6,657 |
-| Reflection annotations (failure) | 2,946 |
-| Evidence markers | 7,208 |
+### Platform
+- **Task Management**: Create datasets, assign tasks, track progress
+- **User System**: Authentication with role-based access, informed consent
+- **Admin Dashboard**: Analytics, data visualization, progress monitoring
+- **Data Export/Import**: HuggingFace-compatible JSONL export with anonymization
+- **Discussion Forum & Messaging**: Community space and private messaging
 
 ## Prerequisites
 
 - Python 3.8+
-- Redis (required for benchmarking features)
+- Redis
 - Google Chrome (for the extension)
-- Node.js 18+ (only for agent pipelines)
 
 ## Quick Start
 
@@ -90,8 +65,6 @@ cp Platform/.env.example Platform/.env
 
 Key settings in `.env`:
 - `DJANGO_SECRET_KEY`: Required for Django
-- `LLM_*`: For benchmarking features
-- `SERPER_API_KEY`: For RAG pipeline web search
 
 ### 3. Initialize Database
 
@@ -128,7 +101,6 @@ Visit `http://127.0.0.1:8000/`
 ├── Platform/             # Django backend
 │   ├── task_manager/     # Trajectory and task management
 │   ├── user_system/      # Authentication and profiles
-│   ├── benchmark/        # LLM evaluation pipelines
 │   ├── dashboard/        # Admin analytics
 │   ├── discussion/       # Forum system
 │   └── msg_system/       # Private messaging
@@ -139,9 +111,8 @@ Visit `http://127.0.0.1:8000/`
 ## Privacy
 
 - Password inputs are excluded from recording
-- All participants sign informed consent
 - Browsing data is only recorded during designated task sessions
-- Dataset released with anonymized IDs and all private data removed
+- Data export supports anonymization (usernames, emails, ages binned)
 - Use incognito mode for session isolation
 
 ## Development
@@ -182,4 +153,3 @@ MIT License - see [LICENSE](./LICENSE)
 ## Acknowledgements
 
 This platform is built upon the prototype system from the [Web Search Field Study Toolkit](https://github.com/xuanyuan14/Web-Search-Field-Study-Toolkit). We thank the authors for their foundational contribution.
-

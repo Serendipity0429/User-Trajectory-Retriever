@@ -16,7 +16,7 @@ benchmark_graphs
 Platform/staticfiles/
 NQ-open.train.jsonl
 hard_questions.jsonl
-Platform/benchmark/results/
+Platform/benchmark/
 mcp
 tempCodes
 .github

@@ -18,7 +18,6 @@ urlpatterns = [
     path("discussion/", include("discussion.urls")),
     path("message/", include("msg_system.urls")),
     path("captcha/", include("captcha.urls")),
-    path("benchmark/", include("benchmark.urls")),
     path("dashboard/", include("dashboard.urls")),
 ]
 

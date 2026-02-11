@@ -104,11 +104,6 @@
                     <a href="{% url 'dashboard:index' %}"><i class="bi bi-person-badge-fill"></i> Dashboard</a>
                 </li>
                 {% endif %}
-                {% if user.is_staff %}
-                <li>
-                    <a href="{% url 'benchmark:home' %}"><i class="bi bi-speedometer2"></i> Benchmark</a>
-                </li>
-                {% endif %}
                 {% if request.session.original_user_token %}
                 <li>
                     <form id="return-to-admin-form" action="{% url 'dashboard:return_to_admin' %}" method="post" class="d-none">
@@ -203,8 +198,6 @@
 
             <main class="container-fluid">
                 {% block content %}
-                {% endblock %}
-                {% block benchmark_content %}
                 {% endblock %}
             </main>
 

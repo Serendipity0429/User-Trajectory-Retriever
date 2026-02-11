@@ -28,22 +28,18 @@
   "host_permissions": [
     "http://*/*",
     "https://*/*",
-    "http://127.0.0.1:8000/*",
-    "http://101.6.41.59:32904/*",
-    "http://101.6.43.73:32904/*"
+    "http://127.0.0.1:8000/*"
   ],
   "background": {
     "service_worker": "background.js"
   },
   "externally_connectable": {
     "matches": [
-      "http://127.0.0.1:8000/*",
-      "http://101.6.41.59:32904/*",
-      "http://101.6.43.73:32904/*"
+      "http://127.0.0.1:8000/*"
     ]
   },
   "content_security_policy": {
-    "extension_pages": "script-src 'self'; connect-src http://127.0.0.1:8000 http://localhost:8000 http://101.6.41.59:32904 http://101.6.43.73:32904;"
+    "extension_pages": "script-src 'self'; connect-src http://127.0.0.1:8000 http://localhost:8000;"
   },
   "content_scripts": [
     {
@@ -56,11 +52,7 @@
         "http://127.0.0.1/*",
         "https://127.0.0.1/*",
         "http://0.0.0.0/*",
-        "https://0.0.0.0/*",
-        "http://101.6.41.59:32904/*",
-        "https://101.6.41.59:32904/*",
-        "http://101.6.43.73:32904/*",
-        "https://101.6.43.73:32904/*"
+        "https://0.0.0.0/*"
       ],
       "js": [
         "bypass.js"
@@ -78,11 +70,7 @@
         "http://127.0.0.1/*",
         "https://127.0.0.1/*",
         "http://0.0.0.0/*",
-        "https://0.0.0.0/*",
-        "http://101.6.41.59:32904/*",
-        "https://101.6.41.59:32904/*",
-        "http://101.6.43.73:32904/*",
-        "https://101.6.43.73:32904/*"
+        "https://0.0.0.0/*"
       ],
       "js": [
         "scripts/rrweb.min.js"
@@ -100,11 +88,7 @@
         "http://127.0.0.1/*",
         "https://127.0.0.1/*",
         "http://0.0.0.0/*",
-        "https://0.0.0.0/*",
-        "http://101.6.41.59:32904/*",
-        "https://101.6.41.59:32904/*",
-        "http://101.6.43.73:32904/*",
-        "https://101.6.43.73:32904/*"
+        "https://0.0.0.0/*"
       ],
       "js": [
         "config.js",
@@ -125,9 +109,7 @@
     {
       "matches": [
         "http://127.0.0.1:8000/*",
-        "http://localhost:8000/*",
-        "http://101.6.41.59:32904/*",
-        "http://101.6.43.73:32904/*"
+        "http://localhost:8000/*"
       ],
       "js": ["close_helper.js"],
       "run_at": "document_start"

@@ -63,7 +63,6 @@ INSTALLED_APPS = [
     "discussion",
     'msg_system',
     'core',
-    'benchmark',
     "dashboard",
 ]
 

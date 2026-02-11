@@ -16,7 +16,6 @@ from .stats import (
     get_json_field_distribution,
     get_navigation_stats,
     get_top_domains,
-    get_human_baseline_for_leaderboard,
 )
 
 # Export/Import utilities
@@ -39,7 +38,6 @@ __all__ = [
     'get_json_field_distribution',
     'get_navigation_stats',
     'get_top_domains',
-    'get_human_baseline_for_leaderboard',
     # Export/Import
     'UserAnonymizer',
     'ANONYMIZED_PLACEHOLDER',

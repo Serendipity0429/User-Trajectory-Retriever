@@ -9,7 +9,7 @@ Dataset: [Hugging Face](https://huggingface.co/datasets/Serendipity2004/TEC)
 
 TEC is an open-source platform for recording, replaying, and annotating user web trajectories. It pairs a Chrome extension with a Django backend to support multi-trial web interaction studies.
 
-- **Chrome Extension** (`ManifestV3/`): Built on Manifest V3, records three synchronized streams per page — rrweb DOM snapshots, interaction events (clicks, hovers, keypresses), and continuous mouse/scroll positions. Works on any website without per-site configuration.
+- **Chrome Extension** (`ChromeExtension/`): Built on Manifest V3, records three synchronized streams per page — rrweb DOM snapshots, interaction events (clicks, hovers, keypresses), and continuous mouse/scroll positions. Works on any website without per-site configuration.
 - **Django Backend** (`Platform/`): Manages the full study lifecycle — task assignment, data ingestion, answer evaluation, replay-based annotation, user authentication, informed consent, admin analytics, and data export/import. Studies are organized hierarchically: dataset → question → per-user task → trials.
 
 ## Features
@@ -65,27 +65,41 @@ cp Platform/.env.example Platform/.env
 
 Key settings in `.env`:
 - `DJANGO_SECRET_KEY`: Required for Django
+- `DJANGO_DEBUG`: Set to `True` for development (Django dev server), `False` for production (Gunicorn)
+- `REMOTE`: Set to `True` to bind to `0.0.0.0:8000` for remote access
 
-### 3. Initialize Database
+### 3. Run
 
 ```bash
-python Platform/manage.py migrate
-python Platform/manage.py createsuperuser
+python Platform/start.py
 ```
 
-### 4. Run
+This automatically handles migrations and starts the appropriate server based on your `.env` settings.
+
+For a clean start with sample data (development only):
 
 ```bash
-python Platform/manage.py runserver
+python Platform/start.py --clean
 ```
 
 Visit `http://127.0.0.1:8000/`
 
 ### 5. Install Chrome Extension
 
-1. Navigate to `chrome://extensions`
-2. Enable **Developer mode**
-3. Click **Load unpacked** and select `ManifestV3/`
+1. Configure your server address:
+   - **`ChromeExtension/config.js`**: For local development, the defaults work out of the box. For remote deployment, set `serverType: 'remote'` and `remoteServerAddress` to your server URL.
+   - **`ChromeExtension/manifest.json`**: If using a remote server (e.g. `http://example.com:8000`), add its URL to the following fields:
+     ```jsonc
+     "host_permissions": [..., "http://example.com:8000/*"],
+     "externally_connectable": { "matches": [..., "http://example.com:8000/*"] },
+     "content_security_policy": {
+       "extension_pages": "script-src 'self'; connect-src http://127.0.0.1:8000 http://localhost:8000 http://example.com:8000;"
+     }
+     ```
+     Also add `"http://example.com:8000/*"` to `exclude_matches` in each `content_scripts` entry and to the `close_helper.js` `matches` array.
+2. Navigate to `chrome://extensions`
+3. Enable **Developer mode**
+4. Click **Load unpacked** and select `ChromeExtension/`
 
 ## Usage
 
@@ -97,7 +111,7 @@ Visit `http://127.0.0.1:8000/`
 ## Directory Structure
 
 ```
-├── ManifestV3/           # Chrome extension (rrweb-based recording)
+├── ChromeExtension/           # Chrome extension (rrweb-based recording)
 ├── Platform/             # Django backend
 │   ├── task_manager/     # Trajectory and task management
 │   ├── user_system/      # Authentication and profiles
@@ -115,14 +129,20 @@ Visit `http://127.0.0.1:8000/`
 - Data export supports anonymization (usernames, emails, ages binned)
 - Use incognito mode for session isolation
 
-## Development
+## Deployment
+
+For production, set `DJANGO_DEBUG=False` in `Platform/.env`, then:
 
 ```bash
-# Run tests
-python Platform/manage.py test task_manager
+python Platform/start.py
+```
 
-# Production deployment
-cd Platform && gunicorn --config gunicorn.conf.py annotation_platform.wsgi
+This will collect static files and start Gunicorn automatically.
+
+To run tests:
+
+```bash
+python Platform/manage.py test task_manager
 ```
 
 ## Citation

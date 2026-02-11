@@ -1,10 +1,10 @@
-// ManifestV3/config.js
+// ChromeExtension/config.js
 
 // --- Default Configuration ---
 const defaultConfig = {
-    serverType: 'remote', // 'local' or 'remote'
+    serverType: 'local', // 'local' or 'remote'
     localServerAddress: 'http://127.0.0.1:8000',
-    remoteServerAddress: 'http://101.6.43.73:32904', // Temporary
+    remoteServerAddress: '', // Set your remote server address here, e.g. 'http://your-server:8000'
     isPassiveMode: true,
     cancelTrialThreshold: 5, // Number of cancellations allowed before submission
     messageBoxSize: 'medium',

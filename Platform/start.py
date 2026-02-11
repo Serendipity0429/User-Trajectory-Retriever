@@ -117,7 +117,6 @@ def clean_project() -> None:
         WORK_DIR / "task_manager" / "migrations",
         WORK_DIR / "user_system" / "migrations",
         WORK_DIR / "discussion" / "migrations",
-        WORK_DIR / "benchmark" / "migrations",
         WORK_DIR / "dashboard" / "migrations",
         WORK_DIR / "msg_system" / "migrations",
         WORK_DIR / "media" / "attachments",
@@ -208,7 +207,7 @@ def main() -> None:
 
     # Apply database migrations.
     print_header("Running database migrations")
-    for app in ["task_manager", "user_system", "discussion", "msg_system", "benchmark", "dashboard", "core"]:
+    for app in ["task_manager", "user_system", "discussion", "msg_system", "dashboard", "core"]:
         run_manage_py_command("makemigrations", app)
     run_manage_py_command("makemigrations")
     run_manage_py_command("migrate")

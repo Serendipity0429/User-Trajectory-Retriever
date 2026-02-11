@@ -20,11 +20,16 @@ def generate_dataset_info(stats: Dict[str, Any], anonymized: bool = True) -> Dic
         dataset_info dictionary
     """
     return {
-        "description": "Web trajectory dataset for information-seeking behavior research. "
-                      "Contains user search trajectories, task annotations, and behavioral data.",
-        "citation": "",
-        "homepage": "",
-        "license": "",
+        "description": "TEC: A Collection of Human Trial-and-error Trajectories for Problem Solving. "
+                      "Contains 5,370 trials across 58 open-domain questions with per-trial labels, "
+                      "structured failure reflections, evidence markers, and replayable behavioral traces.",
+        "citation": "@article{zhang2026tec,\n"
+                   "  title={TEC: A Collection of Human Trial-and-error Trajectories for Problem Solving},\n"
+                   "  author={Zhang, Xinkai and Zhan, Jingtao and Liu, Yiqun and Ai, Qingyao},\n"
+                   "  year={2026}\n"
+                   "}",
+        "homepage": "https://github.com/Serendipity0429/TEC",
+        "license": "mit",
         "features": {
             "task_id": {"dtype": "int32", "_type": "Value"},
             "participant_id": {"dtype": "string", "_type": "Value"},
@@ -93,8 +98,8 @@ def generate_dataset_info(stats: Dict[str, Any], anonymized: bool = True) -> Dic
         ],
         "task_categories": ["other"],
         "task_ids": [],
-        "pretty_name": "Web Trajectory Dataset",
-        "tags": ["web-trajectory", "information-seeking", "user-behavior"],
+        "pretty_name": "TEC: Human Trial-and-error Trajectories",
+        "tags": ["web-trajectory", "information-seeking", "user-behavior", "trial-and-error", "problem-solving"],
         "size_categories": [_get_size_category(stats.get("task_count", 0))],
         "annotations": {
             "anonymized": anonymized,
@@ -145,32 +150,41 @@ This dataset has been anonymized:
 """
 
     return f"""---
-license: ""
+license: mit
 task_categories:
   - other
 tags:
   - web-trajectory
   - information-seeking
   - user-behavior
+  - trial-and-error
+  - problem-solving
 size_categories:
   - {_get_size_category(stats.get("task_count", 0))}
 ---
 
-# Web Trajectory Dataset
+# TEC: A Collection of Human Trial-and-error Trajectories for Problem Solving
 
-A dataset of web search trajectories for information-seeking behavior research.
+This is the dataset for the paper:
+
+> **TEC: A Collection of Human Trial-and-error Trajectories for Problem Solving**
+> Xinkai Zhang, Jingtao Zhan, Yiqun Liu, and Qingyao Ai.
 
 ## Dataset Description
 
-This dataset contains user web search trajectories captured during information-seeking tasks.
-Each record represents a task completed by a participant, including:
+TEC captures the human trial-and-error process in web search with both behavioral traces and structured diagnostic reflections. Each record represents a multi-trial task trajectory where participants iteratively search, attempt answers, reflect on failures, and retry with corrective plans.
 
-- **Task information**: Question, ground truth answer, status
-- **Participant profile**: Demographics, expertise levels (anonymized if applicable)
-- **Pre-task annotation**: Initial familiarity, difficulty prediction, search strategy
-- **Post-task annotation**: Actual difficulty, aha moments, strategy shifts
-- **Trials**: Multiple attempts with answers, confidence levels, and justifications
-- **Web trajectories**: Page visits with rrweb recordings, mouse movements, and events
+Each task record includes:
+
+- **Task information**: Open-domain factoid question, ground truth answer, completion status
+- **Participant profile**: Demographics and expertise levels (anonymized)
+- **Pre-task annotation**: Familiarity, difficulty prediction, initial search query, initial guess
+- **Trial outcomes**: Per-trial answers with correctness labels, confidence, and formulation method
+- **Evidence markers**: Selected text, DOM position, source URL with relevance/credibility ratings
+- **Reflection annotations** (on failure): Prioritized failure diagnosis, corrective plan, adjusted difficulty
+- **Post-task annotation** (on success): Actual difficulty, "aha" moments, unhelpful paths, strategy shifts
+- **Cancellation annotation** (on giving up): Cancellation reason, missing resources
+- **Behavioral traces**: Full rrweb DOM recordings, interaction events, and mouse movements per page
 
 ## Dataset Statistics
 
@@ -191,8 +205,8 @@ The dataset is provided in JSONL format (JSON Lines), where each line is a compl
 {{
   "task_id": 1,
   "participant_id": "participant_000001",
-  "question": "What is the capital of France?",
-  "ground_truth": ["Paris"],
+  "question": "What is ...",
+  "ground_truth": ["..."],
   "status": "completed",
   "start_timestamp": "2024-01-15T10:30:00Z",
   "end_timestamp": "2024-01-15T10:45:00Z",
@@ -209,54 +223,98 @@ The dataset is provided in JSONL format (JSON Lines), where each line is a compl
   "pre_task_annotation": {{
     "familiarity": 2,
     "difficulty": 1,
-    "first_search_query": "capital of France"
+    "first_search_query": "...",
+    "initial_guess": "..."
   }},
   "post_task_annotation": {{
-    "difficulty_actual": 1,
-    "aha_moment_type": null
+    "difficulty_actual": 3,
+    "aha_moment_type": "search_result"
   }},
+  "cancel_annotation": null,
   "trials": [
     {{
       "trial_num": 1,
-      "answer": "Paris",
-      "is_correct": true,
-      "confidence": 4,
-      "justifications": [...],
-      "webpages": [...]
+      "answer": "...",
+      "is_correct": false,
+      "confidence": 3,
+      "reflection_annotation": {{
+        "failure_category": "Ineffective Search",
+        "corrective_plan": "Improve Search",
+        "adjusted_difficulty": 4,
+        "notes": "..."
+      }},
+      "justifications": [
+        {{
+          "url": "https://...",
+          "text": "selected text",
+          "dom_position": 150,
+          "relevance": 0.8,
+          "credibility": 0.9
+        }}
+      ],
+      "webpages": [
+        {{
+          "title": "Page Title",
+          "url": "https://...",
+          "referrer": "https://...",
+          "dwell_time": 45,
+          "rrweb_record": ["..."],
+          "event_list": ["..."],
+          "mouse_moves": ["..."]
+        }}
+      ]
     }}
   ]
 }}
 ```
 
-### Webpage Data
+### Key Fields
 
-Each webpage record includes:
-- `url`, `title`, `referrer`
-- `dwell_time`: Time spent on page (seconds)
-- `rrweb_record`: Full DOM recording for replay
-- `event_list`: User interaction events
-- `mouse_moves`: Mouse movement data
+| Record | Key Fields |
+|--------|-----------|
+| Webpage (per page) | URL, title, rrweb DOM recording, interaction events, mouse/scroll trajectory, dwell time, referrer |
+| Trial outcome (per trial) | Answer, correctness, confidence, formulation method |
+| Evidence | Selected text, DOM position, source URL, relevance/credibility ratings |
+| Reflection (on failure) | Failure diagnosis (prioritized), corrective plan (prioritized), adjusted difficulty |
+| Pre-task (per task) | Familiarity, difficulty estimate, initial query plan, initial guess |
+| Post-task | Actual difficulty, "aha" moment type, unhelpful paths, strategy shifts |
+| Cancellation | Cancellation reason, missing resources |
 
 ## Usage
 
 ```python
 from datasets import load_dataset
 
-dataset = load_dataset("path/to/dataset", split="train")
+dataset = load_dataset("Serendipity2004/TEC", split="train")
 
-# Access a single task
+# Access a task trajectory
 task = dataset[0]
 print(task["question"])
-print(task["trials"][0]["answer"])
+print(f"Number of trials: {{task['num_trial']}}")
+
+# Iterate over trials
+import json
+for trial_json in task["trials"]:
+    trial = json.loads(trial_json)
+    print(f"Trial {{trial['trial_num']}}: correct={{trial['is_correct']}}")
+    if trial.get("reflection_annotation"):
+        print(f"  Failure: {{trial['reflection_annotation']['failure_category']}}")
+        print(f"  Plan: {{trial['reflection_annotation']['corrective_plan']}}")
+```
+
+## Citation
+
+```bibtex
+@article{{zhang2026tec,
+  title={{TEC: A Collection of Human Trial-and-error Trajectories for Problem Solving}},
+  author={{Zhang, Xinkai and Zhan, Jingtao and Liu, Yiqun and Ai, Qingyao}},
+  year={{2026}}
+}}
 ```
 
 ## License
 
-[Add license information]
-
-## Citation
-
-[Add citation information]
+MIT License
 
 ## Exported
 

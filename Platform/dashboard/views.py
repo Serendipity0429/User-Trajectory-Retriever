@@ -3,10 +3,15 @@
 
 import json
 import os
+import shutil
 import tempfile
 import threading
 import uuid
 import logging
+import zipfile
+
+import django.db
+import redis
 
 from django.shortcuts import render, get_object_or_404
 from django.http import HttpResponseRedirect, JsonResponse, StreamingHttpResponse
@@ -44,6 +49,9 @@ from .utils import (
     get_navigation_stats,
     get_top_domains,
 )
+from .utils.export import TaskManagerExporter, ExportRedisKeys
+from .utils.importer import TaskManagerImporter, ImportValidationError, ImportRedisKeys
+from .utils.huggingface import save_huggingface_files
 
 def is_superuser(user):
     return user.is_superuser
@@ -491,8 +499,6 @@ def export_datasets_list(request):
 @require_POST
 def export_preview(request):
     """Get preview of what would be exported."""
-    from .utils.export import TaskManagerExporter
-
     try:
         data = json.loads(request.body)
     except json.JSONDecodeError:
@@ -521,15 +527,7 @@ def export_preview(request):
 
 def _run_export(export_id, temp_dir, user_ids, anonymize, exclude_dataset_ids):
     """Background thread function that runs the export and updates Redis progress."""
-    import django.db
-    import redis as redis_lib
-    import zipfile
-    import shutil
-
-    from .utils.export import TaskManagerExporter, ExportRedisKeys
-    from .utils.huggingface import save_huggingface_files
-
-    r = redis_lib.Redis()
+    r = redis.Redis()
     progress_key = ExportRedisKeys.progress(export_id)
 
     def _update_progress(**fields):
@@ -621,10 +619,7 @@ def start_export(request):
 @require_GET
 def export_progress(request, export_id):
     """Poll the progress of a running export."""
-    import redis as redis_lib
-    from .utils.export import ExportRedisKeys
-
-    r = redis_lib.Redis()
+    r = redis.Redis()
     progress_key = ExportRedisKeys.progress(export_id)
     raw = r.hgetall(progress_key)
 
@@ -640,11 +635,7 @@ def export_progress(request, export_id):
 @require_GET
 def download_export(request, export_id):
     """Download the completed export zip file."""
-    import redis as redis_lib
-    import shutil
-    from .utils.export import ExportRedisKeys
-
-    r = redis_lib.Redis()
+    r = redis.Redis()
     progress_key = ExportRedisKeys.progress(export_id)
     raw = r.hgetall(progress_key)
 
@@ -693,8 +684,6 @@ def download_export(request, export_id):
 @require_POST
 def import_preview(request):
     """Validate and preview import from uploaded file."""
-    from .utils.importer import TaskManagerImporter
-
     if 'file' not in request.FILES:
         return JsonResponse({'error': 'No file uploaded'}, status=400)
 
@@ -735,12 +724,7 @@ def import_preview(request):
 
 def _run_import(import_id, temp_path, mode, total_tasks=0):
     """Background thread function that runs the import and updates Redis progress."""
-    import django.db
-    import redis as redis_lib
-
-    from .utils.importer import TaskManagerImporter, ImportValidationError, ImportRedisKeys
-
-    r = redis_lib.Redis()
+    r = redis.Redis()
     progress_key = ImportRedisKeys.progress(import_id)
 
     def _update_progress(**fields):
@@ -829,10 +813,7 @@ def import_data(request):
 @require_GET
 def import_progress(request, import_id):
     """Poll the progress of a running import."""
-    import redis as redis_lib
-    from .utils.importer import ImportRedisKeys
-
-    r = redis_lib.Redis()
+    r = redis.Redis()
     progress_key = ImportRedisKeys.progress(import_id)
     raw = r.hgetall(progress_key)
 

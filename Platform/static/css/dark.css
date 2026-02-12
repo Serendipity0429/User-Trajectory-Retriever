@@ -714,9 +714,6 @@
     color: var(--dark-color);
 }
 
-/* ==========================================================================
-   Benchmark App Dark Mode
-   ========================================================================== */
 
 /* Metric cards */
 .dark-mode .metric-card {
@@ -753,7 +750,7 @@
     background: var(--bs-border-color);
 }
 
-/* Table styles for benchmark */
+/* Table styles */
 .dark-mode .table-success-light {
     --bs-table-bg: rgba(40, 167, 69, 0.2);
     --bs-table-color: var(--bs-body-color);
@@ -955,9 +952,6 @@
     --bs-table-accent-bg: rgba(255, 255, 255, 0.05);
 }
 
-/* ==========================================================================
-   Benchmark App - History Card & Sidebar Dark Mode Fixes
-   ========================================================================== */
 
 /* Leaderboard */
 .dark-mode #leaderboard-container {
@@ -1031,10 +1025,6 @@
     background-color: var(--bs-body-bg) !important;
 }
 
-/* ==========================================================================
-   Benchmark App - Metric Cards & Results Dark Mode Fixes
-   ========================================================================== */
-
 /* Processing row */
 .dark-mode .processing-row,
 .dark-mode .table-light {
@@ -1095,7 +1085,7 @@
     color: var(--bs-body-color) !important;
 }
 
-/* Card headers in benchmark */
+/* Card headers */
 .dark-mode .card-header {
     background-color: var(--bs-body-bg) !important;
     border-color: var(--bs-border-color) !important;

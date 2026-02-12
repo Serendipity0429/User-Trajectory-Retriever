@@ -50,6 +50,23 @@ class TaskManagerImporter:
         self._entry_map: Dict[int, Any] = {}  # old_entry_id -> TaskDatasetEntry instance
         self._mode: str = self.MODE_FULL
 
+    @staticmethod
+    def _is_empty_struct(data: Optional[Dict]) -> bool:
+        """Check if an annotation struct is 'empty' (None or all values are None/empty string)."""
+        if not data:
+            return True
+        return all(v is None or v == "" or v == [] for v in data.values())
+
+    @staticmethod
+    def _parse_json_str(value) -> Any:
+        """Parse a JSON-string field back to a Python object. Passes through non-strings."""
+        if isinstance(value, str):
+            try:
+                return json.loads(value)
+            except (json.JSONDecodeError, TypeError):
+                return value
+        return value
+
     def _parse_datetime(self, value: Optional[str]) -> Optional[datetime]:
         """Parse ISO datetime string."""
         if not value:
@@ -187,9 +204,9 @@ class TaskManagerImporter:
             task.end_timestamp = self._parse_datetime(task_data["end_timestamp"])
             task.save(update_fields=["end_timestamp"])
 
-        # Create annotations
+        # Create annotations (skip empty structs from HF-compatible export)
         pre_task = task_data.get("pre_task_annotation")
-        if pre_task:
+        if pre_task and not self._is_empty_struct(pre_task):
             obj = PreTaskAnnotation.objects.create(
                 belong_task=task,
                 familiarity=pre_task.get("familiarity"),
@@ -209,7 +226,7 @@ class TaskManagerImporter:
                 )
 
         post_task = task_data.get("post_task_annotation")
-        if post_task:
+        if post_task and not self._is_empty_struct(post_task):
             obj = PostTaskAnnotation.objects.create(
                 belong_task=task,
                 difficulty_actual=post_task.get("difficulty_actual"),
@@ -227,7 +244,7 @@ class TaskManagerImporter:
                 )
 
         cancel = task_data.get("cancel_annotation")
-        if cancel:
+        if cancel and not self._is_empty_struct(cancel):
             obj = CancelAnnotation.objects.create(
                 belong_task=task,
                 category=cancel.get("category"),
@@ -262,9 +279,9 @@ class TaskManagerImporter:
             if ts_updates:
                 TaskTrial.objects.filter(pk=trial.pk).update(**ts_updates)
 
-            # Create reflection annotation
+            # Create reflection annotation (skip empty structs)
             reflection = trial_data.get("reflection_annotation")
-            if reflection:
+            if reflection and not self._is_empty_struct(reflection):
                 obj = ReflectionAnnotation.objects.create(
                     belong_task_trial=trial,
                     failure_category=reflection.get("failure_category"),
@@ -283,6 +300,18 @@ class TaskManagerImporter:
 
             # Create justifications
             for just_data in trial_data.get("justifications", []):
+                # Restore element_details: parse attributes from JSON string
+                elem = just_data.get("element_details")
+                if elem and isinstance(elem, dict):
+                    attrs = elem.get("attributes")
+                    if isinstance(attrs, str):
+                        try:
+                            elem = {**elem, "attributes": json.loads(attrs)}
+                        except (json.JSONDecodeError, TypeError):
+                            pass
+                    if self._is_empty_struct(elem):
+                        elem = None
+
                 obj = Justification.objects.create(
                     belong_task_trial=trial,
                     url=just_data.get("url", ""),
@@ -291,7 +320,7 @@ class TaskManagerImporter:
                     dom_position=just_data.get("dom_position"),
                     status=just_data.get("status", "active"),
                     evidence_type=just_data.get("evidence_type", "text_selection"),
-                    element_details=just_data.get("element_details"),
+                    element_details=elem,
                     relevance=just_data.get("relevance", 0),
                     credibility=just_data.get("credibility", 0),
                 )
@@ -300,7 +329,7 @@ class TaskManagerImporter:
                         timestamp=self._parse_datetime(just_data["timestamp"])
                     )
 
-            # Create webpages
+            # Create webpages (parse JSON-string fields back to native)
             for wp_data in trial_data.get("webpages", []):
                 Webpage.objects.create(
                     user=user,
@@ -314,10 +343,10 @@ class TaskManagerImporter:
                     dwell_time=wp_data.get("dwell_time"),
                     width=wp_data.get("width"),
                     height=wp_data.get("height"),
-                    page_switch_record=wp_data.get("page_switch_record"),
-                    mouse_moves=wp_data.get("mouse_moves", []),
-                    event_list=wp_data.get("event_list", []),
-                    rrweb_record=wp_data.get("rrweb_record", []),
+                    page_switch_record=self._parse_json_str(wp_data.get("page_switch_record")),
+                    mouse_moves=self._parse_json_str(wp_data.get("mouse_moves")) or [],
+                    event_list=self._parse_json_str(wp_data.get("event_list")) or [],
+                    rrweb_record=self._parse_json_str(wp_data.get("rrweb_record")) or [],
                     is_redirected=wp_data.get("is_redirected", False),
                     during_annotation=wp_data.get("during_annotation", False),
                     annotation_name=wp_data.get("annotation_name"),

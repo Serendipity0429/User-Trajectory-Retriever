@@ -11,6 +11,45 @@ from django.db.models import Prefetch
 
 from .anonymizer import UserAnonymizer, ANONYMIZED_PLACEHOLDER
 
+# Empty struct templates — ensures every row has the same schema for Arrow/HF
+EMPTY_PRE_TASK_ANNOTATION = {
+    "familiarity": None, "difficulty": None, "effort": None,
+    "first_search_query": None, "initial_guess": None,
+    "initial_guess_unknown": None, "initial_guess_reason": None,
+    "expected_source": [], "expected_source_other": None,
+    "submission_timestamp": None, "duration": None,
+}
+
+EMPTY_POST_TASK_ANNOTATION = {
+    "difficulty_actual": None, "aha_moment_type": None,
+    "aha_moment_other": None, "unhelpful_paths": [],
+    "unhelpful_paths_other": None, "strategy_shift": [],
+    "strategy_shift_other": "", "submission_timestamp": None,
+    "duration": None,
+}
+
+EMPTY_CANCEL_ANNOTATION = {
+    "category": [], "reason": None,
+    "missing_resources": None, "missing_resources_other": None,
+    "submission_timestamp": None, "duration": None,
+}
+
+EMPTY_REFLECTION_ANNOTATION = {
+    "failure_category": None, "failure_category_other": None,
+    "future_plan_actions": None, "future_plan_other": None,
+    "estimated_time": None, "adjusted_difficulty": None,
+    "additional_reflection": None, "submission_timestamp": None,
+    "duration": None,
+}
+
+EMPTY_DATASET = {
+    "dataset_name": None, "entry_id": None,
+}
+
+EMPTY_ELEMENT_DETAILS = {
+    "tagName": None, "attributes": None,
+}
+
 
 class ExportRedisKeys:
     TTL = 3600  # 1 hour auto-expire
@@ -87,10 +126,10 @@ class TaskManagerExporter:
 
         return tasks
 
-    def _serialize_pre_task_annotation(self, annotation) -> Optional[Dict[str, Any]]:
-        """Serialize PreTaskAnnotation."""
+    def _serialize_pre_task_annotation(self, annotation) -> Dict[str, Any]:
+        """Serialize PreTaskAnnotation. Returns empty struct when None for Arrow consistency."""
         if not annotation:
-            return None
+            return dict(EMPTY_PRE_TASK_ANNOTATION)
         return {
             "familiarity": annotation.familiarity,
             "difficulty": annotation.difficulty,
@@ -99,34 +138,34 @@ class TaskManagerExporter:
             "initial_guess": annotation.initial_guess,
             "initial_guess_unknown": annotation.initial_guess_unknown,
             "initial_guess_reason": annotation.initial_guess_reason,
-            "expected_source": annotation.expected_source,
+            "expected_source": annotation.expected_source or [],
             "expected_source_other": annotation.expected_source_other,
             "submission_timestamp": annotation.submission_timestamp.isoformat() if annotation.submission_timestamp else None,
             "duration": annotation.duration,
         }
 
-    def _serialize_post_task_annotation(self, annotation) -> Optional[Dict[str, Any]]:
-        """Serialize PostTaskAnnotation."""
+    def _serialize_post_task_annotation(self, annotation) -> Dict[str, Any]:
+        """Serialize PostTaskAnnotation. Returns empty struct when None for Arrow consistency."""
         if not annotation:
-            return None
+            return dict(EMPTY_POST_TASK_ANNOTATION)
         return {
             "difficulty_actual": annotation.difficulty_actual,
             "aha_moment_type": annotation.aha_moment_type,
             "aha_moment_other": annotation.aha_moment_other,
-            "unhelpful_paths": annotation.unhelpful_paths,
+            "unhelpful_paths": annotation.unhelpful_paths or [],
             "unhelpful_paths_other": annotation.unhelpful_paths_other,
-            "strategy_shift": annotation.strategy_shift,
-            "strategy_shift_other": annotation.strategy_shift_other,
+            "strategy_shift": annotation.strategy_shift or [],
+            "strategy_shift_other": annotation.strategy_shift_other or "",
             "submission_timestamp": annotation.submission_timestamp.isoformat() if annotation.submission_timestamp else None,
             "duration": annotation.duration,
         }
 
-    def _serialize_cancel_annotation(self, annotation) -> Optional[Dict[str, Any]]:
-        """Serialize CancelAnnotation."""
+    def _serialize_cancel_annotation(self, annotation) -> Dict[str, Any]:
+        """Serialize CancelAnnotation. Returns empty struct when None for Arrow consistency."""
         if not annotation:
-            return None
+            return dict(EMPTY_CANCEL_ANNOTATION)
         return {
-            "category": annotation.category,
+            "category": annotation.category or [],
             "reason": annotation.reason,
             "missing_resources": annotation.missing_resources,
             "missing_resources_other": annotation.missing_resources_other,
@@ -134,10 +173,10 @@ class TaskManagerExporter:
             "duration": annotation.duration,
         }
 
-    def _serialize_reflection_annotation(self, annotation) -> Optional[Dict[str, Any]]:
-        """Serialize ReflectionAnnotation."""
+    def _serialize_reflection_annotation(self, annotation) -> Dict[str, Any]:
+        """Serialize ReflectionAnnotation. Returns empty struct when None for Arrow consistency."""
         if not annotation:
-            return None
+            return dict(EMPTY_REFLECTION_ANNOTATION)
         return {
             "failure_category": annotation.failure_category,
             "failure_category_other": annotation.failure_category_other,
@@ -150,6 +189,22 @@ class TaskManagerExporter:
             "duration": annotation.duration,
         }
 
+    def _serialize_element_details(self, element_details) -> Dict[str, Any]:
+        """Normalize element_details to a consistent struct. Attributes serialized as JSON string."""
+        if not element_details:
+            return dict(EMPTY_ELEMENT_DETAILS)
+        # element_details may be a string (legacy) or dict
+        if isinstance(element_details, str):
+            try:
+                element_details = json.loads(element_details)
+            except (json.JSONDecodeError, TypeError):
+                return dict(EMPTY_ELEMENT_DETAILS)
+        attrs = element_details.get("attributes")
+        return {
+            "tagName": element_details.get("tagName"),
+            "attributes": json.dumps(attrs, ensure_ascii=False) if attrs else None,
+        }
+
     def _serialize_justification(self, justification) -> Dict[str, Any]:
         """Serialize Justification."""
         return {
@@ -160,15 +215,22 @@ class TaskManagerExporter:
             "dom_position": justification.dom_position,
             "status": justification.status,
             "evidence_type": justification.evidence_type,
-            "element_details": justification.element_details,
+            "element_details": self._serialize_element_details(justification.element_details),
             "relevance": justification.relevance,
             "credibility": justification.credibility,
             "timestamp": justification.timestamp.isoformat() if justification.timestamp else None,
             "evidence_image": str(justification.evidence_image) if justification.evidence_image else None,
         }
 
+    @staticmethod
+    def _to_json_str(value) -> Optional[str]:
+        """Serialize a variable-schema value to a JSON string for Arrow compatibility."""
+        if value is None:
+            return None
+        return json.dumps(value, ensure_ascii=False, default=str)
+
     def _serialize_webpage(self, webpage) -> Dict[str, Any]:
-        """Serialize Webpage."""
+        """Serialize Webpage. Variable-schema JSON fields are stored as JSON strings."""
         return {
             "id": webpage.id,
             "title": webpage.title,
@@ -179,10 +241,10 @@ class TaskManagerExporter:
             "dwell_time": webpage.dwell_time,
             "width": webpage.width,
             "height": webpage.height,
-            "page_switch_record": webpage.page_switch_record,
-            "mouse_moves": webpage.mouse_moves,
-            "event_list": webpage.event_list,
-            "rrweb_record": webpage.rrweb_record,
+            "page_switch_record": self._to_json_str(webpage.page_switch_record),
+            "mouse_moves": self._to_json_str(webpage.mouse_moves),
+            "event_list": self._to_json_str(webpage.event_list),
+            "rrweb_record": self._to_json_str(webpage.rrweb_record),
             "is_redirected": webpage.is_redirected,
             "during_annotation": webpage.during_annotation,
             "annotation_name": webpage.annotation_name,
@@ -190,12 +252,11 @@ class TaskManagerExporter:
 
     def _serialize_trial(self, trial) -> Dict[str, Any]:
         """Serialize TaskTrial with related data."""
-        # Get reflection annotation
-        reflection = None
+        # Get reflection annotation (empty struct if missing)
         try:
             reflection = self._serialize_reflection_annotation(trial.reflectionannotation)
         except Exception:
-            pass
+            reflection = dict(EMPTY_REFLECTION_ANNOTATION)
 
         # Get justifications
         justifications = [
@@ -223,25 +284,21 @@ class TaskManagerExporter:
 
     def _serialize_task(self, task, participant_id: Any) -> Dict[str, Any]:
         """Serialize a single task with all related data."""
-        # Get annotations
-        pre_task = None
-        post_task = None
-        cancel = None
-
+        # Get annotations (always return structs, never None)
         try:
             pre_task = self._serialize_pre_task_annotation(task.pretaskannotation)
         except Exception:
-            pass
+            pre_task = dict(EMPTY_PRE_TASK_ANNOTATION)
 
         try:
             post_task = self._serialize_post_task_annotation(task.posttaskannotation)
         except Exception:
-            pass
+            post_task = dict(EMPTY_POST_TASK_ANNOTATION)
 
         try:
             cancel = self._serialize_cancel_annotation(task.cancelannotation)
         except Exception:
-            pass
+            cancel = dict(EMPTY_CANCEL_ANNOTATION)
 
         # Get trials
         trials = [self._serialize_trial(t) for t in task.tasktrial_set.all()]
@@ -254,13 +311,14 @@ class TaskManagerExporter:
         else:
             status = "active"
 
-        # Get dataset info
-        dataset_info = None
+        # Get dataset info (always a struct)
         if task.content:
             dataset_info = {
                 "dataset_name": task.content.belong_dataset.name if task.content.belong_dataset else None,
                 "entry_id": task.content.id,
             }
+        else:
+            dataset_info = dict(EMPTY_DATASET)
 
         return {
             "task_id": task.id,
@@ -399,6 +457,77 @@ class TaskManagerExporter:
                     stats["participant_count"] += 1
 
         return stats
+
+    @staticmethod
+    def _features_to_arrow_type(spec):
+        """Convert a single HF feature spec to a pyarrow type."""
+        import pyarrow as pa
+
+        dtype_map = {
+            "string": pa.string(), "int32": pa.int32(), "int64": pa.int64(),
+            "float32": pa.float32(), "float64": pa.float64(), "bool": pa.bool_(),
+        }
+
+        if isinstance(spec, dict):
+            if spec.get("_type") == "Value":
+                return dtype_map.get(spec["dtype"], pa.string())
+            elif spec.get("_type") == "Sequence":
+                inner = TaskManagerExporter._features_to_arrow_type(spec["feature"])
+                return pa.list_(inner)
+            else:
+                # Struct: dict of {field_name: feature_spec}
+                fields = []
+                for name, sub in spec.items():
+                    fields.append(pa.field(name, TaskManagerExporter._features_to_arrow_type(sub)))
+                return pa.struct(fields)
+        return pa.string()
+
+    @staticmethod
+    def _features_to_arrow_schema(features_dict):
+        """Convert HF features dict to a pyarrow Schema (row-oriented, matching JSON layout)."""
+        import pyarrow as pa
+        fields = []
+        for name, spec in features_dict.items():
+            fields.append(pa.field(name, TaskManagerExporter._features_to_arrow_type(spec)))
+        return pa.schema(fields)
+
+    @staticmethod
+    def jsonl_to_parquet(jsonl_path: Path, parquet_path: Path, features_dict: dict, batch_size: int = 50):
+        """
+        Stream-convert JSONL to Parquet with explicit schema.
+
+        Reads JSONL in fixed batches and writes Parquet using a row-oriented
+        Arrow schema, avoiding Arrow's batch-inference null-type bug.
+        Memory usage is bounded to ~batch_size rows.
+        """
+        import pyarrow as pa
+        import pyarrow.parquet as pq
+
+        schema = TaskManagerExporter._features_to_arrow_schema(features_dict)
+        writer = None
+
+        batch = []
+        with open(jsonl_path, 'r', encoding='utf-8') as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                batch.append(json.loads(line))
+                if len(batch) >= batch_size:
+                    table = pa.Table.from_pylist(batch, schema=schema)
+                    if writer is None:
+                        writer = pq.ParquetWriter(str(parquet_path), schema)
+                    writer.write_table(table)
+                    batch = []
+
+        if batch:
+            table = pa.Table.from_pylist(batch, schema=schema)
+            if writer is None:
+                writer = pq.ParquetWriter(str(parquet_path), schema)
+            writer.write_table(table)
+
+        if writer:
+            writer.close()
 
     def get_export_preview(
         self,

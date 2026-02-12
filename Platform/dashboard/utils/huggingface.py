@@ -34,44 +34,139 @@ def generate_dataset_info(stats: Dict[str, Any], anonymized: bool = True) -> Dic
             "task_id": {"dtype": "int32", "_type": "Value"},
             "participant_id": {"dtype": "string", "_type": "Value"},
             "question": {"dtype": "string", "_type": "Value"},
-            "ground_truth": {"_type": "Value", "dtype": "string"},
+            "ground_truth": {"dtype": "string", "_type": "Value"},
             "status": {"dtype": "string", "_type": "Value"},
             "start_timestamp": {"dtype": "string", "_type": "Value"},
             "end_timestamp": {"dtype": "string", "_type": "Value"},
             "num_trial": {"dtype": "int32", "_type": "Value"},
             "participant": {
-                "_type": "Value",
-                "dtype": "string",
-                "description": "JSON-encoded participant information"
+                "participant_id": {"dtype": "string", "_type": "Value"},
+                "username": {"dtype": "string", "_type": "Value"},
+                "email": {"dtype": "string", "_type": "Value"},
+                "first_name": {"dtype": "string", "_type": "Value"},
+                "last_name": {"dtype": "string", "_type": "Value"},
+                "date_joined": {"dtype": "string", "_type": "Value"},
+                "last_login": {"dtype": "string", "_type": "Value"},
+                "login_num": {"dtype": "int32", "_type": "Value"},
+                "consent_agreed": {"dtype": "bool", "_type": "Value"},
+                "profile": {
+                    "name": {"dtype": "string", "_type": "Value"},
+                    "phone": {"dtype": "string", "_type": "Value"},
+                    "age": {"dtype": "string", "_type": "Value"},
+                    "gender": {"dtype": "string", "_type": "Value"},
+                    "occupation": {"dtype": "string", "_type": "Value"},
+                    "education": {"dtype": "string", "_type": "Value"},
+                    "field_of_expertise": {"dtype": "string", "_type": "Value"},
+                    "icon": {"dtype": "string", "_type": "Value"},
+                    "llm_frequency": {"dtype": "string", "_type": "Value"},
+                    "llm_history": {"dtype": "string", "_type": "Value"},
+                    "english_proficiency": {"dtype": "string", "_type": "Value"},
+                    "web_search_proficiency": {"dtype": "string", "_type": "Value"},
+                    "web_agent_familiarity": {"dtype": "string", "_type": "Value"},
+                    "web_agent_frequency": {"dtype": "string", "_type": "Value"},
+                },
             },
             "dataset": {
-                "_type": "Value",
-                "dtype": "string",
-                "description": "JSON-encoded dataset information"
+                "dataset_name": {"dtype": "string", "_type": "Value"},
+                "entry_id": {"dtype": "int32", "_type": "Value"},
             },
             "pre_task_annotation": {
-                "_type": "Value",
-                "dtype": "string",
-                "description": "JSON-encoded pre-task annotation"
+                "familiarity": {"dtype": "int32", "_type": "Value"},
+                "difficulty": {"dtype": "int32", "_type": "Value"},
+                "effort": {"dtype": "int32", "_type": "Value"},
+                "first_search_query": {"dtype": "string", "_type": "Value"},
+                "initial_guess": {"dtype": "string", "_type": "Value"},
+                "initial_guess_unknown": {"dtype": "bool", "_type": "Value"},
+                "initial_guess_reason": {"dtype": "string", "_type": "Value"},
+                "expected_source": {"_type": "Sequence", "feature": {"dtype": "string", "_type": "Value"}},
+                "expected_source_other": {"dtype": "string", "_type": "Value"},
+                "submission_timestamp": {"dtype": "string", "_type": "Value"},
+                "duration": {"dtype": "int32", "_type": "Value"},
             },
             "post_task_annotation": {
-                "_type": "Value",
-                "dtype": "string",
-                "description": "JSON-encoded post-task annotation"
+                "difficulty_actual": {"dtype": "int32", "_type": "Value"},
+                "aha_moment_type": {"dtype": "string", "_type": "Value"},
+                "aha_moment_other": {"dtype": "string", "_type": "Value"},
+                "unhelpful_paths": {"_type": "Sequence", "feature": {"dtype": "string", "_type": "Value"}},
+                "unhelpful_paths_other": {"dtype": "string", "_type": "Value"},
+                "strategy_shift": {"_type": "Sequence", "feature": {"dtype": "string", "_type": "Value"}},
+                "strategy_shift_other": {"dtype": "string", "_type": "Value"},
+                "submission_timestamp": {"dtype": "string", "_type": "Value"},
+                "duration": {"dtype": "int32", "_type": "Value"},
             },
             "cancel_annotation": {
-                "_type": "Value",
-                "dtype": "string",
-                "description": "JSON-encoded cancel annotation"
+                "category": {"_type": "Sequence", "feature": {"dtype": "string", "_type": "Value"}},
+                "reason": {"dtype": "string", "_type": "Value"},
+                "missing_resources": {"dtype": "string", "_type": "Value"},
+                "missing_resources_other": {"dtype": "string", "_type": "Value"},
+                "submission_timestamp": {"dtype": "string", "_type": "Value"},
+                "duration": {"dtype": "int32", "_type": "Value"},
             },
             "trials": {
                 "_type": "Sequence",
                 "feature": {
-                    "_type": "Value",
-                    "dtype": "string",
-                    "description": "JSON-encoded trial data including webpages and justifications"
-                }
-            }
+                    "trial_num": {"dtype": "int32", "_type": "Value"},
+                    "start_timestamp": {"dtype": "string", "_type": "Value"},
+                    "end_timestamp": {"dtype": "string", "_type": "Value"},
+                    "answer": {"dtype": "string", "_type": "Value"},
+                    "is_correct": {"dtype": "bool", "_type": "Value"},
+                    "confidence": {"dtype": "int32", "_type": "Value"},
+                    "answer_formulation_method": {"_type": "Sequence", "feature": {"dtype": "string", "_type": "Value"}},
+                    "answer_formulation_method_other": {"dtype": "string", "_type": "Value"},
+                    "reflection_annotation": {
+                        "failure_category": {"dtype": "string", "_type": "Value"},
+                        "failure_category_other": {"dtype": "string", "_type": "Value"},
+                        "future_plan_actions": {"dtype": "string", "_type": "Value"},
+                        "future_plan_other": {"dtype": "string", "_type": "Value"},
+                        "estimated_time": {"dtype": "int32", "_type": "Value"},
+                        "adjusted_difficulty": {"dtype": "int32", "_type": "Value"},
+                        "additional_reflection": {"dtype": "string", "_type": "Value"},
+                        "submission_timestamp": {"dtype": "string", "_type": "Value"},
+                        "duration": {"dtype": "int32", "_type": "Value"},
+                    },
+                    "justifications": {
+                        "_type": "Sequence",
+                        "feature": {
+                            "id": {"dtype": "int32", "_type": "Value"},
+                            "url": {"dtype": "string", "_type": "Value"},
+                            "page_title": {"dtype": "string", "_type": "Value"},
+                            "text": {"dtype": "string", "_type": "Value"},
+                            "dom_position": {"dtype": "string", "_type": "Value"},
+                            "status": {"dtype": "string", "_type": "Value"},
+                            "evidence_type": {"dtype": "string", "_type": "Value"},
+                            "element_details": {
+                                "tagName": {"dtype": "string", "_type": "Value"},
+                                "attributes": {"dtype": "string", "_type": "Value"},
+                            },
+                            "relevance": {"dtype": "int32", "_type": "Value"},
+                            "credibility": {"dtype": "int32", "_type": "Value"},
+                            "timestamp": {"dtype": "string", "_type": "Value"},
+                            "evidence_image": {"dtype": "string", "_type": "Value"},
+                        },
+                    },
+                    "webpages": {
+                        "_type": "Sequence",
+                        "feature": {
+                            "id": {"dtype": "int32", "_type": "Value"},
+                            "title": {"dtype": "string", "_type": "Value"},
+                            "url": {"dtype": "string", "_type": "Value"},
+                            "referrer": {"dtype": "string", "_type": "Value"},
+                            "start_timestamp": {"dtype": "string", "_type": "Value"},
+                            "end_timestamp": {"dtype": "string", "_type": "Value"},
+                            "dwell_time": {"dtype": "int32", "_type": "Value"},
+                            "width": {"dtype": "int32", "_type": "Value"},
+                            "height": {"dtype": "int32", "_type": "Value"},
+                            "page_switch_record": {"dtype": "string", "_type": "Value"},
+                            "mouse_moves": {"dtype": "string", "_type": "Value"},
+                            "event_list": {"dtype": "string", "_type": "Value"},
+                            "rrweb_record": {"dtype": "string", "_type": "Value"},
+                            "is_redirected": {"dtype": "bool", "_type": "Value"},
+                            "during_annotation": {"dtype": "bool", "_type": "Value"},
+                            "annotation_name": {"dtype": "string", "_type": "Value"},
+                        },
+                    },
+                },
+            },
         },
         "splits": {
             "train": {
@@ -287,19 +382,24 @@ from datasets import load_dataset
 
 dataset = load_dataset("Serendipity2004/TEC", split="train")
 
-# Access a task trajectory
+# Access a task trajectory — all fields are native dicts/lists
 task = dataset[0]
 print(task["question"])
 print(f"Number of trials: {{task['num_trial']}}")
+print(f"Participant age: {{task['participant']['profile']['age']}}")
 
-# Iterate over trials
-import json
-for trial_json in task["trials"]:
-    trial = json.loads(trial_json)
+# Iterate over trials (native dicts, no json.loads needed)
+for trial in task["trials"]:
     print(f"Trial {{trial['trial_num']}}: correct={{trial['is_correct']}}")
-    if trial.get("reflection_annotation"):
+    if trial["reflection_annotation"]["failure_category"]:
         print(f"  Failure: {{trial['reflection_annotation']['failure_category']}}")
-        print(f"  Plan: {{trial['reflection_annotation']['corrective_plan']}}")
+
+# Large behavioral data fields are JSON strings — parse when needed
+import json
+for trial in task["trials"]:
+    for wp in trial["webpages"]:
+        events = json.loads(wp["event_list"]) if wp["event_list"] else []
+        print(f"  Page: {{wp['url']}} ({{len(events)}} events)")
 ```
 
 ## Citation

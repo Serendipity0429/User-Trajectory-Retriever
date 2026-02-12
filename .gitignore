@@ -33,3 +33,5 @@ Platform/logs/
 *.log
 log
 SIGIR/
+migrations/
+dump.rdb

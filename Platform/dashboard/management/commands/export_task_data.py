@@ -7,10 +7,12 @@ Usage:
     python manage.py export_task_data --mode anonymized --output ./export/ --test
 """
 
+from pathlib import Path
+
 from django.core.management.base import BaseCommand, CommandError
 
 from dashboard.utils.export import TaskManagerExporter
-from dashboard.utils.huggingface import save_huggingface_files
+from dashboard.utils.huggingface import save_huggingface_files, generate_dataset_info
 
 
 class Command(BaseCommand):
@@ -82,6 +84,17 @@ class Command(BaseCommand):
         # Save HuggingFace files
         save_huggingface_files(output_dir, stats, anonymized=anonymize)
 
+        # Convert JSONL → Parquet with explicit schema (streaming, memory-safe)
+        output_path = Path(output_dir)
+        jsonl_path = output_path / "data.jsonl"
+        data_dir = output_path / "data"
+        data_dir.mkdir(exist_ok=True)
+        parquet_path = data_dir / "train-00000-of-00001.parquet"
+
+        self.stdout.write('Converting to Parquet...')
+        features_dict = generate_dataset_info(stats, anonymized=anonymize)["features"]
+        TaskManagerExporter.jsonl_to_parquet(jsonl_path, parquet_path, features_dict)
+
         self.stdout.write(self.style.SUCCESS(f'Export completed!'))
         self.stdout.write(f"  - Output directory: {output_dir}")
         self.stdout.write(f"  - Tasks exported: {stats['task_count']}")
@@ -90,5 +103,6 @@ class Command(BaseCommand):
         self.stdout.write(f"  - Webpages: {stats['webpage_count']}")
         self.stdout.write(f"Files created:")
         self.stdout.write(f"  - {output_dir}/data.jsonl")
+        self.stdout.write(f"  - {parquet_path}")
         self.stdout.write(f"  - {output_dir}/dataset_info.json")
         self.stdout.write(f"  - {output_dir}/README.md")

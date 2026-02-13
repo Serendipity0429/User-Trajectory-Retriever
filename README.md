@@ -7,6 +7,8 @@ Dataset: [Hugging Face](https://huggingface.co/datasets/Serendipity2004/TEC)
 
 ## Overview
 
+![Platform Architecture](docs/images/architecture.jpg)
+
 TEC is an open-source platform for recording, replaying, and annotating user web trajectories. It pairs a Chrome extension with a Django backend to support multi-trial web interaction studies.
 
 - **Chrome Extension** (`ChromeExtension/`): Built on Manifest V3, records three synchronized streams per page — rrweb DOM snapshots, interaction events (clicks, hovers, keypresses), and continuous mouse/scroll positions. Works on any website without per-site configuration.
@@ -21,6 +23,9 @@ TEC is an open-source platform for recording, replaying, and annotating user web
 - Evidence marking via right-click context menu
 
 ### Multi-Stage Annotation Workflow
+
+![Annotation Workflow](docs/images/workflow.jpg)
+
 1. **Pre-task assessment** — familiarity, difficulty, and initial strategy
 2. **Browse and collect evidence** — extension records trajectories
 3. **Answer submission** — answer with confidence rating and evidence assessments

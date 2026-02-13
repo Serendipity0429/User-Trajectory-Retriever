@@ -292,7 +292,9 @@ Each task record includes:
 {anonymization_note}
 ## Data Format
 
-The dataset is provided in JSONL format (JSON Lines), where each line is a complete task record.
+The dataset is provided in Parquet format. Each row is a complete task record.
+
+Behavioral trace fields (`rrweb_record`, `event_list`, `mouse_moves`, `page_switch_record`) are stored as JSON strings due to their variable nested structure. All other fields are native types.
 
 ### Schema
 
@@ -301,7 +303,7 @@ The dataset is provided in JSONL format (JSON Lines), where each line is a compl
   "task_id": 1,
   "participant_id": "participant_000001",
   "question": "What is ...",
-  "ground_truth": ["..."],
+  "ground_truth": "...",
   "status": "completed",
   "start_timestamp": "2024-01-15T10:30:00Z",
   "end_timestamp": "2024-01-15T10:45:00Z",
@@ -319,13 +321,21 @@ The dataset is provided in JSONL format (JSON Lines), where each line is a compl
     "familiarity": 2,
     "difficulty": 1,
     "first_search_query": "...",
-    "initial_guess": "..."
+    "initial_guess": "...",
+    "expected_source": ["search_engine"]
   }},
   "post_task_annotation": {{
     "difficulty_actual": 3,
-    "aha_moment_type": "search_result"
+    "aha_moment_type": "search_result",
+    "strategy_shift": ["..."],
+    "strategy_shift_other": "",
+    "unhelpful_paths": ["..."]
   }},
-  "cancel_annotation": null,
+  "cancel_annotation": {{
+    "category": [],
+    "reason": "",
+    "missing_resource": ""
+  }},
   "trials": [
     {{
       "trial_num": 1,
@@ -342,7 +352,7 @@ The dataset is provided in JSONL format (JSON Lines), where each line is a compl
         {{
           "url": "https://...",
           "text": "selected text",
-          "dom_position": 150,
+          "dom_position": "CSS selector",
           "relevance": 0.8,
           "credibility": 0.9
         }}
@@ -353,9 +363,10 @@ The dataset is provided in JSONL format (JSON Lines), where each line is a compl
           "url": "https://...",
           "referrer": "https://...",
           "dwell_time": 45,
-          "rrweb_record": ["..."],
-          "event_list": ["..."],
-          "mouse_moves": ["..."]
+          "rrweb_record": "[{{...}}]",
+          "event_list": "[{{...}}]",
+          "mouse_moves": "[{{...}}]",
+          "page_switch_record": "[{{...}}]"
         }}
       ]
     }}

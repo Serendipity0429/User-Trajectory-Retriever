@@ -44,6 +44,8 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        from task_manager.models import TaskDataset
+
         mode = options['mode']
         output_dir = options['output']
         test_mode = options['test']
@@ -65,11 +67,20 @@ class Command(BaseCommand):
         if test_mode:
             self.stdout.write(self.style.WARNING('[TEST MODE] Exporting only 2 users...'))
 
+        # Always exclude tutorial dataset
+        exclude_dataset_ids = list(
+            TaskDataset.objects.filter(name="tutorial").values_list('id', flat=True)
+        )
+        if exclude_dataset_ids:
+            self.stdout.write(f"Excluding tutorial dataset (ID: {exclude_dataset_ids})")
+
         # Create exporter
         exporter = TaskManagerExporter(anonymize=anonymize)
 
         # Get preview first
-        preview = exporter.get_export_preview(user_ids=user_ids, limit=limit)
+        preview = exporter.get_export_preview(
+            user_ids=user_ids, limit=limit, exclude_dataset_ids=exclude_dataset_ids
+        )
         self.stdout.write(f"Preparing to export:")
         self.stdout.write(f"  - Participants: {preview['participant_count']}")
         self.stdout.write(f"  - Tasks: {preview['task_count']}")
@@ -79,7 +90,10 @@ class Command(BaseCommand):
 
         # Export
         self.stdout.write('Exporting...')
-        stats = exporter.export_to_file(output_dir, user_ids=user_ids, limit=limit)
+        stats = exporter.export_to_file(
+            output_dir, user_ids=user_ids, limit=limit,
+            exclude_dataset_ids=exclude_dataset_ids
+        )
 
         # Save HuggingFace files
         save_huggingface_files(output_dir, stats, anonymized=anonymize)
@@ -95,6 +109,9 @@ class Command(BaseCommand):
         features_dict = generate_dataset_info(stats, anonymized=anonymize)["features"]
         TaskManagerExporter.jsonl_to_parquet(jsonl_path, parquet_path, features_dict)
 
+        # Remove intermediate JSONL (Parquet is the primary format)
+        jsonl_path.unlink()
+
         self.stdout.write(self.style.SUCCESS(f'Export completed!'))
         self.stdout.write(f"  - Output directory: {output_dir}")
         self.stdout.write(f"  - Tasks exported: {stats['task_count']}")
@@ -102,7 +119,6 @@ class Command(BaseCommand):
         self.stdout.write(f"  - Trials: {stats['trial_count']}")
         self.stdout.write(f"  - Webpages: {stats['webpage_count']}")
         self.stdout.write(f"Files created:")
-        self.stdout.write(f"  - {output_dir}/data.jsonl")
         self.stdout.write(f"  - {parquet_path}")
         self.stdout.write(f"  - {output_dir}/dataset_info.json")
         self.stdout.write(f"  - {output_dir}/README.md")

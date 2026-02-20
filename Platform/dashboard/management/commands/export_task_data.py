@@ -104,25 +104,27 @@ class Command(BaseCommand):
         )
 
         # Save HuggingFace files
-        save_huggingface_files(output_dir, stats, anonymized=anonymize)
+        save_huggingface_files(output_dir, stats, anonymized=anonymize, export_format=export_format)
 
         output_path = Path(output_dir)
         jsonl_path = output_path / "data.jsonl"
-        data_file = jsonl_path
+        data_dir = output_path / "data"
+        data_dir.mkdir(exist_ok=True)
 
         if export_format == 'parquet':
-            # Convert JSONL → Parquet with explicit schema (streaming, memory-safe)
-            data_dir = output_path / "data"
-            data_dir.mkdir(exist_ok=True)
             parquet_path = data_dir / "train-00000-of-00001.parquet"
 
             self.stdout.write('Converting to Parquet...')
-            features_dict = generate_dataset_info(stats, anonymized=anonymize)["features"]
+            features_dict = generate_dataset_info(stats, anonymized=anonymize, export_format=export_format)["features"]
             TaskManagerExporter.jsonl_to_parquet(jsonl_path, parquet_path, features_dict)
 
             # Remove intermediate JSONL
             jsonl_path.unlink()
             data_file = parquet_path
+        else:
+            # Move JSONL into data/ with HF naming
+            data_file = data_dir / "train-00000-of-00001.jsonl"
+            jsonl_path.rename(data_file)
 
         self.stdout.write(self.style.SUCCESS(f'Export completed!'))
         self.stdout.write(f"  - Output directory: {output_dir}")

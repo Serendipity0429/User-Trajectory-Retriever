@@ -8,7 +8,7 @@ from typing import Dict, Any
 from pathlib import Path
 
 
-def generate_dataset_info(stats: Dict[str, Any], anonymized: bool = True) -> Dict[str, Any]:
+def generate_dataset_info(stats: Dict[str, Any], anonymized: bool = True, export_format: str = 'parquet') -> Dict[str, Any]:
     """
     Generate HuggingFace dataset_info.json content.
 
@@ -187,7 +187,7 @@ def generate_dataset_info(stats: Dict[str, Any], anonymized: bool = True) -> Dic
             {
                 "config_name": "default",
                 "data_files": [
-                    {"split": "train", "path": "data.jsonl"}
+                    {"split": "train", "path": f"data/train-00000-of-00001.{export_format}"}
                 ]
             }
         ],
@@ -434,7 +434,7 @@ MIT License
 """
 
 
-def save_huggingface_files(output_dir: str, stats: Dict[str, Any], anonymized: bool = True):
+def save_huggingface_files(output_dir: str, stats: Dict[str, Any], anonymized: bool = True, export_format: str = 'parquet'):
     """
     Save HuggingFace dataset files (dataset_info.json and README.md).
 
@@ -442,12 +442,13 @@ def save_huggingface_files(output_dir: str, stats: Dict[str, Any], anonymized: b
         output_dir: Output directory path
         stats: Export statistics
         anonymized: Whether data is anonymized
+        export_format: Export format ('parquet' or 'jsonl')
     """
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
 
     # Save dataset_info.json
-    dataset_info = generate_dataset_info(stats, anonymized)
+    dataset_info = generate_dataset_info(stats, anonymized, export_format=export_format)
     with open(output_path / "dataset_info.json", 'w', encoding='utf-8') as f:
         json.dump(dataset_info, f, indent=2, ensure_ascii=False)
 

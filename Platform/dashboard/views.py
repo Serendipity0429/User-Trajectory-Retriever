@@ -552,23 +552,27 @@ def _run_export(export_id, temp_dir, user_ids, anonymize, exclude_dataset_ids, e
             exclude_dataset_ids=exclude_dataset_ids if exclude_dataset_ids else None,
             on_progress=on_progress,
         )
-        save_huggingface_files(temp_dir, stats, anonymized=anonymize)
+        save_huggingface_files(temp_dir, stats, anonymized=anonymize, export_format=export_format)
 
         # Convert JSONL to Parquet if requested
-        zip_files = ['dataset_info.json', 'README.md']
+        from pathlib import Path
+        data_dir = Path(temp_dir) / 'data'
+        data_dir.mkdir(exist_ok=True)
+        data_filename = f'data/train-00000-of-00001.{export_format}'
         if export_format == 'parquet':
             _update_progress(status="converting", tasks_exported=stats["task_count"],
                              current_user=stats["participant_count"],
                              total_users=stats["participant_count"])
-            from pathlib import Path
             jsonl_path = Path(temp_dir) / 'data.jsonl'
-            parquet_path = Path(temp_dir) / 'data.parquet'
-            features_dict = generate_dataset_info(stats, anonymized=anonymize)["features"]
+            parquet_path = Path(temp_dir) / data_filename
+            features_dict = generate_dataset_info(stats, anonymized=anonymize, export_format=export_format)["features"]
             TaskManagerExporter.jsonl_to_parquet(jsonl_path, parquet_path, features_dict)
             jsonl_path.unlink()
-            zip_files.append('data.parquet')
         else:
-            zip_files.append('data.jsonl')
+            # Move JSONL into data/ with HF naming
+            jsonl_src = Path(temp_dir) / 'data.jsonl'
+            jsonl_dst = Path(temp_dir) / data_filename
+            jsonl_src.rename(jsonl_dst)
 
         _update_progress(status="zipping", tasks_exported=stats["task_count"],
                          current_user=stats["participant_count"],
@@ -577,7 +581,7 @@ def _run_export(export_id, temp_dir, user_ids, anonymize, exclude_dataset_ids, e
         # Create zip file
         zip_path = os.path.join(temp_dir, 'export.zip')
         with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zf:
-            for filename in zip_files:
+            for filename in ['dataset_info.json', 'README.md', data_filename]:
                 filepath = os.path.join(temp_dir, filename)
                 if os.path.exists(filepath):
                     zf.write(filepath, filename)

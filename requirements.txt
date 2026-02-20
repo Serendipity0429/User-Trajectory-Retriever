@@ -36,8 +36,3 @@ gunicorn
 matplotlib
 numpy
 psycopg2-binary
-beautifulsoup4
-agentscope
-gevent
-brotli
-playwright  # For bot-protected sites (run: playwright install chromium)

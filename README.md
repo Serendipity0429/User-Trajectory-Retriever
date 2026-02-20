@@ -36,7 +36,7 @@ TEC is an open-source platform for recording, replaying, and annotating user web
 - **Task Management**: Create datasets, assign tasks, track progress
 - **User System**: Authentication with role-based access, informed consent
 - **Admin Dashboard**: Analytics, data visualization, progress monitoring
-- **Data Export/Import**: HuggingFace-compatible JSONL export with anonymization
+- **Data Export/Import**: HuggingFace-compatible export (Parquet or JSONL) with anonymization
 - **Discussion Forum & Messaging**: Community space and private messaging
 
 ## Prerequisites
@@ -126,6 +126,25 @@ Visit `http://127.0.0.1:8000/`
 ├── requirements.txt
 └── README.md
 ```
+
+## Data Export / Import
+
+The Admin Dashboard provides export and import under the **Export** / **Import** tabs:
+
+- **Export**: Select users and datasets, choose Parquet or JSONL format, toggle anonymization, then download a zip containing the data file, `dataset_info.json`, and `README.md`.
+- **Import**: Upload a `.parquet` or `.jsonl` file. The platform auto-detects the format. Supports full (replace all) or incremental (skip duplicates) mode.
+
+Exported zip follows [HuggingFace dataset conventions](https://huggingface.co/docs/datasets/en/repository_structure):
+
+```
+export/
+├── data/
+│   └── train-00000-of-00001.parquet   # or .jsonl
+├── dataset_info.json
+└── README.md
+```
+
+The dataset is published at [Serendipity2004/TEC](https://huggingface.co/datasets/Serendipity2004/TEC) in Parquet format.
 
 ## Privacy
 

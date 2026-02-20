@@ -354,6 +354,25 @@ class TaskManagerImporter:
 
         return task
 
+    @staticmethod
+    def parquet_to_jsonl(parquet_path: str, jsonl_path: str, batch_size: int = 100):
+        """
+        Convert a Parquet file to JSONL for import.
+
+        Args:
+            parquet_path: Path to input Parquet file
+            jsonl_path: Path to output JSONL file
+            batch_size: Number of rows to process at a time
+        """
+        import pyarrow.parquet as pq
+
+        pf = pq.ParquetFile(parquet_path)
+        with open(jsonl_path, 'w', encoding='utf-8') as f:
+            for batch in pf.iter_batches(batch_size=batch_size):
+                rows = batch.to_pylist()
+                for row in rows:
+                    f.write(json.dumps(row, ensure_ascii=False, default=str) + '\n')
+
     def validate_jsonl(self, file_path: str) -> Tuple[bool, List[str], Dict[str, Any]]:
         """
         Validate JSONL file format and structure.

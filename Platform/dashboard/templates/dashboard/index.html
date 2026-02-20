@@ -802,6 +802,17 @@
                                                 <br><small class="text-muted">Replace PII with placeholders</small>
                                             </label>
                                         </div>
+                                        <div class="mb-3">
+                                            <label class="form-label fw-bold mb-1">Format</label>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="radio" name="export-format" id="export-format-parquet" value="parquet" checked>
+                                                <label class="form-check-label" for="export-format-parquet">Parquet <small class="text-muted">(HuggingFace-ready)</small></label>
+                                            </div>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="radio" name="export-format" id="export-format-jsonl" value="jsonl">
+                                                <label class="form-check-label" for="export-format-jsonl">JSONL</label>
+                                            </div>
+                                        </div>
                                         <hr>
                                         <div id="export-preview" class="mb-3" style="display: none;">
                                             <h6 class="fw-bold text-muted small">Export Preview</h6>
@@ -850,7 +861,7 @@
                                         <hr>
                                         <div class="mb-3">
                                             <label for="import-file" class="form-label">Select JSONL file</label>
-                                            <input class="form-control" type="file" id="import-file" accept=".jsonl,.json">
+                                            <input class="form-control" type="file" id="import-file" accept=".jsonl,.json,.parquet">
                                         </div>
                                         <button type="button" class="btn btn-outline-secondary w-100" id="import-validate-btn" disabled>
                                             <i class="bi bi-check-circle me-1"></i> Validate & Preview

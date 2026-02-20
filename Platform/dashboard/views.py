@@ -51,7 +51,7 @@ from .utils import (
 )
 from .utils.export import TaskManagerExporter, ExportRedisKeys
 from .utils.importer import TaskManagerImporter, ImportValidationError, ImportRedisKeys
-from .utils.huggingface import save_huggingface_files
+from .utils.huggingface import save_huggingface_files, generate_dataset_info
 
 def is_superuser(user):
     return user.is_superuser
@@ -525,7 +525,7 @@ def export_preview(request):
     })
 
 
-def _run_export(export_id, temp_dir, user_ids, anonymize, exclude_dataset_ids):
+def _run_export(export_id, temp_dir, user_ids, anonymize, exclude_dataset_ids, export_format='parquet'):
     """Background thread function that runs the export and updates Redis progress."""
     r = redis.Redis()
     progress_key = ExportRedisKeys.progress(export_id)
@@ -554,6 +554,22 @@ def _run_export(export_id, temp_dir, user_ids, anonymize, exclude_dataset_ids):
         )
         save_huggingface_files(temp_dir, stats, anonymized=anonymize)
 
+        # Convert JSONL to Parquet if requested
+        zip_files = ['dataset_info.json', 'README.md']
+        if export_format == 'parquet':
+            _update_progress(status="converting", tasks_exported=stats["task_count"],
+                             current_user=stats["participant_count"],
+                             total_users=stats["participant_count"])
+            from pathlib import Path
+            jsonl_path = Path(temp_dir) / 'data.jsonl'
+            parquet_path = Path(temp_dir) / 'data.parquet'
+            features_dict = generate_dataset_info(stats, anonymized=anonymize)["features"]
+            TaskManagerExporter.jsonl_to_parquet(jsonl_path, parquet_path, features_dict)
+            jsonl_path.unlink()
+            zip_files.append('data.parquet')
+        else:
+            zip_files.append('data.jsonl')
+
         _update_progress(status="zipping", tasks_exported=stats["task_count"],
                          current_user=stats["participant_count"],
                          total_users=stats["participant_count"])
@@ -561,7 +577,7 @@ def _run_export(export_id, temp_dir, user_ids, anonymize, exclude_dataset_ids):
         # Create zip file
         zip_path = os.path.join(temp_dir, 'export.zip')
         with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zf:
-            for filename in ['data.jsonl', 'dataset_info.json', 'README.md']:
+            for filename in zip_files:
                 filepath = os.path.join(temp_dir, filename)
                 if os.path.exists(filepath):
                     zf.write(filepath, filename)
@@ -600,13 +616,16 @@ def start_export(request):
     user_ids = data.get('user_ids', [])
     anonymize = data.get('anonymize', True)
     exclude_dataset_ids = data.get('exclude_datasets', [])
+    export_format = data.get('export_format', 'parquet')
+    if export_format not in ('jsonl', 'parquet'):
+        export_format = 'parquet'
 
     export_id = str(uuid.uuid4())
     temp_dir = tempfile.mkdtemp()
 
     t = threading.Thread(
         target=_run_export,
-        args=(export_id, temp_dir, user_ids, anonymize, exclude_dataset_ids),
+        args=(export_id, temp_dir, user_ids, anonymize, exclude_dataset_ids, export_format),
         daemon=True,
     )
     t.start()
@@ -696,12 +715,26 @@ def import_preview(request):
             pass
 
     uploaded_file = request.FILES['file']
+    is_parquet = uploaded_file.name.endswith('.parquet')
+    suffix = '.parquet' if is_parquet else '.jsonl'
 
     # Save to temp file
-    with tempfile.NamedTemporaryFile(mode='wb', suffix='.jsonl', delete=False) as temp_file:
+    with tempfile.NamedTemporaryFile(mode='wb', suffix=suffix, delete=False) as temp_file:
         for chunk in uploaded_file.chunks():
             temp_file.write(chunk)
         temp_path = temp_file.name
+
+    # Convert Parquet to JSONL if needed
+    if is_parquet:
+        from pathlib import Path
+        jsonl_path = str(Path(temp_path).with_suffix('.jsonl'))
+        try:
+            TaskManagerImporter.parquet_to_jsonl(temp_path, jsonl_path)
+        except Exception as e:
+            os.unlink(temp_path)
+            return JsonResponse({'error': f'Failed to read Parquet file: {e}'}, status=400)
+        os.unlink(temp_path)
+        temp_path = jsonl_path
 
     try:
         mode = request.POST.get('mode', 'full')

@@ -1,12 +1,15 @@
 """
-Management command to import task_manager data from HuggingFace-compatible JSONL format.
+Management command to import task_manager data from JSONL or Parquet format.
 
 Usage:
     python manage.py import_task_data --input ./export/data.jsonl --test
+    python manage.py import_task_data --input ./export/data.parquet
     python manage.py import_task_data --input ./export/data.jsonl
 """
 
 import getpass
+import os
+import tempfile
 
 from django.core.management.base import BaseCommand, CommandError
 from django.contrib.auth import authenticate
@@ -15,14 +18,14 @@ from dashboard.utils.importer import TaskManagerImporter, ImportValidationError
 
 
 class Command(BaseCommand):
-    help = 'Import task_manager data from HuggingFace-compatible JSONL format'
+    help = 'Import task_manager data from JSONL or Parquet format'
 
     def add_arguments(self, parser):
         parser.add_argument(
             '--input',
             type=str,
             required=True,
-            help='Input JSONL file path'
+            help='Input file path (JSONL or Parquet)'
         )
         parser.add_argument(
             '--test',
@@ -41,13 +44,29 @@ class Command(BaseCommand):
         input_file = options['input']
         test_mode = options['test']
         mode = options['mode']
+        temp_jsonl = None
 
-        importer = TaskManagerImporter()
+        if input_file.endswith('.parquet'):
+            self.stdout.write('Converting Parquet to JSONL...')
+            temp_fd, temp_jsonl = tempfile.mkstemp(suffix='.jsonl')
+            os.close(temp_fd)
+            try:
+                TaskManagerImporter.parquet_to_jsonl(input_file, temp_jsonl)
+            except Exception as e:
+                os.unlink(temp_jsonl)
+                raise CommandError(f'Failed to read Parquet file: {e}')
+            input_file = temp_jsonl
 
-        if test_mode:
-            self._handle_test_mode(importer, input_file, mode)
-        else:
-            self._handle_import(importer, input_file, mode)
+        try:
+            importer = TaskManagerImporter()
+
+            if test_mode:
+                self._handle_test_mode(importer, input_file, mode)
+            else:
+                self._handle_import(importer, input_file, mode)
+        finally:
+            if temp_jsonl and os.path.exists(temp_jsonl):
+                os.unlink(temp_jsonl)
 
     def _handle_test_mode(self, importer, input_file, mode='full'):
         """Handle dry-run/test mode."""

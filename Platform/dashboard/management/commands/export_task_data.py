@@ -33,6 +33,13 @@ class Command(BaseCommand):
             help='Output directory path'
         )
         parser.add_argument(
+            '--format',
+            type=str,
+            choices=['parquet', 'jsonl'],
+            default='parquet',
+            help='Export format: "parquet" (default) or "jsonl"'
+        )
+        parser.add_argument(
             '--test',
             action='store_true',
             help='Test mode: export only 2 users'
@@ -48,6 +55,7 @@ class Command(BaseCommand):
 
         mode = options['mode']
         output_dir = options['output']
+        export_format = options['format']
         test_mode = options['test']
         user_ids_str = options.get('users')
 
@@ -98,27 +106,32 @@ class Command(BaseCommand):
         # Save HuggingFace files
         save_huggingface_files(output_dir, stats, anonymized=anonymize)
 
-        # Convert JSONL → Parquet with explicit schema (streaming, memory-safe)
         output_path = Path(output_dir)
         jsonl_path = output_path / "data.jsonl"
-        data_dir = output_path / "data"
-        data_dir.mkdir(exist_ok=True)
-        parquet_path = data_dir / "train-00000-of-00001.parquet"
+        data_file = jsonl_path
 
-        self.stdout.write('Converting to Parquet...')
-        features_dict = generate_dataset_info(stats, anonymized=anonymize)["features"]
-        TaskManagerExporter.jsonl_to_parquet(jsonl_path, parquet_path, features_dict)
+        if export_format == 'parquet':
+            # Convert JSONL → Parquet with explicit schema (streaming, memory-safe)
+            data_dir = output_path / "data"
+            data_dir.mkdir(exist_ok=True)
+            parquet_path = data_dir / "train-00000-of-00001.parquet"
 
-        # Remove intermediate JSONL (Parquet is the primary format)
-        jsonl_path.unlink()
+            self.stdout.write('Converting to Parquet...')
+            features_dict = generate_dataset_info(stats, anonymized=anonymize)["features"]
+            TaskManagerExporter.jsonl_to_parquet(jsonl_path, parquet_path, features_dict)
+
+            # Remove intermediate JSONL
+            jsonl_path.unlink()
+            data_file = parquet_path
 
         self.stdout.write(self.style.SUCCESS(f'Export completed!'))
         self.stdout.write(f"  - Output directory: {output_dir}")
+        self.stdout.write(f"  - Format: {export_format}")
         self.stdout.write(f"  - Tasks exported: {stats['task_count']}")
         self.stdout.write(f"  - Participants: {stats['participant_count']}")
         self.stdout.write(f"  - Trials: {stats['trial_count']}")
         self.stdout.write(f"  - Webpages: {stats['webpage_count']}")
         self.stdout.write(f"Files created:")
-        self.stdout.write(f"  - {parquet_path}")
+        self.stdout.write(f"  - {data_file}")
         self.stdout.write(f"  - {output_dir}/dataset_info.json")
         self.stdout.write(f"  - {output_dir}/README.md")

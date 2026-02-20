@@ -367,10 +367,12 @@ document.addEventListener('DOMContentLoaded', function() {
             });
 
             downloadBtn.addEventListener('click', () => {
+                const formatRadio = document.querySelector('input[name="export-format"]:checked');
                 const requestBody = {
                     user_ids: Array.from(selectedUserIds),
                     anonymize: anonymizeCheckbox.checked,
-                    exclude_datasets: Array.from(excludedDatasetIds)
+                    exclude_datasets: Array.from(excludedDatasetIds),
+                    export_format: formatRadio ? formatRadio.value : 'parquet',
                 };
 
                 downloadBtn.disabled = true;
@@ -417,6 +419,10 @@ document.addEventListener('DOMContentLoaded', function() {
                                         bar.style.width = Math.max(pct, 5) + '%';
                                         bar.textContent = `Exporting user ${current + 1} of ${total}`;
                                         detail.textContent = `${data.tasks_exported || 0} tasks exported so far`;
+                                    } else if (data.status === 'converting') {
+                                        bar.style.width = '90%';
+                                        bar.textContent = 'Converting to Parquet...';
+                                        detail.textContent = `${data.tasks_exported || 0} tasks exported`;
                                     } else if (data.status === 'zipping') {
                                         bar.style.width = '95%';
                                         bar.textContent = 'Creating zip file...';
